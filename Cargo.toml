@@ -1,0 +1,152 @@
+[package]
+name = "libcpg"
+version = "0.1.0"
+edition = "2021"
+authors = ["Dylon Edwards <dylon@f1r3fly.io>"]
+description = "Code Property Graph library for program analysis, pattern detection, and semantic code understanding"
+license = "MIT OR Apache-2.0"
+repository = "https://github.com/f1r3fly-io/libcpg"
+keywords = ["code-analysis", "cpg", "ast", "cfg", "dfg", "pattern-detection", "gnn"]
+categories = ["development-tools", "parsing", "algorithms"]
+
+[features]
+default = []
+
+# Graph Neural Network support
+gnn = ["ndarray", "rand"]
+
+# GPU acceleration via wgpu
+gpu = ["wgpu", "pollster"]
+
+# Design pattern detection
+design-patterns = ["serde_yaml", "toml_edit"]
+
+# Algorithm detection and complexity analysis
+algorithm-detection = []
+
+# Rholang-specific CPG patterns
+rholang = []
+
+# MeTTa-specific CPG patterns
+metta = []
+
+# Serialization support
+serde = ["dep:serde", "petgraph/serde-1"]
+
+# ML-based pattern classification using linfa
+ml-linfa = ["linfa", "linfa-trees"]
+
+# Rule-based pattern classification (no ML dependencies)
+ml-rules = []
+
+# Language support features (tree-sitter grammars)
+lang-rust = ["dep:tree-sitter-rust"]
+lang-python = ["dep:tree-sitter-python"]
+lang-javascript = ["dep:tree-sitter-javascript"]
+lang-typescript = ["dep:tree-sitter-typescript"]
+lang-go = ["dep:tree-sitter-go"]
+lang-java = ["dep:tree-sitter-java"]
+lang-c = ["dep:tree-sitter-c"]
+lang-cpp = ["dep:tree-sitter-cpp"]
+lang-json = ["dep:tree-sitter-json"]
+lang-html = ["dep:tree-sitter-html"]
+lang-css = ["dep:tree-sitter-css"]
+lang-bash = ["dep:tree-sitter-bash"]
+lang-toml = ["dep:tree-sitter-toml"]
+lang-yaml = ["dep:tree-sitter-yaml"]
+lang-markdown = ["dep:tree-sitter-md"]
+lang-ruby = ["dep:tree-sitter-ruby"]
+
+# Language groups
+lang-systems = ["lang-rust", "lang-c", "lang-cpp", "lang-go"]
+lang-scripting = ["lang-python", "lang-javascript", "lang-typescript", "lang-ruby"]
+lang-web = ["lang-html", "lang-css", "lang-javascript", "lang-typescript"]
+lang-config = ["lang-json", "lang-yaml", "lang-toml"]
+lang-all = ["lang-systems", "lang-scripting", "lang-web", "lang-config", "lang-bash", "lang-markdown", "lang-java"]
+
+# Full feature set
+full = ["gnn", "design-patterns", "algorithm-detection", "serde", "ml-rules", "lang-all"]
+
+[dependencies]
+# Core graph library
+petgraph = "0.6"
+
+# Parallel processing
+rayon = "1.10"
+
+# Efficient hash maps
+rustc-hash = "2.0"
+ahash = "0.8"
+
+# Small vector optimization
+smallvec = { version = "1.13", features = ["serde"] }
+
+# Interned strings for node labels
+string_cache = "0.8"
+
+# Source code positions
+text-size = "1.1"
+
+# Error handling
+thiserror = "2.0"
+
+# Regex for pattern matching
+regex = "1.11"
+
+# Tree-sitter core (always required)
+tree-sitter = "0.25"
+
+# Tree-sitter language grammars (optional, feature-gated)
+# NOTE: versions of grammars that pgmcp also links must match pgmcp's pins so
+# the shared `tree_sitter_<lang>` C symbol is not duplicated at link time
+# (python/javascript -> 0.25, c -> 0.24). See pgmcp P7b design section 4.3.
+tree-sitter-rust = { version = "0.23", optional = true }
+tree-sitter-python = { version = "0.25", optional = true }
+tree-sitter-javascript = { version = "0.25", optional = true }
+tree-sitter-typescript = { version = "0.23", optional = true }
+tree-sitter-go = { version = "0.23", optional = true }
+tree-sitter-java = { version = "0.23", optional = true }
+tree-sitter-c = { version = "0.24", optional = true }
+tree-sitter-cpp = { version = "0.23", optional = true }
+tree-sitter-json = { version = "0.24", optional = true }
+tree-sitter-html = { version = "0.23", optional = true }
+tree-sitter-css = { version = "0.23", optional = true }
+tree-sitter-bash = { version = "0.23", optional = true }
+tree-sitter-toml = { version = "0.20", optional = true }
+tree-sitter-yaml = { version = "0.7", optional = true }
+tree-sitter-md = { version = "0.3", optional = true }
+tree-sitter-ruby = { version = "0.23", optional = true }
+
+# Optional: DPML parsing (YAML/TOML formats)
+serde_yaml = { version = "0.9", optional = true }
+toml_edit = { version = "0.22", optional = true }
+
+# Optional: ML-based classification
+linfa = { version = "0.7", optional = true }
+linfa-trees = { version = "0.7", optional = true }
+
+# Optional: Numerical arrays for embeddings
+ndarray = { version = "0.16", optional = true, features = ["serde"] }
+
+# Optional: Random number generation for GNN initialization
+rand = { version = "0.8", optional = true }
+
+# Optional: GPU compute
+wgpu = { version = "23", optional = true }
+pollster = { version = "0.4", optional = true }
+
+# Optional: Serialization
+serde = { version = "1.0", features = ["derive"], optional = true }
+
+[dev-dependencies]
+criterion = "0.5"
+proptest = "1.5"
+
+# Benchmarks will be added when implementations are complete
+# [[bench]]
+# name = "cpg_construction"
+# harness = false
+
+# [[bench]]
+# name = "pattern_matching"
+# harness = false

@@ -1,0 +1,8 @@
+# Compiled build artifacts
+/target
+
+# rustfmt backup files
+**/*.rs.bk
+
+# Cargo.lock is intentionally committed: libcpg pins its full dependency graph
+# for reproducible builds (and as a downstream `path` dependency of pgmcp).
