@@ -72,18 +72,19 @@ impl DfgExtractor {
 
     /// Extracts DFG edges for a single function.
     pub fn extract_function_dfg(&self, cpg: &mut CodePropertyGraph, function: NodeId) {
-        // Phase 1: Collect all definitions and uses (takes ownership of collected data)
+        // Phase 1: Collect field/index/parameter sites for the auxiliary edge
+        // builders below. Def/use *edges* are no longer driven from this
+        // collector's name→site tables — see `build_def_use_edges`.
         let collector = {
             let mut c = DefUseCollector::new(function);
             c.collect(cpg);
             c
         };
 
-        // Phase 2: Compute reaching definitions
-        let reaching_defs = self.compute_reaching_definitions(cpg, function, &collector);
-
-        // Phase 3: Build def-use edges
-        self.build_def_use_edges(cpg, &collector, &reaching_defs);
+        // Phase 2+3: Reaching-definition-based def-use edges, threaded all the
+        // way down to the AST-expression identifier uses nested inside each
+        // statement (e.g. `buf` in `decode(buf)`).
+        self.build_def_use_edges(cpg, function);
 
         // Phase 4: Build additional DFG edges
         if self.config.include_parameters {
@@ -99,7 +100,26 @@ impl DfgExtractor {
         }
     }
 
-    /// Computes reaching definitions using iterative dataflow analysis.
+    /// **Superseded** by [`Self::build_def_use_edges`]'s AST-ordered sweep, and
+    /// retained here (never compiled, via `#[cfg(any())]`) as an executable
+    /// record of the original approach rather than silently deleted.
+    ///
+    /// This computed reaching definitions as an iterative dataflow fixpoint over
+    /// the CPG's `ControlFlow` edges, keyed **only by CFG nodes**. On *parsed*
+    /// code it produced no usable def-use edges for two compounding reasons:
+    ///
+    /// 1. Nested-expression identifier uses (the common case, e.g. `buf` in
+    ///    `decode(buf)`) are AST `Identifier` nodes that are not CFG nodes, so
+    ///    `reaching_defs.get(&use_site)` returned `None` and no edge was added.
+    /// 2. Even for the few uses that carry a CFG edge, the coarse parsed CFG for
+    ///    straight-line `let`/assignment chains does not carry a definition from
+    ///    one statement to the next (statements are chained through deep
+    ///    sub-expression "exit" nodes with no back-link to the defining node), so
+    ///    the reaching set was empty anyway.
+    ///
+    /// The replacement abstract-interprets the AST in execution order instead of
+    /// relying on the (unreliable, for parsed code) CFG propagation.
+    #[cfg(any())]
     fn compute_reaching_definitions(
         &self,
         cpg: &CodePropertyGraph,
@@ -193,8 +213,13 @@ impl DfgExtractor {
         in_sets
     }
 
-    /// Builds def-use edges based on reaching definitions.
-    fn build_def_use_edges(
+    /// **Superseded** by the AST-ordered `build_def_use_edges` below; retained
+    /// (never compiled, via `#[cfg(any())]`) for reference. It keyed reaching
+    /// sets by `use_site`, but nested-expression identifier uses are not CFG
+    /// nodes and so were absent from `reaching_defs`, yielding zero edges on
+    /// parsed code.
+    #[cfg(any())]
+    fn build_def_use_edges_cfg(
         &self,
         cpg: &mut CodePropertyGraph,
         collector: &DefUseCollector,
@@ -215,6 +240,66 @@ impl DfgExtractor {
                         }
                     }
                 }
+            }
+        }
+    }
+
+    /// Builds def-use edges via an AST-ordered, flow-sensitive reaching-
+    /// definitions sweep, threading each statement's reaching definitions down
+    /// to the *nested* identifier uses inside it (e.g. `buf` in `decode(buf)` or
+    /// `x` in `return f(x)`) — precisely the uses the CFG-propagated predecessor
+    /// (`compute_reaching_definitions`, retained above) missed.
+    ///
+    /// The sweep abstract-interprets the function body in execution order over
+    /// the AST, maintaining a per-name set of *currently reaching* definition
+    /// nodes ([`ReachingEnv`]):
+    ///
+    /// * A `let`/`Variable`, `Parameter`, or simple `Assignment` **generates** a
+    ///   definition (the defining node) for its bound name. In straight-line
+    ///   (unconditional) context it also **kills** prior definitions of that
+    ///   name — flow-sensitive: the latest write wins. Inside a conditionally
+    ///   executed region (a branch or loop body) a definition is *added* without
+    ///   killing, so a write on one path does not erase a write on another — a
+    ///   sound over-approximation (extra edges, never a missing one).
+    /// * An identifier in *use* position links every currently-reaching
+    ///   definition of its name to itself with a [`DfgEdgeKind::DefUse`] edge.
+    ///   Binder identifiers (the `x` in `let x = …`, a parameter's own name, the
+    ///   target of a plain `x = …`) are definition sites, not uses, and are
+    ///   skipped so no spurious self-edge is created.
+    /// * The initializer/RHS of a definition is evaluated *before* the name is
+    ///   (re)bound, so a use in the initializer sees the pre-existing definition
+    ///   (`let x = x + 1`, `x = x + 1`).
+    /// * Loop bodies are swept twice (a bounded fixpoint) so a use near the top
+    ///   can observe a definition made lower in the same body (loop-carried
+    ///   dependence).
+    ///
+    /// The pass is intraprocedural, bounded, language-agnostic (it dispatches on
+    /// [`CpgNodeKind`], never on grammar specifics) and idempotent: an edge is
+    /// added only when an identical one does not already exist, so uses that
+    /// *are* CFG nodes are not double-linked and re-running `extract` is a no-op.
+    fn build_def_use_edges(&self, cpg: &mut CodePropertyGraph, function: NodeId) {
+        // Idempotency: never re-add a DefUse edge that already exists.
+        let mut existing: FxHashSet<(u32, u32)> = cpg
+            .edges()
+            .filter_map(|e| match e.kind {
+                CpgEdgeKind::DataFlow(DfgEdgeKind::DefUse) => Some((e.source.0, e.target.0)),
+                _ => None,
+            })
+            .collect();
+
+        // Compute the (def -> use) pairs while borrowing `cpg` immutably, then
+        // emit them (mutable borrow). The reaching environment threads through
+        // the walk in place; parameters are bound before the body because they
+        // precede it in the function's AST child order.
+        let mut env: ReachingEnv = FxHashMap::default();
+        let mut pairs: Vec<(NodeId, NodeId)> = Vec::new();
+        for child in cpg.ast_children(function) {
+            visit_reaching(cpg, child, &mut env, false, &mut pairs);
+        }
+
+        for (def, use_site) in pairs {
+            if def != use_site && existing.insert((def.0, use_site.0)) {
+                cpg.connect(def, use_site, CpgEdgeKind::DataFlow(DfgEdgeKind::DefUse));
             }
         }
     }
@@ -255,17 +340,33 @@ impl DfgExtractor {
             }
         }
 
-        // Also connect uses of parameters within the function
+        // Also connect uses of parameters *declared as direct children of the
+        // function* to their parameter definition. This is an idempotent
+        // supplement to the primary `build_def_use_edges` sweep (which already
+        // links parameter uses flow-sensitively wherever the parameters are
+        // reachable in the AST); it is a no-op for parser-built graphs, where
+        // parameters are nested under a `parameters` wrapper rather than direct
+        // children. Dedup against existing DefUse edges keeps it idempotent and
+        // avoids double-linking the uses the sweep already connected.
+        let mut existing_def_use: FxHashSet<(u32, u32)> = cpg
+            .edges()
+            .filter_map(|e| match e.kind {
+                CpgEdgeKind::DataFlow(DfgEdgeKind::DefUse) => Some((e.source.0, e.target.0)),
+                _ => None,
+            })
+            .collect();
         for &param in &params {
             let param_name = cpg.node(param).and_then(|n| n.name().map(Arc::from));
             if let Some(name) = param_name {
                 if let Some(uses) = collector.uses.get(&name) {
                     for &use_site in uses {
-                        cpg.connect(
-                            param,
-                            use_site,
-                            CpgEdgeKind::DataFlow(DfgEdgeKind::DefUse),
-                        );
+                        if param != use_site && existing_def_use.insert((param.0, use_site.0)) {
+                            cpg.connect(
+                                param,
+                                use_site,
+                                CpgEdgeKind::DataFlow(DfgEdgeKind::DefUse),
+                            );
+                        }
                     }
                 }
             }
@@ -359,6 +460,179 @@ impl Default for DfgExtractor {
     }
 }
 
+/// Per-variable set of currently-reaching definition nodes, keyed by bound name.
+/// The small on-stack vector keeps the common single-definition (straight-line)
+/// case allocation-free; multiple entries arise only after a branch/loop merge.
+type ReachingEnv = FxHashMap<Arc<str>, SmallVec<[NodeId; 2]>>;
+
+/// Returns true for node kinds whose children execute *conditionally* (a branch
+/// or loop body). A definition inside such a region performs a weak update (add
+/// without kill) so it cannot erase a definition live on a sibling path.
+fn is_conditional_region(kind: &CpgNodeKind) -> bool {
+    matches!(
+        kind,
+        CpgNodeKind::If
+            | CpgNodeKind::Else
+            | CpgNodeKind::While
+            | CpgNodeKind::For
+            | CpgNodeKind::Loop
+            | CpgNodeKind::Match
+            | CpgNodeKind::MatchArm
+            | CpgNodeKind::Try
+            | CpgNodeKind::Catch
+            | CpgNodeKind::Finally
+    )
+}
+
+/// Returns true for loop kinds, whose bodies are swept twice so a use near the
+/// top of the body can observe a definition made lower in the same body.
+fn is_loop_region(kind: &CpgNodeKind) -> bool {
+    matches!(kind, CpgNodeKind::While | CpgNodeKind::For | CpgNodeKind::Loop)
+}
+
+/// The identifier child of a binding node (`let`/parameter) that *is* the bound
+/// name — the binder, which is a definition site, not a use, and is skipped by
+/// the walk. Chosen as the first `Identifier` child whose text equals the
+/// binder's declared `name`; because a pattern precedes its initializer in
+/// source (hence in node/edge order), a shadowing initializer use of the same
+/// name (`let x = x + 1`) comes *after* the binder and is still visited as a use.
+fn binder_identifier(cpg: &CodePropertyGraph, node: NodeId, name: &str) -> Option<NodeId> {
+    if name.is_empty() {
+        return None;
+    }
+    cpg.ast_children(node).into_iter().find(|&c| {
+        matches!(
+            cpg.node(c).map(|n| &n.kind),
+            Some(CpgNodeKind::Identifier { name: n, .. }) if &**n == name
+        )
+    })
+}
+
+/// The bound name of an `Identifier` node, if that is its kind.
+fn identifier_name(cpg: &CodePropertyGraph, node: NodeId) -> Option<Arc<str>> {
+    match cpg.node(node).map(|n| &n.kind) {
+        Some(CpgNodeKind::Identifier { name, .. }) => Some(name.clone()),
+        _ => None,
+    }
+}
+
+/// Records `def` as a reaching definition of `name` in `env`. In straight-line
+/// context (`conditional == false`) this is a strong update (kill + gen: the
+/// latest write wins); inside a conditional region it is a weak update (add
+/// without kill) so a write on one path does not erase another path's.
+fn bind_definition(env: &mut ReachingEnv, name: Arc<str>, def: NodeId, conditional: bool) {
+    if name.is_empty() {
+        return;
+    }
+    let slot = env.entry(name).or_default();
+    if conditional {
+        if !slot.contains(&def) {
+            slot.push(def);
+        }
+    } else {
+        slot.clear();
+        slot.push(def);
+    }
+}
+
+/// Core AST-ordered reaching-definitions walk. See
+/// [`DfgExtractor::build_def_use_edges`] for the algorithm and its rationale.
+fn visit_reaching(
+    cpg: &CodePropertyGraph,
+    node: NodeId,
+    env: &mut ReachingEnv,
+    conditional: bool,
+    pairs: &mut Vec<(NodeId, NodeId)>,
+) {
+    // Clone the kind so the immutable borrow of `cpg.node(node)` ends before we
+    // recurse (each arm re-borrows `cpg` immutably via `ast_children`).
+    let kind = match cpg.node(node) {
+        Some(n) => n.kind.clone(),
+        None => return,
+    };
+
+    match &kind {
+        // `let` / local declaration: evaluate the initializer (whose uses see the
+        // pre-binding environment), then bind the declared name.
+        CpgNodeKind::Variable { name, .. } => {
+            let binder = binder_identifier(cpg, node, name);
+            for child in cpg.ast_children(node) {
+                if Some(child) == binder {
+                    continue;
+                }
+                visit_reaching(cpg, child, env, conditional, pairs);
+            }
+            bind_definition(env, name.clone(), node, conditional);
+        }
+
+        // Parameter: its identifier child is the binder (a definition), not a
+        // use; any remaining children (e.g. a default-value expression, in
+        // languages that have them) are visited as uses.
+        CpgNodeKind::Parameter { name, .. } => {
+            let binder = binder_identifier(cpg, node, name);
+            for child in cpg.ast_children(node) {
+                if Some(child) == binder {
+                    continue;
+                }
+                visit_reaching(cpg, child, env, conditional, pairs);
+            }
+            bind_definition(env, name.clone(), node, conditional);
+        }
+
+        // Assignment: the first child is the target l-value. For a plain `=` to a
+        // simple variable the target is a pure write (skipped as a use); for a
+        // compound assignment (`+=`, …) it is read-then-written; for a complex
+        // l-value (`a.f = …`, `a[i] = …`) the target is not a simple identifier,
+        // so it is visited normally (its base is a genuine use).
+        CpgNodeKind::Assignment { operator } => {
+            let compound = &**operator != "=";
+            let kids = cpg.ast_children(node);
+            let target = kids.first().copied();
+            let target_is_ident = matches!(
+                target.and_then(|t| cpg.node(t)).map(|n| &n.kind),
+                Some(CpgNodeKind::Identifier { .. })
+            );
+
+            for &child in &kids {
+                if Some(child) == target && target_is_ident && !compound {
+                    continue; // simple `x = …`: the target is written, not read
+                }
+                visit_reaching(cpg, child, env, conditional, pairs);
+            }
+
+            if target_is_ident {
+                if let Some(name) = target.and_then(|t| identifier_name(cpg, t)) {
+                    bind_definition(env, name, node, conditional);
+                }
+            }
+        }
+
+        // Identifier in use position: link every currently-reaching definition
+        // of its name. Binder identifiers never reach this arm — their parent
+        // construct skips them above.
+        CpgNodeKind::Identifier { name, .. } => {
+            if let Some(defs) = env.get(name) {
+                for &def in defs {
+                    pairs.push((def, node));
+                }
+            }
+        }
+
+        // Everything else (blocks, calls, arguments, control flow, …): recurse in
+        // source order. Branch/loop bodies switch to conditional (weak-update)
+        // context; loop bodies are swept twice for loop-carried dependences.
+        _ => {
+            let child_conditional = conditional || is_conditional_region(&kind);
+            let passes = if is_loop_region(&kind) { 2 } else { 1 };
+            for _ in 0..passes {
+                for child in cpg.ast_children(node) {
+                    visit_reaching(cpg, child, env, child_conditional, pairs);
+                }
+            }
+        }
+    }
+}
+
 /// Collects definitions and uses from a function.
 #[derive(Debug)]
 struct DefUseCollector {
@@ -440,7 +714,7 @@ impl DefUseCollector {
                         if !is_assignment_target {
                             self.uses
                                 .entry(name.clone())
-                                .or_insert_with(SmallVec::new)
+                                .or_default()
                                 .push(node_id);
                         }
                     }
@@ -556,11 +830,11 @@ impl DefUseChain {
     pub fn link(&mut self, def: NodeId, use_site: NodeId) {
         self.def_to_uses
             .entry(def)
-            .or_insert_with(Vec::new)
+            .or_default()
             .push(use_site);
         self.use_to_defs
             .entry(use_site)
-            .or_insert_with(Vec::new)
+            .or_default()
             .push(def);
     }
 
@@ -749,5 +1023,199 @@ mod tests {
 
         assert_eq!(chain.uses_of(NodeId::new(1)), &[NodeId::new(3)]);
         assert_eq!(chain.definitions_of(NodeId::new(4)), &[NodeId::new(2)]);
+    }
+
+    // ===================================================================
+    // Parsed-code def-use (the P7c prerequisite): the DFG must be non-empty
+    // and correct on a normally-parsed Rust function, with reaching
+    // definitions threaded down to nested-expression identifier uses.
+    // ===================================================================
+
+    #[cfg(feature = "lang-rust")]
+    fn build_rust(src: &str) -> CodePropertyGraph {
+        use crate::{CpgBuilder, TreeSitterCpgBuilder};
+        TreeSitterCpgBuilder::new()
+            .build(src, Language::Rust)
+            .expect("parse + build should succeed")
+    }
+
+    /// All node ids whose kind satisfies `pred`, sorted by id for determinism.
+    #[cfg(feature = "lang-rust")]
+    fn nodes_where(
+        cpg: &CodePropertyGraph,
+        pred: impl Fn(&CpgNodeKind) -> bool,
+    ) -> Vec<NodeId> {
+        let mut ids: Vec<NodeId> = cpg
+            .node_ids()
+            .filter(|&id| cpg.node(id).map(|n| pred(&n.kind)).unwrap_or(false))
+            .collect();
+        ids.sort_by_key(|n| n.0);
+        ids
+    }
+
+    /// The (unique) `Variable` definition node named `name`.
+    #[cfg(feature = "lang-rust")]
+    fn var_named(cpg: &CodePropertyGraph, name: &str) -> NodeId {
+        let v = nodes_where(cpg, |k| {
+            matches!(k, CpgNodeKind::Variable { name: n, .. } if &**n == name)
+        });
+        assert_eq!(v.len(), 1, "expected exactly one `let {name}`");
+        v[0]
+    }
+
+    /// The identifier *use* of `name`: an `Identifier` node that actually
+    /// received a reaching definition (i.e. it is not the binder of `name`).
+    #[cfg(feature = "lang-rust")]
+    fn ident_use(cpg: &CodePropertyGraph, name: &str) -> NodeId {
+        nodes_where(cpg, |k| {
+            matches!(k, CpgNodeKind::Identifier { name: n, .. } if &**n == name)
+        })
+        .into_iter()
+        .find(|&id| !cpg.reaching_definitions(id).is_empty())
+        .unwrap_or_else(|| panic!("no reaching-def use of `{name}` (bug: DFG empty?)"))
+    }
+
+    /// Scenario 1: `let buf = read(fd); let out = decode(buf); sink(out);`.
+    /// The nested `buf` inside `decode(buf)` — an AST `Identifier`, not a CFG
+    /// node — must resolve to the `let buf` definition, and the whole
+    /// buf -> out -> sink-arg data path must exist.
+    #[test]
+    #[cfg(feature = "lang-rust")]
+    fn parsed_nested_use_resolves_and_chains() {
+        let cpg = build_rust(
+            "fn foo(fd: i32) { let buf = read(fd); let out = decode(buf); sink(out); }",
+        );
+
+        // The whole point: a normally-parsed function now has DFG edges.
+        // (fd -> use in read, buf -> use in decode, out -> use in sink.)
+        assert!(
+            cpg.stats().dfg_edges >= 3,
+            "parsed code must have def-use edges; got {}",
+            cpg.stats().dfg_edges
+        );
+
+        let buf_def = var_named(&cpg, "buf");
+        let out_def = var_named(&cpg, "out");
+        let buf_use = ident_use(&cpg, "buf"); // the `buf` inside decode(buf)
+        let out_use = ident_use(&cpg, "out"); // the `out` inside sink(out)
+
+        // reaching_definitions of the nested `buf` use returns the `let buf` def.
+        assert!(
+            cpg.reaching_definitions(buf_use).contains(&buf_def),
+            "reaching defs of the nested `buf` use must include `let buf`"
+        );
+        // dfg_successors(let buf) reaches the `buf` use.
+        assert!(
+            cpg.dfg_successors(buf_def).iter().any(|(t, _)| *t == buf_use),
+            "dfg_successors(let buf) must reach the `buf` use"
+        );
+
+        // The `buf` use is the initializer of `let out`, and the `out` use's
+        // reaching def is that same `let out` — chaining buf -> out -> sink-arg.
+        assert!(
+            cpg.ast_descendants(out_def).contains(&buf_use),
+            "the `buf` use lives inside the `let out` statement"
+        );
+        assert!(
+            cpg.reaching_definitions(out_use).contains(&out_def),
+            "reaching defs of the sink argument `out` must include `let out`"
+        );
+        assert!(
+            cpg.dfg_successors(out_def).iter().any(|(t, _)| *t == out_use),
+            "dfg_successors(let out) must reach the `out` use"
+        );
+    }
+
+    /// Scenario 2: a reassignment. `let mut x = a; x = b; use_it(x);` — the use
+    /// must resolve to the LATEST definition (`x = b`), not the killed first one
+    /// (`let mut x = a`). Flow-sensitivity in straight-line code.
+    #[test]
+    #[cfg(feature = "lang-rust")]
+    fn parsed_reassignment_uses_latest_definition() {
+        let cpg = build_rust("fn g(a: i32, b: i32) { let mut x = a; x = b; use_it(x); }");
+
+        let let_x = var_named(&cpg, "x");
+        let assign_x = nodes_where(&cpg, |k| matches!(k, CpgNodeKind::Assignment { .. }));
+        assert_eq!(assign_x.len(), 1, "one assignment `x = b`");
+        let assign_x = assign_x[0];
+        let x_use = ident_use(&cpg, "x");
+
+        let reaching = cpg.reaching_definitions(x_use);
+        assert!(
+            reaching.contains(&assign_x),
+            "the use must see the latest def `x = b`"
+        );
+        assert!(
+            !reaching.contains(&let_x),
+            "the use must NOT see the killed def `let mut x = a`"
+        );
+        assert_eq!(
+            reaching.len(),
+            1,
+            "straight-line code: exactly one reaching def"
+        );
+    }
+
+    /// Scenario 3: unrelated variables do not flow into each other's uses.
+    #[test]
+    #[cfg(feature = "lang-rust")]
+    fn parsed_unrelated_variable_does_not_flow() {
+        let cpg = build_rust("fn f() { let x = mk(); let y = mk(); use_x(x); use_y(y); }");
+
+        let x_def = var_named(&cpg, "x");
+        let y_def = var_named(&cpg, "y");
+        let x_use = ident_use(&cpg, "x");
+        let y_use = ident_use(&cpg, "y");
+
+        assert!(cpg.reaching_definitions(x_use).contains(&x_def));
+        assert!(cpg.reaching_definitions(y_use).contains(&y_def));
+        assert!(
+            !cpg.reaching_definitions(x_use).contains(&y_def),
+            "`y` must not flow to `x`'s use"
+        );
+        assert!(
+            !cpg.reaching_definitions(y_use).contains(&x_def),
+            "`x` must not flow to `y`'s use"
+        );
+        assert!(
+            !cpg.dfg_successors(x_def).iter().any(|(t, _)| *t == y_use),
+            "`x`'s def must not reach `y`'s use"
+        );
+    }
+
+    /// A shadowing initializer use sees the *outer* definition, and the walk is
+    /// idempotent: re-running `extract` adds no duplicate edges.
+    #[test]
+    #[cfg(feature = "lang-rust")]
+    fn parsed_shadowing_and_idempotent() {
+        let mut cpg = build_rust("fn f(n: i32) { let n = n + 1; consume(n); }");
+
+        // Two distinct definitions of `n`: the parameter and the shadowing let.
+        let param_n = nodes_where(&cpg, |k| matches!(k, CpgNodeKind::Parameter { .. }))[0];
+        let let_n = var_named(&cpg, "n");
+
+        // The `n` in `n + 1` is the shadowing initializer use: it must resolve
+        // to the parameter (the pre-binding definition), not to the `let n`.
+        let init_use = nodes_where(&cpg, |k| {
+            matches!(k, CpgNodeKind::Identifier { name, .. } if &**name == "n")
+        })
+        .into_iter()
+        .find(|&id| cpg.reaching_definitions(id).contains(&param_n))
+        .expect("initializer use of `n` bound to the parameter");
+        assert!(!cpg.reaching_definitions(init_use).contains(&let_n));
+
+        // `consume(n)` sees the shadowing `let n`.
+        let consume_use = nodes_where(&cpg, |k| {
+            matches!(k, CpgNodeKind::Identifier { name, .. } if &**name == "n")
+        })
+        .into_iter()
+        .find(|&id| cpg.reaching_definitions(id).contains(&let_n))
+        .expect("consume use of `n` bound to the shadowing let");
+        assert!(consume_use != init_use);
+
+        // Idempotency: a second extraction pass must not add any edge.
+        let before = cpg.stats().dfg_edges;
+        DfgExtractor::new().extract(&mut cpg);
+        assert_eq!(before, cpg.stats().dfg_edges, "extract must be idempotent");
     }
 }

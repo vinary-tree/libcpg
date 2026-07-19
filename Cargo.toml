@@ -1,6 +1,6 @@
 [package]
 name = "libcpg"
-version = "0.1.0"
+version = "0.1.1"
 edition = "2021"
 authors = ["Dylon Edwards <dylon@f1r3fly.io>"]
 description = "Code Property Graph library for program analysis, pattern detection, and semantic code understanding"

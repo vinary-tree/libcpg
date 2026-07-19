@@ -224,9 +224,16 @@ impl TreeSitterCpgBuilder {
         let cpg_node = CpgNode::new(NodeId::new(0), cpg_kind.clone(), range);
         let node_id = cpg.add_node(cpg_node);
 
-        // Create AST edge from parent to this node
+        // Create the AST edge from parent to this node AND record the parent
+        // pointer on the node itself. `ast_parent`/`ast_ancestors` read the
+        // pointer, not the edge; leaving it unset made every parsed node look
+        // like an AST root, silently breaking every ancestor-based analysis
+        // (def/use classification, enclosing-statement lookup, program slicing).
         if let Some(parent) = parent_id {
             cpg.connect(parent, node_id, CpgEdgeKind::AstChild);
+            if let Some(node) = cpg.node_mut(node_id) {
+                node.parent = Some(parent);
+            }
         }
 
         // Mark function nodes as CFG entry points
