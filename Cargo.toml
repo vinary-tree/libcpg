@@ -24,10 +24,21 @@ design-patterns = ["serde_yaml", "toml_edit"]
 # Algorithm detection and complexity analysis
 algorithm-detection = []
 
-# Rholang-specific CPG patterns
+# Rholang / MeTTa CPG node-mappers (Mode B — no grammar vendoring).
+#
+# These are intentionally EMPTY feature lists: they are pure logical `cfg`
+# toggles that gate ONLY the `map_rholang` / `map_metta` node-mapper arms (and
+# their `map_kind` / `should_include` dispatch) in `src/builder/node_mapper.rs`.
+# Those arms reference only `ts_kind` strings and `tree_sitter::Node`
+# navigation — never a `tree_sitter_rholang` / `tree_sitter_metta` symbol — so
+# there is nothing to pull in: the ρ-calculus / S-expression CPG is built from a
+# caller-supplied, already-parsed tree via `TreeSitterCpgBuilder::build_from_tree`
+# (e.g. pgmcp, which links these grammars itself). Adding grammar `dep:` entries
+# here would duplicate the consumer's grammars and risk a duplicate
+# `tree_sitter_<lang>` C-symbol at link time for zero benefit (ADR-041 §7). The
+# grammars ARE linked, but only as TEST-ONLY path `[dev-dependencies]` (which
+# Cargo never propagates downstream), to drive the Mode-B unit tests.
 rholang = []
-
-# MeTTa-specific CPG patterns
 metta = []
 
 # Serialization support
@@ -141,6 +152,21 @@ serde = { version = "1.0", features = ["derive"], optional = true }
 [dev-dependencies]
 criterion = "0.5"
 proptest = "1.5"
+
+# Rholang / MeTTa tree-sitter grammars — TEST-ONLY (path dev-dependencies).
+#
+# These are `[dev-dependencies]`, NOT regular deps, on purpose: they are used
+# solely by the `#[cfg(feature = "rholang")]` / `#[cfg(feature = "metta")]`
+# unit tests in `builder::node_mapper`, which parse a `.rho`/`.metta` snippet
+# and drive the Mode-B `build_from_tree` path end-to-end. Because Cargo does
+# NOT propagate dev-dependencies to downstream crates, a consumer that links
+# libcpg (e.g. pgmcp, which links these same grammars itself) never pulls them
+# in transitively — so the duplicate-`tree_sitter_<lang>` C-symbol link hazard
+# (design ADR-041 §7.2 / D1) cannot arise. The runtime `rholang`/`metta`
+# features stay pure logical cfg toggles (`= []`, no grammar symbol referenced
+# in non-test code), preserving the "Mode B, no grammar vendoring" decision.
+tree-sitter-rholang = { package = "rholang-tree-sitter", path = "/home/dylon/Workspace/f1r3fly.io/rholang-rs/rholang-tree-sitter" }
+tree-sitter-metta = { package = "tree-sitter-metta", path = "/home/dylon/Workspace/f1r3fly.io/MeTTa-Compiler/tree-sitter-metta" }
 
 # Benchmarks will be added when implementations are complete
 # [[bench]]

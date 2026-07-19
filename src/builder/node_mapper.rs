@@ -50,6 +50,15 @@ impl NodeMapper {
             Language::Bash => self.map_bash(ts_kind, node, source),
             Language::Yaml | Language::Toml => self.map_config(ts_kind, node, source),
             Language::Markdown => self.map_markdown(ts_kind, node, source),
+            // F1R3FLY.io languages. Gated on the (dependency-free) `rholang` /
+            // `metta` cfg toggles: the arms reference only `ts_kind` strings and
+            // `tree_sitter::Node` navigation — no grammar crate symbol — so the
+            // features pull in nothing (Mode B; the caller hands over an
+            // already-parsed tree via `build_from_tree`). See §7 of ADR-041.
+            #[cfg(feature = "rholang")]
+            Language::Rholang => self.map_rholang(ts_kind, node, source),
+            #[cfg(feature = "metta")]
+            Language::MeTTa => self.map_metta(ts_kind, node, source),
             _ => self.map_generic(ts_kind, node, source),
         }
     }
@@ -58,6 +67,16 @@ impl NodeMapper {
     ///
     /// Some tree-sitter nodes are purely syntactic (punctuation, etc.)
     /// and don't contribute to the semantic structure.
+    ///
+    /// This is the string-keyed inclusion test: punctuation, comments, and the
+    /// language-specific *transparent wrapper / grouping-container* rule nodes
+    /// whose names never collide with a semantic rule (so keying on the string
+    /// alone is safe). Anonymous keyword/operator *tokens* — which in
+    /// tree-sitter share their `kind()` string with a same-named rule node (e.g.
+    /// the `"contract"` keyword vs. the `contract` rule) — cannot be filtered
+    /// here without also dropping the semantic node; that job belongs to the
+    /// node-aware [`Self::should_include_node`], which can consult
+    /// [`tree_sitter::Node::is_named`].
     pub fn should_include(&self, ts_kind: &str, include_comments: bool) -> bool {
         // Skip pure punctuation
         if matches!(
@@ -72,6 +91,86 @@ impl NodeMapper {
             return false;
         }
 
+        // Language-aware flattening of transparent wrappers / grouping
+        // containers. Each name below is a *named rule* that carries no CFG/DFG
+        // meaning of its own; dropping it reparents its children to the current
+        // parent so the head-dispatch (MeTTa) and child-ordering (Rholang)
+        // logic in `map_*` sees the real structure directly. None of these
+        // names collide with a semantic rule this crate maps, so the string key
+        // is sufficient and safe.
+        match self.language {
+            // MeTTa: `expression` / `atom_expression` wrap *every* node and
+            // `prefixed_expression` wraps the `!e`/`?e`/`'e` exec forms
+            // (grammar.js:14,43,28). Flatten them so a `list`'s head atom and
+            // operands are direct AST children. (The `operator` wrapper is left
+            // in place — `map_metta` unwraps it during head-dispatch — because a
+            // standalone operator glyph is a meaningful, if inert, leaf.)
+            #[cfg(feature = "metta")]
+            Language::MeTTa
+                if matches!(ts_kind, "expression" | "atom_expression" | "prefixed_expression") =>
+            {
+                false
+            }
+            // Rholang: pure comma/semicolon/`&`-list and marker containers with
+            // no CFG/DFG meaning. Their concrete members (name_decl, receipt's
+            // binds, a send's argument procs, …) reparent to the enclosing
+            // construct. `send_single`/`send_multiple`/`var_ref_kind` are
+            // arity/kind markers already captured by the `Call`/`Identifier`
+            // they annotate.
+            #[cfg(feature = "rholang")]
+            Language::Rholang
+                if matches!(
+                    ts_kind,
+                    "names"
+                        | "name_decls"
+                        | "receipts"
+                        | "receipt"
+                        | "linear_decls"
+                        | "conc_decls"
+                        | "agent_decls"
+                        | "agent_decl"
+                        | "inputs"
+                        | "messages"
+                        | "args"
+                        | "procs"
+                        | "cases"
+                        | "branches"
+                        | "send_single"
+                        | "send_multiple"
+                        | "var_ref_kind"
+                ) =>
+            {
+                false
+            }
+            _ => true,
+        }
+    }
+
+    /// Node-aware inclusion test used by the builder walk
+    /// ([`crate::builder::tree_sitter`]). It layers a check that *requires* the
+    /// raw node on top of the string-keyed [`Self::should_include`]: for
+    /// Rholang it drops anonymous keyword/operator/punctuation **tokens**
+    /// (`is_named() == false`), which the string test cannot filter because
+    /// their `kind()` collides with the same-named semantic rule nodes
+    /// (`contract`, `match`, `new`, `let`, `bundle`, `method`, …). Dropping the
+    /// tokens — but never the rules — yields clean child ordering for the CFG
+    /// builder (e.g. an `ifElse` node's surviving children become exactly
+    /// `[condition, consequence, alternative]`, matching `process_if`) and keeps
+    /// operator glyphs (`!`, `|`, `++`, `*`) out of the DFG use-set. All CFG/DFG
+    /// content in Rholang lives in named rules, so no information is lost.
+    ///
+    /// MeTTa needs no token filtering: its only anonymous tokens are `(`/`)`
+    /// (already dropped as punctuation), and its "keywords" (`if`, `let`,
+    /// `import!`) are *named* `identifier` atoms that `map_metta` dispatches on —
+    /// they must be retained.
+    pub fn should_include_node(&self, node: &tree_sitter::Node, include_comments: bool) -> bool {
+        if !self.should_include(node.kind(), include_comments) {
+            return false;
+        }
+        #[cfg(feature = "rholang")]
+        if self.language == Language::Rholang && !node.is_named() {
+            return false;
+        }
         true
     }
 
@@ -1125,6 +1224,595 @@ impl NodeMapper {
         }
     }
 
+    // ========== Rholang mapper (ρ-calculus → CPG) ==========
+    //
+    // Maps the `rholang-tree-sitter` grammar
+    // (`rholang-rs/rholang-tree-sitter/grammar.js`) onto the imperative CPG
+    // vocabulary. Process-calculus constructs have no dedicated CPG node kind;
+    // each is normalized onto the nearest anchor that keeps the CFG/DFG *sound*
+    // (never an edge the semantics forbid) even where it is *incomplete* (it may
+    // omit an edge the semantics allow) — the standard multi-language-CPG
+    // posture (Yamaguchi et al. 2014, "Modeling and Discovering Vulnerabilities
+    // with Code Property Graphs", DOI:10.1109/SP.2014.44).
+    //
+    // Key soundness invariants this mapping upholds:
+    //   * a named process abstraction (`contract`/agent decl) → `Function`, so
+    //     the CFG builder (`cfg.rs`) seeds an entry and treats its trailing
+    //     `block` child as the body;
+    //   * a *bound* name (new-restriction, receive-bound, contract/agent formal,
+    //     `let` binder) → `Variable`/`Parameter` (a DFG definition), while a
+    //     *referenced* name → `Identifier` (a DFG use) — so def-use edges form
+    //     (see `classify_rholang_var`);
+    //   * a send / receive / method-call → `Call`, so the argument→parameter
+    //     machinery can fire.
+    #[cfg(feature = "rholang")]
+    fn map_rholang(&self, ts_kind: &str, node: &tree_sitter::Node, source: &str) -> CpgNodeKind {
+        match ts_kind {
+            // --- Structural ---
+            "source_file" => CpgNodeKind::Root,
+
+            // Named process abstractions → Function (CFG entries). Their body
+            // `block` is the LAST AST child, matching the CFG builder's
+            // body = last-child rule (`cfg.rs:76-77`).
+            "contract" => CpgNodeKind::Function {
+                signature: self.rholang_signature(node, source, "contract"),
+            },
+            "constructor_decl" => CpgNodeKind::Function {
+                signature: self.rholang_signature(node, source, "constructor"),
+            },
+            "method_decl" => CpgNodeKind::Function {
+                signature: self.rholang_signature(node, source, "method"),
+            },
+            "default_decl" => CpgNodeKind::Function {
+                signature: self.rholang_signature(node, source, "default"),
+            },
+            // Agent = object-like grouping of a constructor + methods.
+            "agent_block" => CpgNodeKind::Class {
+                name: self.extract_child_text(node, "name", source),
+                is_abstract: false,
+            },
+
+            // --- Scopes / process blocks ---
+            // `new … in {…}` (ν-restriction), `let … in {…}`, `for(…){…}`
+            // (receive), explicit `{…}`, `|` parallel composition, `bundle`,
+            // and send-continuations all introduce a process region → `Block`.
+            // `par` keeps both operands as concurrent sibling sub-blocks: the
+            // CFG is sound (both run) though it does not model interleaving.
+            "new" | "let" | "input" | "block" | "par" | "bundle" | "sync_send_cont"
+            | "non_empty_cont" | "empty_cont" => CpgNodeKind::Block {
+                scope: ScopeId::GLOBAL,
+            },
+
+            // --- Control flow ---
+            "ifElse" => CpgNodeKind::If,
+            // `match` scrutinee-dispatch and `select` (non-deterministic choice)
+            // both behave like a switch.
+            "match" | "choice" => CpgNodeKind::Match,
+            "case" | "branch" => CpgNodeKind::MatchArm,
+
+            // --- Message passing → Call ---
+            // `x!(v)` / `x!?(v)` send at the send site (the load-bearing Call).
+            "send" | "send_sync" => CpgNodeKind::Call {
+                target: None,
+                is_method: false,
+            },
+            // `x!m(v)` method-style send / `recv.m(args)` method call.
+            "send_method" | "method" | "send_method_source" => CpgNodeKind::Call {
+                target: None,
+                is_method: true,
+            },
+            // `names <- src` / `<= src` / `<<- src` receive: consumes on `src`.
+            "linear_bind" | "repeated_bind" | "peek_bind" | "receive_send_source"
+            | "send_receive_source" => CpgNodeKind::Call {
+                target: None,
+                is_method: false,
+            },
+            // Bare channel name in for-source position = use.
+            "simple_source" => CpgNodeKind::Identifier {
+                name: Arc::from(self.node_text(node, source)),
+                definition: None,
+            },
+
+            // --- Declarations: the polyglot import anchor + binding scopes ---
+            // A URI-bearing `new` decl (`new stdout(`rho:io:stdout`)`) is a
+            // system-process import (the polyglot anchor); the bound `var` child
+            // still becomes the `Variable` def (`classify_rholang_var`). A plain
+            // decl is just a scope wrapper around that `Variable`.
+            "name_decl" => match self.rholang_uri_child(node, source) {
+                Some(uri) => CpgNodeKind::Import { path: uri },
+                None => CpgNodeKind::Block {
+                    scope: ScopeId::GLOBAL,
+                },
+            },
+            "let_var_decl" | "decl" => CpgNodeKind::Block {
+                scope: ScopeId::GLOBAL,
+            },
+
+            // --- Identifiers — the DFG-soundness core (def vs. use by position) ---
+            "var" => self.classify_rholang_var(node, source),
+            "wildcard" => CpgNodeKind::Identifier {
+                name: Arc::from("_"),
+                definition: None,
+            },
+            // `=x` / `=*x` pattern-variable reference = use.
+            "var_ref" => CpgNodeKind::Identifier {
+                name: Arc::from(self.node_text(node, source)),
+                definition: None,
+            },
+
+            // --- Dereference / quote (unary) ---
+            // `*x` (unquote): child `name` stays a DFG *use* (strictly more
+            // informative for slicing than treating the whole thing as a Call).
+            "eval" => CpgNodeKind::UnaryOp {
+                operator: Arc::from("*"),
+            },
+            // `@P` reify process as a name.
+            "quote" => CpgNodeKind::UnaryOp {
+                operator: Arc::from("@"),
+            },
+
+            // --- Binary / unary operators ---
+            "add" | "sub" | "mult" | "div" | "mod" | "concat" | "diff" | "interpolation" | "eq"
+            | "neq" | "lt" | "lte" | "gt" | "gte" | "and" | "or" | "matches" | "disjunction"
+            | "conjunction" => CpgNodeKind::BinaryOp {
+                operator: Arc::from(self.rholang_operator_text(ts_kind)),
+            },
+            "not" | "neg" | "negation" => CpgNodeKind::UnaryOp {
+                operator: Arc::from(self.rholang_operator_text(ts_kind)),
+            },
+
+            // --- Types ---
+            "simple_type" => CpgNodeKind::TypeAnnotation {
+                type_info: TypeInfo::new(self.node_text(node, source)),
+            },
+
+            // --- Literals ---
+            "bool_literal" => CpgNodeKind::Literal {
+                kind: LiteralKind::Bool(self.node_text(node, source) == "true"),
+            },
+            "signed_int_literal" | "unsigned_int_literal" | "bigint_literal" | "long_literal" => {
+                CpgNodeKind::Literal {
+                    kind: self.rholang_int_literal(node, source),
+                }
+            }
+            "bigrat_literal" | "float_literal" | "fixed_point_literal" => CpgNodeKind::Literal {
+                kind: self.rholang_float_literal(node, source),
+            },
+            "string_literal" => CpgNodeKind::Literal {
+                kind: LiteralKind::String(Arc::from(self.node_text(node, source))),
+            },
+            // `` `rho:…` `` system URI — a polyglot anchor lifted by pgmcp's
+            // binding classifier; here it is simply its string value.
+            "uri_literal" => CpgNodeKind::Literal {
+                kind: LiteralKind::String(Arc::from(self.node_text(node, source))),
+            },
+            // Inert process `Nil` and empty value `()`.
+            "nil" | "unit" => CpgNodeKind::Literal {
+                kind: LiteralKind::Null,
+            },
+            "list" | "set" | "tuple" | "collection" => CpgNodeKind::Literal {
+                kind: LiteralKind::Array,
+            },
+            "map" | "pathmap" => CpgNodeKind::Literal {
+                kind: LiteralKind::Object,
+            },
+            "key_value_pair" => CpgNodeKind::Field {
+                name: Arc::from(""),
+                field_type: None,
+                visibility: Visibility::Public,
+            },
+
+            // --- Bundle capability markers ---
+            "bundle_read" | "bundle_write" | "bundle_equiv" | "bundle_read_write" => {
+                CpgNodeKind::Attribute {
+                    name: Arc::from(ts_kind),
+                }
+            }
+
+            // --- Comments / errors ---
+            "line_comment" | "block_comment" => CpgNodeKind::Comment { is_doc: false },
+            "ERROR" => CpgNodeKind::Error {
+                message: Arc::from("Parse error"),
+            },
+
+            _ => CpgNodeKind::Unknown {
+                kind: Arc::from(ts_kind),
+            },
+        }
+    }
+
+    /// Classifies a Rholang `var` (the sole lexical identifier token) as a DFG
+    /// **definition** (`Variable`/`Parameter`) or a **use** (`Identifier`) by its
+    /// syntactic position, walking `node.parent()` (parent pointers are set by
+    /// the builder). This is what makes the Rholang DFG sound: a name bound in a
+    /// `new`, a `let`, a contract/agent formal list, or a `for`-receipt is a
+    /// definition; a name mentioned as a send channel, an argument, an operand,
+    /// or an `*x` dereference target is a use.
+    ///
+    /// `name` is `inline` in the grammar (grammar.js:19), so in binder positions
+    /// a `var`'s parent is the `names`/`name_decl`/`let_var_decl` node directly
+    /// (no intervening `name`); a `@`-quoted pattern (`@msg`) interposes a
+    /// `quote`, which this peeks through.
+    #[cfg(feature = "rholang")]
+    fn classify_rholang_var(&self, node: &tree_sitter::Node, source: &str) -> CpgNodeKind {
+        let name: Arc<str> = Arc::from(self.node_text(node, source));
+        let def_var = |name: Arc<str>| CpgNodeKind::Variable {
+            name,
+            var_type: None,
+            scope: ScopeId::GLOBAL,
+            is_mutable: false,
+        };
+        let use_ident = |name: Arc<str>| CpgNodeKind::Identifier {
+            name,
+            definition: None,
+        };
+
+        let Some(parent) = node.parent() else {
+            return use_ident(name);
+        };
+
+        match parent.kind() {
+            // `new x(…)` / `new x`: the new-restricted channel name is a def.
+            "name_decl" => return def_var(name),
+            // `let x = P`: the FIRST child of `let_var_decl` is the bound name.
+            "let_var_decl" if parent.named_child(0).map(|c| c.id()) == Some(node.id()) => {
+                return def_var(name)
+            }
+            _ => {}
+        }
+
+        // Formal parameter / receive-bound name: `var` sits directly under a
+        // `names` list — possibly through a `@`-quote pattern — whose parent is a
+        // binding construct.
+        let container = if parent.kind() == "quote" {
+            parent.parent()
+        } else {
+            Some(parent)
+        };
+        if let Some(c) = container {
+            if c.kind() == "names" {
+                if let Some(gp) = c.parent() {
+                    if matches!(
+                        gp.kind(),
+                        "contract"
+                            | "constructor_decl"
+                            | "method_decl"
+                            | "default_decl"
+                            | "linear_bind"
+                            | "repeated_bind"
+                            | "peek_bind"
+                            | "decl"
+                    ) {
+                        return CpgNodeKind::Parameter {
+                            name,
+                            param_type: None,
+                            is_variadic: false,
+                        };
+                    }
+                }
+            }
+        }
+
+        use_ident(name)
+    }
+
+    /// Builds a `MethodSignature` for a Rholang process abstraction. The name is
+    /// the `name` field's text (a `contract`'s name / a `method`'s name) or the
+    /// supplied default (`constructor`/`default`, which have no name field).
+    #[cfg(feature = "rholang")]
+    fn rholang_signature(
+        &self,
+        node: &tree_sitter::Node,
+        source: &str,
+        default_name: &str,
+    ) -> MethodSignature {
+        let name = node
+            .child_by_field_name("name")
+            .map(|n| Arc::from(self.node_text(&n, source)))
+            .unwrap_or_else(|| Arc::from(default_name));
+        MethodSignature {
+            name,
+            params: SmallVec::new(),
+            return_type: None,
+            is_static: false,
+            is_async: false,
+            visibility: Visibility::Public,
+        }
+    }
+
+    /// The URI string of a `name_decl`'s `uri_literal` child, backticks
+    /// stripped (`` `rho:io:stdout` `` → `rho:io:stdout`), or `None` for a
+    /// plain (non-URI) declaration.
+    #[cfg(feature = "rholang")]
+    fn rholang_uri_child(&self, node: &tree_sitter::Node, source: &str) -> Option<Arc<str>> {
+        let mut cursor = node.walk();
+        for child in node.children(&mut cursor) {
+            if child.kind() == "uri_literal" {
+                return Some(Arc::from(self.node_text(&child, source).trim_matches('`')));
+            }
+        }
+        None
+    }
+
+    /// The glyph for a Rholang operator rule kind.
+    #[cfg(feature = "rholang")]
+    fn rholang_operator_text(&self, kind: &str) -> &'static str {
+        match kind {
+            "add" => "+",
+            "sub" | "neg" => "-",
+            "mult" => "*",
+            "div" => "/",
+            "mod" => "%",
+            "concat" => "++",
+            "diff" => "--",
+            "interpolation" => "%%",
+            "eq" => "==",
+            "neq" => "!=",
+            "lt" => "<",
+            "lte" => "<=",
+            "gt" => ">",
+            "gte" => ">=",
+            "and" => "and",
+            "or" => "or",
+            "matches" => "matches",
+            "disjunction" => "\\/",
+            "conjunction" => "/\\",
+            "not" => "not",
+            "negation" => "~",
+            _ => "?",
+        }
+    }
+
+    /// Parses a Rholang integer literal, tolerating the grammar's type suffixes
+    /// (`5i32`, `7u8`, `9n`) by keeping the leading `-?\d+` — the literal's
+    /// *value* is irrelevant to CFG/DFG structure, only its `Integer` kind is.
+    #[cfg(feature = "rholang")]
+    fn rholang_int_literal(&self, node: &tree_sitter::Node, source: &str) -> LiteralKind {
+        let text = self.node_text(node, source);
+        let mut digits = String::new();
+        for (i, c) in text.chars().enumerate() {
+            if c.is_ascii_digit() || (i == 0 && c == '-') {
+                digits.push(c);
+            } else {
+                break;
+            }
+        }
+        LiteralKind::Integer(digits.parse().unwrap_or(0))
+    }
+
+    /// Parses a Rholang float/bigrat/fixed-point literal, tolerating the
+    /// grammar's type suffixes (`1.5f64`, `3r`, `2.0p10`) by keeping the leading
+    /// numeric run.
+    #[cfg(feature = "rholang")]
+    fn rholang_float_literal(&self, node: &tree_sitter::Node, source: &str) -> LiteralKind {
+        let text = self.node_text(node, source);
+        let mut num = String::new();
+        for (i, c) in text.chars().enumerate() {
+            if c.is_ascii_digit() || matches!(c, '.' | 'e' | 'E' | '+') || (i == 0 && c == '-') {
+                num.push(c);
+            } else {
+                break;
+            }
+        }
+        LiteralKind::Float(num.parse().unwrap_or(0.0))
+    }
+
+    // ========== MeTTa mapper (S-expression head-atom dispatch → CPG) ==========
+    //
+    // MeTTa (`MeTTa-Compiler/tree-sitter-metta/grammar.js`) is a minimal
+    // S-expression grammar: `expression` and `atom_expression` wrap *every*
+    // node, and a rule `(= (f $x) body)` is not a distinct node but a `list`
+    // whose head atom (an `operator`) carries the semantics. The wrappers are
+    // flattened by `should_include`; `map_metta` navigates the *raw* tree (which
+    // still contains them) via `metta_unwrap` to reach each head/operand.
+    #[cfg(feature = "metta")]
+    fn map_metta(&self, ts_kind: &str, node: &tree_sitter::Node, source: &str) -> CpgNodeKind {
+        match ts_kind {
+            "source_file" => CpgNodeKind::Root,
+            // The semantic core: a compound form dispatches on its head atom.
+            "list" => self.map_metta_list(node, source),
+
+            // --- Atoms ---
+            "identifier" => CpgNodeKind::Identifier {
+                name: Arc::from(self.node_text(node, source)),
+                definition: None,
+            },
+            // `$x`: a use by default, promoted to `Parameter` in a rule-LHS
+            // binder position (DFG soundness; see `classify_metta_var`).
+            "variable" => self.classify_metta_var(node, source),
+            "wildcard" => CpgNodeKind::Identifier {
+                name: Arc::from("_"),
+                definition: None,
+            },
+            // `&self` atom-space handle / `%Undefined%` type marker = use atoms.
+            "space_reference" | "special_type_symbol" => CpgNodeKind::Identifier {
+                name: Arc::from(self.node_text(node, source)),
+                definition: None,
+            },
+
+            "boolean_literal" => CpgNodeKind::Literal {
+                kind: LiteralKind::Bool(self.node_text(node, source) == "True"),
+            },
+            "integer_literal" => CpgNodeKind::Literal {
+                kind: self.parse_integer(node, source),
+            },
+            "float_literal" => CpgNodeKind::Literal {
+                kind: self.parse_float(node, source),
+            },
+            "string_literal" => CpgNodeKind::Literal {
+                kind: LiteralKind::String(Arc::from(self.node_text(node, source))),
+            },
+
+            // Operator glyphs as *standalone* leaves (a list head is consumed by
+            // `map_metta_list` and never reaches here). Kept out of the DFG
+            // use-set as `Unknown`.
+            "operator" | "arrow_operator" | "comparison_operator" | "assignment_operator"
+            | "type_annotation_operator" | "rule_definition_operator" | "punctuation_operator"
+            | "arithmetic_operator" | "logic_operator" | "exclaim_prefix" | "question_prefix"
+            | "quote_prefix" => CpgNodeKind::Unknown {
+                kind: Arc::from(ts_kind),
+            },
+
+            "line_comment" => CpgNodeKind::Comment { is_doc: false },
+            "ERROR" => CpgNodeKind::Error {
+                message: Arc::from("Parse error"),
+            },
+
+            _ => CpgNodeKind::Unknown {
+                kind: Arc::from(ts_kind),
+            },
+        }
+    }
+
+    /// Head-dispatch for a MeTTa `list` — the semantic core of the mapper. The
+    /// head is the first named child, unwrapped through the
+    /// `expression → atom_expression → operator` layers.
+    #[cfg(feature = "metta")]
+    fn map_metta_list(&self, node: &tree_sitter::Node, source: &str) -> CpgNodeKind {
+        let Some(head) = node.named_child(0).map(|h| self.metta_unwrap(h)) else {
+            // Empty list `()` = unit.
+            return CpgNodeKind::Literal {
+                kind: LiteralKind::Null,
+            };
+        };
+        match head.kind() {
+            // `(= LHS RHS)` / `(:= LHS RHS)` rule definition → Function (CFG
+            // entry); body = RHS = last AST child.
+            "assignment_operator" | "rule_definition_operator" => CpgNodeKind::Function {
+                signature: MethodSignature {
+                    name: self.metta_rule_name(node, source),
+                    params: SmallVec::new(),
+                    return_type: None,
+                    is_static: false,
+                    is_async: false,
+                    visibility: Visibility::Public,
+                },
+            },
+            // `(: name Type)` annotation / `(-> A B R)` function-type.
+            "type_annotation_operator" | "arrow_operator" => CpgNodeKind::TypeAnnotation {
+                type_info: TypeInfo::new(self.node_text(node, source)),
+            },
+            // A user/built-in identifier head: a handful of built-ins have
+            // control/structural meaning; everything else is a function
+            // application / grounded call.
+            "identifier" => match self.node_text(&head, source) {
+                "if" => CpgNodeKind::If,
+                "case" | "match" => CpgNodeKind::Match,
+                "let" | "let*" => CpgNodeKind::Block {
+                    scope: ScopeId::GLOBAL,
+                },
+                "import!" => CpgNodeKind::Import {
+                    path: self.metta_import_path(node, source),
+                },
+                _ => CpgNodeKind::Call {
+                    target: None,
+                    is_method: false,
+                },
+            },
+            // Grounded-operator application (`(+ $a $b)`, `(== $x 1)`),
+            // application against a space (`(&self …)`), higher-order/computed
+            // head (`($f …)` / nested `((…) …)`) → Call.
+            _ => CpgNodeKind::Call {
+                target: None,
+                is_method: false,
+            },
+        }
+    }
+
+    /// Descends through the MeTTa wrapper nodes (`expression`, `atom_expression`,
+    /// `operator`) that the grammar interposes on every atom, returning the
+    /// innermost meaningful node (an `identifier`, `variable`, `list`, a specific
+    /// operator kind, a literal, …).
+    #[cfg(feature = "metta")]
+    fn metta_unwrap<'tree>(&self, node: tree_sitter::Node<'tree>) -> tree_sitter::Node<'tree> {
+        let mut n = node;
+        while matches!(n.kind(), "expression" | "atom_expression" | "operator") {
+            match n.named_child(0) {
+                Some(child) => n = child,
+                None => break,
+            }
+        }
+        n
+    }
+
+    /// The name of a MeTTa rule `list` `(= LHS RHS)`: if `LHS` is itself a
+    /// `list` (`(= (foo $x) …)`) its head `identifier` is the name; if `LHS` is a
+    /// bare atom (`(:= bar …)`) that atom's text is the name. Best-effort — an
+    /// empty name is harmless because a CPG node anchors by source range.
+    #[cfg(feature = "metta")]
+    fn metta_rule_name(&self, list_node: &tree_sitter::Node, source: &str) -> Arc<str> {
+        let Some(lhs) = list_node.named_child(1).map(|l| self.metta_unwrap(l)) else {
+            return Arc::from("");
+        };
+        if lhs.kind() == "list" {
+            match lhs.named_child(0).map(|h| self.metta_unwrap(h)) {
+                Some(head) => Arc::from(self.node_text(&head, source)),
+                None => Arc::from(""),
+            }
+        } else {
+            Arc::from(self.node_text(&lhs, source))
+        }
+    }
+
+    /// The imported module/file of a MeTTa `(import! &space module)` — the last
+    /// named child, unwrapped.
+    #[cfg(feature = "metta")]
+    fn metta_import_path(&self, list_node: &tree_sitter::Node, source: &str) -> Arc<str> {
+        let count = list_node.named_child_count();
+        if count == 0 {
+            return Arc::from("");
+        }
+        match list_node.named_child(count - 1).map(|c| self.metta_unwrap(c)) {
+            Some(module) => Arc::from(self.node_text(&module, source)),
+            None => Arc::from(""),
+        }
+    }
+
+    /// Classifies a MeTTa `$variable` as a DFG **definition** (`Parameter`) when
+    /// it is a rule-LHS binder — `$x` in `(= (foo $x) …)` — or a **use**
+    /// (`Identifier`) everywhere else (RHS occurrences, non-rule contexts). The
+    /// LHS shape is `outer_list(=|:=) → … → lhs_list → … → variable`; the check
+    /// walks the raw parent chain (`variable → atom_expression → expression →
+    /// lhs_list → expression → outer_list`) and confirms (a) the outer head is
+    /// `=`/`:=` and (b) the enclosing list is the LHS (second) operand, not the
+    /// RHS. With it, `(= (double $x) (* $x 2))` gets a `$x` def→use edge.
+    #[cfg(feature = "metta")]
+    fn classify_metta_var(&self, node: &tree_sitter::Node, source: &str) -> CpgNodeKind {
+        let name: Arc<str> = Arc::from(self.node_text(node, source));
+        let is_lhs_binder = (|| {
+            let lhs = node.parent()?.parent()?.parent()?; // atom_expression → expression → lhs_list
+            if lhs.kind() != "list" {
+                return Some(false);
+            }
+            let outer = lhs.parent()?.parent()?; // expression → outer_list
+            if outer.kind() != "list" {
+                return Some(false);
+            }
+            let head = self.metta_unwrap(outer.named_child(0)?);
+            let head_is_rule =
+                matches!(head.kind(), "assignment_operator" | "rule_definition_operator");
+            let lhs_is_second = outer
+                .named_child(1)
+                .map(|c| self.metta_unwrap(c).id())
+                == Some(lhs.id());
+            Some(head_is_rule && lhs_is_second)
+        })()
+        .unwrap_or(false);
+
+        if is_lhs_binder {
+            CpgNodeKind::Parameter {
+                name,
+                param_type: None,
+                is_variadic: false,
+            }
+        } else {
+            CpgNodeKind::Identifier {
+                name,
+                definition: None,
+            }
+        }
+    }
+
     // ========== Helper methods ==========
 
     fn node_text<'a>(&self, node: &tree_sitter::Node, source: &'a str) -> &'a str {
@@ -1468,5 +2156,284 @@ mod tests {
         // Regular nodes should be included
         assert!(mapper.should_include("function_item", false));
         assert!(mapper.should_include("identifier", false));
+    }
+
+    // ========================================================================
+    // Rholang / MeTTa (Mode B): parse a snippet with the real grammar (a
+    // TEST-ONLY path dev-dependency, never propagated to downstream crates) and
+    // drive `build_from_tree` end-to-end, asserting the resulting CPG. These
+    // are the behavioral tests the no-vendoring feature design (§7/§8) could
+    // not place in libcpg until it was recognized that dev-dependencies solve
+    // the duplicate-C-symbol hazard without leaking to consumers.
+    // ========================================================================
+
+    #[cfg(any(feature = "rholang", feature = "metta"))]
+    fn kinds(cpg: &crate::CodePropertyGraph) -> Vec<crate::CpgNodeKind> {
+        cpg.nodes().map(|n| n.kind.clone()).collect()
+    }
+
+    /// True iff the DFG contains a `DefUse` edge whose def side and use side are
+    /// both a binder/reference of `name` — i.e. the reaching-defs pass linked a
+    /// `Variable`/`Parameter` definition of `name` to an `Identifier` use of it.
+    #[cfg(any(feature = "rholang", feature = "metta"))]
+    fn defuse_by_name(cpg: &crate::CodePropertyGraph, name: &str) -> bool {
+        use crate::{CpgEdgeKind, DfgEdgeKind};
+        let name_of = |id: crate::NodeId| {
+            cpg.node(id).and_then(|n| match &n.kind {
+                CpgNodeKind::Variable { name, .. }
+                | CpgNodeKind::Parameter { name, .. }
+                | CpgNodeKind::Identifier { name, .. } => Some(name.clone()),
+                _ => None,
+            })
+        };
+        cpg.edges().any(|e| {
+            matches!(e.kind, CpgEdgeKind::DataFlow(DfgEdgeKind::DefUse))
+                && name_of(e.source).as_deref() == Some(name)
+                && name_of(e.target).as_deref() == Some(name)
+        })
+    }
+
+    #[cfg(feature = "rholang")]
+    fn build_rholang(source: &str) -> crate::CodePropertyGraph {
+        let mut parser = tree_sitter::Parser::new();
+        parser
+            .set_language(&tree_sitter_rholang::LANGUAGE.into())
+            .expect("set rholang grammar");
+        let tree = parser.parse(source, None).expect("parse rholang");
+        crate::TreeSitterCpgBuilder::new()
+            .build_from_tree(&tree, source, Language::Rholang)
+            .expect("build_from_tree rholang")
+    }
+
+    /// The load-bearing gate: a `.rho` `contract` becomes a `Function` (named
+    /// from the contract) that seeds a CFG entry, and the `x!(…)` send becomes a
+    /// `Call` at the send site. Without the `Function`, a `.rho` CPG has no CFG.
+    #[test]
+    #[cfg(feature = "rholang")]
+    fn rholang_contract_is_function_with_cfg_and_send_call() {
+        let src = "new stdout(`rho:io:stdout`) in {\n  \
+                   contract @\"greet\"(@name) = {\n    \
+                   stdout!(\"hello, \" ++ *name)\n  }\n}\n";
+        let cpg = build_rholang(src);
+
+        let funcs: Vec<_> = cpg.functions().collect();
+        assert_eq!(funcs.len(), 1, "the contract must map to exactly one Function");
+        match &funcs[0].kind {
+            CpgNodeKind::Function { signature } => {
+                assert!(
+                    signature.name.contains("greet"),
+                    "signature name should carry the contract name, got {:?}",
+                    signature.name
+                );
+            }
+            other => panic!("expected Function, got {other:?}"),
+        }
+        assert!(
+            !cpg.cfg_entries().is_empty(),
+            "a contract-as-Function must seed a CFG entry (Mode B → CFG for .rho)"
+        );
+        let send_calls = kinds(&cpg)
+            .into_iter()
+            .filter(|k| matches!(k, CpgNodeKind::Call { is_method: false, .. }))
+            .count();
+        assert!(send_calls >= 1, "the `stdout!(…)` send must be a Call");
+    }
+
+    /// A URI-bearing `new` declaration yields the `Import` polyglot anchor (URI
+    /// backticks stripped) and the bound channel becomes a `Variable` def.
+    #[test]
+    #[cfg(feature = "rholang")]
+    fn rholang_new_decl_yields_uri_import_and_channel_variable() {
+        let src = "new stdout(`rho:io:stdout`) in { stdout!(42) }\n";
+        let cpg = build_rholang(src);
+
+        let import = cpg.nodes().find_map(|n| match &n.kind {
+            CpgNodeKind::Import { path } => Some(path.clone()),
+            _ => None,
+        });
+        assert_eq!(
+            import.as_deref(),
+            Some("rho:io:stdout"),
+            "the `rho:` URI decl must be an Import anchor with the stripped URI"
+        );
+        assert!(
+            cpg.nodes().any(|n| matches!(&n.kind,
+                CpgNodeKind::Variable { name, .. } if &**name == "stdout")),
+            "the new-bound channel `stdout` must be a Variable def"
+        );
+    }
+
+    /// A `for(@msg <- c){…}` receive: the received name is a `Parameter` def, the
+    /// receive is a `Call`, and the new-bound channel `c` is a `Variable`.
+    #[test]
+    #[cfg(feature = "rholang")]
+    fn rholang_for_receive_binds_parameter() {
+        let src = "new c in { for (@msg <- c) { c!(*msg) } }\n";
+        let cpg = build_rholang(src);
+
+        assert!(
+            cpg.nodes().any(|n| matches!(&n.kind,
+                CpgNodeKind::Parameter { name, .. } if &**name == "msg")),
+            "the received `@msg` must be a Parameter def"
+        );
+        assert!(
+            cpg.nodes().any(|n| matches!(&n.kind, CpgNodeKind::Call { .. })),
+            "the receive must be a Call"
+        );
+        assert!(
+            cpg.nodes().any(|n| matches!(&n.kind,
+                CpgNodeKind::Variable { name, .. } if &**name == "c")),
+            "the new-bound channel `c` must be a Variable def"
+        );
+    }
+
+    /// DFG soundness: inside a contract (a Function, so the DFG runs), the
+    /// new-bound channel `c` (a `Variable` def) links to its use as the send
+    /// channel (`Identifier`) via a `DefUse` edge.
+    #[test]
+    #[cfg(feature = "rholang")]
+    fn rholang_channel_def_links_to_send_use() {
+        let src = "contract @\"main\"() = { new c in { c!(1) } }\n";
+        let cpg = build_rholang(src);
+        assert!(
+            defuse_by_name(&cpg, "c"),
+            "channel `c` def (new) must reach its use (send channel) in the DFG"
+        );
+    }
+
+    /// The `should_include` collision fix: a Rholang *rule* node named
+    /// `"contract"`/`"match"` is kept, while a same-named anonymous *keyword
+    /// token* is dropped by the node-aware `should_include_node`. Grouping
+    /// containers (`names`) are dropped; semantic sends (`send`) are kept.
+    #[test]
+    #[cfg(feature = "rholang")]
+    fn rholang_should_include_keyword_vs_rule_collision() {
+        let mapper = NodeMapper::new(Language::Rholang);
+        // String-keyed view: rule names kept, containers/markers dropped.
+        assert!(mapper.should_include("contract", false), "contract RULE kept");
+        assert!(mapper.should_include("match", false), "match RULE kept");
+        assert!(mapper.should_include("send", false), "send kept");
+        assert!(!mapper.should_include("names", false), "names container dropped");
+        assert!(!mapper.should_include("send_single", false), "arity marker dropped");
+
+        // Node-aware view against a real tree: the anonymous `contract` keyword
+        // token (kind() == "contract", is_named() == false) is dropped, but the
+        // `contract` rule node (is_named() == true) is kept — the exact
+        // collision the string-only test cannot resolve.
+        let src = "contract @\"m\"() = { Nil }\n";
+        let mut parser = tree_sitter::Parser::new();
+        parser
+            .set_language(&tree_sitter_rholang::LANGUAGE.into())
+            .expect("set rholang grammar");
+        let tree = parser.parse(src, None).expect("parse rholang");
+        let mut cursor = tree.root_node().walk();
+        let contract_rule = tree
+            .root_node()
+            .children(&mut cursor)
+            .find(|n| n.kind() == "contract" && n.is_named())
+            .expect("contract rule node");
+        assert!(
+            mapper.should_include_node(&contract_rule, false),
+            "the contract RULE node must be kept"
+        );
+        let mut inner = contract_rule.walk();
+        let contract_kw = contract_rule
+            .children(&mut inner)
+            .find(|n| n.kind() == "contract" && !n.is_named())
+            .expect("contract keyword token");
+        assert!(
+            !mapper.should_include_node(&contract_kw, false),
+            "the anonymous contract KEYWORD token must be dropped"
+        );
+    }
+
+    #[cfg(feature = "metta")]
+    fn build_metta(source: &str) -> crate::CodePropertyGraph {
+        let mut parser = tree_sitter::Parser::new();
+        parser
+            .set_language(&tree_sitter_metta::language())
+            .expect("set metta grammar");
+        let tree = parser.parse(source, None).expect("parse metta");
+        crate::TreeSitterCpgBuilder::new()
+            .build_from_tree(&tree, source, Language::MeTTa)
+            .expect("build_from_tree metta")
+    }
+
+    /// The load-bearing gate: a MeTTa rule `(= (double $x) (* $x 2))` becomes a
+    /// `Function` named from the rule-head atom, seeding a CFG entry; and the
+    /// LHS `$x` (a `Parameter` def) links to the RHS `$x` use via a `DefUse`
+    /// edge (the recommended rule-LHS binder refinement).
+    #[test]
+    #[cfg(feature = "metta")]
+    fn metta_rule_is_function_with_cfg_and_param_defuse() {
+        let cpg = build_metta("(= (double $x) (* $x 2))\n");
+
+        let funcs: Vec<_> = cpg.functions().collect();
+        assert_eq!(funcs.len(), 1, "the `(= …)` rule must map to exactly one Function");
+        match &funcs[0].kind {
+            CpgNodeKind::Function { signature } => {
+                assert_eq!(&*signature.name, "double", "rule-head atom is the name");
+            }
+            other => panic!("expected Function, got {other:?}"),
+        }
+        assert!(
+            !cpg.cfg_entries().is_empty(),
+            "a rule-as-Function must seed a CFG entry (Mode B → CFG for .metta)"
+        );
+        assert!(
+            cpg.nodes().any(|n| matches!(&n.kind,
+                CpgNodeKind::Parameter { name, .. } if &**name == "$x")),
+            "the rule-LHS `$x` must be a Parameter def"
+        );
+        assert!(
+            defuse_by_name(&cpg, "$x"),
+            "the LHS `$x` def must reach the RHS `$x` use in the DFG"
+        );
+    }
+
+    /// Head-dispatch of the non-rule forms: `(:` → `TypeAnnotation`,
+    /// `(import! …)` → `Import`, a grounded `(+ …)` → `Call`.
+    #[test]
+    #[cfg(feature = "metta")]
+    fn metta_head_dispatch_type_import_call() {
+        let ta = build_metta("(: double (-> Number Number))\n");
+        assert!(
+            ta.nodes().any(|n| matches!(&n.kind, CpgNodeKind::TypeAnnotation { .. })),
+            "`(: name Type)` must map to a TypeAnnotation"
+        );
+
+        let imp = build_metta("(import! &self math)\n");
+        let path = imp.nodes().find_map(|n| match &n.kind {
+            CpgNodeKind::Import { path } => Some(path.clone()),
+            _ => None,
+        });
+        assert_eq!(path.as_deref(), Some("math"), "`import!` must map to an Import");
+
+        let call = build_metta("(+ 1 2)\n");
+        assert!(
+            call.nodes().any(|n| matches!(&n.kind, CpgNodeKind::Call { .. })),
+            "a grounded `(+ …)` operation must map to a Call"
+        );
+        // The grounded-op operands and a bare atom are still in the graph.
+        assert!(
+            kinds(&call)
+                .iter()
+                .any(|k| matches!(k, CpgNodeKind::Literal { .. })),
+            "operands survive as Literals"
+        );
+    }
+
+    /// `should_include` flattens the MeTTa transparent wrappers so a `list`'s
+    /// head/operands are direct AST children, but keeps `list` and the atoms.
+    #[test]
+    #[cfg(feature = "metta")]
+    fn metta_should_include_flattens_wrappers() {
+        let mapper = NodeMapper::new(Language::MeTTa);
+        assert!(!mapper.should_include("expression", false));
+        assert!(!mapper.should_include("atom_expression", false));
+        assert!(!mapper.should_include("prefixed_expression", false));
+        assert!(mapper.should_include("list", false));
+        assert!(mapper.should_include("identifier", false));
+        assert!(mapper.should_include("variable", false));
     }
 }

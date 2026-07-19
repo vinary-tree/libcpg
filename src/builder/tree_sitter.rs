@@ -201,8 +201,10 @@ impl TreeSitterCpgBuilder {
     ) -> Result<Option<NodeId>> {
         let ts_kind = ts_node.kind();
 
-        // Check if this node should be included
-        if !mapper.should_include(ts_kind, self.config.include_comments) {
+        // Check if this node should be included. Uses the node-aware test so a
+        // language mapper can distinguish an anonymous keyword/operator *token*
+        // from a same-named semantic *rule* node (e.g. Rholang's `contract`).
+        if !mapper.should_include_node(ts_node, self.config.include_comments) {
             // Still process children even if this node is skipped
             let mut cursor = ts_node.walk();
             for child in ts_node.children(&mut cursor) {
