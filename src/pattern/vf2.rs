@@ -528,49 +528,58 @@ mod tests {
 
     /// Regression test for the `pop_mapping` backtracking bug.
     ///
-    /// A 3-node directed path pattern `p0 -> p1 -> p2` has exactly TWO
-    /// monomorphic embeddings in a 4-node directed path target
-    /// `t0 -> t1 -> t2 -> t3`: `{t0,t1,t2}` and `{t1,t2,t3}`. Finding the second
-    /// requires the DFS to backtrack out of the first *correctly* — restoring
-    /// the exact pre-push state. The previous implementation popped an arbitrary
-    /// `FxHashMap` entry (and never restored terminal sets), corrupting the state
-    /// and dropping an embedding. Both must now be found.
+    /// A 3-node directed path pattern `p0 -> p1 -> p2` is matched against a
+    /// *diamond* target `t0 -> {t1, t2} -> t3`. It has exactly TWO monomorphic
+    /// embeddings — `{t0,t1,t3}` and `{t0,t2,t3}` — that diverge at the MIDDLE
+    /// node: after mapping `p0 -> t0`, the middle node `p1` has two candidate
+    /// targets (`t1` and `t2`). Finding the second embedding therefore requires
+    /// the DFS to backtrack *partially* out of the first (pop only `p2` and
+    /// `p1`, retain `p0 -> t0`) and retry `p1 -> t2`.
+    ///
+    /// This is precisely what the old implementation could not do: `pop_mapping`
+    /// removed an arbitrary `FxHashMap` entry (via `mapping.iter().last()`)
+    /// rather than the last-pushed pair, and never restored the terminal sets —
+    /// so the partial backtrack corrupted the state and dropped an embedding.
+    /// (A straight path target masks the bug: every node is mapped before any
+    /// backtrack, so N arbitrary pops empty the mapping just like N correct
+    /// pops. The diamond forces a mid-search retry that exposes it.)
     #[test]
     fn test_multi_embedding_backtracking() {
-        // Build a directed path of `len` nodes, all of the same kind so that
-        // relaxed node matching never rejects a pair and the graph *structure*
-        // alone determines the matches. Returns the node ids in path order.
-        fn path_graph(len: usize) -> (CodePropertyGraph, Vec<NodeId>) {
-            let mut g = CodePropertyGraph::new(Language::Rust);
-            let mut ids = Vec::with_capacity(len);
-            for _ in 0..len {
-                ids.push(g.add_node(CpgNode::new(
-                    NodeId::new(0),
-                    CpgNodeKind::If,
-                    SourceRange::default(),
-                )));
-            }
-            for w in ids.windows(2) {
-                g.connect(w[0], w[1], CpgEdgeKind::AstChild);
-            }
-            (g, ids)
+        // All nodes share a kind so relaxed matching never rejects a pair and
+        // the graph *structure* alone determines the matches.
+        fn node(g: &mut CodePropertyGraph) -> NodeId {
+            g.add_node(CpgNode::new(
+                NodeId::new(0),
+                CpgNodeKind::If,
+                SourceRange::default(),
+            ))
         }
 
-        let (pattern, p) = path_graph(3);
-        let (target, t) = path_graph(4);
+        // Pattern: path p0 -> p1 -> p2.
+        let mut pattern = CodePropertyGraph::new(Language::Rust);
+        let p: Vec<NodeId> = (0..3).map(|_| node(&mut pattern)).collect();
+        pattern.connect(p[0], p[1], CpgEdgeKind::AstChild);
+        pattern.connect(p[1], p[2], CpgEdgeKind::AstChild);
 
-        let matcher = Vf2Matcher::new();
-        let matches = matcher.find_matches(&pattern, &target);
+        // Target: diamond t0 -> {t1, t2} -> t3.
+        let mut target = CodePropertyGraph::new(Language::Rust);
+        let t: Vec<NodeId> = (0..4).map(|_| node(&mut target)).collect();
+        target.connect(t[0], t[1], CpgEdgeKind::AstChild);
+        target.connect(t[0], t[2], CpgEdgeKind::AstChild);
+        target.connect(t[1], t[3], CpgEdgeKind::AstChild);
+        target.connect(t[2], t[3], CpgEdgeKind::AstChild);
+
+        let matches = Vf2Matcher::new().find_matches(&pattern, &target);
 
         // Exactly the two embeddings, no more, no fewer.
         assert_eq!(
             matches.len(),
             2,
-            "expected both embeddings of a 3-path in a 4-path, got {}",
+            "expected both diamond embeddings, got {}",
             matches.len()
         );
 
-        // Normalize each match to (pattern_id -> target_id) tuples for comparison.
+        // Normalize each match to sorted (pattern_id -> target_id) tuples.
         let embeddings: FxHashSet<Vec<(u32, u32)>> = matches
             .iter()
             .map(|m| {
@@ -584,25 +593,25 @@ mod tests {
             })
             .collect();
 
-        let expected_first = vec![
+        let via_t1 = vec![
             (p[0].as_u32(), t[0].as_u32()),
             (p[1].as_u32(), t[1].as_u32()),
-            (p[2].as_u32(), t[2].as_u32()),
+            (p[2].as_u32(), t[3].as_u32()),
         ];
-        let expected_second = vec![
-            (p[0].as_u32(), t[1].as_u32()),
+        let via_t2 = vec![
+            (p[0].as_u32(), t[0].as_u32()),
             (p[1].as_u32(), t[2].as_u32()),
             (p[2].as_u32(), t[3].as_u32()),
         ];
 
         assert!(
-            embeddings.contains(&expected_first),
-            "missing embedding {{t0,t1,t2}}; found {:?}",
+            embeddings.contains(&via_t1),
+            "missing embedding via t1; found {:?}",
             embeddings
         );
         assert!(
-            embeddings.contains(&expected_second),
-            "missing embedding {{t1,t2,t3}}; found {:?}",
+            embeddings.contains(&via_t2),
+            "missing embedding via t2; found {:?}",
             embeddings
         );
     }
