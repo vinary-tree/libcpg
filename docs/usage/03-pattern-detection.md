@@ -73,7 +73,7 @@ let matcher = Vf2Matcher::new()
 
 - **Relaxed (default).** Two nodes match if they fall in the same broad category (declaration / expression / statement) or share a kind tag; two edges match if they are in the same overlay (AST/CFG/DFG/call). This maximises recall and is what the GoF detector uses.
 - **Strict.** Node-kind tags and edge kinds must be identical. Use this for exact structural search.
-- **`with_max_matches`** bounds the search — indispensable on large targets where an unbounded VF2 can be expensive (worst case `` $`O(N!\,N)`$ ``, though pruning makes it practical in code graphs). It is a `usize`; `0` means unlimited.
+- **`with_max_matches`** bounds the search — indispensable on large targets where an unbounded VF2 can be expensive (worst case $`O(N!\,N)`$, though pruning makes it practical in code graphs). It is a `usize`; `0` means unlimited.
 
 ### Inspecting a `PatternMatch`
 
@@ -180,7 +180,7 @@ fn main() -> Result<(), libcpg::Error> {
 
 ### Confidence and tuning
 
-Each match carries a [`confidence`](../GLOSSARY.md#confidence-pattern-match) in `` $`[0, 1]`$ `` measuring how completely the candidate subgraph fills the pattern's template. The detector keeps only matches at or above `min_confidence`:
+Each match carries a [`confidence`](../GLOSSARY.md#confidence-pattern-match) in $`[0, 1]`$ measuring how completely the candidate subgraph fills the pattern's template. The detector keeps only matches at or above `min_confidence`:
 
 - The detector's default `min_confidence` is **`0.7`**.
 - Individual templates may set their own floor — the `Observer` template, for instance, uses **`0.8`** internally, so it is inherently more conservative.

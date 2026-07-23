@@ -2,7 +2,7 @@
 
 > Theory pillar · file 08. Uses the control‑flow structure of [file 02](02-control-flow-and-complexity.md) and the CPG traversal of [file 01](01-code-property-graphs.md); a heuristic sibling to the pattern work of files [05](05-subgraph-isomorphism-vf2.md)–[07](07-design-pattern-detection.md).
 
-Given a function, two questions recur in code understanding: *what kind of algorithm is this?* (sorting, searching, a graph traversal, dynamic programming…) and *how expensive is it?* (`` $`O(n)`$ ``? `` $`O(n^2)`$ ``? `` $`O(2^n)`$ ``?). `libcpg` answers both **statically and heuristically** from the shape of the [Code Property Graph](../GLOSSARY.md#code-property-graph-cpg): loop‑nesting depth and recursion structure drive a [complexity class](../GLOSSARY.md#complexity-class--big-o) estimate, and a handful of structural signatures name an [algorithm family](../GLOSSARY.md#algorithm-family). This is recognition by *shape*, not proof of *behaviour* — the results are advisory, and this page is candid about where the heuristics stop.
+Given a function, two questions recur in code understanding: *what kind of algorithm is this?* (sorting, searching, a graph traversal, dynamic programming…) and *how expensive is it?* ($`O(n)`$? $`O(n^2)`$? $`O(2^n)`$?). `libcpg` answers both **statically and heuristically** from the shape of the [Code Property Graph](../GLOSSARY.md#code-property-graph-cpg): loop‑nesting depth and recursion structure drive a [complexity class](../GLOSSARY.md#complexity-class--big-o) estimate, and a handful of structural signatures name an [algorithm family](../GLOSSARY.md#algorithm-family). This is recognition by *shape*, not proof of *behaviour* — the results are advisory, and this page is candid about where the heuristics stop.
 
 The analysis lives in the `algorithms` module, gated behind the `algorithm-detection` feature. Its entry point is per‑function:
 
@@ -35,7 +35,7 @@ for func in functions {
 
 ## 1. The detection pipeline
 
-`DefaultAlgorithmDetector::detect(&cpg, function)` runs three phases and returns a `Vec<DetectedAlgorithm>` sorted by confidence, descending, filtered at the detector's `min_confidence` (default `` $`0.5`$ `` — **not** the `` $`0.7`$ `` of the GoF detector in [file 07](07-design-pattern-detection.md)):
+`DefaultAlgorithmDetector::detect(&cpg, function)` runs three phases and returns a `Vec<DetectedAlgorithm>` sorted by confidence, descending, filtered at the detector's `min_confidence` (default $`0.5`$ — **not** the $`0.7`$ of the GoF detector in [file 07](07-design-pattern-detection.md)):
 
 1. **Control‑flow analysis** (`ControlFlowAnalyzer`) extracts the function's loops and any recursion.
 2. **Complexity estimation** (`ComplexityAnalyzer::estimate_time_complexity`) turns that structure into a `ComplexityEstimate`.
@@ -50,20 +50,20 @@ A `DetectedAlgorithm` bundles the `AlgorithmFamily`, an optional specific `name`
 `ControlFlowAnalyzer::detect_loops` walks the function's AST descendants and records a `LoopPattern` for each loop node, capturing its **kind**, its **nesting depth**, and whether it is **counted** (bounded):
 
 - **Kind** (`LoopKind`): `For`, `While`, `Infinite` (a Rust `loop`), plus `DoWhile` and `Iterator` for the shapes some front‑ends emit.
-- **Depth**: computed by counting loop ancestors — a loop with two enclosing loops has depth `` $`3`$ ``.
+- **Depth**: computed by counting loop ancestors — a loop with two enclosing loops has depth $`3`$.
 - **Counted**: a `For` over a range‑like expression, or a `While` carrying both a comparison *and* an increment, is treated as bounded; an `Infinite` or iterator loop is not. Counted‑ness raises the confidence of the resulting estimate but not its class.
 
 Maximum nesting depth is the dominant loop signal. The estimator maps it straight onto the polynomial ladder:
 
 | Max loop depth | `ComplexityClass` | Big‑O |
 |---|---|---|
-| 0 (no loops) | `Constant` | `` $`O(1)`$ `` |
-| 1 | `Linear` | `` $`O(n)`$ `` |
-| 2 | `Quadratic` | `` $`O(n^2)`$ `` |
-| 3 | `Cubic` | `` $`O(n^3)`$ `` |
-| `` $`d \ge 4`$ `` | `Polynomial(d)` | `` $`O(n^d)`$ `` |
+| 0 (no loops) | `Constant` | $`O(1)`$ |
+| 1 | `Linear` | $`O(n)`$ |
+| 2 | `Quadratic` | $`O(n^2)`$ |
+| 3 | `Cubic` | $`O(n^3)`$ |
+| $`d \ge 4`$ | `Polynomial(d)` | $`O(n^d)`$ |
 
-This is a *structural upper‑bound heuristic*: it assumes each nested counted loop multiplies the iteration count by `` $`n`$ ``. It cannot see that an inner loop runs a constant number of times, so it may over‑estimate — a limitation stated plainly here and reflected in the estimate's `confidence`.
+This is a *structural upper‑bound heuristic*: it assumes each nested counted loop multiplies the iteration count by $`n`$. It cannot see that an inner loop runs a constant number of times, so it may over‑estimate — a limitation stated plainly here and reflected in the estimate's `confidence`.
 
 ---
 
@@ -75,14 +75,14 @@ The number of recursive calls, together with a **divide‑and‑conquer** test, 
 
 | Recursion shape | `ComplexityClass` | Big‑O |
 |---|---|---|
-| Tail recursion | `Linear` | `` $`O(n)`$ `` |
-| Divide‑and‑conquer, 1 recursive call | `Logarithmic` | `` $`O(\log n)`$ `` |
-| Divide‑and‑conquer, 2 recursive calls | `Linearithmic` | `` $`O(n \log n)`$ `` |
-| Divide‑and‑conquer, `` $`k \ge 3`$ `` calls | `Polynomial(k)` | `` $`O(n^k)`$ `` |
-| Non‑D&C, 1 recursive call | `Linear` | `` $`O(n)`$ `` |
-| Non‑D&C, `` $`\ge 2`$ `` recursive calls | `Exponential` | `` $`O(2^n)`$ `` |
+| Tail recursion | `Linear` | $`O(n)`$ |
+| Divide‑and‑conquer, 1 recursive call | `Logarithmic` | $`O(\log n)`$ |
+| Divide‑and‑conquer, 2 recursive calls | `Linearithmic` | $`O(n \log n)`$ |
+| Divide‑and‑conquer, $`k \ge 3`$ calls | `Polynomial(k)` | $`O(n^k)`$ |
+| Non‑D&C, 1 recursive call | `Linear` | $`O(n)`$ |
+| Non‑D&C, $`\ge 2`$ recursive calls | `Exponential` | $`O(2^n)`$ |
 
-The **divide‑and‑conquer** test (`is_divide_and_conquer`) is itself a heuristic: it looks for the input being halved — a division or right‑shift by `` $`2`$ ``, or an identifier named `mid`, `middle`, `pivot`, or `…half…` — before the recursive calls. Its presence is what separates `` $`O(n \log n)`$ `` merge‑sort‑like recursion from `` $`O(2^n)`$ `` naïve‑Fibonacci‑like recursion at the same call count.
+The **divide‑and‑conquer** test (`is_divide_and_conquer`) is itself a heuristic: it looks for the input being halved — a division or right‑shift by $`2`$, or an identifier named `mid`, `middle`, `pivot`, or `…half…` — before the recursive calls. Its presence is what separates $`O(n \log n)`$ merge‑sort‑like recursion from $`O(2^n)`$ naïve‑Fibonacci‑like recursion at the same call count.
 
 When a function has *both* loops and recursion, the estimator keeps the **worse** of the two classes, compared via `ComplexityClass::is_better_than` (Section 5).
 
@@ -92,13 +92,13 @@ When a function has *both* loops and recursion, the estimator keeps the **worse*
 
 ## 4. The Master Theorem
 
-The two‑call divide‑and‑conquer heuristic is grounded in the **Master Theorem** for divide‑and‑conquer recurrences (CLRS [[1]](#references)). A function that splits its input of size `` $`n`$ `` into `` $`a`$ `` subproblems of size `` $`n/b`$ ``, with `` $`f(n)`$ `` non‑recursive work per level, satisfies
+The two‑call divide‑and‑conquer heuristic is grounded in the **Master Theorem** for divide‑and‑conquer recurrences (CLRS [[1]](#references)). A function that splits its input of size $`n`$ into $`a`$ subproblems of size $`n/b`$, with $`f(n)`$ non‑recursive work per level, satisfies
 
 ```math
 T(n) = a\,T(n/b) + f(n), \qquad a \ge 1,\ b > 1,
 ```
 
-whose solution compares `` $`f(n)`$ `` against `` $`n^{\log_b a}`$ ``:
+whose solution compares $`f(n)`$ against $`n^{\log_b a}`$:
 
 ```math
 T(n) =
@@ -109,7 +109,7 @@ T(n) =
 \end{cases}
 ```
 
-Merge sort is the canonical case: `` $`a = 2`$ `` subproblems, each of size `` $`n/2`$ `` (`` $`b = 2`$ ``), with linear merge work `` $`f(n) = \Theta(n)`$ ``. Since `` $`\log_b a = 1`$ `` and `` $`f(n) = \Theta(n^1)`$ ``, the middle case gives `` $`T(n) = \Theta(n \log n)`$ `` — exactly the `Linearithmic` class the analyzer assigns to *two* recursive calls with halving. A single halving call (`` $`a = 1, b = 2`$ ``, `` $`f(n) = O(1)`$ ``) gives `` $`\Theta(\log n)`$ ``, the binary‑search case. The heuristic is a structural shorthand for these Master‑Theorem outcomes; it does not solve the recurrence, so it reads `` $`a`$ `` and the halving directly from the CPG rather than deriving `` $`b`$ `` and `` $`f`$ ``.
+Merge sort is the canonical case: $`a = 2`$ subproblems, each of size $`n/2`$ ($`b = 2`$), with linear merge work $`f(n) = \Theta(n)`$. Since $`\log_b a = 1`$ and $`f(n) = \Theta(n^1)`$, the middle case gives $`T(n) = \Theta(n \log n)`$ — exactly the `Linearithmic` class the analyzer assigns to *two* recursive calls with halving. A single halving call ($`a = 1, b = 2`$, $`f(n) = O(1)`$) gives $`\Theta(\log n)`$, the binary‑search case. The heuristic is a structural shorthand for these Master‑Theorem outcomes; it does not solve the recurrence, so it reads $`a`$ and the halving directly from the CPG rather than deriving $`b`$ and $`f`$.
 
 ---
 
@@ -125,7 +125,7 @@ Merge sort is the canonical case: `` $`a = 2`$ `` subproblems, each of size `` $
 | `Linearithmic` | `O(n log n)` | 3 |
 | `Quadratic` | `O(n²)` | 4 |
 | `Cubic` | `O(n³)` | 5 |
-| `Polynomial(k)` | `O(n^k)` | `` $`5 + k`$ `` |
+| `Polynomial(k)` | `O(n^k)` | $`5 + k`$ |
 | `Exponential` | `O(2^n)` | 100 |
 | `Factorial` | `O(n!)` | 200 |
 | `Unknown` | `Unknown` | 1000 |
@@ -136,13 +136,13 @@ Merge sort is the canonical case: `` $`a = 2`$ `` subproblems, each of size `` $
 
 *Figure — the `ComplexityClass` ladder ordered by `ordinal()`, cheapest at the bottom. Source: [`diagrams/complexity-ladder.dot`](../diagrams/complexity-ladder.dot).*
 
-> **Honesty — the analyzer never emits `Factorial`.** `O(n!)` is a rung on the ladder (`ordinal() = 200`, `as_str() = "O(n!)"`) but the shipped `ComplexityAnalyzer` has **no path that produces it**: non‑divide‑and‑conquer recursion is capped at `Exponential` regardless of how many recursive calls it makes (see Section 3's table). So `Factorial` can appear in a hand‑constructed `ComplexityEstimate`, but *estimation from code tops out at `Exponential`*. Treat the ladder's top rung as reserved, not reachable, when reading analyzer output. Likewise, a `Polynomial(k)` for `` $`k \ge 4`$ `` arises only from loop nesting of depth `` $`\ge 4`$ ``.
+> **Honesty — the analyzer never emits `Factorial`.** `O(n!)` is a rung on the ladder (`ordinal() = 200`, `as_str() = "O(n!)"`) but the shipped `ComplexityAnalyzer` has **no path that produces it**: non‑divide‑and‑conquer recursion is capped at `Exponential` regardless of how many recursive calls it makes (see Section 3's table). So `Factorial` can appear in a hand‑constructed `ComplexityEstimate`, but *estimation from code tops out at `Exponential`*. Treat the ladder's top rung as reserved, not reachable, when reading analyzer output. Likewise, a `Polynomial(k)` for $`k \ge 4`$ arises only from loop nesting of depth $`\ge 4`$.
 
 ### Worked examples
 
-- **`factorial(n)`** — one recursive call, no halving ⇒ **`Linear`, `` $`O(n)`$ ``**. Note the analyzer classifies the *recursion structure* (linear depth), not the mathematical function's value; it is *not* `Factorial`. This is the sharpest illustration of "shape, not behaviour".
-- **`merge_sort(a)`** — two recursive calls with a midpoint split ⇒ **`Linearithmic`, `` $`O(n \log n)`$ ``**, matching the Master‑Theorem derivation of Section 4.
-- **naïve `fib(n)`** — two recursive calls, *no* halving ⇒ **`Exponential`, `` $`O(2^n)`$ ``**, the non‑D&C branch.
+- **`factorial(n)`** — one recursive call, no halving ⇒ **`Linear`, $`O(n)`$**. Note the analyzer classifies the *recursion structure* (linear depth), not the mathematical function's value; it is *not* `Factorial`. This is the sharpest illustration of "shape, not behaviour".
+- **`merge_sort(a)`** — two recursive calls with a midpoint split ⇒ **`Linearithmic`, $`O(n \log n)`$**, matching the Master‑Theorem derivation of Section 4.
+- **naïve `fib(n)`** — two recursive calls, *no* halving ⇒ **`Exponential`, $`O(2^n)`$**, the non‑D&C branch.
 
 ---
 
@@ -169,11 +169,11 @@ Beyond cost, `libcpg` names an [algorithm family](../GLOSSARY.md#algorithm-famil
 
 The **five implemented** detectors recognise their families by these signatures:
 
-- **`Sorting`** — loops present, comparison operations, and swaps (three‑plus assignments or a `swap`‑named call); adjacent‑index swaps hint at bubble sort, otherwise selection/insertion at `` $`O(n^2)`$ ``.
-- **`Searching`** — comparisons plus either a midpoint calculation / recursion (→ `"Binary Search"` at `` $`O(\log n)`$ ``) or a single loop with an early return (→ `"Linear Search"` at `` $`O(n)`$ ``).
+- **`Sorting`** — loops present, comparison operations, and swaps (three‑plus assignments or a `swap`‑named call); adjacent‑index swaps hint at bubble sort, otherwise selection/insertion at $`O(n^2)`$.
+- **`Searching`** — comparisons plus either a midpoint calculation / recursion (→ `"Binary Search"` at $`O(\log n)`$) or a single loop with an early return (→ `"Linear Search"` at $`O(n)`$).
 - **`GraphTraversal`** — a *visited/seen* set together with queue operations (→ `"BFS"`) or stack / `while` structure (→ `"DFS"`).
 - **`DynamicProgramming`** — a memoization table (a variable named `memo`, `dp`, `cache`, `table`, …), stronger when combined with nested loops.
-- **`DivideAndConquer`** — recursion with a `` $`O(\log n)`$ ``/`` $`O(n \log n)`$ `` estimate and one or two recursive calls.
+- **`DivideAndConquer`** — recursion with a $`O(\log n)`$/$`O(n \log n)`$ estimate and one or two recursive calls.
 
 ![Algorithm‑family taxonomy: the 14 AlgorithmFamily categories, grouped by the structural signature that identifies each.](../diagrams/algorithm-family-taxonomy.svg)
 

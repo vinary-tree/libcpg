@@ -266,7 +266,7 @@ assert_eq!(back, 7);
 Node ids are stable across serialisation, which is why analysis code and the
 on-disk form both refer to nodes by `NodeId` rather than by petgraph's internal
 `NodeIndex`. Resolving an id to a node is `cpg.node(id) -> Option<&CpgNode>` (an
-`` $`O(1)`$ `` map lookup returning `None` for an unknown id).
+$`O(1)`$ map lookup returning `None` for an unknown id).
 
 ## `SourceRange`
 

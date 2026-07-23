@@ -23,12 +23,12 @@ graph fine-grained enough to carry a definition to each such use:
 
 - **Classic iterative data-flow** (Kildall's fixed-point framework [2]; the
   gen/kill reaching-definitions instance in the Dragon book [3]) iterates
-  `` $`\mathit{IN}[n] = \bigcup_{p \in \mathit{pred}(n)} \mathit{OUT}[p]`$ `` and
-  `` $`\mathit{OUT}[n] = \mathit{gen}[n] \cup (\mathit{IN}[n] \setminus \mathit{kill}[n])`$ ``
+  $`\mathit{IN}[n] = \bigcup_{p \in \mathit{pred}(n)} \mathit{OUT}[p]`$ and
+  $`\mathit{OUT}[n] = \mathit{gen}[n] \cup (\mathit{IN}[n] \setminus \mathit{kill}[n])`$
   over CFG nodes until nothing changes.
 - **[Static Single Assignment](../GLOSSARY.md#static-single-assignment-ssa)**
   (Cytron et al. [1]) renames each definition uniquely and inserts
-  `` $`\phi`$ ``-functions at control-flow joins, after which def-use is a direct
+  $`\phi`$-functions at control-flow joins, after which def-use is a direct
   lookup.
 
 Both are keyed on the CFG. But `libcpg`'s [CFG](../GLOSSARY.md#control-flow-graph-cfg)
@@ -197,7 +197,7 @@ let cpg = TreeSitterCpgBuilder::new().build(
   [`CpgNodeKind`](../GLOSSARY.md#node-kind--edge-kind), never on grammar
   specifics, so it works for every frontend including the Mode-B F1R3FLY
   languages ([ADR-0002](0002-mode-b-build-from-tree.md)). It runs in time linear
-  in the number of AST nodes, `` $`O(n)`$ ``, up to a small constant from the
+  in the number of AST nodes, $`O(n)`$, up to a small constant from the
   two-pass loop bodies — no global fixed-point iteration.
 - **Idempotent.** Re-running `extract` adds nothing, so construction stages
   compose safely (see [idempotent](../GLOSSARY.md#idempotent)).
@@ -212,7 +212,7 @@ let cpg = TreeSitterCpgBuilder::new().build(
   policy can attach a def-use edge for a definition that a more precise analysis
   would rule out on a given path — extra edges, never missing ones, but callers
   doing precision-sensitive work should know the bias.
-- **No `` $`\phi`$ ``-node disambiguation.** Because there is no SSA renaming, a
+- **No $`\phi`$-node disambiguation.** Because there is no SSA renaming, a
   use at a merge point can carry several reaching definitions with no explicit
   join node distinguishing them; the DFG records all of them.
 - **Two dead code paths carried in the source.** The retired
@@ -232,8 +232,8 @@ let cpg = TreeSitterCpgBuilder::new().build(
    result the AST already orders for free.
 
 2. **Full SSA construction** (Cytron et al. [1]). *Rejected.* SSA buys precise,
-   `` $`\phi`$ ``-mediated joins, but at the cost of dominance-frontier
-   `` $`\phi`$ ``-placement and a renaming pass — real machinery for a library
+   $`\phi`$-mediated joins, but at the cost of dominance-frontier
+   $`\phi`$-placement and a renaming pass — real machinery for a library
    whose DFG is a *query substrate*, not an optimizer IR. The AST-ordered sweep
    delivers the def-use edges callers need at a fraction of the complexity;
    SSA remains defined in the glossary precisely to mark this contrast.

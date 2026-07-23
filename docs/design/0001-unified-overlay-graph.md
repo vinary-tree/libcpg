@@ -119,7 +119,7 @@ is a count over the control-flow edge subset,
 M = E - N + 2
 ```
 
-where `` $`E`$ `` and `` $`N`$ `` are the CFG edge and node counts of one
+where $`E`$ and $`N`$ are the CFG edge and node counts of one
 function's control-flow overlay — McCabe's metric, surfaced as
 `cyclomatic_complexity()` and defined with its citation in the
 [glossary](../GLOSSARY.md#cyclomatic-complexity).

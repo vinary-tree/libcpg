@@ -6,8 +6,8 @@
 > Every term used here is defined once in the [Glossary](../GLOSSARY.md); this page
 > links to it rather than redefining. Mathematical notation follows the Glossary's
 > [notation conventions](../GLOSSARY.md#notation-conventions): a graph is
-> `` $`G = (V, E)`$ `` with vertex set `` $`V`$ `` and typed edge set `` $`E`$ ``,
-> and `` $`N`$ ``/`` $`E`$ `` denote node/edge **counts** when a scalar is needed.
+> $`G = (V, E)`$ with vertex set $`V`$ and typed edge set $`E`$,
+> and $`N`$/$`E`$ denote node/edge **counts** when a scalar is needed.
 
 ## 1. Three questions, historically three tools
 

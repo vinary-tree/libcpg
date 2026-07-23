@@ -219,7 +219,7 @@ fn metrics(cpg: &CodePropertyGraph) {
 M = E - N + 2
 ```
 
-where `` $`E`$ `` is the count of CFG edges and `` $`N`$ `` the count of CFG nodes (one connected component, one entry, one exit). An empty CFG yields `1`. The theory and worked examples are in [Control Flow and Complexity](../theory/02-control-flow-and-complexity.md); the full `stats()` bundle is described in [Getting Started](00-getting-started.md#step-4c--inspect-counts-and-statistics).
+where $`E`$ is the count of CFG edges and $`N`$ the count of CFG nodes (one connected component, one entry, one exit). An empty CFG yields `1`. The theory and worked examples are in [Control Flow and Complexity](../theory/02-control-flow-and-complexity.md); the full `stats()` bundle is described in [Getting Started](00-getting-started.md#step-4c--inspect-counts-and-statistics).
 
 ---
 

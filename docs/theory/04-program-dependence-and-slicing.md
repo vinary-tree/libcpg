@@ -15,16 +15,16 @@
 
 ## 1. Dominators and post-dominators
 
-Fix a CFG with a single `` $`\mathit{entry}`$ `` and a single `` $`\mathit{exit}`$ ``.
+Fix a CFG with a single $`\mathit{entry}`$ and a single $`\mathit{exit}`$.
 
-- Node `` $`d`$ `` **dominates** node `` $`n`$ `` (written `` $`d \gg n`$ ``) if
-  *every* path from `` $`\mathit{entry}`$ `` to `` $`n`$ `` passes through
-  `` $`d`$ ``. Every node dominates itself; the immediate dominator
-  `` $`\mathrm{idom}(n)`$ `` is the unique closest strict dominator, and the idom
+- Node $`d`$ **dominates** node $`n`$ (written $`d \gg n`$) if
+  *every* path from $`\mathit{entry}`$ to $`n`$ passes through
+  $`d`$. Every node dominates itself; the immediate dominator
+  $`\mathrm{idom}(n)`$ is the unique closest strict dominator, and the idom
   relation forms the **dominator tree**.
-- Node `` $`p`$ `` **post-dominates** node `` $`n`$ `` if every path from `` $`n`$ ``
-  to `` $`\mathit{exit}`$ `` passes through `` $`p`$ ``. Post-domination is
-  domination computed on the **reversed** CFG rooted at `` $`\mathit{exit}`$ ``.
+- Node $`p`$ **post-dominates** node $`n`$ if every path from $`n`$
+  to $`\mathit{exit}`$ passes through $`p`$. Post-domination is
+  domination computed on the **reversed** CFG rooted at $`\mathit{exit}`$.
 
 `libcpg` obtains both from `petgraph`'s `dominators::simple_fast`, the
 Cooper–Harvey–Kennedy iterative dominator algorithm: run it on the CFG for
@@ -34,33 +34,33 @@ Post-dominators are the prerequisite for control dependence.
 ## 2. Dominance frontier and control dependence
 
 The **[dominance frontier](../GLOSSARY.md#dominance-frontier--reverse-dominance-frontier)**
-of `` $`d`$ `` is the set of nodes where `` $`d`$ ``'s dominance just stops:
+of $`d`$ is the set of nodes where $`d`$'s dominance just stops:
 
 ```math
 \mathrm{DF}(d) = \{\, w : d \gg p \text{ for some } p \in \mathrm{pred}(w),\ \text{and } d \not\gg_{\!s} w \,\}
 ```
 
-where `` $`\gg_{\!s}`$ `` is *strict* domination. Intuitively, `` $`w`$ `` is a join
-point just beyond the region `` $`d`$ `` dominates — the classic use is
-`` $`\phi`$ ``-placement in [SSA](../GLOSSARY.md#static-single-assignment-ssa)
+where $`\gg_{\!s}`$ is *strict* domination. Intuitively, $`w`$ is a join
+point just beyond the region $`d`$ dominates — the classic use is
+$`\phi`$-placement in [SSA](../GLOSSARY.md#static-single-assignment-ssa)
 (Cytron et al. [[2]](#references)).
 
-**Control dependence** asks the dual question: node `` $`n`$ `` is
-[control-dependent](../GLOSSARY.md#control-dependence) on branch `` $`b`$ `` when
-`` $`b`$ `` *decides whether `` $`n`$ `` executes*. Formally (Ferrante–Ottenstein–Warren
-[[1]](#references)), `` $`n`$ `` is control-dependent on `` $`b`$ `` iff
+**Control dependence** asks the dual question: node $`n`$ is
+[control-dependent](../GLOSSARY.md#control-dependence) on branch $`b`$ when
+$`b`$ *decides whether $`n`$ executes*. Formally (Ferrante–Ottenstein–Warren
+[[1]](#references)), $`n`$ is control-dependent on $`b`$ iff
 
-1. there is a CFG path from `` $`b`$ `` to `` $`n`$ `` on which every node (except
-   `` $`b`$ `` and `` $`n`$ ``) is post-dominated by `` $`n`$ ``, **and**
-2. `` $`b`$ `` is **not** post-dominated by `` $`n`$ `` (so `` $`b`$ `` has an
-   alternative successor from which `` $`n`$ `` is not guaranteed).
+1. there is a CFG path from $`b`$ to $`n`$ on which every node (except
+   $`b`$ and $`n`$) is post-dominated by $`n`$, **and**
+2. $`b`$ is **not** post-dominated by $`n`$ (so $`b`$ has an
+   alternative successor from which $`n`$ is not guaranteed).
 
 Cytron et al. [[2]](#references) supply the operational identity `libcpg` uses:
 
 > **Control dependence is exactly the dominance frontier of the _reverse_ CFG.**
 
-That is, `` $`n`$ `` is control-dependent on `` $`b`$ `` iff
-`` $`b \in \mathrm{RDF}(n)`$ ``, the **[reverse dominance frontier](../GLOSSARY.md#dominance-frontier--reverse-dominance-frontier)**
+That is, $`n`$ is control-dependent on $`b`$ iff
+$`b \in \mathrm{RDF}(n)`$, the **[reverse dominance frontier](../GLOSSARY.md#dominance-frontier--reverse-dominance-frontier)**
 (the dominance frontier computed on the reversed CFG, i.e. using post-dominators).
 
 ![Control dependence as the reverse dominance frontier of the CFG](../diagrams/dominance-frontier.svg)
@@ -76,7 +76,7 @@ skips duplicates, so a re-build adds nothing.
 
 ### Control dependence — the five steps
 
-Following §2, the builder computes `` $`\mathrm{RDF}`$ `` directly:
+Following §2, the builder computes $`\mathrm{RDF}`$ directly:
 
 ```text
 compute_control_dependence(cpg, function):
@@ -107,7 +107,7 @@ with multiple returns.
 [Data dependence](../GLOSSARY.md#data-dependence) is already latent in the DFG:
 `libcpg` **reprojects** it. For every `DefUse` / `ReachingDef` edge (Theory 03) whose
 *both* endpoints lie within the function's AST subtree, it emits a first-class
-`DataDependence` edge `` $`d \to u`$ `` (definition → use). Collapsing the two DFG
+`DataDependence` edge $`d \to u`$ (definition → use). Collapsing the two DFG
 edge kinds into one uniform dependence kind lets the slicer traverse a single edge set.
 
 ```math
@@ -128,15 +128,15 @@ nodes reachable from the criterion over dependence edges. `libcpg` adopts exactl
 PDG-reachability formulation, in both directions and **bounded**:
 
 - The **[backward slice](../GLOSSARY.md#backward-slice--forward-slice)** of criterion
-  `` $`c`$ `` is everything `` $`c`$ `` transitively *depends on* — its PDG
+  $`c`$ is everything $`c`$ transitively *depends on* — its PDG
   predecessors — found by reverse-BFS over **incoming** `ControlDependence` /
   `DataDependence` edges. It answers *"what could have produced this value / caused
   this to run?"*
-- The **forward slice** is everything `` $`c`$ `` transitively *affects* — its PDG
+- The **forward slice** is everything $`c`$ transitively *affects* — its PDG
   successors — found by forward-BFS over **outgoing** dependence edges. It answers
   *"what would break if I change this?"*
 
-Both include `` $`c`$ `` itself and take a `max_nodes` bound: the BFS stops once the
+Both include $`c`$ itself and take a `max_nodes` bound: the BFS stops once the
 slice reaches that many nodes (and returns empty if `max_nodes` is `0` or the
 criterion is absent), so slicing hostile or huge inputs is safe. The result is a set
 of `NodeId`s (a `FxHashSet<NodeId>`).

@@ -132,7 +132,7 @@ for (succ, kind) in cpg.cfg_successors(node_id) {
 
 `cfg_predecessors` is the mirror image (returning the *source* id with its edge
 kind). The [`cyclomatic_complexity`](../../GLOSSARY.md#cyclomatic-complexity) of
-a graph, `` $`M = E - N + 2`$ ``, is computed purely from these CFG edges and the
+a graph, $`M = E - N + 2`$, is computed purely from these CFG edges and the
 CFG node count; see [`theory/02-control-flow-and-complexity.md`](../../theory/02-control-flow-and-complexity.md).
 
 ## DFG edges
@@ -159,7 +159,7 @@ Data-flow edges are wrapped as `CpgEdgeKind::DataFlow(DfgEdgeKind)`. There are
 There is no `Phi` and no `UseUse`: `libcpg`'s data flow is
 [AST-ordered reaching definitions](../../GLOSSARY.md#ast-ordered-reaching-definitions),
 not [SSA](../../GLOSSARY.md#static-single-assignment-ssa), so there are no
-`` $`\phi`$ ``-nodes. `DfgEdgeKind` classifiers are `is_read()` (`DefUse`, `FieldRead`,
+$`\phi`$-nodes. `DfgEdgeKind` classifiers are `is_read()` (`DefUse`, `FieldRead`,
 `IndexRead`, `Dereference`) and `is_write()` (`UseDef`, `FieldWrite`,
 `IndexWrite`).
 

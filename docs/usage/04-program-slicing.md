@@ -43,7 +43,7 @@ If you constructed the CPG with `with_cfg(false)` or `with_dfg(false)`, run the 
 
 ## Step 2: take a slice
 
-With PDG edges in place, slicing is one call. The **backward** slice of a criterion `` $`s`$ `` is every node that can affect `` $`s`$ `` (its transitive PDG predecessors); the **forward** slice is every node that `` $`s`$ `` can affect (its transitive successors). Both **include the criterion itself**.
+With PDG edges in place, slicing is one call. The **backward** slice of a criterion $`s`$ is every node that can affect $`s`$ (its transitive PDG predecessors); the **forward** slice is every node that $`s`$ can affect (its transitive successors). Both **include the criterion itself**.
 
 ```rust
 // requires: features = ["lang-rust"]

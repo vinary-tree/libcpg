@@ -52,22 +52,22 @@ see [contributing](04-contributing.md).
 
 ## Asymptotic cost of key operations
 
-The table gives *expected* costs. Symbols: `` $`n`$ `` = number of tree-sitter /
-AST nodes, `` $`V`$ `` and `` $`E`$ `` = node and edge counts of the (sub)graph an
-operation touches, `` $`L`$ `` = GNN layers (`num_layers`), `` $`d`$ `` = embedding
-dimension, `` $`k`$ `` = Weisfeiler-Lehman iterations (3).
+The table gives *expected* costs. Symbols: $`n`$ = number of tree-sitter /
+AST nodes, $`V`$ and $`E`$ = node and edge counts of the (sub)graph an
+operation touches, $`L`$ = GNN layers (`num_layers`), $`d`$ = embedding
+dimension, $`k`$ = Weisfeiler-Lehman iterations (3).
 
 | Operation | Expected cost | Notes |
 | --- | --- | --- |
-| CPG construction (AST walk) | `` $`O(n)`$ `` | One depth-first pass over the parse tree, one `CpgNode` per kept tree-sitter node. |
-| CFG extraction (per function) | `` $`O(n)`$ `` | A per-construct walk over the function's AST children. |
-| DFG reaching-defs (per function) | `` $`O(I \cdot n)`$ `` | An [AST-ordered sweep](../GLOSSARY.md#ast-ordered-reaching-definitions); `` $`I`$ `` is bounded by `max_iterations` (default 100), with loop bodies swept twice. |
-| PDG construction (per function) | near-linear in `` $`V + E`$ `` of the CFG | `petgraph::dominators::simple_fast` on the reversed CFG plus a Cytron reverse-dominance-frontier walk. |
-| [`backward_slice`](../GLOSSARY.md#backward-slice--forward-slice) / `forward_slice` | `` $`O(V + E)`$ ``, capped at `max_nodes` | Breadth-first over PDG edges; returns as soon as the slice reaches `max_nodes`. |
-| [VF2](../GLOSSARY.md#vf2) `find_matches` | worst case `` $`O(N!\,N)`$ ``; pruned in practice | Feasibility rules and `max_matches` cut the state space dramatically; see [`theory/05-subgraph-isomorphism-vf2.md`](../theory/05-subgraph-isomorphism-vf2.md). |
-| [Jaccard](../GLOSSARY.md#jaccard-similarity) similarity | `` $`O(V_1 + V_2)`$ `` | Over the two graphs' node-kind multisets. |
-| Weisfeiler-Lehman similarity | `` $`O(k(V + E))`$ `` | `` $`k = 3`$ `` label-refinement rounds. |
-| GNN `propagate` | `` $`O(L \cdot (V + E) \cdot d)`$ `` | Each layer means neighbour vectors over the AST/CFG/DFG overlays, then ReLU. |
+| CPG construction (AST walk) | $`O(n)`$ | One depth-first pass over the parse tree, one `CpgNode` per kept tree-sitter node. |
+| CFG extraction (per function) | $`O(n)`$ | A per-construct walk over the function's AST children. |
+| DFG reaching-defs (per function) | $`O(I \cdot n)`$ | An [AST-ordered sweep](../GLOSSARY.md#ast-ordered-reaching-definitions); $`I`$ is bounded by `max_iterations` (default 100), with loop bodies swept twice. |
+| PDG construction (per function) | near-linear in $`V + E`$ of the CFG | `petgraph::dominators::simple_fast` on the reversed CFG plus a Cytron reverse-dominance-frontier walk. |
+| [`backward_slice`](../GLOSSARY.md#backward-slice--forward-slice) / `forward_slice` | $`O(V + E)`$, capped at `max_nodes` | Breadth-first over PDG edges; returns as soon as the slice reaches `max_nodes`. |
+| [VF2](../GLOSSARY.md#vf2) `find_matches` | worst case $`O(N!\,N)`$; pruned in practice | Feasibility rules and `max_matches` cut the state space dramatically; see [`theory/05-subgraph-isomorphism-vf2.md`](../theory/05-subgraph-isomorphism-vf2.md). |
+| [Jaccard](../GLOSSARY.md#jaccard-similarity) similarity | $`O(V_1 + V_2)`$ | Over the two graphs' node-kind multisets. |
+| Weisfeiler-Lehman similarity | $`O(k(V + E))`$ | $`k = 3`$ label-refinement rounds. |
+| GNN `propagate` | $`O(L \cdot (V + E) \cdot d)`$ | Each layer means neighbour vectors over the AST/CFG/DFG overlays, then ReLU. |
 
 Two of these deserve emphasis. VF2 is worst-case super-exponential, which is why
 its `max_matches` cap and strict-matching toggles matter for untrusted input

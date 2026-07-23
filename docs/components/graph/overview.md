@@ -11,8 +11,8 @@ create and inspect one.
 ## What is a Code Property Graph?
 
 A [Code Property Graph](../../GLOSSARY.md#code-property-graph-cpg) is a single
-directed graph `` $`G = (V, E)`$ `` that merges several classic program
-representations onto **one shared node set** `` $`V`$ ``. Instead of building a
+directed graph $`G = (V, E)`$ that merges several classic program
+representations onto **one shared node set** $`V`$. Instead of building a
 separate tree for syntax, a separate graph for control flow, and yet another for
 data flow, a CPG keeps *one* set of nodes — the syntactic elements of the
 program — and layers **typed edges** over them, one edge type per view. The idea
@@ -236,7 +236,7 @@ helpers (`is_ast`, `is_cfg`, `is_dfg`, `is_pdg`, `is_call`, `is_type`).
   non-cryptographic hash suited to integer keys.
 
 Resolving an id to a node or its incident edges is an
-`` $`O(1)`$ `` map lookup followed by petgraph adjacency iteration.
+$`O(1)`$ map lookup followed by petgraph adjacency iteration.
 
 ## Thread-safety
 

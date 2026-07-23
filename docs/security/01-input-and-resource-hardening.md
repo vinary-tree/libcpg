@@ -60,7 +60,7 @@ parsing (next section). This is a deliberate design property, not an oversight; 
 ## Pattern matching: VF2
 
 [VF2](../GLOSSARY.md#vf2) subgraph isomorphism is worst-case super-exponential —
-`` $`O(N!\,N)`$ `` — so on adversarial graphs the search space is the concern. Two
+$`O(N!\,N)`$ — so on adversarial graphs the search space is the concern. Two
 controls bound it:
 
 - **`with_max_matches(n)`** stops the state-space search after `n` matches (`0`

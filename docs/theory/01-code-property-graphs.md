@@ -20,22 +20,22 @@ G = (V,\ E,\ \kappa,\ \tau)
 
 where
 
-- `` $`V`$ `` is a finite set of **vertices**, one per AST node of the analysed
+- $`V`$ is a finite set of **vertices**, one per AST node of the analysed
   program;
-- `` $`E`$ `` is a finite set of directed **edges**; each `` $`e \in E`$ `` has a
-  source `` $`\mathrm{src}(e) \in V`$ `` and a target `` $`\mathrm{tgt}(e) \in V`$ ``
+- $`E`$ is a finite set of directed **edges**; each $`e \in E`$ has a
+  source $`\mathrm{src}(e) \in V`$ and a target $`\mathrm{tgt}(e) \in V`$
   (it is a multigraph — two vertices may be joined by several edges of different
   types, e.g. an AST edge *and* a CFG edge);
-- `` $`\kappa : V \to K`$ `` is the **node-kind labelling**, assigning every vertex
-  a kind from the alphabet `` $`K`$ `` of 45 [`CpgNodeKind`](../GLOSSARY.md#node-kind--edge-kind)
+- $`\kappa : V \to K`$ is the **node-kind labelling**, assigning every vertex
+  a kind from the alphabet $`K`$ of 45 [`CpgNodeKind`](../GLOSSARY.md#node-kind--edge-kind)
   variants;
-- `` $`\tau : E \to T`$ `` is the **edge-kind labelling**, assigning every edge a
-  kind from the alphabet `` $`T`$ `` of [`CpgEdgeKind`](../GLOSSARY.md#node-kind--edge-kind)
+- $`\tau : E \to T`$ is the **edge-kind labelling**, assigning every edge a
+  kind from the alphabet $`T`$ of [`CpgEdgeKind`](../GLOSSARY.md#node-kind--edge-kind)
   variants.
 
-The essential design commitment is that **`` $`V`$ `` is shared by every layer**.
+The essential design commitment is that **$`V`$ is shared by every layer**.
 There is exactly one vertex per program element; the AST, CFG, DFG, and PDG differ
-only in *which edges they contribute to `` $`E`$ ``*. This is what makes "the same
+only in *which edges they contribute to $`E`$*. This is what makes "the same
 statement, seen three ways" a single object rather than three cross-referenced ones.
 
 In `libcpg` this graph is the type `CodePropertyGraph`, which wraps a
@@ -50,14 +50,14 @@ the level of the model.
 
 ## 2. Overlays as edge-induced subgraphs
 
-Partition the edge alphabet `` $`T`$ `` into families and define, for each family
-`` $`F \subseteq T`$ ``, the **edge subset**
+Partition the edge alphabet $`T`$ into families and define, for each family
+$`F \subseteq T`$, the **edge subset**
 
 ```math
 E_F \;=\; \{\, e \in E : \tau(e) \in F \,\}
 ```
 
-and the corresponding **overlay** `` $`G_F = (V, E_F)`$ `` — the same vertices,
+and the corresponding **overlay** $`G_F = (V, E_F)`$ — the same vertices,
 restricted to the edges of that family. `libcpg` exposes exactly this partition
 through predicate methods on `CpgEdgeKind` (`is_ast`, `is_cfg`, `is_dfg`, `is_pdg`,
 `is_call`, `is_type`), so an overlay is recovered by *filtering* the one edge set:
@@ -74,14 +74,14 @@ E_{\mathrm{PDG}} &= \{\, e : \texttt{is\_pdg}(\tau(e)) \,\} & &\text{(dependence
 Three properties follow directly and are worth stating because analyses rely on
 them:
 
-1. **Shared vertices.** Every overlay is a graph on the *whole* of `` $`V`$ ``. A
-   vertex with no CFG edge is still present in `` $`G_{\mathrm{CFG}}`$ `` as an
+1. **Shared vertices.** Every overlay is a graph on the *whole* of $`V`$. A
+   vertex with no CFG edge is still present in $`G_{\mathrm{CFG}}`$ as an
    isolated vertex; it is simply not part of the control flow.
-2. **Disjoint edge families.** `` $`E_{\mathrm{AST}}`$ ``,
-   `` $`E_{\mathrm{CFG}}`$ ``, `` $`E_{\mathrm{DFG}}`$ ``, `` $`E_{\mathrm{PDG}}`$ ``,
+2. **Disjoint edge families.** $`E_{\mathrm{AST}}`$,
+   $`E_{\mathrm{CFG}}`$, $`E_{\mathrm{DFG}}`$, $`E_{\mathrm{PDG}}`$,
    and the call/type/reference/scope/import families are pairwise disjoint — each
    edge has exactly one kind — so the overlays never double-count an edge.
-3. **The AST is the base layer.** `` $`E_{\mathrm{AST}}`$ `` is always present (the
+3. **The AST is the base layer.** $`E_{\mathrm{AST}}`$ is always present (the
    builder produces it first); the other families are overlaid on top. The CFG and
    DFG are built by their extractors; the PDG — the dependence overlay of
    Ferrante–Ottenstein–Warren [[2]](#references) — is added on demand
@@ -91,7 +91,7 @@ them:
 
 *Figure — the AST (base), CFG, and DFG as edge subsets over a single vertex set; the PDG overlays two further dependence families on the same nodes. Source: [`diagrams/cpg-overlay.dot`](../diagrams/cpg-overlay.dot).*
 
-## 3. The node-kind alphabet `` $`K`$ ``
+## 3. The node-kind alphabet $`K`$
 
 A vertex's kind is what every query, pattern, and heuristic dispatches on, so the
 alphabet is deliberately expressive: 45 [`CpgNodeKind`](../GLOSSARY.md#node-kind--edge-kind)
@@ -114,7 +114,7 @@ seven groups:
 Being *language-agnostic* is the point: a tree-sitter grammar for any of the 16
 built-in languages — or a caller-supplied Rholang/MeTTa grammar via
 [Mode B](../GLOSSARY.md#mode-b--build_from_tree) — is mapped onto this fixed
-vocabulary, so downstream analyses are written once against `` $`K`$ `` rather than
+vocabulary, so downstream analyses are written once against $`K`$ rather than
 per language. The full variant-by-variant reference lives in
 [`components/graph/nodes.md`](../components/graph/nodes.md) and
 [`api/graph-reference.md`](../api/graph-reference.md).
@@ -123,7 +123,7 @@ per language. The full variant-by-variant reference lives in
 
 *Figure — the 45 `CpgNodeKind` variants organised by group. Source: [`diagrams/node-kind-taxonomy.puml`](../diagrams/node-kind-taxonomy.puml).*
 
-## 4. The edge-kind alphabet `` $`T`$ ``
+## 4. The edge-kind alphabet $`T`$
 
 Edges are typed so that overlays are addressable. `CpgEdgeKind` groups into the
 families below; the CFG and DFG families are *wrappers* around finer sub-alphabets
@@ -155,17 +155,17 @@ walked in either direction and let **source order be recovered** even though
 
 ## 5. How queries compose across layers
 
-Because overlays share `` $`V`$ ``, a cross-layer query is a **composition of edge
-relations**, filtered by node kind. Writing `` $`u \xrightarrow{F} v`$ `` for "there
-is an edge `` $`e \in E_F`$ `` with `` $`\mathrm{src}(e)=u`$ ``,
-`` $`\mathrm{tgt}(e)=v`$ ``", a [taint](../GLOSSARY.md#taint-analysis) query is the
+Because overlays share $`V`$, a cross-layer query is a **composition of edge
+relations**, filtered by node kind. Writing $`u \xrightarrow{F} v`$ for "there
+is an edge $`e \in E_F`$ with $`\mathrm{src}(e)=u`$,
+$`\mathrm{tgt}(e)=v`$", a [taint](../GLOSSARY.md#taint-analysis) query is the
 existence of a data-flow path between two vertices selected by their kind:
 
 ```math
 \mathrm{tainted}(s, t) \;\equiv\; \kappa(s) \in \mathit{Sources} \;\wedge\; \kappa(t) \in \mathit{Sinks} \;\wedge\; s \xrightarrow{\ \mathrm{DFG}\ ^{+}} t
 ```
 
-where `` $`\xrightarrow{\ \mathrm{DFG}\ ^{+}}`$ `` is the transitive closure of the
+where $`\xrightarrow{\ \mathrm{DFG}\ ^{+}}`$ is the transitive closure of the
 DFG edge relation. A *guarded*-taint refinement additionally asks the PDG whether a
 sanitising branch dominates the path — the same nodes, a different overlay. The
 point of the model is that this is one traversal over one graph, not a join across
@@ -185,8 +185,8 @@ Inputs: CPG G; definition node d.
  6. // to also require reachability, intersect with cfg-reachable(entry, a)
 ```
 
-Step 1 reads `` $`E_{\mathrm{DFG}}`$ ``, step 3 reads `` $`E_{\mathrm{AST}}`$ ``, and
-the optional step 6 reads `` $`E_{\mathrm{CFG}}`$ `` — all indexing into the same
+Step 1 reads $`E_{\mathrm{DFG}}`$, step 3 reads $`E_{\mathrm{AST}}`$, and
+the optional step 6 reads $`E_{\mathrm{CFG}}`$ — all indexing into the same
 vertices. The corresponding real API restricts each hop to its overlay:
 
 ```rust
@@ -214,7 +214,7 @@ fn calls_reached_by(cpg: &CodePropertyGraph, d: NodeId) -> Vec<NodeId> {
 `uses_of_definition` traverses only DFG edges; `ast_parent` and `node` read the AST
 overlay and the node label — three layers, one graph, no side tables. The same
 composition underlies subgraph matching ([Theory 05](05-subgraph-isomorphism-vf2.md)),
-where a whole *pattern graph* over `` $`(V, E)`$ `` is matched against the CPG, and
+where a whole *pattern graph* over $`(V, E)`$ is matched against the CPG, and
 GNN message passing ([Theory 09](09-graph-neural-networks.md)), where a node's
 neighbourhood is taken across the AST, CFG, and DFG overlays at once.
 

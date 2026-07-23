@@ -65,14 +65,14 @@ Under this *relaxed* configuration (see [file 05 §4](05-subgraph-isomorphism-vf
 
 ## 3. Confidence scoring
 
-A relaxed match tells you a skeleton *embeds*; it does not tell you *how well*. `libcpg` attaches a **[confidence](../GLOSSARY.md#confidence-pattern-match)** in `` $`[0,1]`$ `` to each match, derived from **template completeness** — the fraction of the template's declared roles that the match actually bound:
+A relaxed match tells you a skeleton *embeds*; it does not tell you *how well*. `libcpg` attaches a **[confidence](../GLOSSARY.md#confidence-pattern-match)** in $`[0,1]`$ to each match, derived from **template completeness** — the fraction of the template's declared roles that the match actually bound:
 
 ```math
 \text{completeness} = \frac{\text{matched\_nodes}}{\text{expected\_nodes}}, \qquad
 \text{expected\_nodes} = |\,\text{template node constraints}\,|.
 ```
 
-The final confidence blends this completeness with the template's own baseline `` $`b = \texttt{min\_confidence}`$ ``, so that a fully‑bound template scores `` $`b`$ `` and a barely‑bound one decays toward `` $`b/2`$ ``:
+The final confidence blends this completeness with the template's own baseline $`b = \texttt{min\_confidence}`$, so that a fully‑bound template scores $`b`$ and a barely‑bound one decays toward $`b/2`$:
 
 ```math
 \text{confidence} = \text{completeness}\cdot b \;+\; (1 - \text{completeness})\cdot 0.5\, b.
@@ -80,8 +80,8 @@ The final confidence blends this completeness with the template's own baseline `
 
 Matches scoring **below** the detector's `min_confidence` are discarded; survivors are sorted by confidence, highest first. Two thresholds govern this:
 
-- the **detector** threshold `GofPatternDetector::min_confidence`, default `` $`0.7`$ `` (tunable via `with_min_confidence`);
-- each **template**'s own baseline `` $`b`$ ``, which varies by pattern — e.g. `Observer`, `Singleton`, `Prototype`, `Iterator`, and `Memento` set `` $`b = 0.8`$ `` (their skeletons are distinctive, so a partial match should still score high), while the looser `Facade` sets `` $`b = 0.6`$ `` and most others `` $`0.7`$ ``.
+- the **detector** threshold `GofPatternDetector::min_confidence`, default $`0.7`$ (tunable via `with_min_confidence`);
+- each **template**'s own baseline $`b`$, which varies by pattern — e.g. `Observer`, `Singleton`, `Prototype`, `Iterator`, and `Memento` set $`b = 0.8`$ (their skeletons are distinctive, so a partial match should still score high), while the looser `Facade` sets $`b = 0.6`$ and most others $`0.7`$.
 
 Detected matches carry metadata: `category` (the `GofCategory` name) and `pattern_type = "GoF"`, alongside `pattern_name` and the `node_mapping`.
 

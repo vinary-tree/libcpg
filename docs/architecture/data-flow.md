@@ -83,7 +83,7 @@ From the resulting CFG, libcpg derives [cyclomatic complexity](../GLOSSARY.md#cy
 M = E - N + 2
 ```
 
-where `` $`E`$ `` and `` $`N`$ `` are the CFG edge and node counts of a single-entry/single-exit component. `cpg.cyclomatic_complexity()` computes it directly.
+where $`E`$ and $`N`$ are the CFG edge and node counts of a single-entry/single-exit component. `cpg.cyclomatic_complexity()` computes it directly.
 
 ### Stage 3 — DFG extraction
 

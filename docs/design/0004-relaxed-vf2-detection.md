@@ -103,11 +103,11 @@ it fills the template:
 \mathrm{conf}(m) \;=\; c\,b \;+\; (1 - c)\cdot \tfrac{1}{2}\,b \;=\; b\left(\tfrac{1}{2} + \tfrac{1}{2}\,c\right)
 ```
 
-where `` $`c = |\mathrm{matched}|\,/\,|\mathrm{template}|`$ `` is the fraction of
+where $`c = |\mathrm{matched}|\,/\,|\mathrm{template}|`$ is the fraction of
 template node-constraints the match covers (`match_size()` over
-`template.node_constraints.len()`), and `` $`b`$ `` is the template's own
-`min_confidence` weight. So a *full* match (`` $`c = 1`$ ``) scores `` $`b`$ ``,
-and a half-covered match (`` $`c = 0.5`$ ``) scores `` $`0.75\,b`$ ``. The
+`template.node_constraints.len()`), and $`b`$ is the template's own
+`min_confidence` weight. So a *full* match ($`c = 1`$) scores $`b`$,
+and a half-covered match ($`c = 0.5`$) scores $`0.75\,b`$. The
 detector then keeps matches whose score meets its acceptance threshold and sorts
 the survivors best-first:
 
@@ -131,8 +131,8 @@ because they are easy to conflate:
 
 | Value | Where | Role |
 | :--- | :--- | :--- |
-| **Template `min_confidence`** (`` $`b`$ ``) | per template in `templates.rs` (e.g. Observer `0.8`, most others `0.7`, Facade `0.6`) | the *weight* `` $`b`$ `` that scales a match's score |
-| **Detector `min_confidence`** | `GofPatternDetector` (default `0.7`, set by `new()`) | the *acceptance gate*: keep `` $`\mathrm{conf}(m) \ge`$ `` this |
+| **Template `min_confidence`** ($`b`$) | per template in `templates.rs` (e.g. Observer `0.8`, most others `0.7`, Facade `0.6`) | the *weight* $`b`$ that scales a match's score |
+| **Detector `min_confidence`** | `GofPatternDetector` (default `0.7`, set by `new()`) | the *acceptance gate*: keep $`\mathrm{conf}(m) \ge`$ this |
 
 ## Consequences
 
@@ -161,14 +161,14 @@ because they are easy to conflate:
   means the matcher proposes candidates that are structurally pattern-shaped but
   semantically unrelated; confidence and the threshold filter *some*, not all.
   Results are **advisory**, not verdicts.
-- **Confidence is a completeness heuristic, not a probability.** `` $`\mathrm{conf}(m)`$ ``
+- **Confidence is a completeness heuristic, not a probability.** $`\mathrm{conf}(m)`$
   measures how much of the template was covered, weighted by a hand-set
-  `` $`b`$ ``; it is not calibrated against a labelled corpus and must not be
+  $`b`$; it is not calibrated against a labelled corpus and must not be
   read as `P(pattern)`.
 - **Category conflation.** Treating all "declarations" (or all "expressions") as
   interchangeable can match a `Struct` where the template meant a `Class`; a
   caller who needs that distinction should set `strict_kinds = true`.
-- **Worst-case cost.** VF2 is `` $`O(N!\,N)`$ `` in the worst case (subgraph
+- **Worst-case cost.** VF2 is $`O(N!\,N)`$ in the worst case (subgraph
   isomorphism is [NP-complete](../GLOSSARY.md#isomorphism--subgraph-isomorphism));
   pruning makes it practical, and `with_max_matches` bounds the search when a
   program contains many embeddings.

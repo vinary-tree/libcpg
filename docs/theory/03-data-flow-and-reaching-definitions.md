@@ -17,11 +17,11 @@
 
 Classical data-flow analysis (Kildall [[1]](#references)) frames a whole-procedure
 property as the least solution of a monotone equation system over a
-[lattice](../GLOSSARY.md#lattice-data-flow). Fix a finite set `` $`D`$ `` of *facts*;
-the analysis domain is the powerset lattice `` $`(2^{D}, \subseteq)`$ `` with join
-`` $`\sqcup = \cup`$ ``, bottom `` $`\bot = \varnothing`$ ``, and top
-`` $`\top = D`$ ``. Each CFG node `` $`b`$ `` carries a monotone **transfer
-function** `` $`f_b : 2^{D} \to 2^{D}`$ `` describing how it changes the facts that
+[lattice](../GLOSSARY.md#lattice-data-flow). Fix a finite set $`D`$ of *facts*;
+the analysis domain is the powerset lattice $`(2^{D}, \subseteq)`$ with join
+$`\sqcup = \cup`$, bottom $`\bot = \varnothing`$, and top
+$`\top = D`$. Each CFG node $`b`$ carries a monotone **transfer
+function** $`f_b : 2^{D} \to 2^{D}`$ describing how it changes the facts that
 flow through it. For a *forward* analysis, the entry facts of a node are the join of
 its predecessors' exit facts, and the exit facts are the transfer of the entry:
 
@@ -31,8 +31,8 @@ its predecessors' exit facts, and the exit facts are the transfer of the entry:
 \mathrm{OUT}[b] \;=\; f_b\!\big(\mathrm{IN}[b]\big) .
 ```
 
-Because every `` $`f_b`$ `` is monotone and the lattice has finite height, iterating
-these equations from `` $`\bot`$ `` reaches a least fixed point — the
+Because every $`f_b`$ is monotone and the lattice has finite height, iterating
+these equations from $`\bot`$ reaches a least fixed point — the
 **maximum-fixed-point (MFP)** solution — in finitely many rounds. When the transfer
 functions are *distributive* (as they are for reaching definitions), the MFP
 coincides with the ideal **meet-over-all-paths (MOP)** solution, so the fixed point
@@ -42,11 +42,11 @@ loses no precision relative to enumerating paths [[2]](#references).
 
 A [definition](../GLOSSARY.md#def-use-chain--definition--use) is a program point that
 assigns a variable; a **[reaching definition](../GLOSSARY.md#reaching-definition)** at
-a point `` $`p`$ `` is a definition `` $`d`$ `` of some variable `` $`x`$ `` such that
-there is a path from `` $`d`$ `` to `` $`p`$ `` with **no intervening redefinition**
-of `` $`x`$ ``. Reaching definitions is the archetypal forward, *may* analysis: the
-facts `` $`D`$ `` are the definition sites, the join is union (a definition reaches
-`` $`p`$ `` if it reaches along *some* predecessor), and each node's transfer is
+a point $`p`$ is a definition $`d`$ of some variable $`x`$ such that
+there is a path from $`d`$ to $`p`$ with **no intervening redefinition**
+of $`x`$. Reaching definitions is the archetypal forward, *may* analysis: the
+facts $`D`$ are the definition sites, the join is union (a definition reaches
+$`p`$ if it reaches along *some* predecessor), and each node's transfer is
 expressed with two sets — the definitions it creates and the ones it invalidates:
 
 ```math
@@ -85,7 +85,7 @@ incident edges rather than re-running the analysis (`reaching_definitions`,
 
 The classical algorithm iterates the equations of §1 over the CFG until a fixed
 point; [SSA](../GLOSSARY.md#static-single-assignment-ssa) instead rewrites the program
-so each variable is assigned once, inserting `` $`\phi`$ ``-functions at joins
+so each variable is assigned once, inserting $`\phi`$-functions at joins
 (Cytron et al., see [Theory 04](04-program-dependence-and-slicing.md)). `libcpg`
 deliberately uses **neither**. Its `DfgExtractor` performs a single
 **[AST-ordered, flow-sensitive sweep](../GLOSSARY.md#ast-ordered-reaching-definitions)**:
@@ -108,7 +108,7 @@ nodes). The choice is a considered trade-off, honest about its limits:
   [`CpgNodeKind`](../GLOSSARY.md#node-kind--edge-kind), never on grammar specifics, so
   one implementation serves all 16 grammars plus the
   [Mode-B](../GLOSSARY.md#mode-b--build_from_tree) Rholang/MeTTa frontends.
-- **Honesty.** It is **not** SSA (no `` $`\phi`$ ``-functions, no single-assignment
+- **Honesty.** It is **not** SSA (no $`\phi`$-functions, no single-assignment
   renaming) and **not** a classic CFG fixed point. Two earlier CFG-based
   reaching-definition implementations are retained in the source but *never compiled*
   (guarded by `#[cfg(any())]`) as an executable record of the approaches the sweep
@@ -116,7 +116,7 @@ nodes). The choice is a considered trade-off, honest about its limits:
 
 ### The sweep in detail
 
-The environment `` $`\rho`$ `` is updated as the walk descends, with these rules
+The environment $`\rho`$ is updated as the walk descends, with these rules
 (the `bind` operation is a [strong or weak update](../GLOSSARY.md#strong-update--weak-update)
 per context):
 
@@ -148,7 +148,7 @@ re-exposes the body's own late definitions to its early uses.
 
 ## 4. Literate procedure
 
-The core walk (`visit_reaching`) descends the AST, mutating `` $`\rho`$ `` in place
+The core walk (`visit_reaching`) descends the AST, mutating $`\rho`$ in place
 and collecting `(definition, use)` pairs:
 
 ```text

@@ -1,6 +1,6 @@
 # Graph Data Model
 
-The [Code Property Graph](../GLOSSARY.md#code-property-graph-cpg) is one directed graph `` $`G = (V, E)`$ `` in which the vertex set `` $`V`$ `` is the program's syntax nodes and the edge set `` $`E`$ `` carries *typed overlays* — [AST](../GLOSSARY.md#abstract-syntax-tree-ast), [CFG](../GLOSSARY.md#control-flow-graph-cfg), [DFG](../GLOSSARY.md#data-flow-graph-dfg), and (on demand) [PDG](../GLOSSARY.md#program-dependence-graph-pdg) — over the *same* `` $`V`$ ``. This single-node-set design is what lets one query cross layers, following Yamaguchi et al. [[1]](#references). This page specifies the storage: the [petgraph](../GLOSSARY.md#petgraph) backing, the `CpgNode` and `CpgEdge` shapes, the four overlays, and how AST source order is recovered.
+The [Code Property Graph](../GLOSSARY.md#code-property-graph-cpg) is one directed graph $`G = (V, E)`$ in which the vertex set $`V`$ is the program's syntax nodes and the edge set $`E`$ carries *typed overlays* — [AST](../GLOSSARY.md#abstract-syntax-tree-ast), [CFG](../GLOSSARY.md#control-flow-graph-cfg), [DFG](../GLOSSARY.md#data-flow-graph-dfg), and (on demand) [PDG](../GLOSSARY.md#program-dependence-graph-pdg) — over the *same* $`V`$. This single-node-set design is what lets one query cross layers, following Yamaguchi et al. [[1]](#references). This page specifies the storage: the [petgraph](../GLOSSARY.md#petgraph) backing, the `CpgNode` and `CpgEdge` shapes, the four overlays, and how AST source order is recovered.
 
 ## petgraph-backed storage
 
@@ -17,7 +17,7 @@ CodePropertyGraph (private fields)
 └── cfg_entries / cfg_exits: Vec<NodeId>                    ← CFG boundary nodes
 ```
 
-The distinction between a `NodeId` and petgraph's `NodeIndex` is deliberate. `NodeId` is libcpg's public, stable identity: it is assigned monotonically, never reused, and is what appears in edges, pattern matches, and serialized graphs. petgraph's `NodeIndex` is an internal storage detail; the `FxHashMap` (from `rustc-hash`) bridges the two in `` $`O(1)`$ ``. All the fields are private — callers interact through methods (`node_count`, `add_node`, `connect`, `node`, the traversal families, `stats`), documented in [`../api/graph-reference.md`](../api/graph-reference.md).
+The distinction between a `NodeId` and petgraph's `NodeIndex` is deliberate. `NodeId` is libcpg's public, stable identity: it is assigned monotonically, never reused, and is what appears in edges, pattern matches, and serialized graphs. petgraph's `NodeIndex` is an internal storage detail; the `FxHashMap` (from `rustc-hash`) bridges the two in $`O(1)`$. All the fields are private — callers interact through methods (`node_count`, `add_node`, `connect`, `node`, the traversal families, `stats`), documented in [`../api/graph-reference.md`](../api/graph-reference.md).
 
 Building a graph by hand needs no Cargo features — this is the surface that always works, even under `default = []`:
 
@@ -123,7 +123,7 @@ There is **no** `CfgEdge`/`DfgEdge` wrapper type and **no** `BranchTrue`/`UseUse
 
 ## Four overlays over one node set
 
-The payoff of the shared `` $`V`$ `` is that the overlays *co-locate*: the same `Call` node participates in AST child edges, CFG sequencing, DFG argument edges, and — after `PdgBuilder::build` — dependence edges.
+The payoff of the shared $`V`$ is that the overlays *co-locate*: the same `Call` node participates in AST child edges, CFG sequencing, DFG argument edges, and — after `PdgBuilder::build` — dependence edges.
 
 ![The AST, CFG, and DFG overlays drawn on one shared set of code nodes](../diagrams/cpg-overlay.svg)
 
@@ -139,7 +139,7 @@ Each overlay is queried through its own traversal family, all returning owned `V
 | PDG | `ControlDependence`, `DataDependence` | traversed by `backward_slice` / `forward_slice` |
 | Call | `CallSite`/`StaticCall`/`DynamicCall` | `call_sites`, `callees`, `callers` |
 
-Positional and kind queries round out the surface: `node_at_offset`, `nodes_in_range`, `scope_at_offset`; `functions`, `classes`, `variables`, `calls`, and the general `nodes_by_kind(predicate)` (note: a **predicate**, `Fn(&CpgNodeKind) -> bool`, not a single kind). Metrics include `ast_depth`, `cyclomatic_complexity` (`` $`M = E - N + 2`$ `` over the CFG), and `stats() -> CpgStats`. Subgraph extraction — `subgraph`, `function_cfg`, `function_dfg` — returns new `CodePropertyGraph`s.
+Positional and kind queries round out the surface: `node_at_offset`, `nodes_in_range`, `scope_at_offset`; `functions`, `classes`, `variables`, `calls`, and the general `nodes_by_kind(predicate)` (note: a **predicate**, `Fn(&CpgNodeKind) -> bool`, not a single kind). Metrics include `ast_depth`, `cyclomatic_complexity` ($`M = E - N + 2`$ over the CFG), and `stats() -> CpgStats`. Subgraph extraction — `subgraph`, `function_cfg`, `function_dfg` — returns new `CodePropertyGraph`s.
 
 ## Identities and ranges
 

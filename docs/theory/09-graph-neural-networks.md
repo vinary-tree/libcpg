@@ -14,7 +14,7 @@ GNNs for graphs were pioneered by Scarselli et al. [[1]](#references); the appli
 
 ## 1. Message passing, intuitively
 
-The core operation is **[message passing](../GLOSSARY.md#message-passing)**: every node repeatedly gathers its neighbours' current vectors, combines them with its own, and updates. It is a structured game of *telephone* — each round, a node hears from everyone one step away, so after `` $`k`$ `` rounds a node's vector reflects everything within `` $`k`$ `` hops.
+The core operation is **[message passing](../GLOSSARY.md#message-passing)**: every node repeatedly gathers its neighbours' current vectors, combines them with its own, and updates. It is a structured game of *telephone* — each round, a node hears from everyone one step away, so after $`k`$ rounds a node's vector reflects everything within $`k`$ hops.
 
 ```text
 Round 0            Round 1                     Round 2
@@ -24,22 +24,22 @@ Round 0            Round 1                     Round 2
                     [C₁]=agg(C₀, B₀)            [C₂]=agg(C₁, B₁)   ⟵ C now "knows" A
 ```
 
-By round 2, node `` $`C`$ `` has indirectly absorbed information from `` $`A`$ `` (two hops away, via `` $`B`$ ``). What makes a *code* GNN distinctive — the Devign insight — is that the neighbourhood spans **several edge overlays at once**: syntax ([AST](../GLOSSARY.md#abstract-syntax-tree-ast)), control ([CFG](../GLOSSARY.md#control-flow-graph-cfg)), and data flow ([DFG](../GLOSSARY.md#data-flow-graph-dfg)) all contribute messages, so an embedding fuses *how the code is written*, *how it executes*, and *how values move*.
+By round 2, node $`C`$ has indirectly absorbed information from $`A`$ (two hops away, via $`B`$). What makes a *code* GNN distinctive — the Devign insight — is that the neighbourhood spans **several edge overlays at once**: syntax ([AST](../GLOSSARY.md#abstract-syntax-tree-ast)), control ([CFG](../GLOSSARY.md#control-flow-graph-cfg)), and data flow ([DFG](../GLOSSARY.md#data-flow-graph-dfg)) all contribute messages, so an embedding fuses *how the code is written*, *how it executes*, and *how values move*.
 
 ---
 
 ## 2. The aggregation equation
 
-One round of `libcpg`'s message passing updates each node `` $`v`$ `` by taking the **mean** of its neighbours' and its own previous vectors and applying a [ReLU](../GLOSSARY.md#relu) nonlinearity:
+One round of `libcpg`'s message passing updates each node $`v`$ by taking the **mean** of its neighbours' and its own previous vectors and applying a [ReLU](../GLOSSARY.md#relu) nonlinearity:
 
 ```math
 h_v^{(k)} = \mathrm{ReLU}\!\left( \mathrm{mean}\left( \{ h_u^{(k-1)} : u \in \mathcal{N}(v) \} \cup \{ h_v^{(k-1)} \} \right) \right),
 ```
 
-where `` $`h_v^{(k)}`$ `` is node `` $`v`$ ``'s vector after round `` $`k`$ ``, `` $`\mathcal{N}(v)`$ `` is its neighbourhood across the three overlays, and the self term `` $`\{ h_v^{(k-1)} \}`$ `` is included in the mean (a "self‑loop", so a node never forgets itself). The three design choices each earn their place:
+where $`h_v^{(k)}`$ is node $`v`$'s vector after round $`k`$, $`\mathcal{N}(v)`$ is its neighbourhood across the three overlays, and the self term $`\{ h_v^{(k-1)} \}`$ is included in the mean (a "self‑loop", so a node never forgets itself). The three design choices each earn their place:
 
 - **Mean** aggregation is *permutation‑invariant* (neighbour order is irrelevant) and *degree‑stable* (a high‑degree node does not blow up the magnitude), unlike `Sum`.
-- **[ReLU](../GLOSSARY.md#relu)**, `` $`\mathrm{ReLU}(x) = \max(0, x)`$ ``, injects the nonlinearity that lets stacked rounds represent more than a single linear smoothing.
+- **[ReLU](../GLOSSARY.md#relu)**, $`\mathrm{ReLU}(x) = \max(0, x)`$, injects the nonlinearity that lets stacked rounds represent more than a single linear smoothing.
 - **Self‑inclusion** keeps each node's own signal in play across rounds.
 
 ![GNN message passing: a node aggregates the mean of its AST, CFG, and DFG neighbours plus itself, then applies ReLU to produce its next‑round embedding.](../diagrams/gnn-message-passing.svg)
@@ -50,7 +50,7 @@ where `` $`h_v^{(k)}`$ `` is node `` $`v`$ ``'s vector after round `` $`k`$ ``, 
 
 ## 3. `libcpg`'s concrete propagation
 
-`CpgGnn::propagate(iterations)` realises the equation above literally. The neighbourhood `` $`\mathcal{N}(v)`$ `` is the union of six directed relations across the three overlays, taken **undirected** (both directions contribute):
+`CpgGnn::propagate(iterations)` realises the equation above literally. The neighbourhood $`\mathcal{N}(v)`$ is the union of six directed relations across the three overlays, taken **undirected** (both directions contribute):
 
 ```text
 Algorithm CpgGnn‑Propagate(G, iterations):
@@ -70,7 +70,7 @@ Algorithm CpgGnn‑Propagate(G, iterations):
   mark initialised
 ```
 
-Dividing by `` $`\text{count} + 1`$ `` is precisely the "mean including self" of Section 2. Each round is **embarrassingly parallel across nodes** (every `` $`h'[v]`$ `` reads only the *previous* round's vectors), but the rounds themselves are inherently sequential — round `` $`k`$ `` depends on round `` $`k-1`$ ``. Without the `gnn` feature the method is a no‑op that merely marks the graph initialised.
+Dividing by $`\text{count} + 1`$ is precisely the "mean including self" of Section 2. Each round is **embarrassingly parallel across nodes** (every $`h'[v]`$ reads only the *previous* round's vectors), but the rounds themselves are inherently sequential — round $`k`$ depends on round $`k-1`$. Without the `gnn` feature the method is a no‑op that merely marks the graph initialised.
 
 > **Honesty — an untrained propagator.** `CpgGnn` is a **deterministic structural embedder, not a trained model**: there are no learned weight matrices and no back‑propagation. It computes a fixed mean‑aggregation message pass over the CPG. The `with_num_layers` and `with_dropout` builders store hyper‑parameters, but `propagate(iterations)` runs exactly the `iterations` you pass (it does not read `num_layers`), and dropout — a *training*-time regulariser — is not applied during this inference‑only pass. So the embeddings capture *structure*, not patterns *learned from labelled data*; feeding them to a downstream trained classifier (the Devign use case) is where learning would enter.
 
@@ -81,7 +81,7 @@ Dividing by `` $`\text{count} + 1`$ `` is precisely the "mean including self" of
 Before any message passing, each node is seeded with a vector that combines a **type signal** and a little **noise**:
 
 - a 16‑dimensional, one‑hot‑like **node‑kind encoding** (`node_type_features`) placed into the leading dimensions, and
-- small random values in `` $`[-0.1, 0.1]`$ `` across all `embedding_dim` dimensions, to break symmetry between nodes of the same kind.
+- small random values in $`[-0.1, 0.1]`$ across all `embedding_dim` dimensions, to break symmetry between nodes of the same kind.
 
 The 16 buckets coarsen the 45 [node kinds](../GLOSSARY.md#node-kind--edge-kind) into families the network can distinguish from round zero:
 
@@ -98,7 +98,7 @@ Because the type signal seeds the vectors and message passing then mixes in neig
 
 ## 5. Receptive field
 
-The **receptive field** of a node after `` $`k`$ `` rounds is the set of nodes that can influence its embedding — exactly its `` $`k`$ ``‑hop neighbourhood. More rounds means broader context:
+The **receptive field** of a node after $`k`$ rounds is the set of nodes that can influence its embedding — exactly its $`k`$‑hop neighbourhood. More rounds means broader context:
 
 | Iterations | Context captured (roughly) |
 |---|---|
@@ -109,12 +109,12 @@ The **receptive field** of a node after `` $`k`$ `` rounds is the set of nodes t
 
 ![GNN receptive field: expanding k‑hop neighbourhoods around a node as message‑passing rounds increase from 1 to 3.](../diagrams/gnn-receptive-field.svg)
 
-*Figure — the receptive field growing with iterations `` $`k = 1, 2, 3`$ ``. Source: [`diagrams/gnn-receptive-field.dot`](../diagrams/gnn-receptive-field.dot).*
+*Figure — the receptive field growing with iterations $`k = 1, 2, 3`$. Source: [`diagrams/gnn-receptive-field.dot`](../diagrams/gnn-receptive-field.dot).*
 
-There is a genuine trade‑off. More rounds widen the context but risk **over‑smoothing**: as `` $`k`$ `` grows, mean aggregation drives distant nodes' embeddings toward a shared average, erasing the very distinctions you want. Cost is `` $`O(\text{iterations} \times |E|)`$ ``. For code, 2–4 rounds are usually the sweet spot. Two structural cases behave as one would hope:
+There is a genuine trade‑off. More rounds widen the context but risk **over‑smoothing**: as $`k`$ grows, mean aggregation drives distant nodes' embeddings toward a shared average, erasing the very distinctions you want. Cost is $`O(\text{iterations} \times |E|)`$. For code, 2–4 rounds are usually the sweet spot. Two structural cases behave as one would hope:
 
 - **Disconnected components** (e.g. unrelated functions) never exchange messages, so function‑level analysis stays local — usually the desired behaviour.
-- **Cycles** are handled naturally by the fixed‑point iteration: information circulates `` $`A \to B \to C \to A \to \dots`$ `` across rounds without special casing.
+- **Cycles** are handled naturally by the fixed‑point iteration: information circulates $`A \to B \to C \to A \to \dots`$ across rounds without special casing.
 
 ---
 
@@ -131,7 +131,7 @@ Similarity between embeddings uses the same [cosine](../GLOSSARY.md#cosine-simil
 \cos(u, v) = \frac{u \cdot v}{\lVert u \rVert \, \lVert v \rVert} \in [-1, 1],
 ```
 
-returning `` $`0`$ `` when either vector is zero or the dimensions differ. This is the bridge between the two similarity worlds: [file 06](06-graph-similarity.md) compares *hand‑built* feature vectors; here the same cosine compares *message‑passed* embeddings.
+returning $`0`$ when either vector is zero or the dimensions differ. This is the bridge between the two similarity worlds: [file 06](06-graph-similarity.md) compares *hand‑built* feature vectors; here the same cosine compares *message‑passed* embeddings.
 
 ```rust
 // requires: features = ["gnn"]

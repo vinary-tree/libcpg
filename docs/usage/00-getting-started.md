@@ -196,7 +196,7 @@ fn describe(cpg: &CodePropertyGraph) {
 }
 ```
 
-`CpgStats` is a plain struct with public fields — `node_count`, `edge_count`, `ast_edges`, `cfg_edges`, `dfg_edges`, `call_edges`, `function_count`, `class_count`, and `cyclomatic_complexity`. The complexity figure is McCabe's [cyclomatic complexity](../GLOSSARY.md#cyclomatic-complexity), `` $`M = E - N + 2`$ `` over the CFG — see [Querying and Traversal](02-querying-and-traversal.md#metrics) and the [complexity theory page](../theory/02-control-flow-and-complexity.md), which derive and cite it.
+`CpgStats` is a plain struct with public fields — `node_count`, `edge_count`, `ast_edges`, `cfg_edges`, `dfg_edges`, `call_edges`, `function_count`, `class_count`, and `cyclomatic_complexity`. The complexity figure is McCabe's [cyclomatic complexity](../GLOSSARY.md#cyclomatic-complexity), $`M = E - N + 2`$ over the CFG — see [Querying and Traversal](02-querying-and-traversal.md#metrics) and the [complexity theory page](../theory/02-control-flow-and-complexity.md), which derive and cite it.
 
 ---
 

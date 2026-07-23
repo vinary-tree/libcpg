@@ -86,7 +86,7 @@ fn next_sibling(cpg: &CodePropertyGraph, id: NodeId) -> Option<NodeId> {
 
 `cfg_successors` and `cfg_predecessors` return `Vec<(NodeId, CfgEdgeKind)>` — the
 neighbour paired with the labelled control-flow edge. A depth-first reachability
-check is the canonical use; it runs in `` $`O(V + E)`$ `` over the CFG:
+check is the canonical use; it runs in $`O(V + E)`$ over the CFG:
 
 ```rust
 use std::collections::HashSet;
@@ -197,7 +197,7 @@ fn reaches_sink(cpg: &CodePropertyGraph, source: NodeId, sink: NodeId) -> bool {
 ```
 
 This visits each node at most once and scans its data-flow out-edges once, so it
-is `` $`O(V + E)`$ `` over the DFG. Two refinements are worth knowing:
+is $`O(V + E)`$ over the DFG. Two refinements are worth knowing:
 
 - **Require an executable path.** Pure data-flow reachability does not check that
   a control-flow path also exists. Intersect the taint set with a

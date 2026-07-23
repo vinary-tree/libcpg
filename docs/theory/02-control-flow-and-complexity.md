@@ -2,11 +2,11 @@
 
 > **Where this sits.** [Theory 01](01-code-property-graphs.md) defined the
 > [CFG](../GLOSSARY.md#control-flow-graph-cfg) overlay abstractly as the edge subset
-> `` $`E_{\mathrm{CFG}}`$ `` over the shared vertex set. This chapter gives the
+> $`E_{\mathrm{CFG}}`$ over the shared vertex set. This chapter gives the
 > control-flow theory: what a CFG is, what a [basic block](../GLOSSARY.md#basic-block)
 > is, the semantics of `libcpg`'s 14 [`CfgEdgeKind`](../GLOSSARY.md#control-flow-graph-cfg)
 > edge types, and McCabe's [cyclomatic complexity](../GLOSSARY.md#cyclomatic-complexity)
-> `` $`M = E - N + 2`$ `` computed over that overlay. Notation follows the
+> $`M = E - N + 2`$ computed over that overlay. Notation follows the
 > [Glossary conventions](../GLOSSARY.md#notation-conventions).
 
 ## 1. The control-flow graph
@@ -18,16 +18,16 @@ G_{\mathrm{CFG}} = (V,\ E_{\mathrm{CFG}},\ \mathit{entry},\ \mathit{exit})
 ```
 
 whose edges encode *possible* successor relationships during execution: an edge
-`` $`u \to v`$ `` means control may pass from `` $`u`$ `` to `` $`v`$ `` in some run.
-A distinguished `` $`\mathit{entry}`$ `` has no predecessors and every execution
-begins there; the `` $`\mathit{exit}`$ `` set collects the points where the
+$`u \to v`$ means control may pass from $`u`$ to $`v`$ in some run.
+A distinguished $`\mathit{entry}`$ has no predecessors and every execution
+begins there; the $`\mathit{exit}`$ set collects the points where the
 procedure returns. A CFG is an *over-approximation* — it admits every path the
 program *could* take, not the (undecidable) set it actually takes — which is exactly
 what makes conservative static analysis sound.
 
 In `libcpg` the CFG is not a separate structure: it is the overlay
-`` $`G_{\mathrm{CFG}} = (V, E_{\mathrm{CFG}})`$ `` over the CPG's shared vertices,
-where `` $`E_{\mathrm{CFG}} = \{\, e : \texttt{is\_cfg}(\tau(e)) \,\}`$ ``. The
+$`G_{\mathrm{CFG}} = (V, E_{\mathrm{CFG}})`$ over the CPG's shared vertices,
+where $`E_{\mathrm{CFG}} = \{\, e : \texttt{is\_cfg}(\tau(e)) \,\}`$. The
 `CfgExtractor` populates it, recording each function's entry and exit vertices
 (`cfg_entries` / `cfg_exits`), and the graph is queried with `cfg_successors`,
 `cfg_predecessors`, and `cfg_nodes`. Crucially, `libcpg` works at **AST-node
@@ -46,7 +46,7 @@ can recover **block leaders** — the nodes that begin a basic block — through
 `BasicBlockIdentifier`, described in [`components/builder/cfg.md`](../components/builder/cfg.md).
 Cyclomatic complexity (§4) is invariant to whether it is computed over blocks or over
 the finer per-node CFG, because collapsing a straight-line chain removes equal
-numbers of nodes and edges and leaves `` $`E - N`$ `` unchanged.
+numbers of nodes and edges and leaves $`E - N`$ unchanged.
 
 ## 3. The 14 control-flow edge kinds
 
@@ -97,18 +97,18 @@ composes from:
 McCabe [[1]](#references) proposed measuring a procedure's structural complexity by
 the **cyclomatic number** of its CFG — the number of *linearly independent paths*
 through it, equivalently the dimension of the cycle space of the graph. For a CFG
-with `` $`E`$ `` edges, `` $`N`$ `` nodes, and `` $`P`$ `` connected components,
+with $`E`$ edges, $`N`$ nodes, and $`P`$ connected components,
 
 ```math
 M = E - N + 2P .
 ```
 
 The intuition is graph-theoretic: a connected graph has a spanning tree with
-`` $`N - 1`$ `` edges; each of the remaining `` $`E - (N - 1)`$ `` edges closes an
+$`N - 1`$ edges; each of the remaining $`E - (N - 1)`$ edges closes an
 independent cycle, and adding the virtual edge from exit back to entry (the
-`` $`+1`$ `` that turns `` $`+1`$ `` into `` $`+2`$ `` per component) makes the count
+$`+1`$ that turns $`+1`$ into $`+2`$ per component) makes the count
 the number of independent circuits. For a single procedure analysed in isolation —
-one entry, one exit, one connected component — `` $`P = 1`$ `` and the formula
+one entry, one exit, one connected component — $`P = 1`$ and the formula
 reduces to the familiar
 
 ```math
@@ -116,9 +116,9 @@ M = E - N + 2 .
 ```
 
 An equivalent and often handier characterisation for structured code is
-`` $`M = d + 1`$ ``, where `` $`d`$ `` is the number of binary decision points
+$`M = d + 1`$, where $`d`$ is the number of binary decision points
 (each `if`, `while`, `for`, `case`, and short-circuit `&&`/`||` adds one), because
-every decision contributes exactly one extra edge over a node. `` $`M`$ `` is also a
+every decision contributes exactly one extra edge over a node. $`M`$ is also a
 lower bound on the number of test cases needed for branch coverage, which is what
 made it a durable software metric.
 
@@ -127,10 +127,10 @@ made it a durable software metric.
 `cyclomatic_complexity()` counts the CFG overlay of the whole graph and applies the
 single-component formula, with two deliberate, documented edge behaviours:
 
-- it counts `` $`E`$ `` as the edges satisfying `is_cfg` and `` $`N`$ `` as the
+- it counts $`E`$ as the edges satisfying `is_cfg` and $`N`$ as the
   vertices returned by `cfg_nodes()` (those incident to at least one CFG edge);
 - if there are **no** CFG nodes it returns `1` (a trivial single-path procedure),
-  and it uses a **saturating** subtraction so `` $`E - N`$ `` never underflows.
+  and it uses a **saturating** subtraction so $`E - N`$ never underflows.
 
 Because the count is taken over the entire graph's CFG edges, invoke it on a
 per-function subgraph (via `function_cfg`) when you want a single procedure's number
@@ -179,11 +179,11 @@ MeTTa frontends.
 
 Take `fn max(a, b) { if a > b { a } else { b } }`. Its CFG (the first figure above)
 has the entry, the condition, the two branches, and a join — the two-way branch adds
-one decision point, so `` $`d = 1`$ `` and `` $`M = d + 1 = 2`$ ``: there are exactly
-two independent paths (the `then` and the `else`), matching `` $`E - N + 2`$ `` on the
+one decision point, so $`d = 1`$ and $`M = d + 1 = 2`$: there are exactly
+two independent paths (the `then` and the `else`), matching $`E - N + 2`$ on the
 drawn graph. Nesting a loop inside a branch adds its own `LoopBack`/`LoopExit` pair
-and one more independent path, taking `` $`M`$ `` to 3 — each decision point
-contributing linearly, which is precisely the behaviour that makes `` $`M`$ `` track
+and one more independent path, taking $`M`$ to 3 — each decision point
+contributing linearly, which is precisely the behaviour that makes $`M`$ track
 the effort of testing a routine.
 
 ## Cross-references
@@ -192,7 +192,7 @@ the effort of testing a routine.
 - What the branch edges feed into: [control dependence and slicing](04-program-dependence-and-slicing.md).
 - How loop and recursion structure maps to a [complexity class](../GLOSSARY.md#complexity-class--big-o):
   [Theory 08](08-algorithm-and-complexity-analysis.md) (a different, per-function
-  *asymptotic* notion — not to be confused with McCabe's structural `` $`M`$ ``).
+  *asymptotic* notion — not to be confused with McCabe's structural $`M`$).
 - Construction details: [`components/builder/cfg.md`](../components/builder/cfg.md);
   the edge catalogue: [`components/graph/edges.md`](../components/graph/edges.md);
   traversal recipes: [`components/graph/traversal.md`](../components/graph/traversal.md).
