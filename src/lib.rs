@@ -10,7 +10,9 @@
 //! - **Pattern Detection**: Detect design patterns using subgraph isomorphism (VF2/VF3)
 //! - **Algorithm Analysis**: Extract algorithm signatures and estimate complexity
 //! - **GNN Support**: Graph neural network message passing for semantic embeddings
-//! - **Parallel Processing**: Leverages rayon for multi-threaded analysis
+//! - **Parallel Processing** (planned): `rayon` is a declared dependency
+//!   reserved for future multi-threaded analysis; the current extractors and
+//!   detectors run sequentially (no `par_iter` is wired yet)
 //!
 //! ## Example
 //!

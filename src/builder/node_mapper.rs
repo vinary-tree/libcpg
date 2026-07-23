@@ -1762,7 +1762,10 @@ impl NodeMapper {
         if count == 0 {
             return Arc::from("");
         }
-        match list_node.named_child(count - 1).map(|c| self.metta_unwrap(c)) {
+        // tree-sitter 0.26 changed `named_child`'s index parameter from `usize`
+        // to `u32` (while `named_child_count` still returns `usize`); `count >= 1`
+        // is guaranteed by the guard above, so `count - 1` cannot underflow.
+        match list_node.named_child((count - 1) as u32).map(|c| self.metta_unwrap(c)) {
             Some(module) => Arc::from(self.node_text(&module, source)),
             None => Arc::from(""),
         }
@@ -2351,7 +2354,7 @@ mod tests {
     fn build_metta(source: &str) -> crate::CodePropertyGraph {
         let mut parser = tree_sitter::Parser::new();
         parser
-            .set_language(&tree_sitter_metta::language())
+            .set_language(&tree_sitter_metta::LANGUAGE.into())
             .expect("set metta grammar");
         let tree = parser.parse(source, None).expect("parse metta");
         crate::TreeSitterCpgBuilder::new()

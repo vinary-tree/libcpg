@@ -1,0 +1,41 @@
+# Version-agnostic, DEV-ONLY shim of the MeTTa tree-sitter grammar.
+#
+# WHY THIS EXISTS (conditional patch — droppable once upstream is fixed):
+# The canonical grammar crate at
+#   /home/dylon/Workspace/f1r3fly.io/MeTTa-Compiler/tree-sitter-metta
+# binds `tree_sitter_metta()` directly to `tree_sitter::Language` and pins
+# `tree-sitter = "0.25"` as a *normal* dependency. Because `tree-sitter` carries
+# `links = "tree-sitter"`, only ONE version may appear in a dependency graph, so
+# that 0.25 pin is irreconcilable with libcpg's target of `tree-sitter = "0.26"`
+# (Cargo aborts resolution before any compilation). Bumping the canonical crate
+# in place is NOT an option: MeTTaTron (`mettatron`) itself pins `tree-sitter =
+# "0.25"` and consumes `tree_sitter_metta::language() -> tree_sitter::Language@0.25`,
+# so changing it would break MeTTa-Compiler.
+#
+# This shim recompiles the SAME canonical C sources (parser.c + scanner.c, by
+# absolute path — no vendoring/duplication) but exposes them through
+# `tree-sitter-language`'s `LanguageFn` instead of `tree_sitter::Language`,
+# exactly as `rholang-tree-sitter` already does. `LanguageFn` is decoupled from
+# the `tree-sitter` version, so `LANGUAGE.into()` yields whatever
+# `tree_sitter::Language` the consumer (libcpg) links — 0.26 here.
+#
+# TO DROP THIS SHIM: once MeTTa-Compiler/tree-sitter-metta adopts
+# `tree-sitter-language` (or tree-sitter 0.26), repoint libcpg's
+# `[dev-dependencies] tree-sitter-metta` back at that crate and delete this dir.
+[package]
+name = "tree-sitter-metta"
+version = "0.1.0"
+edition = "2021"
+description = "Dev-only, version-agnostic shim of the MeTTa tree-sitter grammar for libcpg tests"
+license = "MIT"
+publish = false
+
+[lib]
+name = "tree_sitter_metta"
+path = "lib.rs"
+
+[dependencies]
+tree-sitter-language = "0.1"
+
+[build-dependencies]
+cc = "1"

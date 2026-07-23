@@ -108,7 +108,7 @@ impl ParserRegistry {
         // TOML
         #[cfg(feature = "lang-toml")]
         {
-            parsers.insert(Language::Toml, tree_sitter_toml::LANGUAGE.into());
+            parsers.insert(Language::Toml, tree_sitter_toml_ng::LANGUAGE.into());
         }
 
         // YAML

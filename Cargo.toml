@@ -63,7 +63,7 @@ lang-json = ["dep:tree-sitter-json"]
 lang-html = ["dep:tree-sitter-html"]
 lang-css = ["dep:tree-sitter-css"]
 lang-bash = ["dep:tree-sitter-bash"]
-lang-toml = ["dep:tree-sitter-toml"]
+lang-toml = ["dep:tree-sitter-toml-ng"]
 lang-yaml = ["dep:tree-sitter-yaml"]
 lang-markdown = ["dep:tree-sitter-md"]
 lang-ruby = ["dep:tree-sitter-ruby"]
@@ -105,27 +105,33 @@ thiserror = "2.0"
 regex = "1.11"
 
 # Tree-sitter core (always required)
-tree-sitter = "0.25"
+tree-sitter = "0.26"
 
 # Tree-sitter language grammars (optional, feature-gated)
-# NOTE: versions of grammars that pgmcp also links must match pgmcp's pins so
-# the shared `tree_sitter_<lang>` C symbol is not duplicated at link time
-# (python/javascript -> 0.25, c -> 0.24). See pgmcp P7b design section 4.3.
-tree-sitter-rust = { version = "0.23", optional = true }
+# NOTE: all grammars below expose `pub const LANGUAGE: LanguageFn` from
+# `tree-sitter-language` 0.1, which is the same ABI shim `tree-sitter` 0.26
+# links, so `LANGUAGE.into()` yields a `tree_sitter::Language` regardless of the
+# grammar crate's own (dev-only) `tree-sitter` pin. Versions are the latest on
+# crates.io that build against tree-sitter 0.26.
+#
+# For grammars that pgmcp ALSO links, keep the major.minor aligned with pgmcp's
+# pins so the shared `tree_sitter_<lang>` C symbol is not duplicated at link
+# time (python/javascript -> 0.25, c -> 0.24). See pgmcp P7b design section 4.3.
+tree-sitter-rust = { version = "0.24", optional = true }
 tree-sitter-python = { version = "0.25", optional = true }
 tree-sitter-javascript = { version = "0.25", optional = true }
 tree-sitter-typescript = { version = "0.23", optional = true }
-tree-sitter-go = { version = "0.23", optional = true }
+tree-sitter-go = { version = "0.25", optional = true }
 tree-sitter-java = { version = "0.23", optional = true }
 tree-sitter-c = { version = "0.24", optional = true }
 tree-sitter-cpp = { version = "0.23", optional = true }
 tree-sitter-json = { version = "0.24", optional = true }
 tree-sitter-html = { version = "0.23", optional = true }
-tree-sitter-css = { version = "0.23", optional = true }
-tree-sitter-bash = { version = "0.23", optional = true }
-tree-sitter-toml = { version = "0.20", optional = true }
+tree-sitter-css = { version = "0.25", optional = true }
+tree-sitter-bash = { version = "0.25", optional = true }
+tree-sitter-toml-ng = { version = "0.7", optional = true }
 tree-sitter-yaml = { version = "0.7", optional = true }
-tree-sitter-md = { version = "0.3", optional = true }
+tree-sitter-md = { version = "0.5", optional = true }
 tree-sitter-ruby = { version = "0.23", optional = true }
 
 # Optional: DPML parsing (YAML/TOML formats)
@@ -166,7 +172,17 @@ proptest = "1.5"
 # features stay pure logical cfg toggles (`= []`, no grammar symbol referenced
 # in non-test code), preserving the "Mode B, no grammar vendoring" decision.
 tree-sitter-rholang = { package = "rholang-tree-sitter", path = "/home/dylon/Workspace/f1r3fly.io/rholang-rs/rholang-tree-sitter" }
-tree-sitter-metta = { package = "tree-sitter-metta", path = "/home/dylon/Workspace/f1r3fly.io/MeTTa-Compiler/tree-sitter-metta" }
+# CONDITIONAL PATCH (droppable): points at a local, version-agnostic shim rather
+# than MeTTa-Compiler/tree-sitter-metta directly. The canonical crate pins
+# `tree-sitter = "0.25"` as a *normal* dep and binds `tree_sitter_metta()` to
+# `tree_sitter::Language`; because `tree-sitter` is a `links = "tree-sitter"`
+# native crate, that 0.25 pin cannot coexist with libcpg's `tree-sitter = "0.26"`.
+# Bumping it upstream would break MeTTaTron (which itself pins tree-sitter 0.25),
+# so `vendor/tree-sitter-metta` recompiles the SAME canonical C sources but
+# exposes them via `tree-sitter-language` (like `rholang-tree-sitter`), yielding
+# `LANGUAGE: LanguageFn`. Repoint this back at MeTTa-Compiler and delete the
+# shim once that crate adopts tree-sitter-language / tree-sitter 0.26.
+tree-sitter-metta = { package = "tree-sitter-metta", path = "vendor/tree-sitter-metta" }
 
 # Benchmarks will be added when implementations are complete
 # [[bench]]
