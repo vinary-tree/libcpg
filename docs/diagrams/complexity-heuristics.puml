@@ -1,0 +1,52 @@
+@startuml
+!include _libcpg-theme.iuml
+title ComplexityAnalyzer — structural heuristics mapping code shape to ComplexityClass
+start
+:function NodeId
++ ControlFlowAnalyzer loop / recursion patterns;<<#FFF3BF>>
+
+partition "Loop nesting  d = max loop depth  (analyze_loop_complexity)" #FFF3BF {
+  if (maximum loop-nesting depth d?) then (d = 0, no recursion)
+    :Constant  <latex>O(1)</latex>;<<#FFF3BF>>
+  elseif (d = 1) then (single loop)
+    :Linear  <latex>O(n)</latex>;<<#FFF3BF>>
+  elseif (d = 2) then (nested x2)
+    :Quadratic  <latex>O(n^2)</latex>;<<#FFF3BF>>
+  elseif (d = 3) then (nested x3)
+    :Cubic  <latex>O(n^3)</latex>;<<#FFF3BF>>
+  else (d >= 4)
+    :Polynomial(d)  <latex>O(n^d)</latex>;<<#FFF3BF>>
+  endif
+}
+
+partition "Recursion shape  (analyze_recursion_complexity)" #FFF3BF {
+  if (recursion kind / call shape?) then (tail recursion)
+    :Linear  <latex>O(n)</latex>;<<#FFF3BF>>
+  elseif (1 call, input halved) then (divide & conquer)
+    :Logarithmic  <latex>O(\log n)</latex>;<<#FFF3BF>>
+  elseif (2 calls, input halved) then (divide & conquer)
+    :Linearithmic  <latex>O(n \log n)</latex>;<<#FFF3BF>>
+    note right: <latex>T(n) = 2\,T(n/2) + O(n)</latex>
+  elseif (2 calls, no halving / no memo) then (binary recursion)
+    :Exponential  <latex>O(2^n)</latex>;<<#FFF3BF>>
+  else (factorial branching)
+    :Factorial  <latex>O(n!)</latex>;<<#FFF3BF>>
+  endif
+}
+
+:Combine — keep the dominant (worse) class
+via ComplexityClass::is_better_than;<<#FFF3BF>>
+note right
+  Master Theorem frames the divide-and-conquer cases:
+  <latex>T(n) = a\,T(n/b) + f(n)</latex>
+  Reality check: the shipped ComplexityAnalyzer emits
+  Exponential for two or more non-D&C recursive calls;
+  Factorial is the ComplexityClass reserved for
+  factorial-growth branching (e.g. enumerating n! permutations).
+end note
+stop
+legend right
+  |= colour |= concept |
+  |<#FFF3BF>| complexity heuristic |
+endlegend
+@enduml

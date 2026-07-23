@@ -1,0 +1,38 @@
+@startuml
+!include _libcpg-theme.iuml
+title PatternClassifier.classify(&cpg) — feature extraction + mode dispatch
+start
+:for each Class / Struct node in the CPG;
+:extract_features --> FeatureVector
+(12-element to_array(): method_count, field_count,
+method_field_ratio, inheritance_depth, interface_count,
+static_method_count, has_private_constructor,
+factory_method_count, observer_method_count,
+interface_field_count, is_decorator_candidate,
+static/method ratio);<<#FFF3BF>>
+switch (ClassificationMode?)
+case (RuleBased -- default)
+  :classify_rule_based
+hand-crafted heuristics;
+case (MachineLearning)
+  :classify_ml
+requires feature ml-linfa;<<#FCC2D7>>
+case (Hybrid)
+  :classify_hybrid
+rules + ML, boost when they agree;
+endswitch
+:PatternMatch { pattern label, confidence };<<#C3FAE8>>
+if (confidence >= min_confidence (0.7)?) then (yes)
+  :keep match;<<#C3FAE8>>
+else (no)
+  :discard;<<#F1F3F5>>
+endif
+stop
+legend right
+  |= colour |= stage |
+  |<#FFF3BF>| FeatureVector extraction |
+  |<#FCC2D7>| ML classification (ml-linfa) |
+  |<#C3FAE8>| labelled PatternMatch |
+  |<#F1F3F5>| discarded (below threshold) |
+endlegend
+@enduml

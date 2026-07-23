@@ -1,0 +1,48 @@
+@startuml
+!include _libcpg-theme.iuml
+title DefaultAlgorithmDetector.detect(&cpg, function) — per-function pipeline
+start
+:ControlFlowAnalyzer — detect loops
+(nesting depth, counted-ness) and
+recursion (direct / tail, base cases);<<#D3F9D8>>
+note right
+  Phase 1 (detection/control_flow.rs)
+  detect_loops   -> Vec<LoopPattern>   { header, kind, depth, is_counted }
+  detect_recursion -> RecursionPattern { kind, base_cases, recursive_calls }
+end note
+:ComplexityAnalyzer — map loop-nesting +
+recursion shape to ComplexityClass;<<#FFF3BF>>
+note right
+  Phase 2 (detection/complexity.rs)
+  estimate_time_complexity -> ComplexityEstimate
+  { class, confidence, justification }
+  Combine loops vs recursion: keep the worse
+  class via ComplexityClass::is_better_than.
+end note
+:family heuristics — has_midpoint_calculation /
+has_visited_tracking / has_memoization_table
+-> AlgorithmFamily;<<#C3FAE8>>
+note right
+  Phase 3 confidence-scored per-family detectors:
+  detect_sorting, detect_searching, detect_graph,
+  detect_dp, detect_divide_conquer
+  (each returns Option<DetectedAlgorithm>).
+end note
+:DetectedAlgorithm { signature :
+AlgorithmSignature { time_complexity } };<<#F1F3F5>>
+note right
+  Returns Vec<DetectedAlgorithm>
+  { family, name, function, key_nodes,
+    signature, confidence }
+  sorted by confidence (descending),
+  filtered by min_confidence (default 0.5).
+end note
+stop
+legend right
+  |= colour |= pipeline stage |
+  |<#D3F9D8>| Phase 1 — control-flow analysis |
+  |<#FFF3BF>| Phase 2 — complexity estimation |
+  |<#C3FAE8>| Phase 3 — family heuristics |
+  |<#F1F3F5>| result — DetectedAlgorithm |
+endlegend
+@enduml

@@ -1,0 +1,70 @@
+@startmindmap
+!include _libcpg-theme.iuml
+caption CpgNodeKind — the 45 language-agnostic node variants, grouped by role (src/graph/node.rs)
+
+*[#F1F3F5] CpgNodeKind\n(45 variants)
+
+left side
+
+**[#DBE4FF] Structural\n(7)
+***[#DBE4FF] Root
+***[#DBE4FF] Module
+***[#DBE4FF] Class
+***[#DBE4FF] Struct
+***[#DBE4FF] Enum
+***[#DBE4FF] Trait
+***[#DBE4FF] Impl
+
+**[#D3F9D8] Statement\n(14)
+***[#D3F9D8] Return
+***[#D3F9D8] If
+***[#D3F9D8] Else
+***[#D3F9D8] While
+***[#D3F9D8] For
+***[#D3F9D8] Loop
+***[#D3F9D8] Match
+***[#D3F9D8] MatchArm
+***[#D3F9D8] Break
+***[#D3F9D8] Continue
+***[#D3F9D8] Throw
+***[#D3F9D8] Try
+***[#D3F9D8] Catch
+***[#D3F9D8] Finally
+
+right side
+
+**[#C3FAE8] Function-level\n(3)
+***[#C3FAE8] Function
+***[#C3FAE8] Parameter
+***[#C3FAE8] Block
+
+**[#E5DBFF] Variable\n(2)
+***[#E5DBFF] Variable
+***[#E5DBFF] Field
+
+**[#FFF3BF] Expression\n(11)
+***[#FFF3BF] BinaryOp
+***[#FFF3BF] UnaryOp
+***[#FFF3BF] Assignment
+***[#FFF3BF] Call
+***[#FFF3BF] MemberAccess
+***[#FFF3BF] IndexAccess
+***[#FFF3BF] Identifier
+***[#FFF3BF] Literal
+***[#FFF3BF] Lambda
+***[#FFF3BF] Await
+***[#FFF3BF] Yield
+
+**[#E9ECEF] Type\n(2)
+***[#E9ECEF] TypeAnnotation
+***[#E9ECEF] GenericParam
+
+**[#FFE8CC] Special\n(6)
+***[#FFE8CC] Comment
+***[#FFE8CC] Import
+***[#FFE8CC] Attribute
+***[#FFE8CC] Macro
+***[#FFE8CC] Error
+***[#FFE8CC] Unknown
+
+@endmindmap

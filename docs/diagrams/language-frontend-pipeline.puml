@@ -1,0 +1,48 @@
+@startuml
+!include _libcpg-theme.iuml
+title libcpg language frontend — ParserRegistry (16 grammars) and Mode B into one NodeMapper
+
+component "Source text\n+ Language" as SRC #F1F3F5
+
+package "ParserRegistry frontend  (feature lang-*)" as regpkg #F8F9FA {
+  component "ParserRegistry\n16 tree-sitter grammars:\nRust · Python · JS · TS · Go · Java ·\nC · C++ · JSON · HTML · CSS · Bash ·\nTOML · YAML · Markdown · Ruby" <<feature "lang-*">> as PR #DBE4FF
+}
+
+component "Caller-supplied\ntree_sitter::Tree\nMode B — feature-free\n(the only path for Rholang / MeTTa)" as MB #E5DBFF
+
+component "TreeSitterCpgBuilder\n.convert_node  (recursive walk)" as TB #DBE4FF
+component "NodeMapper.map_kind\ndispatch by Language" as NM #F1F3F5
+
+package "per-language mappers" as mappers #F8F9FA {
+  component "Registry-backed mappers\nmap_rust · map_python · map_javascript ·\nmap_go · map_java · map_c_cpp · map_ruby ·\nmap_json · map_html · map_css · map_bash ·\nmap_config · map_markdown" as REG #DBE4FF
+  component "map_rholang\n« Mode-B only »" <<feature "rholang">> as MR #E5DBFF
+  component "map_metta\n« Mode-B only »" <<feature "metta">> as MM #E5DBFF
+}
+
+component "CpgNodeKind\n40 variants" as CNK #C3FAE8
+
+SRC --> PR
+PR --> TB : parsed tree
+MB --> TB : already-parsed tree (Mode B)
+TB --> NM : per node
+NM --> REG
+NM --> MR
+NM --> MM
+REG --> CNK
+MR --> CNK
+MM --> CNK
+
+note bottom of MB
+  Rholang & MeTTa are **not** registered in ParserRegistry.
+  The host (e.g. pgmcp) parses with its own grammar and calls
+  build_from_tree(&tree, source, language) — no lang-* feature.
+end note
+
+legend right
+  |= colour |= role |
+  |<#DBE4FF>| ParserRegistry parse / AST frontend |
+  |<#E5DBFF>| Mode B — caller tree (Rholang / MeTTa) |
+  |<#F1F3F5>| dispatch / neutral |
+  |<#C3FAE8>| CpgNodeKind output |
+endlegend
+@enduml

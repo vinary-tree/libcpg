@@ -1,0 +1,45 @@
+@startuml
+!include _libcpg-theme.iuml
+title DfgExtractor::visit_reaching — AST-ordered reaching-definitions sweep
+start
+:initialize ReachingEnv = empty
+a map from name to its reaching definitions,
+binding parameters before the function body;<<#FFF3BF>>
+repeat
+:visit next AST node in source (AST child) order;<<#DBE4FF>>
+if (node is a definition?) then (yes)
+  if (enclosing context?) then (straight-line)
+    :strong update (kill + gen) in straight-line context;<<#FFF3BF>>
+  else (conditional region)
+    :weak update (add, no kill);<<#FFF3BF>>
+  endif
+else (no)
+endif
+if (node is a use?) then (yes)
+  :link use to current ReachingEnv definitions
+(incl. nested-expression uses);<<#FFF3BF>>
+else (no)
+endif
+if (node is a loop region: While / For / Loop?) then (yes)
+  :sweep loop body twice for loop-carried deps;<<#FFF3BF>>
+else (no)
+endif
+repeat while (more AST nodes in source order?) is (yes) not (no)
+stop
+
+note right
+  Idempotent, flow-sensitive sweep.
+  <b>NOT SSA</b> — no phi nodes.
+  <b>NOT CFG-propagated</b> — reaching
+  definitions flow along AST child
+  order, threaded down into the
+  nested-expression uses of each
+  statement (e.g. x in return f(x)).
+end note
+
+legend right
+  |= colour |= sweep step |
+  |<#DBE4FF>| AST traversal (visit node) |
+  |<#FFF3BF>| DataFlow — reaching-definition update / use link |
+endlegend
+@enduml

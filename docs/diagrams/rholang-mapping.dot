@@ -1,0 +1,50 @@
+// rholang-mapping.dot — how the Rholang (ρ-calculus) tree-sitter grammar is
+// normalised onto libcpg's imperative CpgNodeKind vocabulary in Mode B.
+// Left  : Rholang constructs (neutral #F1F3F5).
+// Right : CpgNodeKind, coloured by concept.
+digraph RholangMapping {
+  bgcolor="white"; rankdir=LR;
+  labelloc="t";
+  label="Rholang (Mode B)  →  CpgNodeKind mapping";
+  fontname="DejaVu Sans"; fontsize=15;
+  node[shape=box, style="rounded,filled", fontname="DejaVu Sans", fontsize=11, margin="0.13,0.08"];
+  edge[fontname="DejaVu Sans", fontsize=9, color="#868E96", fontcolor="#495057"];
+
+  // ---------- left column: Rholang tree-sitter constructs (neutral) ----------
+  node[fillcolor="#F1F3F5", color="#495057"];
+  r_new  [label="new stdout(`rho:io:stdout`)"];
+  r_con  [label="contract @\"greet\"(name) { … }"];
+  r_send [label="stdout!(name)        (send)"];
+  r_name [label="name"];
+
+  // ---------- right column: CpgNodeKind (coloured by concept) ----------
+  k_func   [label="Function",  fillcolor="#DBE4FF", color="#4C6EF5"];
+  k_var    [label="Variable",  fillcolor="#FFF3BF", color="#F08C00"];
+  k_import [label="Import",    fillcolor="#FFE8CC", color="#E8590C"];
+  k_call   [label="Call",      fillcolor="#C3FAE8", color="#0CA678"];
+  k_param  [label="Parameter", fillcolor="#FFF3BF", color="#F08C00"];
+
+  // ---------- mapping edges (left → right, "maps to") ----------
+  r_con  -> k_func   [label="maps to"];
+  r_new  -> k_var    [label="bound name → def"];
+  r_new  -> k_import [label="`rho:` URI → import"];
+  r_send -> k_call   [label="maps to"];
+  r_name -> k_param  [label="formal → def"];
+
+  // keep the two columns aligned
+  { rank=same; r_new; r_con; r_send; r_name; }
+  { rank=same; k_func; k_var; k_import; k_call; k_param; }
+
+  // ---------- legend ----------
+  leg [shape=plaintext, label=<
+    <table border="0" cellborder="1" cellspacing="0" cellpadding="5" bgcolor="#F8F9FA">
+      <tr><td colspan="2"><b>Legend — CpgNodeKind concept colours</b></td></tr>
+      <tr><td bgcolor="#DBE4FF">Function</td><td align="left">named process abstraction (CFG entry)</td></tr>
+      <tr><td bgcolor="#FFF3BF">Variable / Parameter</td><td align="left">bound name &#8212; DFG definition</td></tr>
+      <tr><td bgcolor="#C3FAE8">Call</td><td align="left">send / message passing</td></tr>
+      <tr><td bgcolor="#FFE8CC">Import</td><td align="left">rho: system URI &#8212; polyglot anchor</td></tr>
+    </table>
+  >];
+  edge[style=invis, constraint=false];
+  k_call -> leg;
+}

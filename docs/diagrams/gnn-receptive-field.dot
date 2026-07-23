@@ -1,0 +1,59 @@
+// gnn-receptive-field.dot — the receptive field of node v grows one hop per GNN layer.
+// Nested (onion) clusters show hops 0, 1, 2; radius of the field == num_layers.
+digraph gnn_receptive_field {
+  bgcolor="white";
+  compound=true;
+  rankdir=TB;
+  labelloc="t";
+  fontname="DejaVu Sans";
+  label="CpgGnn receptive field — one hop of neighbourhood per stacked layer";
+  node [fontname="DejaVu Sans", shape=circle, style=filled, fontsize=11, width=0.5];
+  edge [fontname="DejaVu Sans", penwidth=1.4, arrowsize=0.75, dir=back];
+
+  subgraph cluster_h2 {
+    label="2 hops  —  num_layers = 2";
+    style="filled"; fillcolor="#FFF0F6"; color="#C2255C"; fontcolor="#862e4f"; penwidth=1.4;
+
+    pp [label="", fillcolor="#DBE4FF", color="#4C6EF5", width=0.34];
+    cc [label="", fillcolor="#DBE4FF", color="#4C6EF5", width=0.34];
+    ss [label="", fillcolor="#D3F9D8", color="#2F9E44", width=0.34];
+    dd [label="", fillcolor="#FFF3BF", color="#F08C00", width=0.34];
+
+    subgraph cluster_h1 {
+      label="1 hop  —  num_layers = 1";
+      style="filled"; fillcolor="#FCC2D7"; color="#C2255C"; fontcolor="#7a213f"; penwidth=1.4;
+
+      p [label="p", fillcolor="#DBE4FF", color="#4C6EF5"];
+      c [label="c", fillcolor="#DBE4FF", color="#4C6EF5"];
+      s [label="s", fillcolor="#D3F9D8", color="#2F9E44"];
+      u [label="u", fillcolor="#FFF3BF", color="#F08C00"];
+
+      subgraph cluster_h0 {
+        label="0 hops (v)";
+        style="filled"; fillcolor="#FAA2C1"; color="#C2255C"; fontcolor="#5c1130"; penwidth=1.6;
+        v [label="v", shape=doublecircle, fillcolor="#F06595", color="#C2255C",
+           fontcolor="white", fontsize=15, penwidth=2.0, width=0.7];
+      }
+    }
+  }
+
+  // edges reach inward; dir=back draws the arrowhead toward v (message direction).
+  v -> p [color="#4C6EF5"];
+  v -> c [color="#4C6EF5"];
+  v -> s [color="#2F9E44"];
+  v -> u [color="#F08C00", style=dashed];
+  p -> pp [color="#4C6EF5"];
+  c -> cc [color="#4C6EF5"];
+  s -> ss [color="#2F9E44"];
+  u -> dd [color="#F08C00", style=dashed];
+
+  legend [shape=plaintext, label=<
+    <table border="0" cellborder="1" cellspacing="0" cellpadding="4">
+      <tr><td bgcolor="#FAA2C1"><b>hop 0</b> — v itself (0 layers)</td></tr>
+      <tr><td bgcolor="#FCC2D7"><b>hop 1</b> — direct AST/CFG/DFG neighbours</td></tr>
+      <tr><td bgcolor="#FFF0F6"><b>hop 2</b> — neighbours of neighbours</td></tr>
+      <tr><td>receptive-field radius = num_layers (default 3)</td></tr>
+    </table>
+  >];
+  dd -> legend [style=invis];
+}

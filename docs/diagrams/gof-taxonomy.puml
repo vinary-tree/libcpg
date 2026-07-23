@@ -1,0 +1,31 @@
+@startmindmap
+!include _libcpg-theme.iuml
+caption Gang of Four design patterns — libcpg GofPattern taxonomy (GofCategory)
+*[#F1F3F5] Gang of Four\n(23 patterns)
+**[#D3F9D8] Creational (5)
+***[#D3F9D8] AbstractFactory
+***[#D3F9D8] Builder
+***[#D3F9D8] FactoryMethod
+***[#D3F9D8] Prototype
+***[#D3F9D8] Singleton
+**[#DBE4FF] Structural (7)
+***[#DBE4FF] Adapter
+***[#DBE4FF] Bridge
+***[#DBE4FF] Composite
+***[#DBE4FF] Decorator
+***[#DBE4FF] Facade
+***[#DBE4FF] Flyweight
+***[#DBE4FF] Proxy
+**[#FCC2D7] Behavioral (11)
+***[#FCC2D7] ChainOfResponsibility
+***[#FCC2D7] Command
+***[#FCC2D7] Interpreter
+***[#FCC2D7] Iterator
+***[#FCC2D7] Mediator
+***[#FCC2D7] Memento
+***[#FCC2D7] Observer
+***[#FCC2D7] State
+***[#FCC2D7] Strategy
+***[#FCC2D7] TemplateMethod
+***[#FCC2D7] Visitor
+@endmindmap

@@ -1,313 +1,238 @@
 # CPG Nodes
 
-Nodes in a Code Property Graph represent syntactic elements from the source code. Each node has a kind, source location, and optional properties.
+A [`CpgNode`](../../GLOSSARY.md#node-kind--edge-kind) is a single syntactic
+element from the source program — a function, an `if`, a call, a literal. Nodes
+are the **shared substrate** of the whole
+[Code Property Graph](../../GLOSSARY.md#code-property-graph-cpg): the
+[AST](../../GLOSSARY.md#abstract-syntax-tree-ast),
+[CFG](../../GLOSSARY.md#control-flow-graph-cfg),
+[DFG](../../GLOSSARY.md#data-flow-graph-dfg), and
+[PDG](../../GLOSSARY.md#program-dependence-graph-pdg) overlays all attach their
+edges to the same nodes. This page documents the node structure, the 45 node
+kinds, and the small value types (`SourceRange`, `TypeInfo`, `MethodSignature`,
+`Visibility`) that nodes carry.
 
-## Node Structure
+## Node structure
+
+`CpgNode` has **public fields** — you read `node.kind` and `node.range`
+*directly*; they are not accessor methods.
 
 ```rust
 pub struct CpgNode {
-    /// Unique identifier within the graph
-    id: NodeId,
-    /// The type of syntactic element
-    kind: CpgNodeKind,
-    /// Location in source code
-    source_range: SourceRange,
-    /// Original source text (optional)
-    text: Option<Arc<str>>,
-    /// Additional properties
-    properties: HashMap<PropertyKey, PropertyValue>,
+    /// Unique node identifier within the graph.
+    pub id: NodeId,
+    /// Node kind with its associated data.
+    pub kind: CpgNodeKind,
+    /// Source code span (bytes + line/column).
+    pub range: SourceRange,
+    /// Original source text, present for terminals/leaves.
+    pub text: Option<Arc<str>>,
+    /// Extra key/value metadata.
+    pub properties: FxHashMap<PropertyKey, PropertyValue>,
+    /// AST children, in source order.
+    pub children: SmallVec<[NodeId; 4]>,
+    /// AST parent, if any.
+    pub parent: Option<NodeId>,
 }
 ```
 
-## Node Kinds
-
-### Control Flow Nodes
-
-These nodes represent control flow structures:
-
-| Kind | Description | Example |
-|------|-------------|---------|
-| `Function` | Function definition | `fn foo() {}` |
-| `Method` | Method definition | `impl T { fn bar() {} }` |
-| `Constructor` | Constructor | `new()`, `__init__` |
-| `Block` | Statement block | `{ stmt1; stmt2; }` |
-| `If` | Conditional | `if cond { }` |
-| `Loop` | Loop construct | `for`, `while`, `loop` |
-| `Match` | Pattern match | `match x { }` |
-| `Return` | Return statement | `return value` |
-| `Break` | Break statement | `break` |
-| `Continue` | Continue statement | `continue` |
-
-**Example: Extracting Functions**
+Construct nodes with `CpgNode::new(id, kind, range)` and refine them with the
+chainable builders `with_text`, `with_property`, `with_child`, and `with_parent`:
 
 ```rust
-// Find all functions in the CPG
-let functions: Vec<&CpgNode> = cpg
-    .nodes_of_kind(CpgNodeKind::Function)
-    .collect();
+use libcpg::{CpgNode, CpgNodeKind, NodeId, SourceRange};
 
-for func in functions {
-    let name = func.property(PropertyKey::Name)
-        .and_then(|v| v.as_string())
-        .unwrap_or("anonymous");
-
-    println!("Function: {} at line {}",
-             name,
-             func.source_range().start_line);
-}
+let node = CpgNode::new(NodeId::new(0), CpgNodeKind::Return, SourceRange::default())
+    .with_text("return x");
 ```
 
-### Expression Nodes
+When you add a node to a graph with `add_node`, the graph assigns the real
+[`NodeId`](#nodeid) and overwrites the placeholder you passed — so `NodeId::new(0)`
+is the idiomatic filler at construction time.
 
-Nodes representing expressions:
+## Node kinds
 
-| Kind | Description | Example |
-|------|-------------|---------|
-| `BinaryOp` | Binary operation | `a + b`, `x && y` |
-| `UnaryOp` | Unary operation | `-x`, `!flag` |
-| `Call` | Function call | `foo(arg)` |
-| `Index` | Index access | `arr[i]` |
-| `FieldAccess` | Field access | `obj.field` |
-| `Cast` | Type cast | `x as i32` |
-| `Reference` | Reference | `&x`, `&mut x` |
-| `Dereference` | Dereference | `*ptr` |
+`CpgNodeKind` has **45 variants**. Most are *unit* variants (`Root`, `If`,
+`Return`), but many are *struct* variants that carry data (`Function { signature }`,
+`Call { target, is_method }`, `Variable { name, .. }`). Grouping them by role:
 
-**Example: Finding All Function Calls**
+![The 45 CpgNodeKind variants grouped by role](../../diagrams/node-kind-taxonomy.svg)
 
-```rust
-// Find all function calls
-for call in cpg.nodes_of_kind(CpgNodeKind::Call) {
-    // Get the callee name from the first AST child
-    let callee = cpg.ast_children(call.id())
-        .next()
-        .and_then(|child| child.text().map(|s| s.to_string()))
-        .unwrap_or_else(|| "unknown".to_string());
+*Figure — the 45 `CpgNodeKind` variants organised into structural,
+function-level, variable, statement, expression, type, and special groups.
+Source: [`diagrams/node-kind-taxonomy.puml`](../../diagrams/node-kind-taxonomy.puml).*
 
-    println!("Call to: {} at {:?}", callee, call.source_range());
-}
-```
+### Structural nodes (7)
 
-### Declaration Nodes
+The top-level shape of a compilation unit.
 
-Nodes for variable and constant declarations:
+| Variant | Fields | Example |
+|---------|--------|---------|
+| `Root` | — | the compilation unit / file root |
+| `Module` | `name: Arc<str>` | `mod foo`, a namespace |
+| `Class` | `name: Arc<str>`, `is_abstract: bool` | `class Foo { }` |
+| `Struct` | `name: Arc<str>` | `struct Bar { }` |
+| `Enum` | `name: Arc<str>` | `enum Baz { }` |
+| `Trait` | `name: Arc<str>` | `trait T { }` / `interface I { }` |
+| `Impl` | `for_type: Option<Arc<str>>`, `trait_name: Option<Arc<str>>` | `impl T for Bar { }` |
 
-| Kind | Description | Example |
-|------|-------------|---------|
-| `Variable` | Variable declaration | `let x = 5` |
-| `Parameter` | Function parameter | `fn f(x: i32)` |
-| `Constant` | Constant declaration | `const X: i32 = 5` |
-| `Field` | Struct/class field | `struct S { x: i32 }` |
+### Function-level nodes (3)
 
-**Example: Variable Declarations**
+| Variant | Fields | Example |
+|---------|--------|---------|
+| `Function` | `signature: MethodSignature` | `fn foo(x: i32) -> i32` |
+| `Parameter` | `name: Arc<str>`, `param_type: Option<TypeInfo>`, `is_variadic: bool` | `x: i32`, `*args` |
+| `Block` | `scope: ScopeId` | `{ stmt1; stmt2; }` |
 
-```rust
-// Find all variable declarations with their types
-for var in cpg.nodes_of_kind(CpgNodeKind::Variable) {
-    let name = var.property(PropertyKey::Name)
-        .and_then(|v| v.as_string());
+Both free functions and methods use the single `Function` variant; the
+distinction lives in the [`MethodSignature`](#methodsignature) (its `visibility`
+and `is_static`).
 
-    let type_info = var.type_info();
+### Variable nodes (2)
 
-    if let (Some(name), Some(ti)) = (name, type_info) {
-        println!("Variable: {}: {:?}", name, ti);
-    }
-}
-```
+| Variant | Fields | Example |
+|---------|--------|---------|
+| `Variable` | `name: Arc<str>`, `var_type: Option<TypeInfo>`, `scope: ScopeId`, `is_mutable: bool` | `let x = 5` |
+| `Field` | `name: Arc<str>`, `field_type: Option<TypeInfo>`, `visibility: Visibility` | `struct S { x: i32 }` |
 
-### Type Definition Nodes
+### Statement nodes (14)
 
-Nodes for type definitions:
+Control-flow and structural statements. These are all *unit* variants — their
+operands are AST children, not inline fields.
 
-| Kind | Description | Example |
-|------|-------------|---------|
-| `Class` | Class definition | `class Foo { }` |
-| `Struct` | Struct definition | `struct Bar { }` |
-| `Enum` | Enum definition | `enum Baz { }` |
-| `Interface` | Interface/protocol | `interface I { }` |
-| `Trait` | Trait definition | `trait T { }` |
-| `TypeAlias` | Type alias | `type X = Y` |
+| Variants |
+|----------|
+| `Return`, `If`, `Else`, `While`, `For`, `Loop`, `Match`, `MatchArm`, `Break`, `Continue`, `Throw`, `Try`, `Catch`, `Finally` |
 
-**Example: Finding Classes with Methods**
+The [`CfgExtractor`](../builder/cfg.md) reads these to lay down
+[control-flow edges](edges.md#cfg-edges): an `If`'s children are interpreted as
+`[condition, then, else]`, a `While`'s last child as its body, and so on.
 
-```rust
-// Find all classes and their methods
-for class in cpg.nodes_of_kind(CpgNodeKind::Class) {
-    let class_name = class.property(PropertyKey::Name)
-        .and_then(|v| v.as_string())
-        .unwrap_or("anonymous");
+### Expression nodes (11)
 
-    println!("Class: {}", class_name);
+| Variant | Fields | Example |
+|---------|--------|---------|
+| `BinaryOp` | `operator: Arc<str>` | `a + b`, `x && y` |
+| `UnaryOp` | `operator: Arc<str>` | `-x`, `!flag` |
+| `Assignment` | `operator: Arc<str>` | `x = 1`, `y += 2` |
+| `Call` | `target: Option<NodeId>`, `is_method: bool` | `foo(arg)`, `obj.bar()` |
+| `MemberAccess` | `member: Arc<str>` | `obj.field` |
+| `IndexAccess` | — | `arr[i]` |
+| `Identifier` | `name: Arc<str>`, `definition: Option<NodeId>` | `x` (with resolved def) |
+| `Literal` | `kind: LiteralKind` | `42`, `"hi"`, `true` |
+| `Lambda` | `captures: SmallVec<[NodeId; 4]>` | `|x| x + 1` |
+| `Await` | — | `fut.await` |
+| `Yield` | — | `yield v` |
 
-    // Find methods (traverse AST children)
-    for child in cpg.ast_descendants(class.id()) {
-        if child.kind() == CpgNodeKind::Method {
-            let method_name = child.property(PropertyKey::Name)
-                .and_then(|v| v.as_string())
-                .unwrap_or("anonymous");
-            println!("  Method: {}", method_name);
-        }
-    }
-}
-```
+`Call.target` and `Identifier.definition` hold resolved `NodeId`s when the
+builder could resolve them, letting you jump straight from a use to its
+definition or from a call site to its callee.
 
-### Literal Nodes
+### Type nodes (2)
 
-Literal value nodes:
+| Variant | Fields | Example |
+|---------|--------|---------|
+| `TypeAnnotation` | `type_info: TypeInfo` | `: i32` |
+| `GenericParam` | `name: Arc<str>` | `<T>` |
+
+### Special nodes (6)
+
+| Variant | Fields | Example |
+|---------|--------|---------|
+| `Comment` | `is_doc: bool` | `// note`, `/// doc` |
+| `Import` | `path: Arc<str>` | `use std::io`, `import os` |
+| `Attribute` | `name: Arc<str>` | `#[derive(..)]`, `@Override` |
+| `Macro` | `name: Arc<str>` | `println!` |
+| `Error` | `message: Arc<str>` | parser error-recovery node |
+| `Unknown` | `kind: Arc<str>` | grammar node with no direct mapping |
+
+`Error` and `Unknown` are how `libcpg` stays robust: an unfamiliar or malformed
+construct becomes a typed node (carrying the original grammar kind string)
+rather than aborting construction.
+
+### Literal kinds
+
+The `Literal` variant carries a `LiteralKind` (9 variants); the scalar kinds
+embed their parsed value:
 
 ```rust
 pub enum LiteralKind {
-    Integer,
-    Float,
-    String,
-    Char,
-    Boolean,
-    Null,
-    Array,
-    Object,
+    Integer(i64),
+    Float(f64),
+    String(Arc<str>),
+    Char(char),
+    Bool(bool),
+    Null,     // null / None / nil
+    Array,    // [1, 2, 3]
+    Object,   // { key: value }
+    Regex(Arc<str>),
 }
 ```
 
-| Kind | Description | Example |
-|------|-------------|---------|
-| `Literal(Integer)` | Integer literal | `42` |
-| `Literal(Float)` | Float literal | `3.14` |
-| `Literal(String)` | String literal | `"hello"` |
-| `Literal(Char)` | Character literal | `'a'` |
-| `Literal(Boolean)` | Boolean literal | `true`, `false` |
-| `Literal(Null)` | Null/None/nil | `null`, `None` |
-| `Literal(Array)` | Array literal | `[1, 2, 3]` |
-| `Literal(Object)` | Object literal | `{ key: value }` |
+## Node methods
 
-**Example: Finding String Literals**
+### `name()`
+
+`name(&self) -> Option<&str>` returns the identifying name for the kinds that
+have one — `Module`, `Class`, `Struct`, `Enum`, `Trait`, `Function` (via its
+signature), `Variable`, `Field`, `Parameter`, `Identifier`, `MemberAccess`,
+`Import`, `Attribute`, `Macro`, and `GenericParam` — and `None` for the rest.
 
 ```rust
-// Find all string literals (useful for security analysis)
-for node in cpg.nodes() {
-    if let CpgNodeKind::Literal(LiteralKind::String) = node.kind() {
-        if let Some(text) = node.text() {
-            println!("String literal: {} at line {}",
-                     text,
-                     node.source_range().start_line);
-        }
+for func in cpg.functions() {
+    // start_line is 0-indexed; add 1 for human-facing output.
+    println!("fn {} at line {}", func.name().unwrap_or("<anonymous>"), func.range.start_line + 1);
+}
+```
+
+### Category predicates
+
+Five predicates classify a node by role. Their exact membership (from the
+source) is:
+
+| Predicate | True for |
+|-----------|----------|
+| `is_declaration()` | `Module`, `Class`, `Struct`, `Enum`, `Trait`, `Function`, `Variable`, `Field`, `Parameter` |
+| `is_statement()` | `Return`, `If`, `While`, `For`, `Loop`, `Match`, `Break`, `Continue`, `Throw`, `Try` |
+| `is_expression()` | `BinaryOp`, `UnaryOp`, `Assignment`, `Call`, `MemberAccess`, `IndexAccess`, `Identifier`, `Literal`, `Lambda`, `Await`, `Yield` |
+| `is_control_flow()` | `If`, `While`, `For`, `Loop`, `Match`, `Break`, `Continue`, `Return`, `Throw`, `Try` |
+| `is_error()` | `Error` |
+
+## Querying nodes by kind
+
+Because `node.kind` is a public enum, the general query is `nodes_by_kind`, which
+takes a **predicate over `&CpgNodeKind`** (it is *not* `nodes_of_kind(kind)`).
+Use `matches!` to select struct variants without naming their fields:
+
+```rust
+use libcpg::{CpgNodeKind, LiteralKind};
+
+// Count call sites.
+let calls = cpg.nodes_by_kind(|k| matches!(k, CpgNodeKind::Call { .. })).count();
+
+// Every string literal (useful for security review).
+for node in cpg.nodes_by_kind(|k| matches!(k, CpgNodeKind::Literal { kind: LiteralKind::String(_) })) {
+    if let Some(text) = node.text.as_deref() {
+        println!("string literal {text:?} at line {}", node.range.start_line + 1);
     }
 }
 ```
 
-## Node Properties
-
-### Standard Properties
-
-| Key | Value Type | Description |
-|-----|------------|-------------|
-| `Name` | String | Identifier name |
-| `Type` | String | Type annotation |
-| `Visibility` | String | Access modifier |
-| `Modifiers` | List | static, const, async, etc. |
-| `Documentation` | String | Doc comment |
-| `Operator` | String | For BinaryOp/UnaryOp |
-
-**Example: Accessing Properties**
+For the four most common kinds there are dedicated convenience iterators —
+`functions()`, `classes()`, `variables()`, and `calls()` — each yielding
+`&CpgNode`. To read the data inside a struct variant, pattern-match on
+`&node.kind`:
 
 ```rust
-let node = cpg.node(node_id)?;
+use libcpg::CpgNodeKind;
 
-// Get name
-if let Some(PropertyValue::String(name)) = node.property(PropertyKey::Name) {
-    println!("Name: {}", name);
-}
-
-// Get visibility
-if let Some(vis) = node.visibility() {
-    match vis {
-        Visibility::Public => println!("Public"),
-        Visibility::Private => println!("Private"),
-        Visibility::Protected => println!("Protected"),
-        Visibility::Internal => println!("Internal"),
-    }
-}
-
-// Get modifiers
-if let Some(PropertyValue::List(mods)) = node.property(PropertyKey::Modifiers) {
-    for m in mods {
-        if let PropertyValue::String(s) = m {
-            println!("Modifier: {}", s);
-        }
-    }
-}
-```
-
-### Type Information
-
-Nodes can have associated type information:
-
-```rust
-pub struct TypeInfo {
-    /// The type name
-    pub name: Arc<str>,
-    /// Generic parameters
-    pub generics: Vec<TypeInfo>,
-    /// Whether it's a reference
-    pub is_reference: bool,
-    /// Whether it's mutable
-    pub is_mutable: bool,
-    /// Whether it's optional/nullable
-    pub is_optional: bool,
-}
-```
-
-**Example**:
-
-```rust
-if let Some(type_info) = node.type_info() {
-    println!("Type: {}", type_info.name);
-    if !type_info.generics.is_empty() {
-        print!("<");
-        for (i, g) in type_info.generics.iter().enumerate() {
-            if i > 0 { print!(", "); }
-            print!("{}", g.name);
-        }
-        println!(">");
-    }
-}
-```
-
-### Method Signatures
-
-Function and method nodes have signature information:
-
-```rust
-pub struct MethodSignature {
-    /// Parameter names and types
-    pub parameters: Vec<(Arc<str>, Option<TypeInfo>)>,
-    /// Return type
-    pub return_type: Option<TypeInfo>,
-    /// Whether it's async
-    pub is_async: bool,
-    /// Whether it's a generator
-    pub is_generator: bool,
-}
-```
-
-**Example**:
-
-```rust
-for func in cpg.nodes_of_kind(CpgNodeKind::Function) {
-    if let Some(sig) = func.method_signature() {
-        let name = func.property(PropertyKey::Name)
-            .and_then(|v| v.as_string())
-            .unwrap_or("anonymous");
-
-        print!("fn {}(", name);
-        for (i, (param_name, param_type)) in sig.parameters.iter().enumerate() {
-            if i > 0 { print!(", "); }
-            print!("{}", param_name);
-            if let Some(t) = param_type {
-                print!(": {}", t.name);
-            }
-        }
-        print!(")");
-
-        if let Some(ret) = &sig.return_type {
+for func in cpg.functions() {
+    if let CpgNodeKind::Function { signature } = &func.kind {
+        // `params` holds parameter *types* (each a `TypeInfo`); the parameter
+        // *names* live on the function's `Parameter` child nodes.
+        let param_types: Vec<&str> = signature.params.iter().map(|t| t.name.as_ref()).collect();
+        print!("fn {}({})", signature.name, param_types.join(", "));
+        if let Some(ret) = &signature.return_type {
             print!(" -> {}", ret.name);
         }
         println!();
@@ -315,53 +240,160 @@ for func in cpg.nodes_of_kind(CpgNodeKind::Function) {
 }
 ```
 
-## Node ID
+## `NodeId`
 
-`NodeId` is a lightweight handle for referencing nodes:
+`NodeId` is a compact, `Copy` handle — a newtype around `u32`:
 
 ```rust
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
-pub struct NodeId(u32);
+pub struct NodeId(pub u32);
+```
 
-impl NodeId {
-    /// Get the underlying index
-    pub fn index(self) -> usize {
-        self.0 as usize
+Its API is `NodeId::new(u32)`, `as_u32() -> u32`, and `From` conversions in
+**both** directions (`u32 → NodeId` and `NodeId → u32`). There is no `.index()`
+method:
+
+```rust
+use libcpg::NodeId;
+
+let id = NodeId::new(7);
+assert_eq!(id.as_u32(), 7);
+
+let from_u32: NodeId = 7u32.into();
+let back: u32 = id.into();
+assert_eq!(back, 7);
+```
+
+Node ids are stable across serialisation, which is why analysis code and the
+on-disk form both refer to nodes by `NodeId` rather than by petgraph's internal
+`NodeIndex`. Resolving an id to a node is `cpg.node(id) -> Option<&CpgNode>` (an
+`` $`O(1)`$ `` map lookup returning `None` for an unknown id).
+
+## `SourceRange`
+
+Every node records where it came from. `SourceRange` has **six `u32` fields** —
+a byte span plus 0-indexed line/column endpoints:
+
+```rust
+pub struct SourceRange {
+    pub start: u32,       // start byte offset
+    pub end: u32,         // end byte offset (exclusive)
+    pub start_line: u32,  // 0-indexed
+    pub start_col: u32,   // 0-indexed
+    pub end_line: u32,    // 0-indexed
+    pub end_col: u32,     // 0-indexed
+}
+```
+
+Construct one with `SourceRange::new(start, end, start_line, start_col,
+end_line, end_col)` or `SourceRange::from_bytes(start, end)` (which zeroes the
+line/column fields). Helpers: `len() -> u32` (byte length), `is_empty() -> bool`,
+and `to_text_range() -> text_size::TextRange`.
+
+Because the byte offsets index the original text, you can recover a node's exact
+source slice when you retained the source:
+
+```rust
+use libcpg::CpgNode;
+
+fn node_text<'a>(source: &'a str, node: &CpgNode) -> &'a str {
+    &source[node.range.start as usize .. node.range.end as usize]
+}
+```
+
+## Supporting types
+
+Nodes reference a handful of small value types.
+
+### `TypeInfo`
+
+A lightweight type descriptor. Note `generics` is a `SmallVec` of **name
+strings**, not nested `TypeInfo`s:
+
+```rust
+pub struct TypeInfo {
+    pub name: Arc<str>,
+    pub is_reference: bool,
+    pub is_mutable: bool,
+    pub generics: SmallVec<[Arc<str>; 2]>,
+}
+```
+
+Build one fluently:
+
+```rust
+use libcpg::TypeInfo;
+
+let ty = TypeInfo::new("Vec")
+    .with_generic("String")
+    .with_reference(true);
+assert_eq!(ty.name.as_ref(), "Vec");
+```
+
+### `MethodSignature`
+
+Carried by every `Function` node. Parameters are a `SmallVec<[TypeInfo; 4]>`:
+
+```rust
+pub struct MethodSignature {
+    pub name: Arc<str>,
+    pub params: SmallVec<[TypeInfo; 4]>,
+    pub return_type: Option<TypeInfo>,
+    pub is_static: bool,
+    pub is_async: bool,
+    pub visibility: Visibility,
+}
+```
+
+### `Visibility`
+
+```rust
+pub enum Visibility {
+    Public,
+    Private,     // the Default
+    Protected,
+    Package,     // package/module-private
+    Crate,       // Rust `pub(crate)`
+}
+```
+
+### `ScopeId`
+
+A `u32` newtype tagging lexical scopes, carried by `Block` and `Variable` nodes.
+`ScopeId::GLOBAL` is the constant `ScopeId(0)`; make others with
+`ScopeId::new(id)`.
+
+### Properties: `PropertyKey` / `PropertyValue`
+
+Beyond the typed fields above, a node can hold ad-hoc metadata in its
+`properties` map. Keys are a small enum with a `Custom` escape hatch, and values
+are a tagged union (note the integer/boolean variants are `Int` / `Uint` /
+`Bool`, not `Integer` / `Boolean`):
+
+```rust
+pub enum PropertyKey { Name, Type, Scope, Visibility, Mutable, Static, Async, Custom(Arc<str>) }
+
+pub enum PropertyValue { String(Arc<str>), Int(i64), Uint(u64), Bool(bool), Float(f64), List(Vec<PropertyValue>), Null }
+```
+
+`PropertyValue` offers `as_str() -> Option<&str>`, `as_int() -> Option<i64>`,
+and `as_bool() -> Option<bool>` for convenient extraction:
+
+```rust
+use libcpg::PropertyKey;
+
+if let Some(v) = node.properties.get(&PropertyKey::Name) {
+    if let Some(name) = v.as_str() {
+        println!("name property: {name}");
     }
 }
 ```
 
-Node IDs are:
-- **Copy**: No ownership issues
-- **32-bit**: Compact memory usage
-- **Hashable**: Can be used as map keys
+## Where to go next
 
-## Source Ranges
-
-Every node tracks its location in the source:
-
-```rust
-pub struct SourceRange {
-    pub start_byte: usize,
-    pub end_byte: usize,
-    pub start_line: u32,
-    pub start_column: u32,
-    pub end_line: u32,
-    pub end_column: u32,
-}
-```
-
-**Example: Getting Original Text**
-
-```rust
-fn get_source_text<'a>(cpg: &'a CodePropertyGraph, node: &CpgNode, source: &'a str) -> &'a str {
-    let range = node.source_range();
-    &source[range.start_byte..range.end_byte]
-}
-```
-
-## Next Steps
-
-- [Edges](edges.md) - Edge types and relationships
-- [Traversal](traversal.md) - Navigating the graph
-- [Graph Overview](overview.md) - Back to overview
+- [Edges](edges.md) — how nodes are wired into the four overlays.
+- [Traversal](traversal.md) — navigating from a node to its children,
+  successors, and data-flow neighbours.
+- [Overview](overview.md) — the CPG at a glance.
+- [`api/graph-reference.md`](../../api/graph-reference.md) — the exhaustive
+  node-type reference.
+</content>

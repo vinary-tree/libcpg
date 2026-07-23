@@ -1,0 +1,38 @@
+@startuml
+!include _libcpg-theme.iuml
+title libcpg crate module architecture — always-on core vs. feature-gated analyses
+
+package "always compiled  (default = [])" as core #F8F9FA {
+  component "graph\ngraph::CodePropertyGraph\nDiGraph<CpgNode, CpgEdge>" <<always-on>> as G #F1F3F5
+  component "builder\nTreeSitterCpgBuilder\nCfg / Dfg / Pdg extractors" <<always-on>> as B #DBE4FF
+  component "pattern\nVf2Matcher + GraphSimilarity" <<always-on>> as P #FFE3E3
+}
+
+package "feature-gated  (opt-in)" as gated #FFF9DB {
+  component "patterns\nGoF — 23 patterns" <<feature "design-patterns">> as PS #FFE3E3
+  component "algorithms\nDetector + ComplexityAnalyzer" <<feature "algorithm-detection">> as A #FFF3BF
+  component "gnn\nCpgGnn embeddings" <<feature "gnn">> as GN #FCC2D7
+}
+
+B  --> G  : builds
+P  --> G  : matches over
+PS --> P  : template + relaxed VF2
+PS --> G  : detects in
+A  --> G  : analyses
+GN --> G  : owns / propagates
+
+note bottom of gated
+  Feature-gated modules are absent from the build unless
+  their Cargo feature is enabled ( <latex>default = [\,]</latex> ).
+  The core trio always compiles.
+end note
+
+legend right
+  |= colour |= module (role) |
+  |<#F1F3F5>| graph — CPG store |
+  |<#DBE4FF>| builder — AST / CFG / DFG construction |
+  |<#FFE3E3>| pattern · patterns — VF2 / GoF matching |
+  |<#FFF3BF>| algorithms — complexity |
+  |<#FCC2D7>| gnn — embeddings |
+endlegend
+@enduml

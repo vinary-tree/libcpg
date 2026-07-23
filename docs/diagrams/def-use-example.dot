@@ -1,0 +1,60 @@
+// def-use-example.dot — DataFlow(DfgEdgeKind) edges for
+//     fn g(x) { let y = x + 1; if y > 0 { return y; } }
+// produced by DfgExtractor's AST-ordered reaching-definitions sweep.
+// DFG palette: definitions fill #FFF3BF / line #F08C00 (amber); uses neutral;
+// DataFlow edges dashed amber #F08C00, labeled by DfgEdgeKind variant.
+digraph DefUseExample {
+    bgcolor="white";
+    rankdir=TB;
+    fontname="DejaVu Sans";
+    labelloc="t";
+    label=<<b>Def-use / reaching-def edges for </b><i>fn g(x) { let y = x + 1; if y &gt; 0 { return y; } }</i>>;
+    node [fontname="DejaVu Sans", shape=box, style="rounded,filled",
+          fillcolor="#F1F3F5", color="#495057", fontcolor="#212529", penwidth=1.2];
+    edge [fontname="DejaVu Sans", penwidth=1.4];
+
+    // definitions (data origins) — amber
+    px [label="Parameter  x\n(def)",              fillcolor="#FFF3BF", color="#F08C00"];
+    vy [label="Variable  y\n(def:  let y = x + 1)", fillcolor="#FFF3BF", color="#F08C00"];
+
+    // uses (nested-expression uses) — neutral
+    bx  [label="BinaryOp  x + 1\n(use of x)"];
+    uy1 [label="use  y\n(in  y > 0)"];
+    uy2 [label="use  y\n(in  return y)"];
+
+    // DataFlow edges — dashed amber, labeled by DfgEdgeKind
+    px -> bx  [label="DefUse",      style=dashed, color="#F08C00", fontcolor="#B35900"];
+    vy -> uy1 [label="ReachingDef", style=dashed, color="#F08C00", fontcolor="#B35900"];
+    vy -> uy2 [label="ReachingDef", style=dashed, color="#F08C00", fontcolor="#B35900"];
+
+    // invisible guides: keep nodes in source order top-to-bottom
+    { rank=same; bx; vy; }
+    px  -> vy  [style=invis];
+    vy  -> uy1 [style=invis];
+    uy1 -> uy2 [style=invis];
+
+    // caption
+    cap [shape=plaintext, fillcolor="white",
+         label=<<i>AST-ordered reaching-definitions: a definition reaches the nested-expression uses inside later statements.</i>>];
+    uy2 -> cap [style=invis];
+
+    // legend
+    subgraph cluster_legend {
+        label=<<b>Legend</b>>;
+        style="filled"; color="#CED4DA"; fillcolor="#F8F9FA"; fontcolor="#212529";
+        legend [shape=plaintext, fillcolor="#F8F9FA", label=<
+            <table border="0" cellborder="0" cellspacing="2" cellpadding="3">
+              <tr><td align="left"><font color="#F08C00"><b>&#9476;&#9476;&#9476;&#9654;</b></font></td>
+                  <td align="left">DataFlow(DfgEdgeKind) — dashed amber, labeled</td></tr>
+              <tr><td align="left" bgcolor="#FFF3BF"> </td>
+                  <td align="left">definition (data origin): Parameter / Variable</td></tr>
+              <tr><td align="left" bgcolor="#F1F3F5"> </td>
+                  <td align="left">use site (nested expression)</td></tr>
+              <tr><td align="left"><b>DefUse</b></td>
+                  <td align="left">a definition flows to a direct use</td></tr>
+              <tr><td align="left"><b>ReachingDef</b></td>
+                  <td align="left">one def reaches several later uses</td></tr>
+            </table>
+        >];
+    }
+}

@@ -1,0 +1,21 @@
+@startuml
+!include _libcpg-theme.iuml
+title Mode B — build_from_tree with a caller-supplied grammar
+participant "Host\n(e.g. pgmcp)" as Host #E9ECEF
+participant "tree_sitter::Parser" as TS #DBE4FF
+participant "TreeSitterCpgBuilder" as B #D3F9D8
+participant "CodePropertyGraph" as G #FFF3BF
+Host -> TS : set_language(host grammar)\nparse(source)
+TS --> Host : tree
+Host -> B : build_from_tree(&tree, source, language)
+activate B
+note right of B
+  Feature-free: needs no lang-* grammar and
+  skips the max_file_size check. This is the
+  only construction path for Rholang and MeTTa.
+end note
+B -> G : AST nodes + AstChild edges + parent pointers
+B -> G : CfgExtractor / DfgExtractor (config-gated)
+B --> Host : CodePropertyGraph
+deactivate B
+@enduml

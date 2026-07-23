@@ -1,0 +1,32 @@
+@startuml
+!include _libcpg-theme.iuml
+title PDG construction — PdgBuilder.build(&mut cpg, function)
+start
+:build intraprocedural CFG
+(reachable over ControlFlow edges,
+excluding Call edges into callees);<<#D3F9D8>>
+:add virtual EXIT node
+(sentinel id = u32::MAX,
+every real exit connects to it);<<#D3F9D8>>
+:reverse the CFG
+(edge a -> b becomes b -> a,
+rooted at EXIT);<<#D3F9D8>>
+:post-dominators via petgraph
+dominators::simple_fast on the reversed CFG;<<#E5DBFF>>
+:Cytron reverse-dominance-frontier walk
+-> ControlDependence edges;<<#E5DBFF>>
+:reproject DFG DefUse / ReachingDef
+within function -> DataDependence edges;<<#E5DBFF>>
+stop
+note right
+  Idempotent: existing ControlDependence /
+  DataDependence edges are snapshotted first,
+  so re-running <latex>PdgBuilder.build</latex>
+  never duplicates PDG edges.
+end note
+legend right
+  |= colour |= layer |
+  |<#D3F9D8>| CFG substrate |
+  |<#E5DBFF>| PDG output |
+endlegend
+@enduml

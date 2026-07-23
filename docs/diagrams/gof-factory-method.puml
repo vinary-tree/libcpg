@@ -1,0 +1,33 @@
+@startuml
+!include _libcpg-theme.iuml
+title Factory Method — Creational GoF pattern (detected structure)
+
+abstract class Creator #E9ECEF {
+  + factoryMethod() : Product
+  + anOperation()
+}
+class ConcreteCreator #FFE3E3 {
+  + factoryMethod() : Product
+}
+interface Product #E9ECEF
+class ConcreteProduct #E9ECEF
+
+ConcreteCreator --|> Creator
+ConcreteProduct ..|> Product
+Creator ..> Product : declares / returns
+ConcreteCreator ..> ConcreteProduct : instantiates
+
+note bottom of Creator
+  GofCategory: **Creational**  (relaxed-VF2 template, min-confidence 0.7)
+  Detection signature: an abstract **factoryMethod()** returning an
+  abstract **Product**, overridden in **ConcreteCreator** subclasses.
+  Template = Creator(Class) ─AstChild→ Function, ConcreteCreator(Class)
+  ─AstChild→ Function, ConcreteCreator ─Inherits→ Creator.
+end note
+
+legend right
+  |= colour |= concept |
+  |<#E9ECEF>| type / class structure |
+  |<#FFE3E3>| varying "hook" class (VF2 match focus) |
+endlegend
+@enduml

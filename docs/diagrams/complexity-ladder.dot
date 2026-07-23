@@ -1,0 +1,37 @@
+// complexity-ladder.dot — ComplexityClass variants, fastest (top) -> slowest (bottom).
+// Vertical order and the "ordinal" line encode ComplexityClass::ordinal(),
+// the key behind ComplexityClass::is_better_than().  Graphviz cannot typeset
+// LaTeX, so Big-O is written in plain text (O(n^2), O(2^n), ...).
+digraph complexity_ladder {
+  bgcolor="white";
+  rankdir=TB;
+  nodesep=0.35;
+  ranksep=0.30;
+  node [fontname="DejaVu Sans", shape=box, style="filled,rounded", fontsize=12, width=2.6, height=0.62];
+  edge [color="#495057", arrowsize=0.8];
+
+  Constant     [label="Constant  —  O(1)\nordinal 0",        fillcolor="#F1F3F5", color="#495057"];
+  Logarithmic  [label="Logarithmic  —  O(log n)\nordinal 1", fillcolor="#F3F1F3", color="#5C4C52"];
+  Linear       [label="Linear  —  O(n)\nordinal 2",          fillcolor="#F4EFF0", color="#6F484E"];
+  Linearithmic [label="Linearithmic  —  O(n log n)\nordinal 3", fillcolor="#F6EDEE", color="#824449"];
+  Quadratic    [label="Quadratic  —  O(n^2)\nordinal 4",     fillcolor="#F8EBEC", color="#944044"];
+  Cubic        [label="Cubic  —  O(n^3)\nordinal 5",         fillcolor="#FAE9EA", color="#A73D3F"];
+  Polynomial   [label="Polynomial(k)  —  O(n^k)\nordinal 5 + k", fillcolor="#FCE7E8", color="#BA393A"];
+  Exponential  [label="Exponential  —  O(2^n)\nordinal 100", fillcolor="#FDE5E5", color="#CD3536"];
+  Factorial    [label="Factorial  —  O(n!)\nordinal 200",    fillcolor="#FFE3E3", color="#E03131"];
+
+  Constant -> Logarithmic -> Linear -> Linearithmic -> Quadratic
+            -> Cubic -> Polynomial -> Exponential -> Factorial;
+
+  // Severity axis + legend, pinned beside the top of the ladder.
+  legend [shape=plaintext, fillcolor="white", label=<
+    <table border="0" cellborder="1" cellspacing="0" cellpadding="5">
+      <tr><td bgcolor="#F1F3F5"><b>fastest</b> — neutral (ordinal 0)</td></tr>
+      <tr><td bgcolor="#F6EDEE">warming — growth accelerates</td></tr>
+      <tr><td bgcolor="#FFE3E3"><b>slowest</b> — crimson (ordinal 200)</td></tr>
+      <tr><td>fill gradient = severity&#183; top-to-bottom = ComplexityClass::ordinal()&#183; is_better_than() compares ordinals</td></tr>
+    </table>
+  >];
+  { rank=same; Constant; legend; }
+  Constant -> legend [style=invis];
+}

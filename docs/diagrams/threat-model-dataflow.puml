@@ -1,0 +1,42 @@
+@startuml
+!include _libcpg-theme.iuml
+title Threat model — untrusted-input dataflow and trust boundaries
+
+' ---- Primary flow: parsing untrusted source bytes -----------------------
+start
+:untrusted source bytes;<<#FFE3E3>>
+:max_file_size guard
+(reject > 10 MB in build());<<#D3F9D8>>
+note right
+  <b>Trust boundary.</b> build_from_tree (Mode B)
+  <i>skips</i> this size check — enforcing an input
+  bound is then the caller's responsibility.
+end note
+:tree-sitter parse
+(bounded; no code execution);<<#DBE4FF>>
+:CPG construction
+(AST + CFG + DFG);<<#F1F3F5>>
+:bounded analyses —
+VF2 max_matches, DFG max_iterations,
+slice max_nodes;<<#E5DBFF>>
+:results;<<#C3FAE8>>
+stop
+
+' ---- Separate flow: deserialization is its own trust boundary ------------
+start
+:serialized graph bytes (serde feature);<<#FFE3E3>>
+:serde deserialization
+= trust boundary
+(load only trusted graphs);<<#FFE3E3>>
+:CodePropertyGraph (trusted only);<<#C3FAE8>>
+stop
+
+legend right
+  |= colour |= role |
+  |<#FFE3E3>| trust boundary / untrusted input |
+  |<#D3F9D8>| input-size guard |
+  |<#DBE4FF>| bounded parse (no exec) |
+  |<#E5DBFF>| bounded analysis |
+  |<#C3FAE8>| trusted result |
+endlegend
+@enduml

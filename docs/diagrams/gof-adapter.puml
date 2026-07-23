@@ -1,0 +1,32 @@
+@startuml
+!include _libcpg-theme.iuml
+title Adapter — Structural GoF pattern (detected structure)
+
+interface Target #E9ECEF {
+  + request()
+}
+class Adapter #FFE3E3 {
+  - adaptee : Adaptee
+  + request()
+}
+class Adaptee #E9ECEF {
+  + specificRequest()
+}
+
+Adapter ..|> Target
+Adapter --> Adaptee : specificRequest()
+
+note bottom of Adapter
+  GofCategory: **Structural**  (relaxed-VF2 template, min-confidence 0.7)
+  Detection signature: an **Adapter** implementing **Target** by delegating
+  to an **Adaptee** it holds as a Field.
+  Template = Target(Trait); Adapter(Class) ─Implements→ Target;
+  Adapter ─AstChild→ {adaptee(Field), request(Function)}.
+end note
+
+legend right
+  |= colour |= concept |
+  |<#E9ECEF>| type / class structure |
+  |<#FFE3E3>| varying "hook" class (VF2 match focus) |
+endlegend
+@enduml

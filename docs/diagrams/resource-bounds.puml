@@ -1,0 +1,26 @@
+@startmindmap
+!include _libcpg-theme.iuml
+caption Resource bounds that keep libcpg's work finite on large or untrusted inputs
+
+*[#F1F3F5] Resource bounds
+**[#FFE3E3] Construction
+***[#F1F3F5]:max_file_size = 10 MB default
+build() rejects larger source before parsing.
+build_from_tree (Mode B) skips it —
+the caller already owns a bounded tree.;
+**[#FFE3E3] VF2 matching
+***[#F1F3F5]:max_matches cap (0 = unlimited default)
+short-circuits the state-space search
+once the match limit is reached.;
+***[#F1F3F5]:strict_kinds / strict_edges
+tighten the feasibility test, pruning
+infeasible branches earlier.;
+**[#FFE3E3] DFG
+***[#F1F3F5]:max_iterations = 100
+caps the reaching-definitions fixpoint
+sweeps so it always terminates.;
+**[#FFE3E3] Slicing
+***[#F1F3F5]:max_nodes on backward_slice / forward_slice
+bounds the PDG reverse/forward BFS —
+returns as soon as the slice reaches the cap.;
+@endmindmap

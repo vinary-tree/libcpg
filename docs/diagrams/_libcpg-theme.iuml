@@ -1,0 +1,52 @@
+' ============================================================================
+'  _libcpg-theme.iuml — shared PlantUML theme for libcpg documentation diagrams
+'
+'  Usage:  put  !include _libcpg-theme.iuml  as the first line after @startXXX.
+'  Per-concept colour is applied per element with the LITERAL hex below (robust
+'  across every diagram type); this file only fixes the global look (font,
+'  background, shadow, arrows) so every figure reads as one system.
+'  Graphviz (.dot) figures reuse the same palette by literal hex.
+'
+'  COLOUR -> CONCEPT palette          fill      line       (mnemonic)
+'    AST layer .....................  #DBE4FF   #4C6EF5    slate blue
+'    CFG layer .....................  #D3F9D8   #2F9E44    green
+'    DFG layer .....................  #FFF3BF   #F08C00    amber
+'    PDG layer .....................  #E5DBFF   #7048E8    violet
+'    Call graph ....................  #C3FAE8   #0CA678    teal
+'    Type / inheritance ............  #E9ECEF   #868E96    grey
+'    Pattern match / highlight .....  #FFE3E3   #E03131    crimson
+'    GNN / embedding ...............  #FCC2D7   #C2255C    magenta
+'    Import / scope ................  #FFE8CC   #E8590C    brown
+'    Generic node / neutral ........  #F1F3F5   #495057    slate grey
+' ============================================================================
+skinparam backgroundColor #FFFFFF
+skinparam shadowing false
+skinparam defaultFontName "DejaVu Sans"
+skinparam defaultFontSize 13
+skinparam ArrowThickness 1.1
+skinparam ArrowColor #495057
+skinparam RoundCorner 6
+skinparam TitleFontSize 15
+skinparam TitleFontStyle bold
+skinparam NoteBackgroundColor #FFF9DB
+skinparam NoteBorderColor #F59F00
+skinparam LegendBackgroundColor #F8F9FA
+skinparam LegendBorderColor #CED4DA
+skinparam ClassBackgroundColor #F1F3F5
+skinparam ClassBorderColor #495057
+skinparam ClassFontStyle bold
+skinparam ActivityBackgroundColor #F1F3F5
+skinparam ActivityBorderColor #495057
+skinparam ActivityDiamondBackgroundColor #FFF3BF
+skinparam ActivityDiamondBorderColor #F08C00
+skinparam ActivityStartColor #2F9E44
+skinparam ActivityEndColor #E03131
+skinparam StateBackgroundColor #F1F3F5
+skinparam StateBorderColor #495057
+skinparam ComponentBackgroundColor #F1F3F5
+skinparam ComponentBorderColor #495057
+skinparam InterfaceBackgroundColor #E9ECEF
+skinparam SequenceLifeLineBorderColor #868E96
+skinparam SequenceParticipantBackgroundColor #F1F3F5
+skinparam SequenceParticipantBorderColor #495057
+skinparam SequenceArrowColor #495057

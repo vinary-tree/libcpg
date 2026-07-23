@@ -1,0 +1,20 @@
+@startmindmap
+!include _libcpg-theme.iuml
+caption libcpg cargo features (default = [], nothing enabled)
+*[#F1F3F5] libcpg
+**[#DBE4FF] lang-* grammars (16)
+***[#DBE4FF] groups: lang-systems / scripting / web / config
+***[#DBE4FF] lang-all
+**[#D3F9D8] analysis
+***[#D3F9D8] algorithm-detection
+***[#D3F9D8] design-patterns
+**[#FCC2D7] gnn
+**[#FFF3BF] serde
+**[#E5DBFF] Mode-B toggles
+***[#E5DBFF] rholang
+***[#E5DBFF] metta
+**[#FFE3E3] experimental
+***[#FFE3E3] gpu (reserved)
+***[#FFE3E3] ml-linfa
+**[#C3FAE8] full = gnn + design-patterns + algorithm-detection + serde + ml-rules + lang-all
+@endmindmap

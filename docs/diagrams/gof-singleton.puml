@@ -1,0 +1,20 @@
+@startuml
+!include _libcpg-theme.iuml
+title Singleton — Creational GoF pattern (detected structure)
+class Singleton #E9ECEF {
+  - {static} instance : Singleton
+  - Singleton()
+  + {static} getInstance() : Singleton
+}
+Singleton ..> Singleton : returns cached instance
+note right of Singleton
+  Detection signature (relaxed VF2 template):
+  a private static self-typed field, a private
+  constructor, and a public static accessor
+  whose return type is the class itself.
+end note
+legend right
+  |= colour |= concept |
+  |<#E9ECEF>| type / class structure |
+endlegend
+@enduml

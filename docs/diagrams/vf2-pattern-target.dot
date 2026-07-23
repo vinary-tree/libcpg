@@ -1,0 +1,60 @@
+// VF2 subgraph isomorphism — one found embedding of a 3-node pattern
+// (Class -> Function, Class -> Field via AstChild) inside a 6-node target CPG.
+// Mapped target nodes are filled crimson; the node_mapping is drawn as crimson
+// dotted edges. Node labels are CpgNodeKind variants.
+digraph vf2_embedding {
+  bgcolor="white";
+  rankdir=LR;
+  labelloc="t";
+  fontname="DejaVu Sans";
+  fontsize=14;
+  label="VF2 subgraph isomorphism — Vf2Matcher.find_matches(pattern, target): one embedding highlighted";
+  node [fontname="DejaVu Sans", shape=box, style="filled,rounded", color="#4C6EF5", fillcolor="#DBE4FF"];
+  edge [fontname="DejaVu Sans", fontsize=10];
+
+  // ---- Pattern graph (find_matches argument 1) ----
+  subgraph cluster_pattern {
+    label="Pattern graph  (3 nodes, AstChild edges)";
+    fontname="DejaVu Sans";
+    style="rounded,filled"; fillcolor="#F8F9FA"; color="#868E96";
+    p0 [label="Class", fillcolor="#F1F3F5", color="#495057"];
+    p1 [label="Function", fillcolor="#F1F3F5", color="#495057"];
+    p2 [label="Field", fillcolor="#F1F3F5", color="#495057"];
+    p0 -> p1 [label="AstChild", color="#4C6EF5", fontcolor="#4C6EF5"];
+    p0 -> p2 [label="AstChild", color="#4C6EF5", fontcolor="#4C6EF5"];
+  }
+
+  // ---- Target CPG (find_matches argument 2) ----
+  subgraph cluster_target {
+    label="Target CPG  (6 nodes)";
+    fontname="DejaVu Sans";
+    style="rounded,filled"; fillcolor="#F8F9FA"; color="#868E96";
+    t0 [label="Module"];
+    t1 [label="Class",     fillcolor="#FFE3E3", color="#E03131"];
+    t2 [label="Function",  fillcolor="#FFE3E3", color="#E03131"];
+    t3 [label="Field",     fillcolor="#FFE3E3", color="#E03131"];
+    t4 [label="Parameter"];
+    t5 [label="Block"];
+    t0 -> t1 [label="AstChild", color="#4C6EF5", fontcolor="#4C6EF5"];
+    t1 -> t2 [label="AstChild", color="#4C6EF5", fontcolor="#4C6EF5"];
+    t1 -> t3 [label="AstChild", color="#4C6EF5", fontcolor="#4C6EF5"];
+    t2 -> t4 [label="AstChild", color="#4C6EF5", fontcolor="#4C6EF5"];
+    t2 -> t5 [label="AstChild", color="#4C6EF5", fontcolor="#4C6EF5"];
+  }
+
+  // ---- The found embedding: node_mapping (pattern -> target) ----
+  p0 -> t1 [label="node_mapping", style=dotted, color="#E03131", fontcolor="#E03131", constraint=false, penwidth=1.6];
+  p1 -> t2 [style=dotted, color="#E03131", constraint=false, penwidth=1.6];
+  p2 -> t3 [style=dotted, color="#E03131", constraint=false, penwidth=1.6];
+
+  // ---- Legend ----
+  legend [shape=none, style="filled", fillcolor="white", margin=0, fontname="DejaVu Sans", label=<
+    <TABLE BORDER="0" CELLBORDER="1" CELLSPACING="0" CELLPADDING="5">
+      <TR><TD BGCOLOR="#F1F3F5">pattern node (unmatched host)</TD></TR>
+      <TR><TD BGCOLOR="#DBE4FF">target AST node</TD></TR>
+      <TR><TD BGCOLOR="#FFE3E3">mapped target node (embedding)</TD></TR>
+      <TR><TD><FONT COLOR="#4C6EF5">AstChild edge (solid blue)</FONT></TD></TR>
+      <TR><TD><FONT COLOR="#E03131">node_mapping (crimson dotted)</FONT></TD></TR>
+    </TABLE>
+  >];
+}

@@ -1,0 +1,37 @@
+@startuml
+!include _libcpg-theme.iuml
+title Decorator — Structural GoF pattern (detected structure)
+
+interface Component #E9ECEF {
+  + operation()
+}
+class ConcreteComponent #E9ECEF {
+  + operation()
+}
+abstract class Decorator #FFE3E3 {
+  - wrappee : Component
+  + operation()
+}
+class ConcreteDecorator #E9ECEF {
+  + operation()
+}
+
+ConcreteComponent ..|> Component
+Decorator ..|> Component
+Decorator o-- Component : wrappee
+ConcreteDecorator --|> Decorator
+
+note bottom of Decorator
+  GofCategory: **Structural**  (relaxed-VF2 template, min-confidence 0.7)
+  Detection signature: a **Decorator** that BOTH implements **Component**
+  and wraps a same-typed **wrappee** Field (Implements + Field ─TypeOf→ Component).
+  Template = Component(Trait); Decorator(Class) ─AstChild→ {wrappee(Field),
+  operation}; Decorator ─Implements→ Component; wrappee ─TypeOf→ Component.
+end note
+
+legend right
+  |= colour |= concept |
+  |<#E9ECEF>| type / class structure |
+  |<#FFE3E3>| varying "hook" class (VF2 match focus) |
+endlegend
+@enduml

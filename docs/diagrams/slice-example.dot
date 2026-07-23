@@ -1,0 +1,56 @@
+// Backward program slice (Weiser 1981) over a 7-node function PDG.
+// Seed = `r` (return z). Its backward slice = every node transitively reaching
+// r via reversed PDG edges: {r, m, t, e, c, p}. Node `d` is excluded — it is
+// control-dependent on the same branch, yet its value never flows to the seed.
+digraph SliceExample {
+    bgcolor="white";
+    rankdir=TB;
+    labelloc="t";
+    fontname="DejaVu Sans";
+    fontsize=15;
+    label="Backward slice from seed r (return z) over PDG edges — bounded by max_nodes";
+    node[fontname="DejaVu Sans", shape=box, style="filled,rounded", fontsize=11];
+    edge[fontname="DejaVu Sans", fontsize=10];
+
+    // ---- Nodes in the backward slice of r: crimson fill / border ---------
+    p [label="p : param x", fillcolor="#FFE3E3", color="#E03131"];
+    c [label="c : if (x > 0)", fillcolor="#FFE3E3", color="#E03131"];
+    t [label="t : y = x + 1", fillcolor="#FFE3E3", color="#E03131"];
+    e [label="e : y = 0", fillcolor="#FFE3E3", color="#E03131"];
+    m [label="m : z = y", fillcolor="#FFE3E3", color="#E03131"];
+    r [label="r : return z\n(SEED)", fillcolor="#FFE3E3", color="#E03131", penwidth=3.0];
+
+    // ---- Node NOT in the slice: neutral ---------------------------------
+    d [label="d : w = 42\n(unused — excluded)", fillcolor="#F1F3F5", color="#495057"];
+
+    // ---- DataDependence edges (def -> use): violet dashed ---------------
+    p -> c [style=dashed, color="#7048E8", penwidth=1.6];
+    p -> t [style=dashed, color="#7048E8", penwidth=1.6];
+    t -> m [style=dashed, color="#7048E8", penwidth=1.6];
+    e -> m [style=dashed, color="#7048E8", penwidth=1.6];
+    m -> r [style=dashed, color="#7048E8", penwidth=1.6];
+
+    // ---- ControlDependence edges (branch -> guarded): violet dotted -----
+    c -> t [style=dotted, color="#7048E8", penwidth=1.8];
+    c -> e [style=dotted, color="#7048E8", penwidth=1.8];
+    c -> d [style=dotted, color="#7048E8", penwidth=1.8];
+
+    // ---- Legend ---------------------------------------------------------
+    subgraph cluster_legend {
+        label="Legend";
+        fontname="DejaVu Sans";
+        style="filled";
+        fillcolor="#F8F9FA";
+        color="#CED4DA";
+        node[shape=plaintext, style="", fillcolor="white"];
+        legend [label=<
+          <table border="0" cellborder="0" cellspacing="2">
+            <tr><td align="left"><font color="#7048E8">&#183;&#183;&#183;&#183;</font></td><td align="left">ControlDependence (branch &#8594; guarded)</td></tr>
+            <tr><td align="left"><font color="#7048E8">&#8211;&#8211;&#8211;</font></td><td align="left">DataDependence (def &#8594; use)</td></tr>
+            <tr><td align="left" bgcolor="#FFE3E3"><font color="#E03131">&#9632;</font></td><td align="left">in backward slice of r</td></tr>
+            <tr><td align="left" bgcolor="#F1F3F5"><font color="#495057">&#9632;</font></td><td align="left">excluded (value never reaches r)</td></tr>
+            <tr><td align="left"> </td><td align="left">slice = reverse-BFS over PDG edges, capped at max_nodes</td></tr>
+          </table>
+        >];
+    }
+}

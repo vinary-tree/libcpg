@@ -1,0 +1,22 @@
+@startuml
+!include _libcpg-theme.iuml
+title VF2 subgraph-isomorphism search (Cordella et al. 2004)
+[*] --> Empty : initial state
+state Empty #F1F3F5 : mapping = {}
+Empty --> Candidate : select (n, m)\nfrom terminal sets
+state Candidate #FFF3BF : trial pair (n, m)
+Candidate --> Extended : is_feasible(n, m)\nkinds + edges consistent
+Candidate --> Backtrack : infeasible
+state Extended #D3F9D8 : push_mapping(n, m)
+Extended --> Complete : |mapping| = |pattern|
+Extended --> Candidate : recurse / extend
+state Backtrack #FFE3E3 : pop_mapping
+Backtrack --> Candidate : restore exact prior state
+state Complete #C3FAE8 : record embedding
+Complete --> [*]
+note bottom of Backtrack
+  Pop-order fix (P7b): an explicit push-order
+  stack of frames restores the mapping AND the
+  terminal sets exactly on backtrack.
+end note
+@enduml

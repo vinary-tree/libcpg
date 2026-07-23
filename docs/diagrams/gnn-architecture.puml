@@ -1,0 +1,22 @@
+@startuml
+!include _libcpg-theme.iuml
+title CpgGnn embedding architecture (feature "gnn")
+component "Node initialisation\n16-dim kind one-hot + random init" as Init #DBE4FF
+component "Message-passing layer\n(x num_layers, default 3)\nmean(AST + CFG + DFG neighbours) -> ReLU" as MP #FCC2D7
+component "Node embeddings\ndim = embedding_dim (default 128)" as Emb #FCC2D7
+component "Subgraph embedding\nMean / Sum / Max aggregation" as Sub #FCC2D7
+Init --> MP
+MP --> Emb
+Emb --> Sub
+note right of MP
+  propagate(iterations) owns the
+  CodePropertyGraph and aggregates over
+  AST (children + parent), CFG (succ + pred),
+  and DFG (succ + pred) neighbourhoods.
+end note
+legend right
+  |= colour |= concept |
+  |<#DBE4FF>| input features |
+  |<#FCC2D7>| GNN / embedding |
+endlegend
+@enduml

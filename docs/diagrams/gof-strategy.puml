@@ -1,0 +1,36 @@
+@startuml
+!include _libcpg-theme.iuml
+title Strategy — Behavioral GoF pattern (detected structure)
+
+class Context #E9ECEF {
+  - strategy : Strategy
+  + execute()
+}
+interface Strategy #E9ECEF {
+  + algorithm()
+}
+class ConcreteStrategyA #FFE3E3 {
+  + algorithm()
+}
+class ConcreteStrategyB #FFE3E3 {
+  + algorithm()
+}
+
+Context o-- Strategy : strategy
+ConcreteStrategyA ..|> Strategy
+ConcreteStrategyB ..|> Strategy
+
+note bottom of Context
+  GofCategory: **Behavioral**  (relaxed-VF2 template, min-confidence 0.7)
+  Detection signature: a **Context** delegating to an interchangeable
+  **Strategy** interface through a strategy **Field** (Field ─TypeOf→ Strategy).
+  Template = Strategy(Trait) ─AstChild→ algorithm(Function),
+  Context(Class) ─AstChild→ strategy(Field), Field ─TypeOf→ Strategy.
+end note
+
+legend right
+  |= colour |= concept |
+  |<#E9ECEF>| type / class structure |
+  |<#FFE3E3>| varying "hook" class (VF2 match focus) |
+endlegend
+@enduml

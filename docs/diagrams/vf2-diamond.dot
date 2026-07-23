@@ -1,0 +1,58 @@
+// VF2 backtracking regression (src/pattern/vf2.rs :: test_multi_embedding_backtracking).
+// A path-shaped pattern p0 -> p1 -> p2 (AstChild) is matched against the diamond
+// target A -> B, A -> C, B -> D, C -> D. It has EXACTLY TWO embeddings — A-B-D and
+// A-C-D — that diverge at the MIDDLE node p1 (candidates B and C). Finding the
+// second requires partial mid-search backtracking: pop p2 and p1, retain p0 -> A,
+// retry p1 -> C. Each embedding is drawn in its own accent colour.
+digraph vf2_diamond {
+  bgcolor="white";
+  rankdir=TB;
+  labelloc="t";
+  fontname="DejaVu Sans";
+  fontsize=14;
+  label="VF2 mid-search backtracking — path pattern has exactly 2 embeddings in the diamond target";
+  node [fontname="DejaVu Sans", shape=circle, style="filled", color="#495057", fillcolor="#F1F3F5", width=0.55, fixedsize=true];
+  edge [fontname="DejaVu Sans", fontsize=10];
+
+  // ---- Path pattern ----
+  subgraph cluster_pattern {
+    label="Path pattern  p0 -> p1 -> p2  (AstChild)";
+    fontname="DejaVu Sans"; style="rounded"; color="#868E96";
+    p0 [label="p0"];
+    p1 [label="p1", fillcolor="#FFF3BF", color="#F08C00"];
+    p2 [label="p2"];
+    p0 -> p1 [label="AstChild", color="#495057"];
+    p1 -> p2 [label="AstChild", color="#495057"];
+  }
+
+  // ---- Diamond target ----
+  subgraph cluster_target {
+    label="Diamond target  A -> {B, C} -> D";
+    fontname="DejaVu Sans"; style="rounded"; color="#868E96";
+    A [label="A"];
+    B [label="B", fillcolor="#C3FAE8", color="#0CA678"];
+    C [label="C", fillcolor="#FCC2D7", color="#C2255C"];
+    D [label="D"];
+    // embedding 1 : A-B-D  (teal)
+    A -> B [label="AstChild", color="#0CA678", penwidth=2.2];
+    B -> D [label="AstChild", color="#0CA678", penwidth=2.2];
+    // embedding 2 : A-C-D  (magenta)
+    A -> C [label="AstChild", color="#C2255C", penwidth=2.2];
+    C -> D [label="AstChild", color="#C2255C", penwidth=2.2];
+  }
+
+  // ---- Middle-node divergence: p1 has two candidate targets ----
+  p1 -> B [style=dotted, color="#0CA678", constraint=false, penwidth=1.5];
+  p1 -> C [style=dotted, color="#C2255C", constraint=false, penwidth=1.5];
+
+  // ---- Legend ----
+  legend [shape=none, fixedsize=false, width=0, height=0, style="filled", fillcolor="white", margin=0, fontname="DejaVu Sans", label=<
+    <TABLE BORDER="0" CELLBORDER="1" CELLSPACING="0" CELLPADDING="5">
+      <TR><TD><FONT COLOR="#0CA678">embedding 1 : A-B-D  (p0-&gt;A, p1-&gt;B, p2-&gt;D)</FONT></TD></TR>
+      <TR><TD><FONT COLOR="#C2255C">embedding 2 : A-C-D  (p0-&gt;A, p1-&gt;C, p2-&gt;D)</FONT></TD></TR>
+      <TR><TD BGCOLOR="#FFF3BF">pattern middle node p1 (divergence / backtrack point)</TD></TR>
+      <TR><TD BGCOLOR="#F1F3F5">shared nodes A, D</TD></TR>
+      <TR><TD>dotted = p1 candidate targets {B, C}</TD></TR>
+    </TABLE>
+  >];
+}

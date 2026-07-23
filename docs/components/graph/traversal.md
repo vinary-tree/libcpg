@@ -1,420 +1,314 @@
 # Graph Traversal
 
-libcpg provides multiple ways to navigate the Code Property Graph. This document covers traversal patterns for common analysis tasks.
+`libcpg` navigates the [Code Property Graph](../../GLOSSARY.md#code-property-graph-cpg)
+through a set of accessor methods on `CodePropertyGraph`, one family per overlay:
+AST, CFG, DFG, the call graph, and positional/subgraph queries. This page
+catalogues those accessors *with their exact return types*, then works through
+the recurring analysis patterns — reachability, def-use following, and a
+[taint](../../GLOSSARY.md#taint-analysis) walk — over the real API.
 
-## Basic Navigation
+## Return types at a glance
 
-### Outgoing and Incoming Edges
+The single most important thing to internalise: the AST and flow accessors
+return **owned `Vec`s of ids** (or id/edge-kind pairs), *not* iterators of
+`&CpgNode`. You resolve an id to a node with `node(id) -> Option<&CpgNode>`.
 
-The fundamental navigation primitives:
+| Accessor | Returns |
+|----------|---------|
+| `node(id)` | `Option<&CpgNode>` |
+| `ast_children(id)` | `Vec<NodeId>` (source order) |
+| `ast_parent(id)` | `Option<NodeId>` |
+| `ast_descendants(id)` | `Vec<NodeId>` (depth-first) |
+| `ast_ancestors(id)` | `Vec<NodeId>` (toward the root) |
+| `cfg_successors(id)` / `cfg_predecessors(id)` | `Vec<(NodeId, CfgEdgeKind)>` |
+| `cfg_entries()` / `cfg_exits()` | `&[NodeId]` |
+| `cfg_nodes()` | `impl Iterator<Item = &CpgNode>` |
+| `reaching_definitions(use)` / `uses_of_definition(def)` | `Vec<NodeId>` |
+| `dfg_successors(id)` / `dfg_predecessors(id)` | `Vec<(NodeId, DfgEdgeKind)>` |
+| `call_sites(fn)` / `callees(call)` / `callers(fn)` | `Vec<NodeId>` |
+| `node_at_offset(off)` / `scope_at_offset(off)` | `Option<&CpgNode>` |
+| `nodes_in_range(range)` | `Vec<&CpgNode>` |
+| `outgoing_edges(id)` / `incoming_edges(id)` | `impl Iterator<Item = &CpgEdge>` |
+| `edges_between(a, b)` | `Vec<&CpgEdge>` |
+| `subgraph(&[NodeId])` / `function_cfg(fn)` / `function_dfg(fn)` | `CodePropertyGraph` |
 
-```rust
-// Get all outgoing edges from a node
-for edge_id in cpg.outgoing_edges(node_id) {
-    let edge = cpg.edge(edge_id)?;
-    let target = cpg.node(edge.target())?;
-    println!("{:?} -> {:?}", edge.kind(), target.kind());
-}
+There is no generic `successors` / `predecessors` / `neighbors` method and no
+`ast_next_sibling`; sibling and neighbour queries are derived from the accessors
+above (shown below). `node(id)` returns an `Option`, so use `?` in a function
+that returns `Option`, or `map_or` / `if let` inline.
 
-// Get all incoming edges to a node
-for edge_id in cpg.incoming_edges(node_id) {
-    let edge = cpg.edge(edge_id)?;
-    let source = cpg.node(edge.source())?;
-    println!("{:?} <- {:?}", source.kind(), edge.kind());
-}
-```
+## AST traversal
 
-### Neighbors
-
-Get connected nodes regardless of direction:
-
-```rust
-// All nodes connected by outgoing edges
-let successors: Vec<NodeId> = cpg.successors(node_id).collect();
-
-// All nodes connected by incoming edges
-let predecessors: Vec<NodeId> = cpg.predecessors(node_id).collect();
-
-// All connected nodes (both directions)
-let neighbors: Vec<NodeId> = cpg.neighbors(node_id).collect();
-```
-
-## AST Traversal
-
-### Children and Parent
-
-Navigate the syntax tree:
-
-```rust
-// Get AST children
-for child in cpg.ast_children(node_id) {
-    println!("Child: {:?}", child.kind());
-}
-
-// Get AST parent
-if let Some(parent) = cpg.ast_parent(node_id) {
-    println!("Parent: {:?}", parent.kind());
-}
-```
-
-### Descendants and Ancestors
-
-Traverse the full subtree:
+`ast_children` gives a node's immediate children in source order;
+`ast_descendants` returns the whole subtree (depth-first); `ast_ancestors` walks
+up to the root. All three return `Vec<NodeId>`, so pair them with `node(id)` to
+read kinds:
 
 ```rust
-// All descendants (pre-order)
-for descendant in cpg.ast_descendants(node_id) {
-    println!("  {:?}", descendant.kind());
+use libcpg::{CodePropertyGraph, CpgNodeKind, NodeId};
+
+fn is_loop_kind(k: &CpgNodeKind) -> bool {
+    matches!(k, CpgNodeKind::While | CpgNodeKind::For | CpgNodeKind::Loop)
 }
 
-// All ancestors (up to root)
-for ancestor in cpg.ast_ancestors(node_id) {
-    println!("  {:?}", ancestor.kind());
-}
-```
-
-**Example: Finding Nested Loops**
-
-```rust
-fn find_nested_loops(cpg: &CodePropertyGraph) -> Vec<(NodeId, usize)> {
-    let mut results = Vec::new();
-
-    for node in cpg.nodes_of_kind(CpgNodeKind::Loop) {
-        let depth = cpg.ast_ancestors(node.id())
-            .filter(|n| n.kind() == CpgNodeKind::Loop)
+/// Loops nested inside another loop, with their nesting depth.
+fn nested_loops(cpg: &CodePropertyGraph) -> Vec<(NodeId, usize)> {
+    let mut out = Vec::new();
+    for node in cpg.nodes_by_kind(is_loop_kind) {
+        let depth = cpg
+            .ast_ancestors(node.id)                                   // Vec<NodeId>
+            .into_iter()
+            .filter(|&a| cpg.node(a).map_or(false, |n| is_loop_kind(&n.kind)))
             .count();
-
         if depth > 0 {
-            results.push((node.id(), depth));
+            out.push((node.id, depth));
         }
     }
-
-    results
+    out
 }
 ```
 
-### Siblings
-
-Navigate between siblings:
+Because a node knows its `parent` and its ordered `children`, sibling navigation
+is a two-line derivation rather than a dedicated method:
 
 ```rust
-// Next sibling
-if let Some(next) = cpg.ast_next_sibling(node_id) {
-    println!("Next: {:?}", next.kind());
-}
+use libcpg::{CodePropertyGraph, NodeId};
 
-// Previous sibling
-if let Some(prev) = cpg.ast_prev_sibling(node_id) {
-    println!("Prev: {:?}", prev.kind());
-}
-
-// All following siblings
-for sibling in cpg.ast_following_siblings(node_id) {
-    println!("Following: {:?}", sibling.kind());
+fn next_sibling(cpg: &CodePropertyGraph, id: NodeId) -> Option<NodeId> {
+    let parent = cpg.ast_parent(id)?;                 // Option<NodeId>
+    let siblings = cpg.ast_children(parent);          // Vec<NodeId>, source order
+    let pos = siblings.iter().position(|&c| c == id)?;
+    siblings.get(pos + 1).copied()
 }
 ```
 
-## CFG Traversal
+## CFG traversal
 
-### Control Flow Successors
-
-Navigate execution paths:
-
-```rust
-// Immediate CFG successors
-for (successor, edge_kind) in cpg.cfg_successors(node_id) {
-    match edge_kind {
-        CfgEdgeKind::Sequential => println!("Next: {:?}", successor.kind()),
-        CfgEdgeKind::BranchTrue => println!("If true: {:?}", successor.kind()),
-        CfgEdgeKind::BranchFalse => println!("If false: {:?}", successor.kind()),
-        CfgEdgeKind::LoopBack => println!("Loop back to: {:?}", successor.kind()),
-        _ => {}
-    }
-}
-
-// CFG predecessors
-for (predecessor, edge_kind) in cpg.cfg_predecessors(node_id) {
-    println!("From {:?} via {:?}", predecessor.kind(), edge_kind);
-}
-```
-
-### Reachability
-
-Check if one node can reach another via CFG:
+`cfg_successors` and `cfg_predecessors` return `Vec<(NodeId, CfgEdgeKind)>` — the
+neighbour paired with the labelled control-flow edge. A depth-first reachability
+check is the canonical use; it runs in `` $`O(V + E)`$ `` over the CFG:
 
 ```rust
-// BFS reachability check
+use std::collections::HashSet;
+use libcpg::{CodePropertyGraph, NodeId};
+
+/// True if `to` is reachable from `from` following control-flow edges.
 fn cfg_reachable(cpg: &CodePropertyGraph, from: NodeId, to: NodeId) -> bool {
-    use std::collections::{HashSet, VecDeque};
-
-    let mut visited = HashSet::new();
-    let mut queue = VecDeque::new();
-    queue.push_back(from);
-
-    while let Some(current) = queue.pop_front() {
-        if current == to {
+    let mut seen = HashSet::new();
+    let mut stack = vec![from];
+    while let Some(cur) = stack.pop() {
+        if cur == to {
             return true;
         }
-
-        if !visited.insert(current) {
-            continue;
+        if !seen.insert(cur) {
+            continue;                                 // already visited
         }
-
-        for (successor, _) in cpg.cfg_successors(current) {
-            queue.push_back(successor.id());
+        for (succ, _kind) in cpg.cfg_successors(cur) {   // Vec<(NodeId, CfgEdgeKind)>
+            stack.push(succ);
         }
     }
-
     false
 }
 ```
 
-### Finding Paths
-
-Find all CFG paths between two nodes:
+The set of function entry points is `cfg_entries()` (a `&[NodeId]` slice), so a
+whole-program forward walk starts there:
 
 ```rust
-fn find_cfg_paths(
-    cpg: &CodePropertyGraph,
-    from: NodeId,
-    to: NodeId,
-    max_length: usize,
-) -> Vec<Vec<NodeId>> {
-    let mut paths = Vec::new();
-    let mut current_path = vec![from];
-
-    fn dfs(
-        cpg: &CodePropertyGraph,
-        current: NodeId,
-        target: NodeId,
-        path: &mut Vec<NodeId>,
-        paths: &mut Vec<Vec<NodeId>>,
-        max_length: usize,
-    ) {
-        if path.len() > max_length {
-            return;
-        }
-
-        if current == target {
-            paths.push(path.clone());
-            return;
-        }
-
-        for (successor, _) in cpg.cfg_successors(current) {
-            let succ_id = successor.id();
-            if !path.contains(&succ_id) {
-                path.push(succ_id);
-                dfs(cpg, succ_id, target, path, paths, max_length);
-                path.pop();
-            }
-        }
-    }
-
-    dfs(cpg, from, to, &mut current_path, &mut paths, max_length);
-    paths
+for &entry in cpg.cfg_entries() {
+    // e.g. mark everything reachable from each function entry ...
+    let _ = entry;
 }
 ```
 
-## DFG Traversal
+`cfg_nodes()` iterates the nodes that actually participate in the CFG (those with
+at least one incident control-flow edge), which is what
+[`cyclomatic_complexity`](../../GLOSSARY.md#cyclomatic-complexity) counts.
 
-### Def-Use Chains
+## DFG traversal
 
-Follow data dependencies:
+Data-flow navigation comes in a def-use direction and a use-def direction:
 
 ```rust
-// Get all uses of a definition
-fn get_uses(cpg: &CodePropertyGraph, def_id: NodeId) -> Vec<NodeId> {
-    cpg.outgoing_edges(def_id)
-        .filter_map(|edge_id| {
-            let edge = cpg.edge(edge_id).ok()?;
-            match edge.kind() {
-                CpgEdgeKind::DfgEdge(DfgEdgeKind::DefUse) => Some(edge.target()),
-                _ => None,
-            }
-        })
-        .collect()
-}
+// Uses reached by a definition (outgoing DefUse edges).
+let direct_uses = cpg.uses_of_definition(def_id);        // Vec<NodeId>
 
-// Get all definitions reaching a use
-fn get_reaching_defs(cpg: &CodePropertyGraph, use_id: NodeId) -> Vec<NodeId> {
-    cpg.incoming_edges(use_id)
-        .filter_map(|edge_id| {
-            let edge = cpg.edge(edge_id).ok()?;
-            match edge.kind() {
-                CpgEdgeKind::DfgEdge(DfgEdgeKind::DefUse) => Some(edge.source()),
-                _ => None,
-            }
-        })
-        .collect()
+// Definitions that reach a use (incoming DefUse / ReachingDef edges).
+let reaching = cpg.reaching_definitions(use_id);         // Vec<NodeId>
+
+// Every data-flow successor, with the edge kind that links it.
+for (next, kind) in cpg.dfg_successors(def_id) {         // Vec<(NodeId, DfgEdgeKind)>
+    println!("{def_id:?} --{kind:?}--> {next:?}");
 }
 ```
 
-### Taint Analysis
+`uses_of_definition` follows only `DefUse` edges, while `dfg_successors` follows
+*every* [`DfgEdgeKind`](edges.md#dfg-edges) (parameter passing, field/index
+access, aliasing, …). Choose the narrower accessor when you want pure def-use
+chains and the broader one when you want all value flow.
 
-Track data flow from sources to sinks:
+## Worked example: forward taint / reachability
+
+[Taint analysis](../../GLOSSARY.md#taint-analysis) asks whether a value from an
+untrusted **source** can reach a sensitive **sink**. Over a CPG this is a graph
+reachability query on the data-flow overlay. The algorithm is a breadth-first
+sweep that follows data-flow successors until the frontier is exhausted:
+
+```text
+taint_set(source):
+  tainted ← {}
+  queue   ← [source]
+  while queue not empty:
+    cur ← dequeue
+    if cur already in tainted: continue      # visited-set guards against cycles
+    insert cur into tainted
+    for (next, _kind) in dfg_successors(cur): # every DFG edge kind
+      enqueue next
+  return tainted                              # a sink is tainted iff it is a member
+```
+
+In Rust over the real API:
 
 ```rust
-/// Find all nodes reachable from a source via data flow
-fn taint_analysis(cpg: &CodePropertyGraph, source: NodeId) -> HashSet<NodeId> {
-    use std::collections::{HashSet, VecDeque};
+use std::collections::{HashSet, VecDeque};
+use libcpg::{CodePropertyGraph, NodeId};
 
+/// Every node reachable from `source` along data-flow edges (the forward taint set).
+fn taint_set(cpg: &CodePropertyGraph, source: NodeId) -> HashSet<NodeId> {
     let mut tainted = HashSet::new();
     let mut queue = VecDeque::new();
     queue.push_back(source);
 
-    while let Some(current) = queue.pop_front() {
-        if !tainted.insert(current) {
-            continue;
+    while let Some(cur) = queue.pop_front() {
+        if !tainted.insert(cur) {
+            continue;                                    // already visited
         }
-
-        // Follow all DFG edges
-        for edge_id in cpg.outgoing_edges(current) {
-            if let Ok(edge) = cpg.edge(edge_id) {
-                if matches!(edge.kind(), CpgEdgeKind::DfgEdge(_)) {
-                    queue.push_back(edge.target());
-                }
-            }
+        for (next, _kind) in cpg.dfg_successors(cur) {   // follow all DFG edges
+            queue.push_back(next);
         }
     }
-
     tainted
 }
-```
 
-## Combined Traversals
-
-### Finding Variables in Scope
-
-Combine AST and DFG traversal:
-
-```rust
-fn variables_in_scope(cpg: &CodePropertyGraph, node_id: NodeId) -> Vec<NodeId> {
-    let mut variables = Vec::new();
-
-    // Walk up the AST to find enclosing scopes
-    for ancestor in cpg.ast_ancestors(node_id) {
-        // Check for variable declarations
-        for child in cpg.ast_children(ancestor.id()) {
-            if child.kind() == CpgNodeKind::Variable {
-                variables.push(child.id());
-            }
-        }
-
-        // Stop at function boundary
-        if ancestor.kind() == CpgNodeKind::Function {
-            // Add parameters
-            for child in cpg.ast_children(ancestor.id()) {
-                if child.kind() == CpgNodeKind::Parameter {
-                    variables.push(child.id());
-                }
-            }
-            break;
-        }
-    }
-
-    variables
+/// True if untrusted data at `source` can flow to `sink`.
+fn reaches_sink(cpg: &CodePropertyGraph, source: NodeId, sink: NodeId) -> bool {
+    taint_set(cpg, source).contains(&sink)
 }
 ```
 
-### Dead Code Detection
+This visits each node at most once and scans its data-flow out-edges once, so it
+is `` $`O(V + E)`$ `` over the DFG. Two refinements are worth knowing:
 
-Combine CFG reachability with AST:
+- **Require an executable path.** Pure data-flow reachability does not check that
+  a control-flow path also exists. Intersect the taint set with a
+  [`cfg_reachable`](#cfg-traversal) test when you need both.
+- **Use dependence, not raw flow, for precision.** After running
+  [`PdgBuilder`](../builder/pdg-and-slicing.md), the
+  [`DataDependence`](../../GLOSSARY.md#data-dependence) /
+  [`ControlDependence`](../../GLOSSARY.md#control-dependence) edges support the
+  bounded [`backward_slice`](../../GLOSSARY.md#backward-slice--forward-slice) /
+  `forward_slice` traversals, which give dependence-accurate answers and a size
+  bound. See [`theory/04-program-dependence-and-slicing.md`](../../theory/04-program-dependence-and-slicing.md).
+
+## Positional queries
+
+When you start from a source location rather than a node, the positional
+accessors map byte offsets to nodes. Offsets are `u32` and match a node whose
+`range` covers them; `node_at_offset` and `scope_at_offset` return the
+*innermost* (smallest-span) match:
 
 ```rust
-fn find_dead_code(cpg: &CodePropertyGraph) -> Vec<NodeId> {
-    use std::collections::HashSet;
+use libcpg::SourceRange;
 
-    let mut dead = Vec::new();
+if let Some(node) = cpg.node_at_offset(42) {
+    println!("at offset 42: {:?}", node.kind);
+}
 
-    // Find all function entry points
-    let functions: Vec<_> = cpg.nodes_of_kind(CpgNodeKind::Function).collect();
+// Innermost enclosing Block or Function.
+if let Some(scope) = cpg.scope_at_offset(42) {
+    println!("enclosing scope: {:?}", scope.kind);
+}
 
-    for func in functions {
-        // Find all reachable nodes from function entry
-        let mut reachable = HashSet::new();
-        let mut stack = vec![func.id()];
+// All nodes overlapping a byte range.
+let overlapping = cpg.nodes_in_range(SourceRange::from_bytes(10, 50));
+println!("{} nodes overlap [10, 50)", overlapping.len());
+```
 
-        while let Some(current) = stack.pop() {
-            if !reachable.insert(current) {
-                continue;
-            }
+## Call-graph traversal
 
-            for (successor, _) in cpg.cfg_successors(current) {
-                stack.push(successor.id());
-            }
-        }
+The call overlay connects call sites to callees. `call_sites(fn)` finds the
+`Call` nodes inside a function; `callees(call)` and `callers(fn)` follow the
+`CallSite` / `StaticCall` / `DynamicCall` edges:
 
-        // Find unreachable statements in this function
-        for descendant in cpg.ast_descendants(func.id()) {
-            if matches!(
-                descendant.kind(),
-                CpgNodeKind::Return | CpgNodeKind::Variable | CpgNodeKind::Call
-            ) && !reachable.contains(&descendant.id()) {
-                dead.push(descendant.id());
-            }
+```rust
+for func in cpg.functions() {
+    for call in cpg.call_sites(func.id) {        // Vec<NodeId>
+        for callee in cpg.callees(call) {        // Vec<NodeId>
+            let _ = callee;                       // resolved target(s)
         }
     }
-
-    dead
 }
 ```
 
-## Visitor Pattern
+## Subgraph extraction
 
-For complex traversals, use the visitor pattern:
+Three methods carve a smaller `CodePropertyGraph` out of a larger one — handy
+for scoping an analysis or a visualisation to a single function:
 
 ```rust
-trait CpgVisitor {
-    fn visit_node(&mut self, node: &CpgNode, cpg: &CodePropertyGraph);
-    fn visit_edge(&mut self, edge: &CpgEdge, cpg: &CodePropertyGraph);
-}
-
-fn walk_cpg<V: CpgVisitor>(cpg: &CodePropertyGraph, visitor: &mut V) {
-    // Visit all nodes
-    for node in cpg.nodes() {
-        visitor.visit_node(node, cpg);
-    }
-
-    // Visit all edges
-    for edge in cpg.edges() {
-        visitor.visit_edge(edge, cpg);
-    }
-}
-
-// Example: Counting node types
-struct NodeCounter {
-    counts: HashMap<CpgNodeKind, usize>,
-}
-
-impl CpgVisitor for NodeCounter {
-    fn visit_node(&mut self, node: &CpgNode, _cpg: &CodePropertyGraph) {
-        *self.counts.entry(node.kind()).or_insert(0) += 1;
-    }
-
-    fn visit_edge(&mut self, _edge: &CpgEdge, _cpg: &CodePropertyGraph) {}
+for func in cpg.functions() {
+    let cfg = cpg.function_cfg(func.id);   // control-flow + expression nodes
+    let dfg = cpg.function_dfg(func.id);   // nodes that carry data-flow edges
+    println!(
+        "{}: {} CFG nodes, {} DFG nodes",
+        func.name().unwrap_or("?"),
+        cfg.node_count(),
+        dfg.node_count(),
+    );
 }
 ```
 
-## Performance Tips
+`subgraph(&[NodeId])` is the general form: it copies the given nodes and every
+edge whose *both* endpoints are in the set, preserving ids so the result stays
+comparable to the parent graph.
 
-1. **Use iterators lazily**: Don't collect unless necessary
-2. **Avoid repeated lookups**: Cache node references
-3. **Filter early**: Apply filters before expensive operations
-4. **Use parallel iteration** with rayon for large graphs:
+## Parallelism with rayon
+
+`libcpg` links [rayon](https://docs.rs/rayon) as a dependency but its own
+traversal accessors are **sequential** — they return owned `Vec`s or borrowing
+iterators, and any graph mutation needs `&mut CodePropertyGraph`. Parallelism is
+therefore a *read-only* concern on your side: because `&CodePropertyGraph` is
+`Sync`, you can share one across rayon threads. The robust pattern is to collect
+a work-list first, then fan out:
 
 ```rust
+// Add `rayon` to your own Cargo.toml — libcpg links it but does not re-export it.
 use rayon::prelude::*;
+use libcpg::{CodePropertyGraph, NodeId};
 
-// Parallel node processing
-let results: Vec<_> = cpg.nodes()
-    .par_bridge()
-    .filter(|n| n.kind() == CpgNodeKind::Function)
-    .map(|n| analyze_function(cpg, n))
-    .collect();
+fn per_function_complexity(cpg: &CodePropertyGraph) -> Vec<(NodeId, usize)> {
+    // 1. Collect the work-list (cheap: NodeId is Copy).
+    let functions: Vec<NodeId> = cpg.functions().map(|n| n.id).collect();
+
+    // 2. Map in parallel; each closure only *reads* the shared &cpg.
+    functions
+        .par_iter()
+        .map(|&f| (f, cpg.function_cfg(f).cyclomatic_complexity()))
+        .collect()
+}
 ```
 
-## Next Steps
+Collecting node ids before parallelising avoids sharing a borrowing iterator
+across threads and keeps every closure a pure read, which is exactly what the
+`Send + Sync` guarantee on `CodePropertyGraph` permits.
 
-- [Nodes](nodes.md) - Node type details
-- [Edges](edges.md) - Edge type details
-- [Overview](overview.md) - Back to overview
+## Where to go next
+
+- [Nodes](nodes.md) — the node kinds you resolve ids into.
+- [Edges](edges.md) — the edge kinds these accessors follow.
+- [Overview](overview.md) — the CPG and its overlays at a glance.
+- [`components/builder/pdg-and-slicing.md`](../builder/pdg-and-slicing.md) —
+  dependence edges and bounded slicing for precise reachability.
+- [`api/graph-reference.md`](../../api/graph-reference.md) — the complete
+  method-by-method reference.
+</content>

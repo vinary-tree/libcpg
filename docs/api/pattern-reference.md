@@ -1,545 +1,504 @@
-# Pattern API Reference
+# Pattern & Analysis API Reference
 
-This reference documents the pattern detection and matching APIs in libcpg.
+This page is the authoritative reference for the four **analysis** surfaces of
+`libcpg` that operate over a built [`CodePropertyGraph`](graph-reference.md):
 
-## Pattern Matching
+| Module | Cargo feature | Purpose | Primary entry points |
+|--------|---------------|---------|----------------------|
+| `pattern` | **always on** | [Subgraph isomorphism](../GLOSSARY.md#isomorphism--subgraph-isomorphism) (VF2) and [graph similarity](../GLOSSARY.md#similarity-metric) | `Vf2Matcher`, `GraphSimilarity` |
+| `patterns` | `design-patterns` | [Gang-of-Four](../GLOSSARY.md#gang-of-four-gof) detection, DPML, rule/ML classification, OO metrics | `GofPatternDetector`, `PatternClassifier` |
+| `algorithms` | `algorithm-detection` | [Algorithm-family](../GLOSSARY.md#algorithm-family) and [complexity](../GLOSSARY.md#complexity-class--big-o) detection | `DefaultAlgorithmDetector` |
+| `gnn` | `gnn` | Message-passing [embeddings](../GLOSSARY.md#embedding) | `CpgGnn` |
 
-### SubgraphMatcher Trait
+> **`pattern` (singular) and `patterns` (plural) are different modules.**
+> `pattern` is the always-on VF2 / similarity toolkit. `patterns` is the
+> feature-gated GoF layer *built on top of it*. Do not conflate them.
 
-Interface for subgraph matching algorithms.
+Term definitions are in the [Glossary](../GLOSSARY.md); graph and builder types
+are in the [Graph](graph-reference.md) and [Builder](builder-reference.md)
+references.
+
+### Module paths at a glance
+
+```rust
+// pattern:: — re-exported at the crate root:
+use libcpg::{PatternMatch, SubgraphMatcher};
+// …the rest of pattern:: needs the full path:
+use libcpg::pattern::{
+    Vf2Matcher, Vf2State, GraphSimilarity, SimilarityMetric,
+    PatternTemplate, NodeConstraint, EdgeConstraint,
+    NodeKindMatcher, NodeKindTag, EdgeKindMatcher,
+};
+
+// patterns:: (feature "design-patterns"):
+use libcpg::patterns::{PatternDetector, GofPatternDetector, GofPattern, PatternClassifier};
+use libcpg::patterns::design::{
+    GofCategory, build_pattern_cpg, build_pattern_template,
+    DpmlTemplate, DpmlRole, DpmlConstraint, DpmlError, PatternMetrics,
+};
+use libcpg::patterns::classification::{ClassificationMode, FeatureVector};
+
+// algorithms:: (feature "algorithm-detection"):
+use libcpg::algorithms::{
+    AlgorithmDetector, DetectedAlgorithm, AlgorithmSignature,
+    ComplexityEstimate, ComplexityClass, AlgorithmFamily,
+};
+use libcpg::algorithms::detection::DefaultAlgorithmDetector;
+
+// gnn:: (feature "gnn"):
+use libcpg::GraphNeuralNetwork;                 // trait, re-exported at root
+use libcpg::gnn::{CpgGnn, NodeEmbedding, SubgraphEmbedding};
+```
+
+---
+
+## `pattern::` — subgraph matching & similarity (always on)
+
+### `SubgraphMatcher` trait
+
+The matching contract. `find_matches` is required; `find_matches_limited`,
+`contains_pattern`, and `algorithm_name` are provided.
 
 ```rust
 pub trait SubgraphMatcher: Send + Sync {
-    fn find_matches(
-        &self,
-        pattern: &CodePropertyGraph,
-        target: &CodePropertyGraph,
-    ) -> Vec<PatternMatch>;
-
-    fn contains_pattern(
-        &self,
-        pattern: &CodePropertyGraph,
-        target: &CodePropertyGraph,
-    ) -> bool {
-        !self.find_matches(pattern, target).is_empty()
-    }
-
-    fn find_matches_limited(
-        &self,
-        pattern: &CodePropertyGraph,
-        target: &CodePropertyGraph,
-        max: usize,
-    ) -> Vec<PatternMatch>;
+    fn find_matches(&self, pattern: &CodePropertyGraph, target: &CodePropertyGraph) -> Vec<PatternMatch>;
+    fn find_matches_limited(&self, pattern: &CodePropertyGraph, target: &CodePropertyGraph, limit: usize) -> Vec<PatternMatch> { /* provided: truncates find_matches */ }
+    fn contains_pattern(&self, pattern: &CodePropertyGraph, target: &CodePropertyGraph) -> bool { /* provided */ }
+    fn algorithm_name(&self) -> &str;
 }
 ```
 
----
+Both `SubgraphMatcher` and `PatternMatch` are re-exported at the crate root.
 
-### Vf2Matcher
+### `PatternMatch`
 
-VF2 subgraph isomorphism implementation.
-
-```rust
-pub struct Vf2Matcher {
-    strict_kinds: bool,
-    strict_edges: bool,
-    max_matches: Option<usize>,
-}
-```
-
-#### Constructor
-
-| Method | Returns | Description |
-|--------|---------|-------------|
-| `Vf2Matcher::new()` | `Vf2Matcher` | Create with defaults |
-
-#### Configuration
-
-| Method | Returns | Description |
-|--------|---------|-------------|
-| `with_strict_kinds(enabled: bool)` | `Self` | Require exact node kind matches |
-| `with_strict_edges(enabled: bool)` | `Self` | Require exact edge kind matches |
-| `with_max_matches(n: usize)` | `Self` | Stop after n matches |
-
-#### Methods
-
-| Method | Returns | Description |
-|--------|---------|-------------|
-| `find_matches(pattern, target)` | `Vec<PatternMatch>` | Find all matches |
-| `contains_pattern(pattern, target)` | `bool` | Check if pattern exists |
-| `find_matches_limited(pattern, target, max)` | `Vec<PatternMatch>` | Find up to max matches |
-
-#### Example
-
-```rust
-use libcpg::pattern::{Vf2Matcher, SubgraphMatcher};
-
-let matcher = Vf2Matcher::new()
-    .with_strict_kinds(true)
-    .with_max_matches(10);
-
-let matches = matcher.find_matches(&pattern_cpg, &target_cpg);
-
-for m in matches {
-    println!("Match found at {:?}", m.root);
-    println!("  Confidence: {:.2}", m.confidence);
-    println!("  Mapped {} nodes", m.match_size());
-}
-```
-
----
-
-### PatternMatch
-
-Result of pattern matching.
+The result of a match — a mapping from pattern nodes to target nodes plus
+metadata.
 
 ```rust
 pub struct PatternMatch {
     pub pattern_name: String,
     pub confidence: f64,
-    pub node_mapping: FxHashMap<NodeId, NodeId>,
-    pub root: NodeId,
+    pub node_mapping: FxHashMap<NodeId, NodeId>,   // pattern node → target node
+    pub root: NodeId,                              // a target node
     pub metadata: FxHashMap<String, String>,
 }
 ```
 
-| Method | Returns | Description |
-|--------|---------|-------------|
-| `match_size()` | `usize` | Number of mapped nodes |
-| `matched_nodes()` | `impl Iterator<Item = NodeId>` | Target node IDs |
-| `pattern_node_for(target: NodeId)` | `Option<NodeId>` | Reverse lookup |
+| Method | Signature | Notes |
+|--------|-----------|-------|
+| `new` | `fn new(pattern_name: impl Into<String>, root: NodeId, confidence: f64) -> Self` | Constructor. |
+| `with_mapping` | `fn with_mapping(self, pattern_node: NodeId, target_node: NodeId) -> Self` | Builder: add a mapping. |
+| `with_metadata` | `fn with_metadata(self, key: impl Into<String>, value: impl Into<String>) -> Self` | Builder: add metadata. |
+| `matched_nodes` | `fn matched_nodes(&self) -> impl Iterator<Item = NodeId> + '_` | Target node ids (the mapping's values). |
+| `match_size` | `fn match_size(&self) -> usize` | Number of mapped nodes. |
 
----
+`confidence` is a score in $`[0, 1]`$.
 
-### PatternTemplate
+### `Vf2Matcher`
 
-Declarative pattern definition.
+[VF2](../GLOSSARY.md#vf2) subgraph isomorphism [[1]](#references). All three
+configuration fields are private; use the builder methods.
+
+```rust
+pub struct Vf2Matcher { /* private: strict_kinds, strict_edges, max_matches */ }
+```
+
+| Method | Signature | Notes |
+|--------|-----------|-------|
+| `new` | `fn new() -> Self` | Relaxed matching, unlimited matches. |
+| `with_strict_kinds` | `fn with_strict_kinds(self, strict: bool) -> Self` | Require exact node-kind tags. |
+| `with_strict_edges` | `fn with_strict_edges(self, strict: bool) -> Self` | Require exact edge kinds. |
+| `with_max_matches` | `fn with_max_matches(self, max: usize) -> Self` | Cap the result; `0` means unlimited. |
+| `find_matches` | *(via `SubgraphMatcher`)* `fn find_matches(&self, pattern, target) -> Vec<PatternMatch>` | Find all embeddings. |
+
+**Relaxed vs strict.** By default (`strict_kinds = false`, `strict_edges =
+false`), two nodes are compatible when they fall in the same category
+(declaration / expression / statement) or share a
+[`NodeKindTag`](#patterntemplate--constraints), and two edges are compatible when they share an
+AST/CFG/DFG/call family. Turning strictness on requires exact tag/kind equality.
+Relaxed matching is what powers GoF detection (below). Worst-case cost is
+$`O(N!\,N)`$ in the pattern size $`N`$, but feasibility pruning makes
+it practical on the sparse graphs typical of code.
+
+![A path pattern matched against a diamond target graph](../diagrams/vf2-pattern-target.svg)
+
+*Figure — a 3-node path pattern `p0 → p1 → p2` matched against a diamond target `A → {B, C} → D` has exactly two embeddings (`A-B-D` and `A-C-D`); finding both requires correct mid-search backtracking. Source: [`diagrams/vf2-pattern-target.dot`](../diagrams/vf2-pattern-target.dot).*
+
+```rust
+// requires: no features (pattern:: is always on)
+use libcpg::pattern::Vf2Matcher;
+use libcpg::SubgraphMatcher;
+
+let matches = Vf2Matcher::new()
+    .with_strict_kinds(true)      // exact node-kind tags
+    .with_max_matches(0)          // 0 = unlimited
+    .find_matches(&pattern_cpg, &target_cpg);
+
+for m in &matches {
+    println!("matched {} nodes rooted at {:?}", m.match_size(), m.root);
+}
+```
+
+The inline regression `test_multi_embedding_backtracking` (`src/pattern/vf2.rs`)
+verifies that the diamond above yields **exactly two** embeddings — the matcher
+finds every embedding, not just the first.
+
+### `Vf2State`
+
+The explicit VF2 search state, exposed for advanced callers who want to drive or
+inspect the state-space search. Most callers use `Vf2Matcher` and never touch it.
+
+| Method | Signature |
+|--------|-----------|
+| `new` | `fn new(pattern: &'a CodePropertyGraph, target: &'a CodePropertyGraph) -> Self` |
+| `is_complete` | `fn is_complete(&self) -> bool` |
+| `candidate_pairs` | `fn candidate_pairs(&self) -> Vec<(NodeId, NodeId)>` |
+| `push_mapping` | `fn push_mapping(&mut self, pattern_node: NodeId, target_node: NodeId)` |
+| `pop_mapping` | `fn pop_mapping(&mut self)` |
+| `to_pattern_match` | `fn to_pattern_match(&self) -> PatternMatch` |
+
+`push_mapping`/`pop_mapping` maintain an explicit push-order stack so backtracking
+restores the mapping and [terminal sets](../GLOSSARY.md#terminal-set-vf2) exactly.
+
+### `PatternTemplate` & constraints
+
+A declarative alternative to hand-building a pattern CPG: describe nodes and
+edges by *constraint*, then compile to a CPG for matching.
 
 ```rust
 pub struct PatternTemplate {
-    name: String,
-    description: String,
-    node_constraints: Vec<NodeConstraint>,
-    edge_constraints: Vec<EdgeConstraint>,
-    min_confidence: f64,
+    pub name: String,
+    pub description: String,
+    pub node_constraints: Vec<NodeConstraint>,
+    pub edge_constraints: Vec<EdgeConstraint>,
+    pub min_confidence: f64,   // default 0.8
 }
 ```
 
-#### Construction
+| `PatternTemplate` method | Signature |
+|--------------------------|-----------|
+| `new` | `fn new(name: impl Into<String>, description: impl Into<String>) -> Self` |
+| `with_node` | `fn with_node(self, constraint: NodeConstraint) -> Self` |
+| `with_edge` | `fn with_edge(self, constraint: EdgeConstraint) -> Self` |
+| `with_min_confidence` | `fn with_min_confidence(self, confidence: f64) -> Self` |
+| `to_pattern_graph` | `fn to_pattern_graph(&self) -> CodePropertyGraph` |
 
-| Method | Returns | Description |
-|--------|---------|-------------|
-| `PatternTemplate::new(name, description)` | `PatternTemplate` | Create template |
-| `with_node(constraint: NodeConstraint)` | `Self` | Add node constraint |
-| `with_edge(constraint: EdgeConstraint)` | `Self` | Add edge constraint |
-| `with_min_confidence(c: f64)` | `Self` | Set minimum confidence |
-| `to_pattern_graph()` | `CodePropertyGraph` | Convert to CPG |
+**`NodeConstraint`** — `index: usize`, `kind: Option<NodeKindMatcher>`,
+`name_pattern: Option<String>`, `properties: FxHashMap<String, String>`.
+Builders: `new(index)`, `with_kind(NodeKindMatcher)`,
+`with_name_pattern(impl Into<String>)`, `with_property(key, value)`.
 
-#### Example
+**`NodeKindMatcher`** — how a node constraint matches a kind. Method
+`matches(&self, kind: &CpgNodeKind) -> bool`.
+
+| Variant | Matches |
+|---------|---------|
+| `Exact(NodeKindTag)` | one specific tag |
+| `AnyOf(Vec<NodeKindTag>)` | any listed tag |
+| `AnyDeclaration` | any declaration kind |
+| `AnyExpression` | any expression kind |
+| `AnyStatement` | any statement kind |
+| `Any` | anything |
+
+**`NodeKindTag`** — a flat, 29-variant tag for node kinds: `Root`, `Module`,
+`Class`, `Struct`, `Enum`, `Trait`, `Impl`, `Function`, `Parameter`, `Block`,
+`Variable`, `Field`, `Return`, `If`, `While`, `For`, `Loop`, `Match`, `BinaryOp`,
+`UnaryOp`, `Assignment`, `Call`, `MemberAccess`, `IndexAccess`, `Identifier`,
+`Literal`, `Lambda`, `Import`, `Unknown`. Methods: `from_kind(&CpgNodeKind) ->
+NodeKindTag` and `matches(&self, &CpgNodeKind) -> bool`.
+
+**`EdgeConstraint`** — `source: usize`, `target: usize`,
+`kind: Option<EdgeKindMatcher>`. Builders: `new(source, target)`,
+`with_kind(EdgeKindMatcher)`.
+
+**`EdgeKindMatcher`** — `AnyAst`, `AnyCfg`, `AnyDfg`, `AnyCall`, `Any`. Method
+`matches(&self, kind: &CpgEdgeKind) -> bool`. (There is no `Exact`/`AnyOf` edge
+matcher — edges match by *family*.)
 
 ```rust
+// requires: no features
 use libcpg::pattern::{PatternTemplate, NodeConstraint, EdgeConstraint};
 use libcpg::pattern::{NodeKindMatcher, NodeKindTag, EdgeKindMatcher};
 
-let template = PatternTemplate::new("Null Check", "Check for null before use")
-    .with_node(
-        NodeConstraint::new(0)
-            .with_kind(NodeKindMatcher::Exact(NodeKindTag::If))
-    )
-    .with_node(
-        NodeConstraint::new(1)
-            .with_kind(NodeKindMatcher::Exact(NodeKindTag::BinaryOp))
-    )
-    .with_edge(
-        EdgeConstraint::new(0, 1)
-            .with_kind(EdgeKindMatcher::AnyAst)
-    )
-    .with_min_confidence(0.8);
+let template = PatternTemplate::new("Singleton", "class + field")
+    .with_node(NodeConstraint::new(0).with_kind(NodeKindMatcher::Exact(NodeKindTag::Class)))
+    .with_node(NodeConstraint::new(1).with_kind(NodeKindMatcher::Exact(NodeKindTag::Field)))
+    .with_edge(EdgeConstraint::new(0, 1).with_kind(EdgeKindMatcher::AnyAst))
+    .with_min_confidence(0.9);
 
-let pattern_cpg = template.to_pattern_graph();
+let pattern_cpg = template.to_pattern_graph(); // feed to Vf2Matcher::find_matches
 ```
 
----
+### `GraphSimilarity` & `SimilarityMetric`
 
-### NodeConstraint
-
-Constraint on pattern nodes.
+Whole-graph [similarity](../GLOSSARY.md#similarity-metric) scoring. Fields are
+private; the defaults are `metric = Jaccard`, `structural_weight = 0.7`,
+`label_weight = 0.3`.
 
 ```rust
-pub struct NodeConstraint {
-    id: usize,
-    kind_matcher: Option<NodeKindMatcher>,
-    name_pattern: Option<String>,
-    required: bool,
-}
+pub struct GraphSimilarity { /* private: metric, structural_weight, label_weight */ }
 ```
 
-| Method | Returns | Description |
-|--------|---------|-------------|
-| `NodeConstraint::new(id: usize)` | `NodeConstraint` | Create constraint |
-| `with_kind(matcher: NodeKindMatcher)` | `Self` | Set kind matcher |
-| `with_name_pattern(pattern: &str)` | `Self` | Set regex for name |
-| `optional()` | `Self` | Mark as optional |
+| Method | Signature | Notes |
+|--------|-----------|-------|
+| `new` | `fn new() -> Self` | Jaccard, weights `0.7`/`0.3`. |
+| `with_metric` | `fn with_metric(self, metric: SimilarityMetric) -> Self` | Choose the metric. |
+| `with_structural_weight` | `fn with_structural_weight(self, weight: f64) -> Self` | Structural weight. |
+| `with_label_weight` | `fn with_label_weight(self, weight: f64) -> Self` | Label weight. |
+| `similarity` | `fn similarity(&self, g1: &CodePropertyGraph, g2: &CodePropertyGraph) -> f64` | Score in $`[0, 1]`$. |
 
----
+**`SimilarityMetric`** — `Jaccard` (the `Default`), `Cosine`, `WeisfeilerLehman`,
+`GraphEdit`. The default [Jaccard index](../GLOSSARY.md#jaccard-similarity) over
+node-kind multisets is
 
-### EdgeConstraint
+```math
+J(A, B) = \frac{|A \cap B|}{|A \cup B|}
+```
 
-Constraint on pattern edges.
+`WeisfeilerLehman` refines node labels over 3 iterations; `GraphEdit`
+approximates edit distance and blends structural (`structural_weight`) and label
+(`label_weight`) components. Only `GraphEdit` currently consults the two weights.
 
 ```rust
-pub struct EdgeConstraint {
-    source_id: usize,
-    target_id: usize,
-    kind_matcher: Option<EdgeKindMatcher>,
-    required: bool,
-}
-```
+// requires: no features
+use libcpg::pattern::{GraphSimilarity, SimilarityMetric};
 
-| Method | Returns | Description |
-|--------|---------|-------------|
-| `EdgeConstraint::new(src: usize, tgt: usize)` | `EdgeConstraint` | Create constraint |
-| `with_kind(matcher: EdgeKindMatcher)` | `Self` | Set kind matcher |
-| `optional()` | `Self` | Mark as optional |
+let score = GraphSimilarity::new()
+    .with_metric(SimilarityMetric::WeisfeilerLehman)
+    .similarity(&cpg_a, &cpg_b);
+```
 
 ---
 
-### NodeKindMatcher
+## `patterns::` — Gang-of-Four detection (feature `design-patterns`)
 
-Flexible node kind matching.
-
-```rust
-pub enum NodeKindMatcher {
-    Exact(NodeKindTag),
-    AnyOf(Vec<NodeKindTag>),
-    AnyDeclaration,
-    AnyExpression,
-    AnyStatement,
-    Any,
-}
-```
-
-| Variant | Description |
-|---------|-------------|
-| `Exact(tag)` | Match specific kind |
-| `AnyOf(tags)` | Match any of the kinds |
-| `AnyDeclaration` | Match any declaration |
-| `AnyExpression` | Match any expression |
-| `AnyStatement` | Match any statement |
-| `Any` | Match anything |
-
----
-
-### EdgeKindMatcher
-
-Flexible edge kind matching.
-
-```rust
-pub enum EdgeKindMatcher {
-    Exact(CpgEdgeKind),
-    AnyOf(Vec<CpgEdgeKind>),
-    AnyAst,
-    AnyCfg,
-    AnyDfg,
-    Any,
-}
-```
-
-| Variant | Description |
-|---------|-------------|
-| `Exact(kind)` | Match specific edge |
-| `AnyOf(kinds)` | Match any of the kinds |
-| `AnyAst` | Match any AST edge |
-| `AnyCfg` | Match any CFG edge |
-| `AnyDfg` | Match any DFG edge |
-| `Any` | Match any edge |
-
----
-
-### NodeKindTag
-
-Simplified node kind for matching.
-
-```rust
-pub enum NodeKindTag {
-    // Declarations
-    Module, Class, Struct, Enum, Trait, Function, Variable, Field, Parameter,
-
-    // Expressions
-    BinaryOp, UnaryOp, Call, MemberAccess, IndexAccess, Identifier, Literal, Lambda,
-
-    // Statements
-    Return, If, While, For, Loop, Match, Break, Continue, Block,
-
-    // Control Flow
-    Entry, Exit,
-
-    // Other
-    Unknown,
-}
-```
-
-| Method | Returns | Description |
-|--------|---------|-------------|
-| `from_kind(kind: &CpgNodeKind)` | `NodeKindTag` | Convert from full kind |
-| `is_declaration()` | `bool` | Is declaration category |
-| `is_expression()` | `bool` | Is expression category |
-| `is_statement()` | `bool` | Is statement category |
-
----
-
-## Design Pattern Detection
-
-### PatternDetector Trait
-
-Interface for design pattern detection.
+### `PatternDetector` trait
 
 ```rust
 pub trait PatternDetector: Send + Sync {
     fn detect(&self, cpg: &CodePropertyGraph) -> Vec<PatternMatch>;
-
-    fn detect_in_function(
-        &self,
-        cpg: &CodePropertyGraph,
-        function: NodeId,
-    ) -> Vec<PatternMatch>;
+    fn supported_patterns(&self) -> &[&str];
 }
 ```
 
----
+### `GofPatternDetector`
 
-### GofPatternDetector
+Detects the 23 GoF patterns structurally. Private fields: `min_confidence`
+(default `0.7`), `patterns_to_detect` (empty ⇒ all).
 
-Gang of Four pattern detector.
+| Method | Signature | Notes |
+|--------|-----------|-------|
+| `new` | `fn new() -> Self` | Detect all patterns, `min_confidence = 0.7`. |
+| `with_min_confidence` | `fn with_min_confidence(self, confidence: f64) -> Self` | Keep matches at/above this. |
+| `with_patterns` | `fn with_patterns(self, patterns: Vec<GofPattern>) -> Self` | Restrict to specific patterns. |
+| `detect` | *(via `PatternDetector`)* `fn detect(&self, cpg) -> Vec<PatternMatch>` | Run detection. |
 
-```rust
-pub struct GofPatternDetector {
-    patterns: Vec<GofPattern>,
-    min_confidence: f64,
-}
-```
-
-#### Constructor
-
-| Method | Returns | Description |
-|--------|---------|-------------|
-| `GofPatternDetector::new()` | `GofPatternDetector` | Detect all patterns |
-
-#### Configuration
-
-| Method | Returns | Description |
-|--------|---------|-------------|
-| `with_patterns(patterns: Vec<GofPattern>)` | `Self` | Filter to specific patterns |
-| `with_min_confidence(c: f64)` | `Self` | Set minimum confidence |
-
-#### Methods
-
-| Method | Returns | Description |
-|--------|---------|-------------|
-| `detect(cpg: &CodePropertyGraph)` | `Vec<PatternMatch>` | Detect all matches |
-
-#### Example
+`detect` runs a **relaxed** [`Vf2Matcher`](#vf2matcher) (`strict_kinds = false`,
+`strict_edges = false`) against each pattern's template, scores every match with
+a completeness-vs-template [confidence](../GLOSSARY.md#confidence-pattern-match),
+keeps those at/above `min_confidence`, attaches `category` and `pattern_type =
+"GoF"` metadata, and sorts by confidence descending.
 
 ```rust
+// requires: features = ["design-patterns"]
 use libcpg::patterns::{GofPatternDetector, GofPattern, PatternDetector};
 
 let detector = GofPatternDetector::new()
-    .with_patterns(vec![
-        GofPattern::Singleton,
-        GofPattern::Factory,
-        GofPattern::Observer,
-    ])
+    .with_patterns(vec![GofPattern::Singleton, GofPattern::FactoryMethod])
     .with_min_confidence(0.75);
 
-let matches = detector.detect(&cpg);
-
-for m in matches {
-    let category = m.metadata.get("category").unwrap();
-    println!("{} ({}) - confidence: {:.0}%",
-             m.pattern_name, category, m.confidence * 100.0);
+for m in detector.detect(&cpg) {
+    let category = m.metadata.get("category").map(String::as_str).unwrap_or("");
+    println!("{} ({}) — {:.0}%", m.pattern_name, category, m.confidence * 100.0);
 }
 ```
 
----
+### `GofPattern` & `GofCategory`
 
-### GofPattern
+The 23 [Gang-of-Four](../GLOSSARY.md#gang-of-four-gof) patterns [[3]](#references),
+grouped into three categories. The creational factory variant is **`FactoryMethod`**
+— there is no `Factory` variant.
 
-All 23 Gang of Four patterns.
+![The Gang-of-Four taxonomy: 5 creational, 7 structural, 11 behavioral](../diagrams/gof-taxonomy.svg)
+
+*Figure — the 23 GoF patterns by category. Source: [`diagrams/gof-taxonomy.puml`](../diagrams/gof-taxonomy.puml).*
+
+| Category (`GofCategory`) | `GofPattern` variants |
+|--------------------------|-----------------------|
+| `Creational` (5) | `AbstractFactory`, `Builder`, `FactoryMethod`, `Prototype`, `Singleton` |
+| `Structural` (7) | `Adapter`, `Bridge`, `Composite`, `Decorator`, `Facade`, `Flyweight`, `Proxy` |
+| `Behavioral` (11) | `ChainOfResponsibility`, `Command`, `Interpreter`, `Iterator`, `Mediator`, `Memento`, `Observer`, `State`, `Strategy`, `TemplateMethod`, `Visitor` |
+
+`GofPattern` methods: `name(&self) -> &'static str` and `category(&self) ->
+GofCategory`. `GofCategory` (`Creational`, `Structural`, `Behavioral`) has
+`name(&self) -> &'static str`.
+
+### Template builders
+
+Two free functions (in `libcpg::patterns::design`) produce the pattern graph and
+template a detector matches against:
 
 ```rust
-pub enum GofPattern {
-    // Creational (5)
-    AbstractFactory,
-    Builder,
-    FactoryMethod,
-    Prototype,
-    Singleton,
+pub fn build_pattern_cpg(pattern: GofPattern) -> CodePropertyGraph;
+pub fn build_pattern_template(pattern: GofPattern) -> PatternTemplate;
+```
 
-    // Structural (7)
-    Adapter,
-    Bridge,
-    Composite,
-    Decorator,
-    Facade,
-    Flyweight,
-    Proxy,
+### DPML — declarative pattern templates
 
-    // Behavioral (11)
-    ChainOfResponsibility,
-    Command,
-    Interpreter,
-    Iterator,
-    Mediator,
-    Memento,
-    Observer,
-    State,
-    Strategy,
-    TemplateMethod,
-    Visitor,
+[DPML](../GLOSSARY.md#dpml-design-pattern-markup-language) declares a pattern as
+roles + relationships in YAML or TOML, compiling to a
+[`PatternTemplate`](#patterntemplate--constraints).
+
+```rust
+pub struct DpmlTemplate {
+    pub name: String,
+    pub description: String,
+    pub category: String,
+    pub roles: Vec<DpmlRole>,
+    pub relationships: Vec<DpmlConstraint>,   // serde alias: "constraints"
+}
+pub struct DpmlRole { pub id: String, pub role_type: String, pub cardinality: String }
+pub struct DpmlConstraint { pub source: String, pub target: String, pub constraint_type: String }
+```
+
+| `DpmlTemplate` method | Signature | Notes |
+|-----------------------|-----------|-------|
+| `new` | `fn new(name: impl Into<String>) -> Self` | Empty template. |
+| `with_description` / `with_category` | `fn(self, impl Into<String>) -> Self` | Set metadata. |
+| `with_role` | `fn with_role(self, role: DpmlRole) -> Self` | Add a role. |
+| `with_relationship` | `fn with_relationship(self, constraint: DpmlConstraint) -> Self` | Add a relationship. |
+| `parse` | `fn parse(content: &str) -> Result<Self, DpmlError>` | Auto-detect YAML then TOML *(design-patterns)*. |
+| `parse_yaml` / `parse_toml` | `fn(content: &str) -> Result<Self, DpmlError>` | Explicit parsers *(design-patterns)*. |
+| `validate` | `fn validate(&self) -> Result<(), DpmlError>` | Check role ids and relationship references. |
+| `to_pattern_template` | `fn to_pattern_template(&self) -> Result<PatternTemplate, DpmlError>` | Compile (validates first). |
+
+`DpmlRole::new(id, role_type)` / `with_cardinality`; `DpmlConstraint::new(source,
+target, constraint_type)`. **`DpmlError`** has 8 variants: `FeatureDisabled`,
+`YamlError`, `TomlError`, `MissingField`, `InvalidRole`, `DuplicateRole`,
+`InvalidRelationship`, `InvalidSyntax` (each wraps a `String`); it implements
+`std::error::Error` and `Display`.
+
+### `PatternMetrics`
+
+Object-oriented cohesion/coupling metrics (Chidamber & Kemerer
+[[5]](#references)) useful as pattern evidence.
+
+```rust
+pub struct PatternMetrics {
+    pub class_count: usize,
+    pub interface_count: usize,
+    pub inheritance_count: usize,
+    pub composition_count: usize,
+    pub avg_methods_per_class: f64,
+    pub cohesion: f64,   // LCOM (higher ⇒ less cohesive)
+    pub coupling: f64,   // CBO (distinct coupled classes, averaged)
 }
 ```
 
-| Method | Returns | Description |
-|--------|---------|-------------|
-| `category()` | `GofCategory` | Get pattern category |
-| `name()` | `&'static str` | Pattern name |
-| `description()` | `&'static str` | Brief description |
+Computed with the associated function `PatternMetrics::compute(cpg:
+&CodePropertyGraph) -> Self`. `cohesion` is the average
+[LCOM](../GLOSSARY.md#gang-of-four-gof) (Lack of Cohesion of Methods) over classes
+and `coupling` the average CBO (Coupling Between Objects).
 
----
+### Classification — `PatternClassifier`
 
-### GofCategory
+A feature-vector alternative to template matching (in
+`libcpg::patterns::classification`). Private fields: `min_confidence` (default
+`0.7`), `mode` (default `RuleBased`).
 
-Pattern categories.
+| Method | Signature | Notes |
+|--------|-----------|-------|
+| `new` | `fn new() -> Self` | `RuleBased`, `min_confidence = 0.7`. |
+| `with_min_confidence` | `fn with_min_confidence(self, confidence: f64) -> Self` | Threshold. |
+| `with_mode` | `fn with_mode(self, mode: ClassificationMode) -> Self` | Pick a mode. |
+| `classify` | `fn classify(&self, cpg: &CodePropertyGraph) -> Vec<PatternMatch>` | Score each class. |
+| `supported_patterns` | `fn supported_patterns(&self) -> &[&str]` | `Singleton`, `Factory`, `Observer`, `Strategy`, `Decorator`. |
+
+**`ClassificationMode`** — `RuleBased` (the `Default`), `MachineLearning` (uses a
+trained model under `ml-linfa`; falls back to rules otherwise), `Hybrid` (merges
+both, boosting agreement).
+
+**`FeatureVector`** — an 11-field per-class summary
+([feature vector](../GLOSSARY.md#feature-vector-classification)):
 
 ```rust
-pub enum GofCategory {
-    Creational,
-    Structural,
-    Behavioral,
+pub struct FeatureVector {
+    pub method_count: usize,
+    pub field_count: usize,
+    pub method_field_ratio: f64,
+    pub inheritance_depth: usize,
+    pub interface_count: usize,
+    pub static_method_count: usize,
+    pub has_private_constructor: bool,
+    pub factory_method_count: usize,
+    pub observer_method_count: usize,
+    pub interface_field_count: usize,
+    pub is_decorator_candidate: bool,
 }
 ```
 
----
+`fn to_array(&self) -> [f64; 12]` flattens the 11 fields plus one derived feature
+(the static-to-total method ratio) into a length-12 array for ML models.
 
-## Graph Similarity
-
-### GraphSimilarity
-
-Computes similarity between graphs.
-
-```rust
-pub struct GraphSimilarity {
-    metric: SimilarityMetric,
-    structural_weight: f64,
-    label_weight: f64,
-}
-```
-
-#### Constructor
-
-| Method | Returns | Description |
-|--------|---------|-------------|
-| `GraphSimilarity::new()` | `GraphSimilarity` | Create with defaults |
-
-#### Configuration
-
-| Method | Returns | Description |
-|--------|---------|-------------|
-| `with_metric(metric: SimilarityMetric)` | `Self` | Set similarity metric |
-| `with_structural_weight(w: f64)` | `Self` | Weight for structure |
-| `with_label_weight(w: f64)` | `Self` | Weight for labels |
-
-#### Methods
-
-| Method | Returns | Description |
-|--------|---------|-------------|
-| `similarity(a, b)` | `f64` | Compute similarity (0.0-1.0) |
-
-#### Example
-
-```rust
-use libcpg::pattern::{GraphSimilarity, SimilarityMetric};
-
-let similarity = GraphSimilarity::new()
-    .with_metric(SimilarityMetric::WeisfeilerLehman)
-    .with_structural_weight(0.7)
-    .with_label_weight(0.3);
-
-let score = similarity.similarity(&cpg1, &cpg2);
-println!("Similarity: {:.2}", score);
-```
+> The classifier's rule-based label for a creational factory is the string
+> `"Factory"`, which is distinct from the [`GofPattern::FactoryMethod`](#gofpattern--gofcategory)
+> enum variant used by the template detector. The two detection paths use
+> independent vocabularies.
 
 ---
 
-### SimilarityMetric
+## `algorithms::` — algorithm & complexity detection (feature `algorithm-detection`)
 
-Available similarity metrics.
+### `AlgorithmDetector` trait
 
-```rust
-pub enum SimilarityMetric {
-    Jaccard,
-    Cosine,
-    WeisfeilerLehman,
-    GraphEdit,
-}
-```
-
-| Metric | Description | Complexity |
-|--------|-------------|------------|
-| `Jaccard` | Set-based node type comparison | O(n) |
-| `Cosine` | Feature vector cosine similarity | O(n) |
-| `WeisfeilerLehman` | Graph kernel with iterated labels | O(n × k) |
-| `GraphEdit` | Approximate edit distance | O(n²) |
-
----
-
-## Algorithm Detection
-
-### AlgorithmDetector Trait
-
-Interface for algorithm detection.
+Detection is **per function** — every method takes a `function: NodeId`.
 
 ```rust
 pub trait AlgorithmDetector: Send + Sync {
-    fn detect(
-        &self,
-        cpg: &CodePropertyGraph,
-        function: NodeId,
-    ) -> Vec<DetectedAlgorithm>;
+    fn detect(&self, cpg: &CodePropertyGraph, function: NodeId) -> Vec<DetectedAlgorithm>;
+    fn supported_families(&self) -> &[AlgorithmFamily];
 }
 ```
 
----
+### `DefaultAlgorithmDetector`
 
-### DefaultAlgorithmDetector
+The shipped detector. Private fields: `min_confidence` (default `0.5`), plus a
+control-flow and a complexity analyzer.
 
-Standard algorithm detector.
+| Method | Signature | Notes |
+|--------|-----------|-------|
+| `new` | `fn new() -> Self` | `min_confidence = 0.5`. |
+| `with_min_confidence` | `fn with_min_confidence(self, confidence: f64) -> Self` | Threshold. |
+| `detect` | *(via `AlgorithmDetector`)* `fn detect(&self, cpg, function) -> Vec<DetectedAlgorithm>` | Analyze one function. |
+
+`detect` runs loop/recursion analysis, estimates time complexity, then tries five
+family routines (sorting, searching, graph, dynamic-programming,
+divide-and-conquer), returning the survivors sorted by `confidence` **descending**
+and filtered at `min_confidence`.
+
+> **Honesty.** `supported_families()` lists `Greedy`, but there is no active
+> greedy detector — only the five families above are actually detected. Detection
+> is *heuristic* (name/shape matching), not a proof of identity. Note the default
+> threshold here is `0.5`, distinct from the GoF detector's `0.7`.
 
 ```rust
-pub struct DefaultAlgorithmDetector {
-    min_confidence: f64,
-    families: Option<Vec<AlgorithmFamily>>,
+// requires: features = ["algorithm-detection"]
+use libcpg::algorithms::detection::DefaultAlgorithmDetector;
+use libcpg::algorithms::AlgorithmDetector;
+
+let detector = DefaultAlgorithmDetector::new();
+for algo in detector.detect(&cpg, function_id) {
+    println!("{} — {:.0}%", algo.family, algo.confidence * 100.0);
 }
 ```
 
-#### Configuration
-
-| Method | Returns | Description |
-|--------|---------|-------------|
-| `DefaultAlgorithmDetector::new()` | `Self` | Create detector |
-| `with_min_confidence(c: f64)` | `Self` | Set minimum confidence |
-| `with_families(families: Vec<AlgorithmFamily>)` | `Self` | Filter to families |
-
----
-
-### DetectedAlgorithm
-
-Result of algorithm detection.
+### `DetectedAlgorithm`
 
 ```rust
 pub struct DetectedAlgorithm {
     pub family: AlgorithmFamily,
-    pub name: Option<String>,
+    pub name: Option<String>,        // e.g. Some("Binary Search")
     pub function: NodeId,
     pub key_nodes: Vec<NodeId>,
     pub signature: AlgorithmSignature,
@@ -547,11 +506,10 @@ pub struct DetectedAlgorithm {
 }
 ```
 
----
+Builders: `new(family, function, confidence)`, `with_name`, `with_key_node`,
+`with_signature`.
 
-### AlgorithmSignature
-
-Structural characteristics of an algorithm.
+### `AlgorithmSignature` & `ComplexityEstimate`
 
 ```rust
 pub struct AlgorithmSignature {
@@ -561,15 +519,6 @@ pub struct AlgorithmSignature {
     pub space_complexity: Option<ComplexityEstimate>,
     pub feature_vector: Vec<f32>,
 }
-```
-
----
-
-### ComplexityEstimate
-
-Estimated complexity.
-
-```rust
 pub struct ComplexityEstimate {
     pub class: ComplexityClass,
     pub confidence: f64,
@@ -577,169 +526,167 @@ pub struct ComplexityEstimate {
 }
 ```
 
----
+`AlgorithmSignature::new()` plus `with_loop_structure`, `with_recursion`,
+`with_time_complexity`, `with_space_complexity`.
 
-### ComplexityClass
+### `ComplexityClass`
 
-Big-O complexity classes.
+The [Big-O ladder](../GLOSSARY.md#complexity-class--big-o).
 
-```rust
-pub enum ComplexityClass {
-    Constant,       // O(1)
-    Logarithmic,    // O(log n)
-    Linear,         // O(n)
-    Linearithmic,   // O(n log n)
-    Quadratic,      // O(n²)
-    Polynomial(u32),// O(n^k)
-    Exponential,    // O(2^n)
-    Factorial,      // O(n!)
-}
-```
+![The complexity-class ladder from constant to factorial](../diagrams/complexity-ladder.svg)
 
-| Method | Returns | Description |
-|--------|---------|-------------|
-| `multiply(other: &Self)` | `Self` | Multiply complexities |
-| `add(other: &Self)` | `Self` | Take maximum |
+*Figure — the ComplexityClass ladder, cheapest to most expensive. Source: [`diagrams/complexity-ladder.dot`](../diagrams/complexity-ladder.dot).*
 
----
+| Variant | Meaning | `as_str()` returns |
+|---------|---------|--------------------|
+| `Constant` | $`O(1)`$ | `O(1)` |
+| `Logarithmic` | $`O(\log n)`$ | `O(log n)` |
+| `Linear` | $`O(n)`$ | `O(n)` |
+| `Linearithmic` | $`O(n \log n)`$ | `O(n log n)` |
+| `Quadratic` | $`O(n^2)`$ | `O(n²)` |
+| `Cubic` | $`O(n^3)`$ | `O(n³)` |
+| `Polynomial(u32)` | $`O(n^k)`$ | `O(n^k)` |
+| `Exponential` | $`O(2^n)`$ | `O(2^n)` |
+| `Factorial` | $`O(n!)`$ | `O(n!)` |
+| `Unknown` | undetermined | `Unknown` |
 
-### AlgorithmFamily
+`Unknown` is the `Default`. Methods: `as_str(&self) -> &'static str` (the literal
+strings above — note the source uses unicode superscripts for `Quadratic`/`Cubic`)
+and `is_better_than(&self, other: &Self) -> bool` (a smaller class is "better").
 
-Algorithm categories.
+> **Honesty.** The shipped complexity analyzer caps non-divide-and-conquer
+> recursion at `Exponential` and in practice **never emits `Factorial`** — the
+> variant exists but is not produced. Treat all estimates as heuristic.
 
-```rust
-pub enum AlgorithmFamily {
-    Sorting,
-    Searching,
-    GraphTraversal,
-    ShortestPath,
-    MinimumSpanningTree,
-    DynamicProgramming,
-    DivideAndConquer,
-    Greedy,
-    Backtracking,
-    StringMatching,
-    Hashing,
-    Compression,
-    Numerical,
-    MachineLearning,
-    Unknown,
-}
-```
+### `AlgorithmFamily`
 
-| Method | Returns | Description |
-|--------|---------|-------------|
-| `typical_complexity()` | `ComplexityClass` | Common complexity |
-| `description()` | `&'static str` | Brief description |
+Fourteen structural [families](../GLOSSARY.md#algorithm-family): `Sorting`,
+`Searching`, `GraphTraversal`, `ShortestPath`, `MinimumSpanningTree`,
+`DynamicProgramming`, `DivideAndConquer`, `Greedy`, `Backtracking`,
+`StringMatching`, `TreeAlgorithm`, `Hashing`, `Mathematical`, `Other`. Methods:
+`name(&self) -> &'static str` and `typical_complexity(&self) -> &'static str`
+(e.g. `Sorting` returns `O(n log n)`); implements `Display` via `name()`. As
+noted above, not every listed family has an active detector.
 
 ---
 
-## GNN API
+## `gnn::` — graph neural network embeddings (feature `gnn`)
 
-### GraphNeuralNetwork Trait
+### `GraphNeuralNetwork` trait
 
-Interface for GNN-based analysis.
+Re-exported at the crate root as `libcpg::GraphNeuralNetwork`. The two embedding
+accessors exist only with the `gnn` feature (they return `ndarray` types).
 
 ```rust
 pub trait GraphNeuralNetwork: Send + Sync {
     fn propagate(&mut self, iterations: usize);
-    fn node_embedding(&self, node: NodeId) -> Option<Array1<f32>>;
-    fn subgraph_embedding(&self, nodes: &[NodeId]) -> Array1<f32>;
+    #[cfg(feature = "gnn")] fn node_embedding(&self, node: NodeId) -> Option<Array1<f32>>;
+    #[cfg(feature = "gnn")] fn subgraph_embedding(&self, nodes: &[NodeId]) -> Array1<f32>;
     fn embedding_dim(&self) -> usize;
+    fn is_initialized(&self) -> bool;
+    fn reset(&mut self);
 }
 ```
 
----
+### `CpgGnn`
 
-### CpgGnn
+The message-passing implementation. It **owns** the CPG (by value — not `Arc`,
+and there is no separate `GnnConfig`).
 
-GNN implementation for CPGs.
+| Method | Signature | Notes |
+|--------|-----------|-------|
+| `new` | `fn new(cpg: CodePropertyGraph) -> Self` | Takes ownership; `embedding_dim = 128`, `num_layers = 3`, `dropout = 0.1`. |
+| `with_embedding_dim` | `fn with_embedding_dim(self, dim: usize) -> Self` | Set embedding width. |
+| `with_num_layers` | `fn with_num_layers(self, layers: usize) -> Self` | Set layer count. |
+| `with_dropout` | `fn with_dropout(self, dropout: f32) -> Self` | Set dropout rate. |
+| `cpg` | `fn cpg(&self) -> &CodePropertyGraph` | Borrow the owned graph. |
+
+`propagate` initializes each node vector from a 16-dimensional node-kind one-hot
+plus small random noise, then for each iteration
+[aggregates](../GLOSSARY.md#message-passing) the mean of a node's AST
+(children + parent), CFG (successors + predecessors), and DFG (successors +
+predecessors) neighbours and applies a
+[ReLU](../GLOSSARY.md#relu) nonlinearity:
+
+```math
+h_v^{(k)} = \mathrm{ReLU}\!\left( \mathrm{mean}\left( \{ h_u^{(k-1)} : u \in \mathcal{N}(v) \} \cup \{ h_v^{(k-1)} \} \right) \right)
+```
+
+Scarselli et al. [[2]](#references) introduced the GNN model this follows.
 
 ```rust
-pub struct CpgGnn {
-    cpg: Arc<CodePropertyGraph>,
-    embeddings: FxHashMap<NodeId, Array1<f32>>,
-    config: GnnConfig,
-}
+// requires: features = ["gnn"]
+use libcpg::gnn::CpgGnn;
+use libcpg::GraphNeuralNetwork;
+
+let mut gnn = CpgGnn::new(cpg)          // moves `cpg` into the GNN
+    .with_embedding_dim(64)
+    .with_num_layers(2);
+gnn.propagate(3);
+let e = gnn.node_embedding(node_id);    // Option<Array1<f32>>
 ```
 
-| Method | Returns | Description |
-|--------|---------|-------------|
-| `CpgGnn::new(cpg, config)` | `CpgGnn` | Create GNN |
-| `propagate(iterations)` | `()` | Run message passing |
-| `node_embedding(id)` | `Option<Array1<f32>>` | Get node embedding |
-| `subgraph_embedding(nodes)` | `Array1<f32>` | Get aggregated embedding |
-
----
-
-### NodeEmbedding
-
-Wrapper for node embeddings.
+### `NodeEmbedding` / `SubgraphEmbedding` / `AggregationMethod`
 
 ```rust
 pub struct NodeEmbedding {
     pub node_id: NodeId,
-    pub vector: Array1<f32>,
+    #[cfg(feature = "gnn")] pub vector: Array1<f32>,   // serde-skipped
     pub dim: usize,
 }
-```
-
-| Method | Returns | Description |
-|--------|---------|-------------|
-| `new(node_id, vector)` | `NodeEmbedding` | Create embedding |
-| `norm()` | `f32` | L2 norm |
-| `cosine_similarity(other)` | `f32` | Similarity score |
-
----
-
-### SubgraphEmbedding
-
-Aggregated embedding for multiple nodes.
-
-```rust
 pub struct SubgraphEmbedding {
     pub node_ids: Vec<NodeId>,
-    pub vector: Array1<f32>,
+    #[cfg(feature = "gnn")] pub vector: Array1<f32>,   // serde-skipped
     pub dim: usize,
     pub aggregation: AggregationMethod,
 }
 ```
 
----
+Both carry a `dim` and (under `gnn`) a `vector`. With the `serde` feature the
+`vector` field is **skipped** during serialization (recomputed at load); only ids
+and `dim`/`aggregation` round-trip.
 
-### AggregationMethod
+| Type | Methods |
+|------|---------|
+| `NodeEmbedding` | `new(node_id, vector)` *(gnn)*, `norm() -> f32` *(gnn)*, `cosine_similarity(&other) -> f32` *(gnn)* |
+| `SubgraphEmbedding` | `new(node_ids, vector, aggregation)` *(gnn)*, `norm() -> f32` *(gnn)*, `cosine_similarity(&other) -> f32` *(gnn)*, `node_count() -> usize` |
 
-Methods for combining node embeddings.
+[Cosine similarity](../GLOSSARY.md#cosine-similarity) returns `0.0` when
+dimensions differ or a norm is zero.
 
-```rust
-pub enum AggregationMethod {
-    Mean,
-    Sum,
-    Max,
-    Attention,
-    Hierarchical,
-}
-```
+**`AggregationMethod`** — the enum stored in `SubgraphEmbedding::aggregation`:
+`Mean` (the `Default`), `Sum`, `Max`, `Attention`, `Hierarchical`.
 
----
-
-## Feature Flags
-
-| Feature | Description |
-|---------|-------------|
-| `default` | Pattern matching only |
-| `gnn` | Enable GNN embeddings |
-| `gpu` | GPU acceleration (wgpu) |
-| `design-patterns` | GoF pattern detection |
-| `algorithm-detection` | Algorithm family detection |
-| `rholang` | Rholang-specific patterns |
-| `metta` | MeTTa-specific patterns |
+> **Honesty.** Message passing uses **`Mean`** aggregation only; `Attention` and
+> `Hierarchical` are reserved placeholders, not yet wired. The `gpu` feature is
+> likewise reserved (no code), and no SIMD path exists. `AggregationMethod` is
+> not separately re-exported at `libcpg::gnn`; it is reached through the
+> `SubgraphEmbedding::aggregation` field.
 
 ---
 
-## See Also
+## See also
 
-- [Pattern Overview](../components/patterns/overview.md)
-- [VF2 Matching](../components/patterns/vf2-matching.md)
-- [Gang of Four Patterns](../components/patterns/gang-of-four.md)
-- [Graph API Reference](graph-reference.md)
+- [Graph reference](graph-reference.md) — the node/edge model matching operates
+  over.
+- [Builder reference](builder-reference.md) — producing the CPG these analyses
+  consume.
+- [Glossary](../GLOSSARY.md) — VF2, similarity metrics, GoF, complexity classes,
+  GNN terms.
+- Component guides: [patterns overview](../components/patterns/overview.md),
+  [VF2 matching](../components/patterns/vf2-matching.md),
+  [Gang of Four](../components/patterns/gang-of-four.md),
+  [algorithms overview](../components/algorithms/overview.md),
+  [complexity](../components/algorithms/complexity.md),
+  [GNN overview](../components/gnn/overview.md),
+  [embeddings](../components/gnn/embeddings.md).
+
+---
+
+## References
+
+1. Cordella, L. P., Foggia, P., Sansone, C., Vento, M. (2004). *A (Sub)graph Isomorphism Algorithm for Matching Large Graphs.* IEEE TPAMI 26(10). DOI: [10.1109/TPAMI.2004.75](https://doi.org/10.1109/TPAMI.2004.75)
+2. Scarselli, F., Gori, M., Tsoi, A. C., Hagenbuchner, M., Monfardini, G. (2009). *The Graph Neural Network Model.* IEEE Transactions on Neural Networks 20(1). DOI: [10.1109/TNN.2008.2005605](https://doi.org/10.1109/TNN.2008.2005605)
+3. Gamma, E., Helm, R., Johnson, R., Vlissides, J. (1994). *Design Patterns: Elements of Reusable Object-Oriented Software.* Addison-Wesley. ISBN 978-0201633610 (no DOI).
+4. Cormen, T. H., Leiserson, C. E., Rivest, R. L., Stein, C. (2009). *Introduction to Algorithms* (3rd ed.). MIT Press. ISBN 978-0262033848 (no DOI). *(Master Theorem.)*
+5. Chidamber, S. R., Kemerer, C. F. (1994). *A Metrics Suite for Object Oriented Design.* IEEE Transactions on Software Engineering 20(6). DOI: [10.1109/32.295895](https://doi.org/10.1109/32.295895) *(LCOM/CBO.)*

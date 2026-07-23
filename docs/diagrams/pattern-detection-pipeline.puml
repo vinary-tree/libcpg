@@ -1,0 +1,39 @@
+@startuml
+!include _libcpg-theme.iuml
+title GofPatternDetector.detect(&cpg) — GoF pattern-detection pipeline
+start
+:requested patterns
+(empty list ==> all 23 GofPattern);
+repeat
+  :next GofPattern;
+  :build_pattern_cpg(pattern)
+--> template CPG;<<#E9ECEF>>
+  :build_pattern_template(pattern)
+--> PatternTemplate
+(NodeConstraint / EdgeConstraint);<<#E9ECEF>>
+  :relaxed Vf2Matcher.find_matches(template CPG, cpg)
+strict_kinds = false, strict_edges = false;<<#FFE3E3>>
+  note right
+    find_matches returns 0..n embeddings;
+    the confidence gate below runs per embedding.
+  end note
+  :calculate_confidence vs build_pattern_template completeness
+= (matched / expected node_constraints) x template.min_confidence
++ (1 - completeness) x 0.5 x template.min_confidence;<<#FFE3E3>>
+  if (confidence >= min_confidence (0.7)?) then (yes)
+    :emit PatternMatch
+{ pattern_name, confidence, node_mapping };<<#C3FAE8>>
+  else (no)
+    :discard match;<<#F1F3F5>>
+  endif
+repeat while (more requested patterns?) is (yes) not (no)
+:sort all matches by confidence (descending);<<#C3FAE8>>
+stop
+legend right
+  |= colour |= stage |
+  |<#E9ECEF>| template build (CPG + PatternTemplate) |
+  |<#FFE3E3>| relaxed VF2 match + confidence |
+  |<#C3FAE8>| emitted / retained PatternMatch |
+  |<#F1F3F5>| discarded (below threshold) |
+endlegend
+@enduml

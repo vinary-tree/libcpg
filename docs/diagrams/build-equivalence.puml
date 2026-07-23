@@ -1,0 +1,31 @@
+@startuml
+!include _libcpg-theme.iuml
+title Mode A / Mode B build equivalence invariant (test_build_from_tree_matches_build)
+start
+:same source + Language::Rust;
+fork
+  :Mode A
+build(source, Language::Rust)
+[needs feature lang-rust —
+parses internally via ParserRegistry];<<#DBE4FF>>
+fork again
+  :Mode B
+tree_sitter::Parser.parse(source)
+-> build_from_tree(&tree, source, Language::Rust)
+[feature-free — caller owns the tree];<<#DBE4FF>>
+end fork
+:assert node_count and edge_count identical
+(and language() equal);<<#C3FAE8>>
+stop
+note right
+  Mode A delegates its post-parse pipeline to
+  Mode B, so the two graphs are identical in shape.
+  Mode B skips the <latex>max\_file\_size</latex> check —
+  the caller already owns the parse tree.
+end note
+legend right
+  |= colour |= role |
+  |<#DBE4FF>| parse + AST/CFG/DFG build |
+  |<#C3FAE8>| equivalence assertion |
+endlegend
+@enduml

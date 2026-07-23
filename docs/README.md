@@ -1,186 +1,172 @@
-# libcpg Documentation
+# libcpg documentation
 
-**libcpg** is a Rust library for constructing and analyzing Code Property Graphs (CPGs). It combines Abstract Syntax Trees (AST), Control Flow Graphs (CFG), and Data Flow Graphs (DFG) into a unified representation for comprehensive program analysis.
+**libcpg** is a Rust library for constructing and analyzing **Code Property
+Graphs** (CPGs): a single `petgraph`-backed directed graph that overlays the
+Abstract Syntax Tree (AST), Control Flow Graph (CFG), Data Flow Graph (DFG),
+and — on demand — the Program Dependence Graph (PDG) on **one shared node set**.
 
 ## What is a Code Property Graph?
 
-A Code Property Graph is a data structure that represents source code as a graph, merging three complementary views:
+A CPG (Yamaguchi et al. 2014) represents source code as a graph that merges
+complementary program views so a single query can reason over syntax, control
+flow, and data flow at once:
 
-- **AST (Abstract Syntax Tree)**: Syntactic structure showing how code is parsed
-- **CFG (Control Flow Graph)**: Execution paths through the code
-- **DFG (Data Flow Graph)**: How data moves between definitions and uses
+- **AST** — syntactic structure (how the code parses);
+- **CFG** — execution order between nodes;
+- **DFG** — how values flow from definitions to uses;
+- **PDG** — control- and data-dependence, built on demand for program slicing.
 
-```
-                         Code Property Graph
-┌────────────────────────────────────────────────────────────────────────┐
-│                                                                        │
-│   Source Code           AST Nodes              CFG/DFG Edges          │
-│                                                                        │
-│   fn foo(x: i32) {      ┌──────────┐                                  │
-│       let y = x + 1;    │ Function │──────── AST_CHILD ────┐         │
-│       if y > 0 {        └──────────┘                       ▼         │
-│           return y;          │                        ┌──────────┐   │
-│       }                 AST_CHILD                     │  Param   │   │
-│       return 0;              │                        └──────────┘   │
-│   }                          ▼                                        │
-│                         ┌──────────┐         ┌──────────┐            │
-│                         │   Let    │── DFG ──│    If    │            │
-│                         │  y = ... │         │  y > 0   │            │
-│                         └──────────┘         └──────────┘            │
-│                              │                    │                   │
-│                           CFG_EDGE            CFG_BRANCH              │
-│                              ▼                    ▼                   │
-│                         ┌──────────┐         ┌──────────┐            │
-│                         │  Binary  │         │  Return  │            │
-│                         │  x + 1   │         │    y     │            │
-│                         └──────────┘         └──────────┘            │
-│                                                                        │
-└────────────────────────────────────────────────────────────────────────┘
-```
+![A Code Property Graph overlays AST, control-flow, and data-flow edges on one shared node set](diagrams/cpg-overlay.svg)
 
-By combining these views, libcpg enables powerful analyses:
+*Figure — the unified CPG for a small function. Source: [`diagrams/cpg-overlay.dot`](diagrams/cpg-overlay.dot).*
 
-- **Vulnerability Detection**: Find tainted data flowing into sensitive sinks
-- **Design Pattern Recognition**: Identify GoF patterns via subgraph matching
-- **Algorithm Detection**: Recognize algorithm families from control flow structure
-- **Code Clone Detection**: Find semantically similar code fragments
-- **Complexity Analysis**: Estimate algorithmic complexity from graph properties
+Combining these views enables, for example: **taint / vulnerability queries**
+(untrusted data reaching a sensitive sink), **design-pattern recognition**
+(subgraph matching), **algorithm detection** (from control-flow structure),
+**code-clone detection** (graph similarity), and **complexity analysis**.
 
-## Quick Start
+## Quick start
 
 ```rust
+// requires: features = ["lang-rust"]
 use libcpg::{TreeSitterCpgBuilder, CpgBuilder, Language};
 
-// Parse source code into a CPG
 let builder = TreeSitterCpgBuilder::new();
 let source = r#"
     fn factorial(n: u64) -> u64 {
         if n <= 1 { 1 } else { n * factorial(n - 1) }
     }
 "#;
-
 let cpg = builder.build(source, Language::Rust)?;
 
-// Explore the graph
-println!("Nodes: {}", cpg.node_count());
-println!("Edges: {}", cpg.edge_count());
-
-// Iterate over CFG nodes
-for node in cpg.cfg_nodes() {
-    println!("CFG: {:?}", node.kind());
+println!("nodes: {}, edges: {}", cpg.node_count(), cpg.edge_count());
+for func in cpg.functions() {
+    println!("function: {}", func.name().unwrap_or("<anonymous>"));
 }
-
-// Find data flow edges
-for edge in cpg.dfg_edges() {
-    println!("DFG: {} -> {}", edge.source(), edge.target());
-}
+# Ok::<(), libcpg::Error>(())
 ```
 
-### Detecting Design Patterns
+With `default = []` no grammars are compiled in — enable a `lang-*` feature (as
+above) or build from a caller-supplied tree with `build_from_tree` (Mode B).
+
+### Detecting design patterns
 
 ```rust
-use libcpg::patterns::design::{GofPatternDetector, GofPattern};
+// requires: features = ["lang-rust", "design-patterns"]
+use libcpg::patterns::design::{GofPatternDetector, PatternDetector};
 
 let detector = GofPatternDetector::new();
-let matches = detector.detect(&cpg);
-
-for m in matches {
-    println!("Found {} pattern with {} confidence",
-             m.pattern.name(), m.confidence);
+for m in detector.detect(&cpg) {
+    println!("{} (confidence {:.2})", m.pattern_name, m.confidence);
 }
 ```
 
-### Algorithm Detection
+### Program slicing
 
 ```rust
-use libcpg::algorithms::{AlgorithmDetector, AlgorithmFamily};
+// requires: features = ["lang-rust"]
+use libcpg::{TreeSitterCpgBuilder, CpgBuilder, PdgBuilder, backward_slice, Language};
 
-let detector = AlgorithmDetector::new();
-let detected = detector.detect(&cpg);
-
-for algo in detected {
-    println!("{:?} algorithm, estimated complexity: {:?}",
-             algo.family, algo.complexity);
-}
+let mut cpg = TreeSitterCpgBuilder::new().build(source, Language::Rust)?;
+let func = cpg.functions().map(|n| n.id).next().expect("a function node");
+PdgBuilder::new().build(&mut cpg, func);            // add PDG edges
+let slice = backward_slice(&cpg, func, 256);         // bounded backward slice
+# Ok::<(), libcpg::Error>(())
 ```
 
-## Documentation Structure
+## Documentation map
 
-### Architecture
+### Theory — the foundations and the "why"
+[Overview](theory/00-overview.md) · [Code property graphs](theory/01-code-property-graphs.md) · [Control flow & complexity](theory/02-control-flow-and-complexity.md) · [Data flow & reaching definitions](theory/03-data-flow-and-reaching-definitions.md) · [Program dependence & slicing](theory/04-program-dependence-and-slicing.md) · [Subgraph isomorphism (VF2)](theory/05-subgraph-isomorphism-vf2.md) · [Graph similarity](theory/06-graph-similarity.md) · [Design-pattern detection](theory/07-design-pattern-detection.md) · [Algorithm & complexity analysis](theory/08-algorithm-and-complexity-analysis.md) · [Graph neural networks](theory/09-graph-neural-networks.md)
 
-- [Overview](architecture/overview.md) - High-level design and principles
-- [Data Flow](architecture/data-flow.md) - Graph construction pipeline
+### Architecture — the "what / where"
+[Overview](architecture/overview.md) · [Graph data model](architecture/graph-data-model.md) · [Construction & analysis data flow](architecture/data-flow.md) · [Language frontends](architecture/language-frontends.md)
+
+### Design decisions (ADRs)
+[Overview](design/00-overview.md) · [0001 Unified overlay graph](design/0001-unified-overlay-graph.md) · [0002 Mode B: build_from_tree](design/0002-mode-b-build-from-tree.md) · [0003 AST-ordered reaching definitions](design/0003-ast-ordered-reaching-defs.md) · [0004 Relaxed VF2 detection](design/0004-relaxed-vf2-detection.md) · [0005 Feature-flag taxonomy](design/0005-feature-flag-taxonomy.md)
+
+### API reference
+[Graph reference](api/graph-reference.md) · [Builder reference](api/builder-reference.md) · [Pattern / algorithm / GNN reference](api/pattern-reference.md)
 
 ### Components
 
-#### Graph Core
+#### Graph core
+[Overview](components/graph/overview.md) · [Nodes](components/graph/nodes.md) · [Edges](components/graph/edges.md) · [Traversal](components/graph/traversal.md)
 
-- [Overview](components/graph/overview.md) - CPG structure and concepts
-- [Nodes](components/graph/nodes.md) - CpgNode types and properties
-- [Edges](components/graph/edges.md) - Edge types (AST, CFG, DFG)
-- [Traversal](components/graph/traversal.md) - Graph navigation APIs
+#### Builder
+[Overview](components/builder/overview.md) · [CFG extraction](components/builder/cfg.md) · [DFG extraction](components/builder/dfg.md) · [PDG & slicing](components/builder/pdg-and-slicing.md) · [Node mapper](components/builder/node-mapper.md)
 
-#### Graph Neural Networks
+#### Pattern detection
+[Overview](components/patterns/overview.md) · [VF2 matching & similarity](components/patterns/vf2-matching.md) · [Gang of Four](components/patterns/gang-of-four.md) · [DPML](components/patterns/dpml.md) · [Classification](components/patterns/classification.md)
 
-- [Overview](components/gnn/overview.md) - GNN concepts and architecture
-- [Message Passing](components/gnn/message-passing.md) - Propagation algorithm
-- [Embeddings](components/gnn/embeddings.md) - Node and subgraph embeddings
+#### Algorithm detection
+[Overview](components/algorithms/overview.md) · [Families](components/algorithms/families.md) · [Complexity](components/algorithms/complexity.md)
 
-#### Pattern Detection
+#### Graph neural networks
+[Overview](components/gnn/overview.md) · [Message passing](components/gnn/message-passing.md) · [Embeddings](components/gnn/embeddings.md)
 
-- [Overview](components/patterns/overview.md) - Pattern detection framework
-- [Gang of Four](components/patterns/gang-of-four.md) - GoF pattern catalog
-- [VF2 Matching](components/patterns/vf2-matching.md) - Subgraph isomorphism algorithm
+### Usage guides
+[Getting started](usage/00-getting-started.md) · [Building CPGs](usage/01-building-cpgs.md) · [Querying & traversal](usage/02-querying-and-traversal.md) · [Pattern detection](usage/03-pattern-detection.md) · [Program slicing](usage/04-program-slicing.md) · [Serialization](usage/05-serialization.md) · [F1R3FLY: Rholang & MeTTa](usage/06-f1r3fly-rholang-metta.md)
 
-#### Algorithm Detection
+### Engineering
+[Overview](engineering/00-overview.md) · [Build & features](engineering/01-build-and-features.md) · [Testing](engineering/02-testing.md) · [Performance](engineering/03-performance.md) · [Contributing](engineering/04-contributing.md)
 
-- [Overview](components/algorithms/overview.md) - Algorithm detection framework
-- [Families](components/algorithms/families.md) - Supported algorithm families
-- [Complexity](components/algorithms/complexity.md) - Complexity estimation
+### Scientific validation
+[Overview](scientific/00-overview.md) · [CPG invariants & equivalence](scientific/01-cpg-invariants-and-equivalence.md) · [Reaching-defs validation](scientific/02-reaching-defs-validation.md) · [VF2 completeness](scientific/03-vf2-completeness.md) · [Measurement methodology](scientific/04-measurement-methodology.md)
 
-### API Reference
+### Security
+[Threat model](security/00-threat-model.md) · [Input & resource hardening](security/01-input-and-resource-hardening.md)
 
-- [Graph Reference](api/graph-reference.md) - Core graph types
-- [Pattern Reference](api/pattern-reference.md) - Pattern detection APIs
+### Reference
+[Glossary](GLOSSARY.md) · [Diagram catalog](diagrams/README.md)
 
 ## Features
 
-```toml
-[dependencies]
-libcpg = { version = "0.1", features = ["design-patterns", "algorithm-detection"] }
-```
+`default = []` — nothing is enabled by default; opt in to what you need.
 
-| Feature | Description |
-|---------|-------------|
-| `default` | Core CPG construction and traversal |
-| `gnn` | Graph neural network support |
-| `design-patterns` | GoF pattern detection |
-| `algorithm-detection` | Algorithm family recognition |
-| `serde` | Serialization/deserialization |
-| `rholang` | Rholang-specific patterns |
-| `metta` | MeTTa-specific patterns |
+| Feature | Enables |
+|---|---|
+| `lang-rust` … `lang-ruby` (16 grammars) | the tree-sitter grammar for that language (enables internal `build`) |
+| `lang-systems` / `lang-scripting` / `lang-web` / `lang-config` / `lang-all` | grammar groups |
+| `design-patterns` | Gang-of-Four detection (`patterns::`) |
+| `algorithm-detection` | algorithm-family recognition + complexity (`algorithms::`) |
+| `serde` | `Serialize` / `Deserialize` derives |
+| `gnn` | graph-neural-network embeddings (`gnn::CpgGnn`) |
+| `ml-linfa` / `ml-rules` | ML- / rule-based pattern classification |
+| `rholang` / `metta` | the Rholang / MeTTa Mode-B node mappers |
+| `full` | `gnn + design-patterns + algorithm-detection + serde + ml-rules + lang-all` |
 
-## Supported Languages
+*(`gpu` is reserved and wires no code yet.)* Full detail:
+[engineering/build-and-features](engineering/01-build-and-features.md).
 
-libcpg uses tree-sitter for parsing, supporting 20+ languages:
+## Supported languages
 
-| Language | Status | Notes |
-|----------|--------|-------|
-| Rust | Full | Primary development language |
-| Python | Full | |
-| JavaScript/TypeScript | Full | |
-| Java | Full | |
-| C/C++ | Full | |
-| Go | Full | |
-| Rholang | Full | Process calculus for F1R3FLY.io |
-| MeTTa | Full | Hypergraph AI language for F1R3FLY.io |
+| Path | Languages | How |
+|---|---|---|
+| Internal parse (`build`) | Rust, Python, JavaScript, TypeScript, Go, Java, C, C++, JSON, HTML, CSS, Bash, TOML, YAML, Markdown, Ruby | enable the matching `lang-*` feature |
+| Mode B (`build_from_tree`) | Rholang, MeTTa (F1R3FLY.io) | caller supplies a parse tree; features `rholang` / `metta` enable the mappers |
 
-## Related Projects
+`TreeSitterCpgBuilder::supported_languages()` lists the 16 built-ins statically;
+actual availability for a given build is `ParserRegistry::supports(lang)`.
 
-- [libgrammstein](../libgrammstein): Hybrid language models with code embeddings
-- [lling-llang](../lling-llang): WFST-based code correction
-- [liblevenshtein](../liblevenshtein-rust): Fuzzy string matching
+## Documentation conventions
+
+- **Accuracy** — every type, method, and snippet is written against the real
+  API and annotated with the feature flag it needs.
+- **Math** — expressions use GitHub math spans (inline ``$`…`$``, display
+  ` ```math ` blocks), never bare `$…$` or unicode literals.
+- **Diagrams** — every figure is a committed PlantUML/Graphviz source rendered
+  to a committed SVG; see the [diagram catalog](diagrams/README.md).
+- **Citations** — claims from the literature link to DOIs where they exist; each
+  substantive page ends with a *References* section. Terms are defined once in
+  the [glossary](GLOSSARY.md).
+
+## Related projects
+
+Part of the [F1R3FLY.io](https://f1r3fly.io) ecosystem; libcpg's Rholang and
+MeTTa frontends integrate with F1R3FLY tooling (e.g. the pgmcp code index, which
+drives CPG construction in Mode B).
 
 ## License
 
-MIT OR Apache-2.0
+Licensed under either of Apache License 2.0 or MIT, at your option.

@@ -1,0 +1,28 @@
+@startuml
+!include _libcpg-theme.iuml
+title Program slicing — backward_slice(&cpg, seed, max_nodes)
+start
+:worklist = {seed}
+visited = {};
+while (worklist non-empty AND size(visited) < max_nodes ?) is (yes)
+  :pop n
+add n to visited;<<#E5DBFF>>
+  :push PDG predecessors of n
+(ControlDependence + DataDependence,
+followed in reverse);<<#E5DBFF>>
+endwhile (no)
+:return visited (bounded slice);<<#FFE3E3>>
+stop
+note right
+  <b>forward_slice</b> is the same BFS over
+  PDG <i>successors</i> (outgoing ControlDependence
+  + DataDependence). Both filter on
+  <latex>e.kind.is\_pdg()</latex> and stop once
+  <latex>|visited| = max\_nodes</latex>.
+end note
+legend right
+  |= colour |= role |
+  |<#E5DBFF>| PDG BFS step |
+  |<#FFE3E3>| bounded result |
+endlegend
+@enduml

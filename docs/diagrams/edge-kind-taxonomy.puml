@@ -1,0 +1,76 @@
+@startmindmap
+!include _libcpg-theme.iuml
+caption CpgEdgeKind — typed edges overlaying AST + CFG + DFG + PDG + call/type/ref/scope/import on one node set (src/graph/edge.rs)
+
+*[#F1F3F5] CpgEdgeKind
+
+left side
+
+**[#DBE4FF] AST\n(4)
+***[#DBE4FF] AstChild
+***[#DBE4FF] AstParent
+***[#DBE4FF] AstNextSibling
+***[#DBE4FF] AstPrevSibling
+
+**[#D3F9D8] ControlFlow(CfgEdgeKind)\n(14)
+***[#D3F9D8] Sequential
+***[#D3F9D8] ConditionalTrue
+***[#D3F9D8] ConditionalFalse
+***[#D3F9D8] LoopBack
+***[#D3F9D8] LoopExit
+***[#D3F9D8] Break
+***[#D3F9D8] Continue
+***[#D3F9D8] Return
+***[#D3F9D8] Throw
+***[#D3F9D8] Catch
+***[#D3F9D8] Call
+***[#D3F9D8] CallReturn
+***[#D3F9D8] Case
+***[#D3F9D8] DefaultCase
+
+**[#E5DBFF] PDG\n(2)
+***[#E5DBFF] ControlDependence
+***[#E5DBFF] DataDependence
+
+**[#FFE8CC] Scope\n(2)
+***[#FFE8CC] EnclosingScope
+***[#FFE8CC] ContainedIn
+
+right side
+
+**[#FFF3BF] DataFlow(DfgEdgeKind)\n(13)
+***[#FFF3BF] DefUse
+***[#FFF3BF] UseDef
+***[#FFF3BF] ReachingDef
+***[#FFF3BF] DataDependency
+***[#FFF3BF] Parameter
+***[#FFF3BF] ReturnValue
+***[#FFF3BF] FieldRead
+***[#FFF3BF] FieldWrite
+***[#FFF3BF] IndexRead
+***[#FFF3BF] IndexWrite
+***[#FFF3BF] Alias
+***[#FFF3BF] Dereference
+***[#FFF3BF] AddressOf
+
+**[#C3FAE8] Call\n(3)
+***[#C3FAE8] StaticCall
+***[#C3FAE8] DynamicCall
+***[#C3FAE8] CallSite
+
+**[#E9ECEF] Type\n(4)
+***[#E9ECEF] TypeOf
+***[#E9ECEF] Inherits
+***[#E9ECEF] Implements
+***[#E9ECEF] GenericInstance
+
+**[#F1F3F5] Reference\n(3)
+***[#F1F3F5] Reference
+***[#F1F3F5] Definition
+***[#F1F3F5] Declaration
+
+**[#FFE8CC] Import\n(2)
+***[#FFE8CC] Imports
+***[#FFE8CC] Exports
+
+@endmindmap

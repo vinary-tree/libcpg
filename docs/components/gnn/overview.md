@@ -1,236 +1,181 @@
-# GNN Overview
+# Graph Neural Networks — Overview
 
-Graph Neural Networks (GNNs) provide a powerful way to learn representations from Code Property Graphs. libcpg includes a native GNN implementation that generates embeddings capturing both structural and semantic properties of code.
+A **[Graph Neural Network (GNN)](../../GLOSSARY.md#graph-neural-network-gnn)** learns a vector for every node by repeatedly mixing in information from its neighbours. `libcpg` ships one — `CpgGnn` — that runs [message passing](message-passing.md) over the three overlays of a [Code Property Graph](../../GLOSSARY.md#code-property-graph-cpg) (AST, CFG, DFG) and produces dense **[embeddings](../../GLOSSARY.md#embedding)** you can compare with [cosine similarity](../../GLOSSARY.md#cosine-similarity).
 
-## What are Graph Neural Networks?
+> **Feature gate.** The whole `gnn` module is compiled only under the `gnn` feature (`default = []`). Without it, `libcpg::gnn` and `CpgGnn` do not exist. The feature also pulls in `ndarray` (vector math) and `rand` (initialisation):
+>
+> ```toml
+> [dependencies]
+> libcpg = { version = "0.1", features = ["gnn"] }
+> ```
+>
+> To build a CPG from source in the same program you additionally need a grammar feature such as `lang-rust`.
 
-GNNs learn node representations by iteratively aggregating information from neighboring nodes. For code analysis, this means:
+## Why a GNN for code?
 
-- A function node "learns about" its statements
-- A variable use "learns about" its definitions
-- A conditional "learns about" both branches
+Classic code metrics — line counts, [cyclomatic complexity](../../GLOSSARY.md#cyclomatic-complexity) — summarise a function with a scalar. A GNN instead gives every node a vector shaped by its *context*: a variable use is pulled toward its definitions along [data-flow](../../GLOSSARY.md#data-flow-graph-dfg) edges, a statement toward its predecessors along [control-flow](../../GLOSSARY.md#control-flow-graph-cfg) edges, and every node toward its syntactic parent and children along [AST](../../GLOSSARY.md#abstract-syntax-tree-ast) edges. After a few rounds, structurally similar code lands near similar code in vector space, which is exactly what clone detection, code search, and ML-feature extraction want.
 
-After several iterations, each node's embedding encodes information about its entire neighborhood in the graph.
+`libcpg`'s design follows the message-passing GNN of Scarselli et al. [[1]](#references) and the CPG-for-vulnerability lineage of Devign [[2]](#references), specialised to mean aggregation over the three CPG overlays.
 
-```
-                         After 3 iterations:
-   Initial:              ┌─────────────────────────────┐
-                         │ Each node knows about nodes │
-   Node A ───▶ Node B    │ up to 3 hops away           │
-      │                  └─────────────────────────────┘
-      ▼
-   Node C                A's embedding contains info about:
-                         - B (1 hop)
-                         - C (1 hop)
-                         - B's neighbors (2 hops)
-                         - ...
-```
-
-## Why GNNs for Code?
-
-Traditional code features (line count, cyclomatic complexity) capture surface properties. GNN embeddings capture:
-
-| Feature Type | Example | What GNN Captures |
-|--------------|---------|-------------------|
-| Structure | Loop nesting | Hierarchical AST context |
-| Control flow | Branch patterns | CFG neighborhood |
-| Data flow | Variable usage | Def-use chain context |
-| Semantics | Similar algorithms | Combined embedding similarity |
-
-## CPGNN Architecture
-
-libcpg implements CPGNN (Code Property Graph Neural Network), inspired by Devign and related work:
-
-```
-┌─────────────────────────────────────────────────────────────────┐
-│                      CPGNN Architecture                          │
-├─────────────────────────────────────────────────────────────────┤
-│                                                                  │
-│   ┌─────────────┐                                               │
-│   │ CPG Input   │                                               │
-│   │ AST+CFG+DFG │                                               │
-│   └──────┬──────┘                                               │
-│          │                                                       │
-│          ▼                                                       │
-│   ┌─────────────────────────────────────────┐                   │
-│   │        Node Feature Initialization       │                   │
-│   │  • Node type one-hot encoding           │                   │
-│   │  • Random initialization for diversity   │                   │
-│   └──────────────────┬──────────────────────┘                   │
-│                      │                                           │
-│          ┌───────────┴───────────┐                              │
-│          │ Message Passing Layers │                              │
-│          │                        │                              │
-│          │  ┌──────────────────┐ │                              │
-│          │  │ Layer 1          │ │                              │
-│          │  │  Aggregate from: │ │                              │
-│          │  │  - AST neighbors │ │                              │
-│          │  │  - CFG neighbors │ │                              │
-│          │  │  - DFG neighbors │ │                              │
-│          │  └────────┬─────────┘ │                              │
-│          │           │           │                              │
-│          │           ▼           │                              │
-│          │  ┌──────────────────┐ │                              │
-│          │  │ Layer 2 ... N    │ │                              │
-│          │  └────────┬─────────┘ │                              │
-│          └───────────┼───────────┘                              │
-│                      │                                           │
-│                      ▼                                           │
-│   ┌─────────────────────────────────────────┐                   │
-│   │         Final Node Embeddings            │                   │
-│   │   [n1_emb, n2_emb, ..., nm_emb]         │                   │
-│   └──────────────────┬──────────────────────┘                   │
-│                      │                                           │
-│         ┌────────────┴────────────┐                             │
-│         ▼                         ▼                             │
-│  ┌──────────────┐         ┌──────────────────┐                  │
-│  │ Node Queries │         │ Subgraph Queries │                  │
-│  └──────────────┘         └──────────────────┘                  │
-│                                                                  │
-└─────────────────────────────────────────────────────────────────┘
-```
-
-## Quick Start
+## `CpgGnn` at a glance
 
 ```rust
-use libcpg::{CpgGnn, GraphNeuralNetwork, TreeSitterCpgBuilder, Language};
+// requires: features = ["gnn"]
+use libcpg::gnn::CpgGnn;
+use libcpg::GraphNeuralNetwork; // the trait; re-exported at the crate root under `gnn`
 
-// Build a CPG from source code
-let builder = TreeSitterCpgBuilder::new();
-let source = r#"
-    fn factorial(n: i32) -> i32 {
-        if n <= 1 { 1 } else { n * factorial(n - 1) }
-    }
-"#;
-let cpg = builder.build(source, Language::Rust)?;
-
-// Create GNN with custom configuration
+// CpgGnn OWNS the CPG — it takes it by value (not an Arc, and there is no GnnConfig).
 let mut gnn = CpgGnn::new(cpg)
-    .with_embedding_dim(128)    // 128-dimensional embeddings
-    .with_num_layers(3)          // 3 message passing layers
-    .with_dropout(0.1);          // 10% dropout
-
-// Run message passing
-gnn.propagate(3);  // 3 iterations
-
-// Query node embeddings
-if let Some(embedding) = gnn.node_embedding(function_node_id) {
-    println!("Embedding dim: {}", embedding.len());
-}
-
-// Get subgraph embeddings
-let func_nodes = vec![func_id, body_id, return_id];
-let func_embedding = gnn.subgraph_embedding(&func_nodes);
+    .with_embedding_dim(128)  // vector width      (default 128)
+    .with_num_layers(3)       // configured depth  (default 3)
+    .with_dropout(0.1);       // training dropout  (default 0.1)
 ```
 
-## Configuration
+`CpgGnn::new` consumes a `CodePropertyGraph` by value; the GNN then holds it for the lifetime of the network. You can borrow it back with `gnn.cpg() -> &CodePropertyGraph`. There is no `Arc`, no shared ownership, and no separate configuration struct — the three `with_*` builders are the entire knob set.
 
-| Parameter | Type | Default | Description |
-|-----------|------|---------|-------------|
-| `embedding_dim` | `usize` | 128 | Size of embedding vectors |
-| `num_layers` | `usize` | 3 | Number of GNN layers |
-| `dropout` | `f32` | 0.1 | Dropout rate (training) |
+![CpgGnn architecture: type-based node initialisation feeds message-passing rounds over AST, CFG, and DFG, yielding node and subgraph embeddings.](../../diagrams/gnn-architecture.svg)
 
-**Choosing embedding dimension:**
+*Figure — `CpgGnn` from initialisation to embeddings. Source: [`diagrams/gnn-architecture.puml`](../../diagrams/gnn-architecture.puml).*
 
-- **64**: Fast, sufficient for simple patterns
-- **128** (default): Good balance for most tasks
-- **256+**: Better for complex semantic similarity
+### Configuration and what is actually consumed
 
-**Choosing iterations:**
+| Builder | Field | Default | Consumed by `propagate`? |
+|---|---|---|---|
+| `with_embedding_dim(usize)` | `embedding_dim` | `128` | **Yes** — sets the vector width for init and every round. |
+| `with_num_layers(usize)` | `num_layers` | `3` | **No** — see below. |
+| `with_dropout(f32)` | `dropout` | `0.1` | **No** — reserved for a training regime not yet implemented. |
 
-- **2-3**: Local structure (immediate neighbors)
-- **4-5**: Medium-range context
-- **6+**: Global patterns (but diminishing returns)
+**Honesty note — the round count comes from the argument, not `num_layers`.** The forward pass is driven by the explicit `iterations` argument to `propagate(iterations)`. The stored `num_layers` records an *intended* depth but the shipped, forward-only propagation does not read it; likewise `dropout` is recorded for a future trainable pass and is not applied. So `gnn.with_num_layers(3)` followed by `gnn.propagate(5)` runs **five** rounds, not three. Choose the round count at the `propagate` call site.
 
-## Use Cases
+## The `GraphNeuralNetwork` trait
 
-### 1. Code Clone Detection
-
-Find similar code fragments by comparing embeddings:
+`CpgGnn` implements this trait, which is re-exported at the crate root (under the `gnn` feature). Bring it into scope to call the methods.
 
 ```rust
-// Get function embeddings
-let emb1 = gnn.subgraph_embedding(&func1_nodes);
-let emb2 = gnn.subgraph_embedding(&func2_nodes);
+// requires: features = ["gnn"]
+use libcpg::NodeId;
+use ndarray::Array1;
 
-// Compute similarity
-let similarity = cosine_similarity(&emb1, &emb2);
-if similarity > 0.85 {
-    println!("Potential code clone detected!");
+pub trait GraphNeuralNetwork: Send + Sync {
+    fn propagate(&mut self, iterations: usize);
+    fn node_embedding(&self, node: NodeId) -> Option<Array1<f32>>; // requires `gnn`
+    fn subgraph_embedding(&self, nodes: &[NodeId]) -> Array1<f32>;  // requires `gnn`
+    fn embedding_dim(&self) -> usize;
+    fn is_initialized(&self) -> bool;
+    fn reset(&mut self);
 }
 ```
 
-### 2. Vulnerability Detection
+`node_embedding` returns a **clone** of a node's vector (or `None` if that node has no embedding yet); `subgraph_embedding` mean-pools the vectors of the nodes you pass. Both return raw `ndarray::Array1<f32>` values — the richer `NodeEmbedding`/`SubgraphEmbedding` wrapper types (with `norm`/`cosine_similarity`) are covered in [Embeddings](embeddings.md).
 
-Embeddings can be used as features for ML models:
+## Quick start
 
 ```rust
-// Extract embeddings for all functions
-let mut features = Vec::new();
-for func in cpg.nodes_of_kind(CpgNodeKind::Function) {
-    let descendants: Vec<_> = cpg.ast_descendants(func.id()).collect();
-    let embedding = gnn.subgraph_embedding(&descendants);
-    features.push((func.id(), embedding));
-}
+// requires: features = ["gnn", "lang-rust"]
+use libcpg::{TreeSitterCpgBuilder, CpgBuilder, Language};
+use libcpg::gnn::CpgGnn;
+use libcpg::GraphNeuralNetwork;
 
-// Use features for classification
-let vulnerable = classifier.predict(&features);
+fn main() -> libcpg::Result<()> {
+    let source = r#"
+        fn factorial(n: i32) -> i32 {
+            if n <= 1 { 1 } else { n * factorial(n - 1) }
+        }
+    "#;
+
+    let cpg = TreeSitterCpgBuilder::new().build(source, Language::Rust)?;
+
+    let mut gnn = CpgGnn::new(cpg).with_embedding_dim(64);
+    gnn.propagate(3);                 // run 3 message-passing rounds
+    assert!(gnn.is_initialized());
+    assert_eq!(gnn.embedding_dim(), 64);
+
+    // Borrow the CPG back to look up node ids, then read an embedding.
+    if let Some(func) = gnn.cpg().functions().next() {
+        if let Some(vec) = gnn.node_embedding(func.id) {
+            println!("factorial embedding has {} dims", vec.len());
+        }
+    }
+    Ok(())
+}
 ```
 
-### 3. Code Search
+`propagate` initialises embeddings lazily on the first call, so you never call an explicit "init" step. Calling `reset()` drops the computed vectors; the next `propagate` re-initialises from scratch.
 
-Index embeddings for semantic search:
+## Receptive field
+
+Each round lets information travel one more hop. After $`K`$ rounds a node's embedding reflects every node within $`K`$ edges of it — its **receptive field**.
+
+![Receptive-field growth: with each additional message-passing round, a node aggregates information from one more hop away.](../../diagrams/gnn-receptive-field.svg)
+
+*Figure — receptive-field growth per round. Source: [`diagrams/gnn-receptive-field.dot`](../../diagrams/gnn-receptive-field.dot).*
+
+| Rounds $`K`$ | Typically captures |
+|---|---|
+| 1 | immediate statements / operands |
+| 2 | the containing block or expression tree |
+| 3 | cross-statement context within a function |
+| 4+ | broader structure, at rising risk of *over-smoothing* (all vectors converging) |
+
+For function-level code analysis, $`K`$ between 2 and 4 is a sensible starting range. More rounds cost more and, past a point, blur nodes together rather than distinguishing them.
+
+## Use cases
+
+All three below rely only on real API. Comparing subgraph vectors uses the `SubgraphEmbedding` wrapper from [Embeddings](embeddings.md).
+
+- **Clone detection** — embed two functions (each as its node set), then compare with cosine similarity; a high score flags near-duplicates.
+- **ML features** — a function's `subgraph_embedding` is a fixed-width feature vector you can feed to an external classifier (e.g. via the `ml-linfa`/`ml-rules` features or your own model).
+- **Semantic code search** — precompute one embedding per function and rank candidates by cosine distance to a query embedding.
 
 ```rust
-// Build index
-let mut index = EmbeddingIndex::new();
-for func in cpg.nodes_of_kind(CpgNodeKind::Function) {
-    let embedding = gnn.subgraph_embedding(&get_func_nodes(&cpg, func.id()));
-    index.add(func.id(), embedding);
+// requires: features = ["gnn"]
+use libcpg::gnn::{CpgGnn, SubgraphEmbedding};
+use libcpg::{GraphNeuralNetwork, NodeId};
+
+// Wrap a function (its node plus AST descendants) as one mean-pooled embedding.
+fn subgraph(gnn: &CpgGnn, func: NodeId) -> SubgraphEmbedding {
+    let nodes: Vec<NodeId> = std::iter::once(func)
+        .chain(gnn.cpg().ast_descendants(func))
+        .collect();
+    let vector = gnn.subgraph_embedding(&nodes);
+    SubgraphEmbedding::new(nodes, vector, Default::default()) // AggregationMethod::Mean
 }
 
-// Search by example
-let query_embedding = gnn.subgraph_embedding(&query_nodes);
-let results = index.search(&query_embedding, k=10);
+// After `gnn.propagate(k)`, embed two functions and compare them.
+fn similarity(gnn: &CpgGnn, a: NodeId, b: NodeId) -> f32 {
+    subgraph(gnn, a).cosine_similarity(&subgraph(gnn, b)) // 1.0 = identical direction
+}
 ```
 
-## Feature Flags
+Note `cpg.ast_descendants(func)` returns a `Vec<NodeId>` (not an iterator), so it is chained via `into_iter`/`chain` directly.
 
-GNN functionality requires the `gnn` feature:
+## Honest limitations
 
-```toml
-[dependencies]
-libcpg = { version = "0.1", features = ["gnn"] }
-```
+- **Untrained, forward-only.** `CpgGnn` has no learned weights — aggregation is a fixed mean plus [ReLU](../../GLOSSARY.md#relu). Embeddings capture *structural neighbourhood*, not task-specific semantics. `dropout` and `num_layers` anticipate a trainable version that does not yet exist.
+- **`Mean` is the only aggregation computed.** The `AggregationMethod` enum also lists `Sum`, `Max`, `Attention`, and `Hierarchical`; `Attention` and `Hierarchical` are **reserved placeholders**, and even `Sum`/`Max` are not applied by the built-in GNN (both message passing and subgraph pooling hard-code mean). See [Embeddings](embeddings.md).
+- **No GPU, no SIMD.** The `gpu` feature is reserved with no wired code, and no SIMD path exists; `propagate` is a plain sequential loop over nodes.
+- **No runnable benchmarks yet.** Costs below are analytical, not measured.
 
-This enables:
-- `ndarray` for vector operations
-- `rand` for initialization
-- Full embedding computation
+## Performance (analytical)
 
-Without the feature, the trait exists but embedding methods are stubbed.
+Let $`N`$ be the node count, $`E`$ the edge count over the three overlays, $`d`$ the embedding dimension, and $`K`$ the number of rounds.
 
-## Performance
+| Operation | Time | Extra memory |
+|---|---|---|
+| Initialisation | $`O(N d)`$ | $`O(N d)`$ |
+| One round | $`O((N + E)\,d)`$ | $`O(N d)`$ (a fresh generation) |
+| `propagate(K)` | $`O(K (N + E)\,d)`$ | $`O(N d)`$ |
+| `node_embedding` | $`O(d)`$ (clone) | $`O(d)`$ |
+| `subgraph_embedding(S)` | $`O(|S|\,d)`$ | $`O(d)`$ |
 
-| Operation | Time | Memory |
-|-----------|------|--------|
-| Initialize embeddings | O(n) | O(n × d) |
-| One propagation iteration | O(n × avg_degree) | O(n × d) |
-| Node embedding query | O(1) | O(d) |
-| Subgraph embedding | O(k) | O(d) |
+## Related reading
 
-Where:
-- n = number of nodes
-- d = embedding dimension
-- k = subgraph size
+- [Message passing](message-passing.md) — the aggregation equation, initialisation, and the receptive field in detail.
+- [Embeddings](embeddings.md) — `NodeEmbedding`/`SubgraphEmbedding`, cosine similarity, aggregation methods, serde behaviour.
+- [Theory: graph neural networks](../../theory/09-graph-neural-networks.md) — the formal model and lineage.
+- [API: pattern & analysis reference](../../api/pattern-reference.md) — exact signatures for the `gnn` surface.
 
-**Memory estimation:**
-- 10K nodes × 128 dim × 4 bytes = ~5 MB
-- 100K nodes × 128 dim × 4 bytes = ~50 MB
+## References
 
-## Next Steps
-
-- [Message Passing](message-passing.md) - How message passing works
-- [Embeddings](embeddings.md) - Working with embeddings
-- [Graph Overview](../graph/overview.md) - CPG structure
+1. Scarselli, F., Gori, M., Tsoi, A. C., Hagenbuchner, M., Monfardini, G. (2009). *The Graph Neural Network Model.* IEEE Transactions on Neural Networks 20(1). DOI: [10.1109/TNN.2008.2005605](https://doi.org/10.1109/TNN.2008.2005605)
+2. Zhou, Y., Liu, S., Siow, J., Du, X., Liu, Y. (2019). *Devign: Effective Vulnerability Identification by Learning Comprehensive Program Semantics via Graph Neural Networks.* NeurIPS 2019. arXiv:[1909.03496](https://arxiv.org/abs/1909.03496) (no DOI).

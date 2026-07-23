@@ -1,0 +1,49 @@
+// cfg-example.dot — the control-flow graph of
+//     fn f(x) { let y = x + 1; if y > 0 { y } else { 0 } }
+// as emitted by CfgExtractor. CFG palette: fill #D3F9D8 / line #2F9E44 (green);
+// the Function node is the CFG entry (double border); edges are labeled with
+// their CfgEdgeKind variant.
+digraph CfgExample {
+    bgcolor="white";
+    rankdir=TB;
+    fontname="DejaVu Sans";
+    labelloc="t";
+    label=<<b>CFG of </b><i>fn f(x) { let y = x + 1; if y &gt; 0 { y } else { 0 } }</i>>;
+    node [fontname="DejaVu Sans", shape=box, style="rounded,filled",
+          fillcolor="#D3F9D8", color="#2F9E44", fontcolor="#212529", penwidth=1.3];
+    edge [fontname="DejaVu Sans", color="#2F9E44", fontcolor="#2F9E44", penwidth=1.4];
+
+    entry [label="Function  f\n(CFG entry)", peripheries=2, fillcolor="#B2F2BB"];
+    asg   [label="Assignment\ny = x + 1"];
+    cond  [label="If  y > 0", shape=diamond, fillcolor="#B2F2BB"];
+    then_y [label="y\n(then value)"];
+    else_0 [label="0\n(else value)"];
+    merge [label="merge", shape=ellipse, fillcolor="#B2F2BB"];
+    exit  [label="exit", shape=ellipse, peripheries=2, fillcolor="#B2F2BB"];
+
+    entry  -> asg    [label="Sequential"];
+    asg    -> cond   [label="Sequential"];
+    cond   -> then_y [label="ConditionalTrue"];
+    cond   -> else_0 [label="ConditionalFalse"];
+    then_y -> merge  [label="Sequential"];
+    else_0 -> merge  [label="Sequential"];
+    merge  -> exit   [label="Sequential"];
+
+    // legend
+    subgraph cluster_legend {
+        label=<<b>Legend</b>>;
+        style="filled"; color="#CED4DA"; fillcolor="#F8F9FA"; fontcolor="#212529";
+        legend [shape=plaintext, fillcolor="#F8F9FA", label=<
+            <table border="0" cellborder="0" cellspacing="2" cellpadding="3">
+              <tr><td align="left"><font color="#2F9E44"><b>&#9472;&#9472;&#9654;</b></font></td>
+                  <td align="left">ControlFlow(CfgEdgeKind) — green, labeled</td></tr>
+              <tr><td align="left" bgcolor="#D3F9D8"> </td>
+                  <td align="left">basic block (statement / value)</td></tr>
+              <tr><td align="left" bgcolor="#B2F2BB"> </td>
+                  <td align="left">entry (double box) · branch head (diamond) · merge / exit (ellipse)</td></tr>
+              <tr><td align="left"><b>variants</b></td>
+                  <td align="left">Sequential, ConditionalTrue, ConditionalFalse</td></tr>
+            </table>
+        >];
+    }
+}

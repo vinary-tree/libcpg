@@ -1,0 +1,34 @@
+@startuml
+!include _libcpg-theme.iuml
+title Observer — Behavioral GoF pattern (detected structure)
+
+class Subject #E9ECEF {
+  - observers
+  + attach()
+  + detach()
+  + notify()
+}
+interface Observer #E9ECEF {
+  + update()
+}
+class ConcreteObserver #FFE3E3 {
+  + update()
+}
+
+ConcreteObserver ..|> Observer
+Subject o-- "0..*" Observer : observers
+
+note bottom of Subject
+  GofCategory: **Behavioral**  (relaxed-VF2 template, min-confidence 0.8)
+  Detection signature: a **Subject** holding a collection of **observers**
+  it iterates over in **notify()**; **Observer**(Trait) declares **update()**.
+  Template = Subject(Class) ─AstChild→ {observers(Field), attach, notify},
+  Observer(Trait) ─AstChild→ update(Function).
+end note
+
+legend right
+  |= colour |= concept |
+  |<#E9ECEF>| type / class structure |
+  |<#FFE3E3>| varying "hook" class (VF2 match focus) |
+endlegend
+@enduml

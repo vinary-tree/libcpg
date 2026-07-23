@@ -1,0 +1,83 @@
+// cfg-control-constructs.dot — how CfgExtractor lowers common control constructs
+// into ControlFlow(CfgEdgeKind) edges. All CFG nodes & edges use the libcpg CFG
+// palette: fill #D3F9D8 / line #2F9E44 (green). Render: dot -Tsvg.
+digraph CfgControlConstructs {
+    bgcolor="white";
+    rankdir=TB;
+    fontname="DejaVu Sans";
+    labelloc="t";
+    label=<<b>CFG control constructs — CfgEdgeKind edges emitted by CfgExtractor</b>>;
+    compound=true;
+    node [fontname="DejaVu Sans", shape=box, style="rounded,filled",
+          fillcolor="#D3F9D8", color="#2F9E44", fontcolor="#212529", penwidth=1.2];
+    edge [fontname="DejaVu Sans", color="#2F9E44", fontcolor="#2F9E44", penwidth=1.3];
+
+    // ---- 1. if / else ----------------------------------------------------
+    subgraph cluster_if {
+        label=<<b>if / else</b>>;
+        style="rounded"; color="#2F9E44"; fontcolor="#2F9E44"; bgcolor="#F4FCF6";
+        if_cond  [shape=diamond, label="if cond", fillcolor="#B2F2BB"];
+        if_then  [label="then arm"];
+        if_else  [label="else arm"];
+        if_merge [label="merge", shape=ellipse, fillcolor="#B2F2BB"];
+        if_cond -> if_then  [label="ConditionalTrue"];
+        if_cond -> if_else  [label="ConditionalFalse"];
+        if_then -> if_merge [label="Sequential"];
+        if_else -> if_merge [label="Sequential"];
+    }
+
+    // ---- 2. while loop ---------------------------------------------------
+    subgraph cluster_while {
+        label=<<b>while loop</b>>;
+        style="rounded"; color="#2F9E44"; fontcolor="#2F9E44"; bgcolor="#F4FCF6";
+        w_head [shape=diamond, label="while cond", fillcolor="#B2F2BB"];
+        w_body [label="loop body"];
+        w_exit [label="after loop", shape=ellipse, fillcolor="#B2F2BB"];
+        w_head -> w_body [label="ConditionalTrue"];
+        w_body -> w_head [label="LoopBack"];
+        w_head -> w_exit [label="LoopExit"];
+    }
+
+    // ---- 3. try / catch --------------------------------------------------
+    subgraph cluster_try {
+        label=<<b>try / catch</b>>;
+        style="rounded"; color="#2F9E44"; fontcolor="#2F9E44"; bgcolor="#F4FCF6";
+        t_body  [label="try body\n(may raise)"];
+        t_catch [label="catch handler"];
+        t_after [label="after", shape=ellipse, fillcolor="#B2F2BB"];
+        t_body  -> t_catch [label="Throw"];
+        t_catch -> t_after [label="Catch"];
+        t_body  -> t_after [label="Sequential", style=dashed];
+    }
+
+    // ---- 4. plain sequence ----------------------------------------------
+    subgraph cluster_seq {
+        label=<<b>straight-line</b>>;
+        style="rounded"; color="#2F9E44"; fontcolor="#2F9E44"; bgcolor="#F4FCF6";
+        s1 [label="stmt A"];
+        s2 [label="stmt B"];
+        s1 -> s2 [label="Sequential"];
+    }
+
+    // ---- legend ----------------------------------------------------------
+    subgraph cluster_legend {
+        label=<<b>Legend</b>>;
+        style="filled"; color="#CED4DA"; fillcolor="#F8F9FA"; fontcolor="#212529";
+        legend [shape=plaintext, fillcolor="#F8F9FA", label=<
+            <table border="0" cellborder="0" cellspacing="2" cellpadding="3">
+              <tr><td align="left"><font color="#2F9E44"><b>&#9472;&#9472;&#9654;</b></font></td>
+                  <td align="left">ControlFlow(CfgEdgeKind) — green, labeled by variant</td></tr>
+              <tr><td align="left" bgcolor="#D3F9D8"> </td>
+                  <td align="left">basic block (statement / arm)</td></tr>
+              <tr><td align="left" bgcolor="#B2F2BB"> </td>
+                  <td align="left">branch head (diamond) / merge &amp; exit (ellipse)</td></tr>
+              <tr><td align="left"><font color="#2F9E44">&#9476;&#9476;&#9476;&#9654;</font></td>
+                  <td align="left">normal (non-exceptional) fall-through path</td></tr>
+              <tr><td align="left"> </td>
+                  <td align="left">shown variants: Sequential, ConditionalTrue/False,</td></tr>
+              <tr><td align="left"> </td>
+                  <td align="left">LoopBack, LoopExit, Throw, Catch</td></tr>
+            </table>
+        >];
+    }
+}

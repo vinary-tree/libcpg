@@ -1,0 +1,29 @@
+@startuml
+!include _libcpg-theme.iuml
+title CPG analysis pipeline — four analyses fan out over one CodePropertyGraph
+start
+:CodePropertyGraph
+(AST + CFG + DFG over one shared node set);
+fork
+  :PdgBuilder.build
+  → backward_slice / forward_slice;<<#E5DBFF>>
+fork again
+  :Vf2Matcher subgraph match
+  → GoF detection;<<#FFE3E3>>
+fork again
+  :per-function algorithm
+  + complexity detection;<<#FFF3BF>>
+fork again
+  :CpgGnn.propagate
+  → node / subgraph embeddings;<<#FCC2D7>>
+end fork
+:analysis results;
+stop
+legend right
+  |= colour |= analysis (module) |
+  |<#E5DBFF>| PDG — program slicing |
+  |<#FFE3E3>| VF2 — subgraph iso / GoF |
+  |<#FFF3BF>| algorithm + complexity |
+  |<#FCC2D7>| GNN — embeddings |
+endlegend
+@enduml

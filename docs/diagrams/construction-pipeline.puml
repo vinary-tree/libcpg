@@ -1,0 +1,29 @@
+@startuml
+!include _libcpg-theme.iuml
+title CPG construction pipeline (TreeSitterCpgBuilder)
+start
+:Source text + Language;
+:tree-sitter parse
+(ParserRegistry grammar, or caller-supplied tree in Mode B);<<#DBE4FF>>
+:convert_node recursion
+AST nodes + AstChild edges + parent pointers;<<#DBE4FF>>
+if (config.build_cfg?) then (yes)
+  :CfgExtractor.extract(&mut cpg)
+adds ControlFlow(CfgEdgeKind) edges;<<#D3F9D8>>
+else (no)
+endif
+if (config.build_dfg?) then (yes)
+  :DfgExtractor.extract(&mut cpg)
+adds DataFlow(DfgEdgeKind) edges
+(AST-ordered reaching definitions);<<#FFF3BF>>
+else (no)
+endif
+:CodePropertyGraph;
+stop
+legend right
+  |= colour |= layer |
+  |<#DBE4FF>| AST |
+  |<#D3F9D8>| CFG |
+  |<#FFF3BF>| DFG |
+endlegend
+@enduml

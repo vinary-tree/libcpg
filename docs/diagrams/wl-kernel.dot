@@ -1,0 +1,93 @@
+// Weisfeiler-Lehman label refinement (src/pattern/similarity.rs :: wl_labels, 3 iterations).
+// Tiny 5-node graph: n1..n5. At each iteration a node's new label = hash( its current
+// label + the SORTED multiset of neighbour labels ), where neighbours are the union of
+// out- and in-edge endpoints. The histogram (multiset) of labels accumulated across
+// iterations is the WL feature vector compared between two graphs (wl_similarity uses a
+// cosine over these histograms). Graphviz cannot render LaTeX, so labels are textual.
+digraph wl_kernel {
+  bgcolor="white";
+  rankdir=LR;
+  compound=true;
+  labelloc="t";
+  fontname="DejaVu Sans";
+  fontsize=14;
+  label="Weisfeiler-Lehman refinement — labels sharpen each round; their histogram is the compared feature vector";
+  node [fontname="DejaVu Sans", shape=box, style="filled,rounded", color="#495057"];
+  edge [fontname="DejaVu Sans", fontsize=9];
+
+  // ================= Iteration 0 : label = node kind =================
+  subgraph cluster_it0 {
+    label="Iteration 0   label = node kind";
+    fontname="DejaVu Sans"; style="rounded"; color="#868E96";
+    a0 [label="n1  Class\nlabel C", fillcolor="#DBE4FF"];
+    b0 [label="n2  Function\nlabel F", fillcolor="#D3F9D8"];
+    c0 [label="n3  Field\nlabel D", fillcolor="#FFF3BF"];
+    d0 [label="n4  Function\nlabel F", fillcolor="#D3F9D8"];
+    e0 [label="n5  Call\nlabel L", fillcolor="#C3FAE8"];
+    // real graph structure (AstChild), shown once
+    a0 -> b0 [color="#4C6EF5"];
+    a0 -> c0 [color="#4C6EF5"];
+    b0 -> d0 [color="#4C6EF5"];
+    d0 -> e0 [color="#4C6EF5"];
+    h0 [shape=note, fillcolor="#FFF9DB", color="#F59F00",
+        label="histogram: C:1  F:2  D:1  L:1\n4 distinct labels"];
+  }
+
+  // ============ Iteration 1 : hash(own + sorted neighbours) ============
+  subgraph cluster_it1 {
+    label="Iteration 1   label = hash(own + sorted neighbours)";
+    fontname="DejaVu Sans"; style="rounded"; color="#868E96";
+    a1 [label="n1\nh(C | D,F) = C1", fillcolor="#DBE4FF"];
+    b1 [label="n2\nh(F | C,F) = F1a", fillcolor="#D3F9D8"];
+    c1 [label="n3\nh(D | C) = D1", fillcolor="#FFF3BF"];
+    d1 [label="n4\nh(F | F,L) = F1b", fillcolor="#E5DBFF"];
+    e1 [label="n5\nh(L | F) = L1", fillcolor="#C3FAE8"];
+    // faint structure to show it is the same graph
+    a1 -> b1 [color="#CED4DA"];
+    a1 -> c1 [color="#CED4DA"];
+    b1 -> d1 [color="#CED4DA"];
+    d1 -> e1 [color="#CED4DA"];
+    h1 [shape=note, fillcolor="#FFF9DB", color="#F59F00",
+        label="histogram: C1:1  F1a:1  F1b:1  D1:1  L1:1\n5 distinct labels — n2, n4 split"];
+  }
+
+  // ================ Iteration 2 : refine once more ================
+  subgraph cluster_it2 {
+    label="Iteration 2   refine once more";
+    fontname="DejaVu Sans"; style="rounded"; color="#868E96";
+    a2 [label="n1\nh(C1 | D1,F1a) = C2", fillcolor="#DBE4FF"];
+    b2 [label="n2\nh(F1a | C1,F1b) = F2a", fillcolor="#D3F9D8"];
+    c2 [label="n3\nh(D1 | C1) = D2", fillcolor="#FFF3BF"];
+    d2 [label="n4\nh(F1b | F1a,L1) = F2b", fillcolor="#E5DBFF"];
+    e2 [label="n5\nh(L1 | F1b) = L2", fillcolor="#C3FAE8"];
+    a2 -> b2 [color="#CED4DA"];
+    a2 -> c2 [color="#CED4DA"];
+    b2 -> d2 [color="#CED4DA"];
+    d2 -> e2 [color="#CED4DA"];
+    h2 [shape=note, fillcolor="#FFF9DB", color="#F59F00",
+        label="histogram: C2:1  F2a:1  F2b:1  D2:1  L2:1\n5 distinct labels — partition stable"];
+  }
+
+  // ---- refinement of the SAME node across iterations (violet dotted) ----
+  a0 -> a1 [style=dotted, color="#7048E8", constraint=false];
+  b0 -> b1 [style=dotted, color="#7048E8", constraint=false];
+  c0 -> c1 [style=dotted, color="#7048E8", constraint=false];
+  d0 -> d1 [style=dotted, color="#7048E8", constraint=false];
+  e0 -> e1 [style=dotted, color="#7048E8", constraint=false];
+  a1 -> a2 [style=dotted, color="#7048E8", constraint=false];
+  b1 -> b2 [style=dotted, color="#7048E8", constraint=false];
+  c1 -> c2 [style=dotted, color="#7048E8", constraint=false];
+  d1 -> d2 [style=dotted, color="#7048E8", constraint=false];
+  e1 -> e2 [style=dotted, color="#7048E8", constraint=false];
+
+  // ---- Legend ----
+  legend [shape=none, style="filled", fillcolor="white", margin=0, fontname="DejaVu Sans", label=<
+    <TABLE BORDER="0" CELLBORDER="1" CELLSPACING="0" CELLPADDING="5">
+      <TR><TD BGCOLOR="#D3F9D8">label class F  (n2, n4 — identical until refined)</TD></TR>
+      <TR><TD BGCOLOR="#E5DBFF">n4 splits to a new class at iteration 1 (neighbourhood F,L differs)</TD></TR>
+      <TR><TD><FONT COLOR="#4C6EF5">AstChild edge (graph structure)</FONT></TD></TR>
+      <TR><TD><FONT COLOR="#7048E8">refinement of the same node across iterations (dotted)</FONT></TD></TR>
+      <TR><TD BGCOLOR="#FFF9DB">per-iteration label histogram = WL feature vector</TD></TR>
+    </TABLE>
+  >];
+}

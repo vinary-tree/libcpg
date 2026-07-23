@@ -1,0 +1,30 @@
+@startuml
+!include _libcpg-theme.iuml
+title Benchmarking methodology (data-driven optimization protocol)
+start
+:pin CPU affinity
++ set cores to max frequency;<<#F1F3F5>>
+:warm up
+(prime caches / branch predictors);<<#F1F3F5>>
+:perf record --call-graph lbr
+(or criterion, when added);<<#FFF3BF>>
+:tee output to a file
+(run once, analyze many);<<#F1F3F5>>
+:generate + analyze perf report
+in parallel;<<#FFF3BF>>
+stop
+note right
+  <b>Documented current gap:</b> runnable benchmarks
+  are not yet wired up. <i>criterion 0.5</i> is a
+  dev-dependency, but both <latex>[[bench]]</latex>
+  targets in Cargo.toml are commented out
+  ("Benchmarks will be added when implementations
+  are complete"). Until then the amber steps use
+  <i>perf</i> directly.
+end note
+legend right
+  |= colour |= role |
+  |<#FFF3BF>| measurement / profiling tool |
+  |<#F1F3F5>| setup / bookkeeping step |
+endlegend
+@enduml

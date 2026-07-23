@@ -1,0 +1,64 @@
+// cpg-overlay.dot — THE hero figure for libcpg READMEs.
+// The unified Code Property Graph for
+//     fn f(x) { let y = x + 1; if y > 0 { y } else { 0 } }
+// drawn over ONE shared node set, with three colour-coded edge overlays:
+//   AST  (AstChild)          solid  blue   #4C6EF5
+//   CFG  (ControlFlow)       solid  green  #2F9E44
+//   DFG  (DataFlow)          dashed amber  #F08C00
+// The AST layer defines the top-down tree (constraint=true); the CFG and DFG
+// layers are overlays (constraint=false) so they never distort the hierarchy.
+digraph CpgOverlay {
+  bgcolor="white";
+  rankdir=TB;
+  labelloc="t";
+  label="Unified CPG — one node set, three overlaid layers\nfn f(x) { let y = x + 1; if y > 0 { y } else { 0 } }";
+  fontname="DejaVu Sans"; fontsize=15;
+  node[shape=box, style="rounded,filled", fillcolor="#F1F3F5", color="#495057",
+       fontname="DejaVu Sans", fontsize=11, margin="0.14,0.08"];
+  edge[fontname="DejaVu Sans", fontsize=9];
+
+  // ---------- shared node set (neutral fills) ----------
+  f     [label="Function\nf"];
+  x     [label="Parameter\nx"];
+  blk   [label="Block\n{ … }"];
+  y     [label="Variable\ny   (let)"];
+  binop [label="BinaryOp\nx + 1"];
+  iff   [label="If\ny > 0"];
+  idy   [label="Identifier\ny   (then-arm)"];
+  lit0  [label="Literal\n0   (else-arm)"];
+
+  // ---------- AST layer : AstChild (solid blue) — defines the TB tree ----------
+  edge[color="#4C6EF5", penwidth=1.4, style=solid, constraint=true];
+  f   -> x;
+  f   -> blk;
+  blk -> y;
+  y   -> binop;
+  blk -> iff;
+  iff -> idy;
+  iff -> lit0;
+
+  // ---------- CFG layer : ControlFlow (solid green) — overlay ----------
+  edge[color="#2F9E44", penwidth=1.5, style=solid, constraint=false];
+  f     -> binop [label="entry"];
+  binop -> iff;
+  iff   -> idy  [label="true"];
+  iff   -> lit0 [label="false"];
+
+  // ---------- DFG layer : DataFlow (dashed amber) — overlay ----------
+  edge[color="#F08C00", penwidth=1.5, style=dashed, constraint=false];
+  x -> binop [label="DefUse"];
+  y -> idy   [label="ReachingDef"];
+
+  // ---------- legend ----------
+  leg [shape=plaintext, label=<
+    <table border="0" cellborder="1" cellspacing="0" cellpadding="5" bgcolor="#F8F9FA">
+      <tr><td colspan="2"><b>Legend — overlaid edge layers</b></td></tr>
+      <tr><td bgcolor="#DBE4FF"><font color="#3B5BDB"><b>———</b></font></td><td align="left">AstChild &#8212; AST tree (solid blue)</td></tr>
+      <tr><td bgcolor="#D3F9D8"><font color="#2F9E44"><b>———</b></font></td><td align="left">ControlFlow &#8212; CFG (solid green)</td></tr>
+      <tr><td bgcolor="#FFF3BF"><font color="#E8590C"><b>&#8211;&#8201;&#8211;&#8201;&#8211;</b></font></td><td align="left">DataFlow &#8212; DFG (dashed amber)</td></tr>
+    </table>
+  >];
+  edge[style=invis, constraint=true];
+  lit0 -> leg;
+  idy  -> leg;
+}

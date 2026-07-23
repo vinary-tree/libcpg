@@ -1,0 +1,37 @@
+@startuml
+!include _libcpg-theme.iuml
+title Command — Behavioral GoF pattern (detected structure)
+
+class Invoker #E9ECEF {
+  - command : Command
+}
+interface Command #E9ECEF {
+  + execute()
+}
+class ConcreteCommand #FFE3E3 {
+  - receiver : Receiver
+  + execute()
+}
+class Receiver #E9ECEF {
+  + action()
+}
+
+ConcreteCommand ..|> Command
+ConcreteCommand --> Receiver : action()
+Invoker o-- Command : command
+
+note bottom of Command
+  GofCategory: **Behavioral**  (relaxed-VF2 template, min-confidence 0.7)
+  Detection signature: **ConcreteCommand** objects encapsulate a
+  **Receiver** action behind **execute()**; the **Invoker** holds a Command.
+  Template = Command(Trait) ─AstChild→ execute(Function),
+  ConcreteCommand(Class) ─AstChild→ receiver(Field),
+  ConcreteCommand ─Implements→ Command.
+end note
+
+legend right
+  |= colour |= concept |
+  |<#E9ECEF>| type / class structure |
+  |<#FFE3E3>| varying "hook" class (VF2 match focus) |
+endlegend
+@enduml

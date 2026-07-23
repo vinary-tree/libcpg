@@ -1,0 +1,54 @@
+@startmindmap
+!include _libcpg-theme.iuml
+caption AlgorithmFamily variants — name-and-structure heuristics (no dynamic/semantic execution); "typ" = typical_complexity() for a well-formed member
+*[#F1F3F5] AlgorithmFamily\n(heuristic detectors)
+**[#DBE4FF] Sorting
+***[#DBE4FF] typ O(n log n)
+***[#DBE4FF] quicksort, mergesort, bubble
+***[#DBE4FF] active: detect_sorting
+**[#D3F9D8] Searching
+***[#D3F9D8] typ O(log n) to O(n)
+***[#D3F9D8] binary search, linear search
+***[#D3F9D8] active: detect_searching
+**[#FFF3BF] Hashing
+***[#FFF3BF] typ O(1) average
+***[#FFF3BF] hash-map probe, dedup
+**[#C3FAE8] Graph traversal
+***[#C3FAE8] typ O(V + E)
+***[#C3FAE8] BFS, DFS
+***[#C3FAE8] active: detect_graph
+**[#E5DBFF] Shortest path
+***[#E5DBFF] typ O(E log V) to O(V^3)
+***[#E5DBFF] Dijkstra, Bellman-Ford
+**[#FFE8CC] Minimum spanning tree
+***[#FFE8CC] typ O(E log V)
+***[#FFE8CC] Prim, Kruskal
+**[#FCC2D7] Divide and conquer
+***[#FCC2D7] typ O(n log n)
+***[#FCC2D7] merge sort, quickselect
+***[#FCC2D7] active: detect_divide_conquer
+**[#FFE3E3] Dynamic programming
+***[#FFE3E3] typ varies
+***[#FFE3E3] knapsack, LCS, edit distance
+***[#FFE3E3] active: detect_dp
+left side
+**[#E9ECEF] Greedy
+***[#E9ECEF] typ O(n log n)
+***[#E9ECEF] Huffman, interval scheduling
+***[#E9ECEF] listed in supported_families (no detector yet)
+**[#DBE4FF] Backtracking
+***[#DBE4FF] typ O(k^n) worst case
+***[#DBE4FF] N-queens, Sudoku
+**[#D3F9D8] String matching
+***[#D3F9D8] typ O(n + m)
+***[#D3F9D8] KMP, Rabin-Karp
+**[#FFF3BF] Mathematical (numerical)
+***[#FFF3BF] typ varies
+***[#FFF3BF] gcd, sieve, fast exponentiation
+**[#C3FAE8] Tree algorithm
+***[#C3FAE8] typ O(n)
+***[#C3FAE8] traversals, LCA
+**[#F1F3F5] Other
+***[#F1F3F5] typ unknown
+***[#F1F3F5] fallback / unclassified
+@endmindmap

@@ -1,0 +1,57 @@
+// gnn-message-passing.dot — one round of CpgGnn::propagate around a center node v.
+// v aggregates messages from its AST, CFG and DFG neighbours, then applies ReLU.
+// Graphviz cannot typeset LaTeX; the update rule is written in plain text.
+digraph gnn_message_passing {
+  bgcolor="white";
+  rankdir=TB;
+  compound=true;
+  labelloc="t";
+  fontname="DejaVu Sans";
+  label="CpgGnn message passing — messages flow from neighbours into v (one layer)";
+  node [fontname="DejaVu Sans", shape=circle, style=filled, fontsize=12, width=0.55, fixedsize=false];
+  edge [fontname="DejaVu Sans", penwidth=1.5, arrowsize=0.8];
+
+  // --- neighbours, grouped on the upper rank ---
+  // AST neighbours (children + parent)  — slate blue
+  p  [label="parent", fillcolor="#DBE4FF", color="#4C6EF5"];
+  c1 [label="child",  fillcolor="#DBE4FF", color="#4C6EF5"];
+  c2 [label="child",  fillcolor="#DBE4FF", color="#4C6EF5"];
+  // CFG neighbours (successors + predecessors) — green
+  cfp [label="pred", fillcolor="#D3F9D8", color="#2F9E44"];
+  cfs [label="succ", fillcolor="#D3F9D8", color="#2F9E44"];
+  // DFG neighbours (successors + predecessors) — amber
+  dfd [label="def", fillcolor="#FFF3BF", color="#F08C00"];
+  dfu [label="use", fillcolor="#FFF3BF", color="#F08C00"];
+
+  { rank=same; p; c1; c2; cfp; cfs; dfd; dfu; }
+
+  // --- center node ---
+  v [label="v", shape=doublecircle, fillcolor="#FCC2D7", color="#C2255C",
+     fontsize=17, penwidth=2.2, width=0.75];
+
+  // --- messages into v, coloured per CPG layer ---
+  p   -> v [color="#4C6EF5"];
+  c1  -> v [color="#4C6EF5"];
+  c2  -> v [color="#4C6EF5"];
+  cfp -> v [color="#2F9E44"];
+  cfs -> v [color="#2F9E44"];
+  dfd -> v [color="#F08C00", style=dashed];
+  dfu -> v [color="#F08C00", style=dashed];
+
+  // --- update rule + receptive-field growth ---
+  rule [shape=box, style="filled,rounded", fillcolor="#F1F3F5", color="#495057",
+        fontsize=12,
+        label="one round (per layer):\nh_v  <-  ReLU( mean( h_v, neighbours ) )\l\lneighbours = AST(children, parent)\l  + CFG(succ, pred) + DFG(succ, pred)\l\lstacking num_layers rounds (default 3)\lwidens v's receptive field by one hop per layer\l"];
+  v -> rule [style=dotted, color="#C2255C", arrowhead=none, penwidth=1.4];
+
+  // --- legend ---
+  legend [shape=plaintext, label=<
+    <table border="0" cellborder="1" cellspacing="0" cellpadding="4">
+      <tr><td bgcolor="#DBE4FF">AST edge (children + parent)</td></tr>
+      <tr><td bgcolor="#D3F9D8">CFG edge (succ + pred)</td></tr>
+      <tr><td bgcolor="#FFF3BF">DFG edge (succ + pred), dashed</td></tr>
+      <tr><td bgcolor="#FCC2D7">v — node whose embedding is updated</td></tr>
+    </table>
+  >];
+  rule -> legend [style=invis];
+}

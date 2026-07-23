@@ -1,0 +1,52 @@
+// Control dependence = reverse (post-)dominance frontier (Cytron et al. 1991).
+// A small if-diamond CFG: the two arms are control-dependent on the branch `b`.
+digraph DominanceFrontier {
+    bgcolor="white";
+    rankdir=TB;
+    labelloc="t";
+    fontname="DejaVu Sans";
+    fontsize=15;
+    label="Control dependence = reverse dominance frontier of the branch";
+    node[fontname="DejaVu Sans", shape=box, style="filled,rounded", fontsize=12];
+    edge[fontname="DejaVu Sans", fontsize=10];
+
+    // ---- CFG nodes (green = CFG layer). Arms t/e are highlighted violet as
+    //      the control-dependence targets of the branch b. -------------------
+    entry [label="entry", fillcolor="#D3F9D8", color="#2F9E44"];
+    b     [label="b : branch\n(if condition)", fillcolor="#D3F9D8", color="#2F9E44"];
+    t     [label="t : then-arm", fillcolor="#E5DBFF", color="#7048E8"];
+    e     [label="e : else-arm", fillcolor="#E5DBFF", color="#7048E8"];
+    m     [label="m : merge", fillcolor="#D3F9D8", color="#2F9E44"];
+    exit  [label="exit", fillcolor="#D3F9D8", color="#2F9E44"];
+
+    // ---- CFG control-flow edges (solid green) ----------------------------
+    entry -> b     [color="#2F9E44"];
+    b     -> t     [color="#2F9E44", label="true"];
+    b     -> e     [color="#2F9E44", label="false"];
+    t     -> m     [color="#2F9E44"];
+    e     -> m     [color="#2F9E44"];
+    m     -> exit  [color="#2F9E44"];
+
+    // ---- Control-dependence edges (violet dotted): b -> {t, e} -----------
+    b -> t [style=dotted, color="#7048E8", penwidth=2.0, constraint=false, label="ctrl-dep"];
+    b -> e [style=dotted, color="#7048E8", penwidth=2.0, constraint=false, label="ctrl-dep"];
+
+    // ---- Legend ----------------------------------------------------------
+    subgraph cluster_legend {
+        label="Legend";
+        fontname="DejaVu Sans";
+        style="filled";
+        fillcolor="#F8F9FA";
+        color="#CED4DA";
+        node[shape=plaintext, style="", fillcolor="white"];
+        legend [label=<
+          <table border="0" cellborder="0" cellspacing="2">
+            <tr><td align="left"><font color="#2F9E44">&#9472;&#9472;</font></td><td align="left">CFG control-flow edge</td></tr>
+            <tr><td align="left"><font color="#7048E8">&#183;&#183;&#183;&#183;</font></td><td align="left">ControlDependence edge (b &#8594; arm)</td></tr>
+            <tr><td align="left"><font color="#7048E8">&#9632;</font></td><td align="left">control-dependent node (arm)</td></tr>
+            <tr><td align="left"> </td><td align="left">t, e post-dominate a successor of b but not b</td></tr>
+            <tr><td align="left"> </td><td align="left">&#8756; b is in their reverse dominance frontier</td></tr>
+          </table>
+        >];
+    }
+}

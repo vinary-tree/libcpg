@@ -1,0 +1,53 @@
+// metta-mapping.dot — how a MeTTa rule is mapped onto CpgNodeKind in Mode B,
+// for the definition   (= (double $x) (* $x 2)).
+// Left  : MeTTa constructs (neutral #F1F3F5).
+// Right : CpgNodeKind, coloured by concept, plus the amber dashed DataFlow
+//         DefUse edge threading the $x definition to its use.
+digraph MettaMapping {
+  bgcolor="white"; rankdir=LR;
+  labelloc="t";
+  label="MeTTa (Mode B)  →  CpgNodeKind mapping\n(= (double $x) (* $x 2))";
+  fontname="DejaVu Sans"; fontsize=15;
+  node[shape=box, style="rounded,filled", fontname="DejaVu Sans", fontsize=11, margin="0.13,0.08"];
+  edge[fontname="DejaVu Sans", fontsize=9, color="#868E96", fontcolor="#495057"];
+
+  // ---------- left column: MeTTa constructs (neutral) ----------
+  node[fillcolor="#F1F3F5", color="#495057"];
+  m_head [label="head  =\n(rule-definition operator)"];
+  m_xl   [label="$x   (rule-LHS binder)"];
+  m_xr   [label="$x   (RHS occurrence)"];
+  m_mul  [label="(* $x 2)"];
+
+  // ---------- right column: CpgNodeKind (coloured) ----------
+  k_func  [label="Function  \"double\"", fillcolor="#DBE4FF", color="#4C6EF5"];
+  k_param [label="Parameter  $x",       fillcolor="#FFF3BF", color="#F08C00"];
+  k_ident [label="Identifier  $x",      fillcolor="#FFF3BF", color="#F08C00"];
+  k_call  [label="Call  (* $x 2)",      fillcolor="#C3FAE8", color="#0CA678"];
+
+  // ---------- mapping edges (left → right, "maps to") ----------
+  m_head -> k_func  [label="maps to"];
+  m_xl   -> k_param [label="LHS binder → def"];
+  m_xr   -> k_ident [label="use"];
+  m_mul  -> k_call  [label="maps to"];
+
+  // ---------- def → use DataFlow edge (amber dashed) between CpgNodeKinds ----------
+  k_param -> k_ident [label="DataFlow: DefUse", color="#F08C00", fontcolor="#E8590C",
+                      style=dashed, penwidth=1.6, constraint=false];
+
+  // keep the two columns aligned
+  { rank=same; m_head; m_xl; m_xr; m_mul; }
+  { rank=same; k_func; k_param; k_ident; k_call; }
+
+  // ---------- legend ----------
+  leg [shape=plaintext, label=<
+    <table border="0" cellborder="1" cellspacing="0" cellpadding="5" bgcolor="#F8F9FA">
+      <tr><td colspan="2"><b>Legend</b></td></tr>
+      <tr><td bgcolor="#DBE4FF">Function</td><td align="left">rule head = &#8594; definition "double"</td></tr>
+      <tr><td bgcolor="#FFF3BF">Parameter / Identifier</td><td align="left">DFG def / use of $x</td></tr>
+      <tr><td bgcolor="#C3FAE8">Call</td><td align="left">grounded application (* $x 2)</td></tr>
+      <tr><td bgcolor="#FFF3BF"><font color="#E8590C"><b>&#8211;&#8201;&#8211;&#8201;&#8211;</b></font></td><td align="left">DataFlow DefUse ($x def &#8594; use)</td></tr>
+    </table>
+  >];
+  edge[style=invis, constraint=false];
+  k_call -> leg;
+}

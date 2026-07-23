@@ -1,562 +1,225 @@
-# Complexity Estimation
+# Complexity Analysis
 
-libcpg estimates algorithmic complexity by analyzing loop structures, recursion patterns, and data access patterns in Code Property Graphs.
+`ComplexityAnalyzer` turns a function's loop-nesting and recursion shape into a **[Big-O complexity class](../../GLOSSARY.md#complexity-class--big-o)** with a confidence score and a human-readable justification. It is the phase-2 engine behind [algorithm detection](overview.md), and it is usable on its own. Like the rest of the module it is **heuristic**: it counts structural features, it does not solve recurrences symbolically.
 
-## How Complexity Estimation Works
+> **Feature gate.** `ComplexityAnalyzer`, `ComplexityEstimate`, and `ComplexityClass` are part of the `algorithm-detection`-gated `algorithms` module. `libcpg`'s `default = []`, so enable the feature to use them (see [Overview](overview.md)).
+>
+> The type is **`ComplexityAnalyzer`** — there is no `ComplexityEstimator`.
 
-```
-┌─────────────────────────────────────────────────────────────────┐
-│                  Complexity Estimation Pipeline                  │
-├─────────────────────────────────────────────────────────────────┤
-│                                                                  │
-│   Function CPG                                                   │
-│       │                                                          │
-│       ├───────────────────────────────────────┐                 │
-│       │                                       │                 │
-│       ▼                                       ▼                 │
-│   ┌───────────────────┐             ┌───────────────────┐      │
-│   │   Loop Analysis   │             │ Recursion Analysis │      │
-│   │                   │             │                    │      │
-│   │ • Nesting depth   │             │ • Recursion kind   │      │
-│   │ • Iteration count │             │ • Reduction factor │      │
-│   │ • Early exits     │             │ • Base case depth  │      │
-│   └─────────┬─────────┘             └──────────┬─────────┘      │
-│             │                                   │                │
-│             └───────────────┬───────────────────┘                │
-│                             │                                    │
-│                             ▼                                    │
-│             ┌───────────────────────────────┐                   │
-│             │     Complexity Combiner       │                   │
-│             │                               │                   │
-│             │ • Nested loops → multiply     │                   │
-│             │ • Sequential → add            │                   │
-│             │ • Recursion → recurrence      │                   │
-│             └───────────────┬───────────────┘                   │
-│                             │                                    │
-│                             ▼                                    │
-│             ┌───────────────────────────────┐                   │
-│             │   ComplexityEstimate          │                   │
-│             │   • class: O(n log n)         │                   │
-│             │   • confidence: 0.85          │                   │
-│             │   • justification: "..."      │                   │
-│             └───────────────────────────────┘                   │
-│                                                                  │
-└─────────────────────────────────────────────────────────────────┘
-```
+## The `ComplexityClass` ladder
 
-## Core Types
-
-### ComplexityClass
-
-Represents Big-O complexity classes:
+`ComplexityClass` is a 10-variant enum ordered from cheapest to most expensive. Each variant has an `as_str()` label, and the enum's `Display` impl delegates to it.
 
 ```rust
+// requires: features = ["algorithm-detection"]
 pub enum ComplexityClass {
-    Constant,       // O(1)
-    Logarithmic,    // O(log n)
-    Linear,         // O(n)
-    Linearithmic,   // O(n log n)
-    Quadratic,      // O(n²)
-    Polynomial(u32),// O(n^k)
-    Exponential,    // O(2^n)
-    Factorial,      // O(n!)
+    Constant,        // O(1)
+    Logarithmic,     // O(log n)
+    Linear,          // O(n)
+    Linearithmic,    // O(n log n)
+    Quadratic,       // O(n^2)
+    Cubic,           // O(n^3)
+    Polynomial(u32), // O(n^k)
+    Exponential,     // O(2^n)
+    Factorial,       // O(n!)
+    Unknown,
 }
 ```
 
-**Ordering**:
-```
-O(1) < O(log n) < O(n) < O(n log n) < O(n²) < O(n³) < O(2^n) < O(n!)
+The `as_str()` labels are fixed strings — note that a few use Unicode superscripts and that `Polynomial` returns a *constant* label rather than interpolating its `k`:
+
+| Variant | `as_str()` returns | Meaning |
+|---|---|---|
+| `Constant` | `"O(1)"` | $`O(1)`$ |
+| `Logarithmic` | `"O(log n)"` | $`O(\log n)`$ |
+| `Linear` | `"O(n)"` | $`O(n)`$ |
+| `Linearithmic` | `"O(n log n)"` | $`O(n \log n)`$ |
+| `Quadratic` | `"O(n²)"` | $`O(n^2)`$ |
+| `Cubic` | `"O(n³)"` | $`O(n^3)`$ |
+| `Polynomial(k)` | `"O(n^k)"` (literal — `k` is **not** substituted) | $`O(n^k)`$ |
+| `Exponential` | `"O(2^n)"` | $`O(2^n)`$ |
+| `Factorial` | `"O(n!)"` | $`O(n!)`$ |
+| `Unknown` | `"Unknown"` | undetermined |
+
+The ladder is, from cheapest to dearest:
+
+```math
+O(1) < O(\log n) < O(n) < O(n \log n) < O(n^2) < O(n^3) < O(n^k) < O(2^n) < O(n!)
 ```
 
-### ComplexityEstimate
+![The ComplexityClass ladder ordered from O(1) to O(n!), with each rung's Big-O label.](../../diagrams/complexity-ladder.svg)
 
-Combines the estimated class with confidence and explanation:
+*Figure — the `ComplexityClass` ordering. Source: [`diagrams/complexity-ladder.dot`](../../diagrams/complexity-ladder.dot).*
+
+### Comparing classes
+
+`ComplexityClass` does **not** implement `PartialOrd`/`Ord`, so `<`/`>` do not work on it. Ordering is exposed through one public method, `is_better_than`, which compares an internal ordinal:
 
 ```rust
+// requires: features = ["algorithm-detection"]
+use libcpg::algorithms::ComplexityClass;
+
+assert!(ComplexityClass::Linear.is_better_than(&ComplexityClass::Quadratic));
+assert!(!ComplexityClass::Exponential.is_better_than(&ComplexityClass::Linear));
+```
+
+The internal ordinal that backs `is_better_than` is:
+
+| Class | Ordinal |
+|---|---|
+| `Constant` | 0 |
+| `Logarithmic` | 1 |
+| `Linear` | 2 |
+| `Linearithmic` | 3 |
+| `Quadratic` | 4 |
+| `Cubic` | 5 |
+| `Polynomial(k)` | $`5 + k`$ |
+| `Exponential` | 100 |
+| `Factorial` | 200 |
+| `Unknown` | 1000 |
+
+One quirk worth knowing: because `Polynomial(k)` scores $`5 + k`$, a `Polynomial(2)` (ordinal 7) is ranked *worse* than the dedicated `Quadratic` (ordinal 4) even though both denote $`O(n^2)`$. In practice the analyzer only ever emits `Polynomial(d)` for loop-nesting depth $`d \ge 4`$, so this rarely bites — but do not treat the two encodings of the same degree as interchangeable.
+
+## `ComplexityEstimate`
+
+Every estimate is a class plus its evidence:
+
+```rust
+// requires: features = ["algorithm-detection"]
 pub struct ComplexityEstimate {
-    /// The complexity class
     pub class: ComplexityClass,
-    /// Confidence score (0.0 to 1.0)
-    pub confidence: f64,
-    /// Human-readable justification
-    pub justification: String,
+    pub confidence: f64,       // 0.0 ..= 1.0
+    pub justification: String, // e.g. "Nested loops (depth 2) detected"
 }
 ```
 
-**Example**:
-```rust
-ComplexityEstimate {
-    class: ComplexityClass::Quadratic,
-    confidence: 0.9,
-    justification: "Two nested loops, each iterating n times".to_string(),
-}
-```
+## Using the analyzer
 
-## Using the ComplexityAnalyzer
-
-### Basic Usage
+The public surface is deliberately tiny — a constructor and two estimators. There are **no** configuration builders (no `with_input_parameter`, no assumption knobs); those never existed.
 
 ```rust
+// requires: features = ["algorithm-detection"]
 use libcpg::algorithms::detection::ComplexityAnalyzer;
 
 let analyzer = ComplexityAnalyzer::new();
 
-// Estimate time complexity
-let time = analyzer.estimate_time_complexity(&cpg, function_id);
-println!("Time: {} (confidence: {:.0}%)", time.class, time.confidence * 100.0);
-
-// Estimate space complexity
+let time  = analyzer.estimate_time_complexity(&cpg, function_id);
 let space = analyzer.estimate_space_complexity(&cpg, function_id);
-println!("Space: {} (confidence: {:.0}%)", space.class, space.confidence * 100.0);
+
+println!("time:  {} ({:.0}% — {})", time.class, time.confidence * 100.0, time.justification);
+println!("space: {} ({:.0}%)",      space.class, space.confidence * 100.0);
 ```
 
-### Configuration Options
+## How the time estimate is derived
 
-```rust
-let analyzer = ComplexityAnalyzer::new()
-    // Consider input size variable 'n' comes from first parameter
-    .with_input_parameter(0)
-    // Assume arrays are of size n
-    .with_array_size_assumption(ArraySizeAssumption::LinearN)
-    // Include recursive call analysis
-    .with_recursion_analysis(true);
+`estimate_time_complexity` computes a loop estimate and a recursion estimate independently, then keeps the **worse** of the two.
+
+```text
+estimate_time_complexity(cpg, function):
+  loops     ← detect_loops(cpg, function)
+  recursion ← detect_recursion(cpg, function)          # None if not self-recursive
+
+  loop_est ← analyze_loop_complexity(loops)            # None if there are no loops
+  rec_est  ← recursion.map(analyze_recursion_complexity)
+
+  match (loop_est, rec_est):
+    (None,  None)  → Constant, confidence 0.9   # "No loops or recursion detected"
+    (Some l, None) → l
+    (None,  Some r) → r
+    (Some l, Some r) → if r.class.is_better_than(l.class) then l else r   # keep the worse
 ```
 
-## Loop Analysis
+![Activity flow mapping loop nesting and recursion shape to a ComplexityClass, backed conceptually by the Master Theorem.](../../diagrams/complexity-heuristics.svg)
 
-The analyzer examines loop structures to estimate iteration counts.
+*Figure — structure-to-complexity heuristics. Source: [`diagrams/complexity-heuristics.puml`](../../diagrams/complexity-heuristics.puml).*
 
-### Loop Bounds Detection
+### Loop heuristic
 
-```rust
-pub enum LoopBounds {
-    Constant,       // Fixed iterations (e.g., for i in 0..10)
-    LinearN,        // O(n) iterations
-    Logarithmic,    // O(log n) iterations (halving pattern)
-    Variable,       // Unknown bounds
-}
+`analyze_loop_complexity` keys off the maximum loop-nesting depth and whether every loop is *counted* (bounded). A loop is counted when it is a `For` with a range/counting iterator, or a `While`/`DoWhile` with both a comparison and an increment.
+
+| Max nesting depth | All loops counted? | Class | Confidence |
+|---|---|---|---|
+| 0 (no loops) | — | `Constant` | 0.9 |
+| 1 | yes | `Linear` | 0.8 |
+| 1 | no | `Linear` | 0.6 |
+| 2 | yes | `Quadratic` | 0.8 |
+| 2 | no | `Quadratic` | 0.5 |
+| 3 | — | `Cubic` | 0.7 |
+| $`d \ge 4`$ | — | `Polynomial(d)` | 0.6 |
+
+### Recursion heuristic
+
+`analyze_recursion_complexity` first asks whether the recursion looks *divide-and-conquer*: the analyzer scans the body for a division or right-shift by an integer literal `2`, or for an identifier named `mid`, `middle`, `pivot`, or containing `half`. It then keys off the recursion kind and the number of recursive call sites.
+
+| Recursion kind | Divide-and-conquer cue? | Recursive calls | Class | Confidence |
+|---|---|---|---|---|
+| `Tail` | — | — | `Linear` | 0.8 |
+| `Direct`/`Indirect` | yes | 1 | `Logarithmic` | 0.8 |
+| `Direct`/`Indirect` | yes | 2 | `Linearithmic` | 0.7 |
+| `Direct`/`Indirect` | yes | $`\ge 3`$ | `Polynomial(calls)` | 0.5 |
+| `Direct`/`Indirect` | no | 1, with a base case | `Linear` | 0.7 |
+| `Direct`/`Indirect` | no | 1, no clear base case | `Linear` | 0.4 |
+| `Direct`/`Indirect` | no | 2 | `Exponential` | 0.7 |
+| `Direct`/`Indirect` | no | $`\ge 3`$ | `Exponential` | 0.6 |
+
+### The Master Theorem, and what the analyzer really does
+
+The divide-and-conquer rows above are a shallow stand-in for the **[Master Theorem](../../GLOSSARY.md#master-theorem)** [[1]](#references), which solves recurrences of the form
+
+```math
+T(n) = a \, T(n/b) + f(n), \qquad a \ge 1,\ b > 1
 ```
 
-**Detection heuristics**:
-
-```rust
-// Constant bounds
-for i in 0..10 { ... }              // Constant
-
-// Linear bounds
-for i in 0..n { ... }               // LinearN
-for item in items { ... }           // LinearN (array iteration)
-while !done { i += 1; ... }         // LinearN (linear progression)
-
-// Logarithmic bounds
-while low < high { mid = (low+high)/2; ... }  // Logarithmic (binary search)
-while n > 0 { n /= 2; ... }                    // Logarithmic (halving)
-```
-
-### Nesting Analysis
-
-Nested loops multiply their complexities:
-
-```rust
-// O(n²) - two nested linear loops
-for i in 0..n {
-    for j in 0..n {
-        // ...
-    }
-}
-
-// O(n log n) - linear outer, logarithmic inner
-for i in 0..n {
-    while j > 0 {
-        j /= 2;
-    }
-}
-
-// O(n) - outer linear, inner constant
-for i in 0..n {
-    for j in 0..5 {  // constant inner
-        // ...
-    }
-}
-```
-
-**Implementation**:
-```rust
-fn analyze_nested_loops(&self, loops: &[LoopType]) -> ComplexityClass {
-    let mut complexity = ComplexityClass::Constant;
-
-    for loop_type in loops {
-        complexity = match (complexity, &loop_type.bounds) {
-            (ComplexityClass::Constant, LoopBounds::Constant) => ComplexityClass::Constant,
-            (ComplexityClass::Constant, LoopBounds::Logarithmic) => ComplexityClass::Logarithmic,
-            (ComplexityClass::Constant, LoopBounds::LinearN) => ComplexityClass::Linear,
-            (ComplexityClass::Linear, LoopBounds::LinearN) => ComplexityClass::Quadratic,
-            (ComplexityClass::Linear, LoopBounds::Logarithmic) => ComplexityClass::Linearithmic,
-            (ComplexityClass::Quadratic, LoopBounds::LinearN) => ComplexityClass::Polynomial(3),
-            // ...
-        };
-    }
-
-    complexity
-}
-```
-
-### Early Exit Detection
-
-Loops with early exits may have lower complexity:
-
-```rust
-// Linear search: O(n) worst, O(1) best
-for i in 0..n {
-    if arr[i] == target {
-        return i;  // Early exit
-    }
-}
-
-// Binary search: O(log n)
-while low <= high {
-    let mid = (low + high) / 2;
-    if arr[mid] == target {
-        return mid;  // Early exit
-    }
-    // ...
-}
-```
-
-## Recursion Analysis
-
-The analyzer uses the Master Theorem and recurrence relations to estimate recursive complexity.
-
-### Recursion Patterns
-
-```rust
-pub enum RecursionKind {
-    Direct,   // f(n) calls f(n-k)
-    Indirect, // f() calls g() calls f()
-    Tail,     // Recursive call is last operation
-    Binary,   // Two recursive calls (divide and conquer)
-    Multiple, // More than two recursive calls
-}
-
-pub enum ReductionPattern {
-    Constant(u32),  // n - k (linear reduction)
-    Linear(u32),    // n - c*k
-    Division(u32),  // n / k
-    Custom,         // Unknown pattern
-}
-```
-
-### Master Theorem Application
-
-For recurrences of the form `T(n) = aT(n/b) + f(n)`:
-
-```rust
-fn apply_master_theorem(
-    &self,
-    num_calls: usize,      // a
-    division_factor: u32,  // b
-    combine_work: ComplexityClass, // f(n)
-) -> ComplexityClass {
-    let a = num_calls as f64;
-    let b = division_factor as f64;
-    let log_b_a = a.log(b);
-
-    match combine_work {
-        // Case 1: f(n) = O(n^c) where c < log_b(a)
-        // T(n) = O(n^(log_b(a)))
-
-        // Case 2: f(n) = O(n^(log_b(a)))
-        // T(n) = O(n^(log_b(a)) * log n)
-
-        // Case 3: f(n) = O(n^c) where c > log_b(a)
-        // T(n) = O(f(n))
-
-        // Simplified implementation
-        ComplexityClass::Constant if log_b_a > 0.0 => {
-            ComplexityClass::Polynomial(log_b_a.ceil() as u32)
-        }
-        ComplexityClass::Linear if num_calls == 2 && division_factor == 2 => {
-            ComplexityClass::Linearithmic  // O(n log n)
-        }
-        _ => combine_work,
-    }
-}
-```
-
-### Common Recursion Patterns
-
-| Pattern | Recurrence | Complexity |
-|---------|------------|------------|
-| Linear recursion | T(n) = T(n-1) + O(1) | O(n) |
-| Tail recursion | T(n) = T(n-1) + O(1) | O(n) [optimizable to O(1) space] |
-| Binary recursion | T(n) = 2T(n/2) + O(n) | O(n log n) |
-| Binary search | T(n) = T(n/2) + O(1) | O(log n) |
-| Tree recursion | T(n) = 2T(n-1) + O(1) | O(2^n) |
-
-**Examples**:
-```rust
-// T(n) = T(n-1) + O(1) → O(n)
-fn factorial(n: u64) -> u64 {
-    if n <= 1 { 1 } else { n * factorial(n - 1) }
-}
-
-// T(n) = 2T(n/2) + O(n) → O(n log n)
-fn merge_sort(arr: &mut [i32]) {
-    if arr.len() <= 1 { return; }
-    let mid = arr.len() / 2;
-    merge_sort(&mut arr[..mid]);
-    merge_sort(&mut arr[mid..]);
-    merge(arr, mid);  // O(n) work
-}
-
-// T(n) = 2T(n-1) + O(1) → O(2^n)
-fn fibonacci(n: u32) -> u32 {
-    if n <= 1 { n } else { fibonacci(n-1) + fibonacci(n-2) }
-}
-```
-
-## Space Complexity
-
-Space analysis considers:
-- Stack depth (recursion)
-- Allocated data structures
-- Auxiliary arrays
-
-### Stack Space
-
-```rust
-fn estimate_stack_space(&self, pattern: &RecursionPattern) -> ComplexityClass {
-    match pattern.reduction {
-        ReductionPattern::Division(k) => ComplexityClass::Logarithmic,  // O(log n)
-        ReductionPattern::Constant(1) => ComplexityClass::Linear,       // O(n)
-        _ => ComplexityClass::Linear,
-    }
-}
-```
-
-### Heap Space
-
-```rust
-fn estimate_heap_space(&self, cpg: &CodePropertyGraph, func: NodeId) -> ComplexityClass {
-    // Look for array allocations
-    let allocations = self.find_allocations(cpg, func);
-
-    let mut max_space = ComplexityClass::Constant;
-    for alloc in allocations {
-        let size = self.estimate_allocation_size(alloc);
-        max_space = max_space.max(size);
-    }
-
-    max_space
-}
-```
-
-## Confidence Scoring
-
-The analyzer provides confidence scores based on analysis certainty.
-
-### Confidence Factors
-
-| Factor | High Confidence | Low Confidence |
-|--------|-----------------|----------------|
-| Loop bounds | Clearly derived from n | Variable/unknown bounds |
-| Recursion | Clear reduction pattern | Complex mutual recursion |
-| Early exits | None | Multiple conditional exits |
-| Data access | Sequential | Pointer-based |
-
-### Combining Confidences
-
-```rust
-fn combine_confidence(&self, loop_conf: f64, rec_conf: f64) -> f64 {
-    // Geometric mean for combining independent estimates
-    (loop_conf * rec_conf).sqrt()
-}
-```
-
-## Practical Examples
-
-### Analyzing a Sorting Function
-
-```rust
-use libcpg::algorithms::detection::ComplexityAnalyzer;
-
-let analyzer = ComplexityAnalyzer::new();
-
-// Analyze bubble sort
-let bubble_time = analyzer.estimate_time_complexity(&cpg, bubble_sort_id);
-assert!(matches!(bubble_time.class, ComplexityClass::Quadratic));
-println!("Bubble sort: {} - {}", bubble_time.class, bubble_time.justification);
-// Output: "Bubble sort: O(n²) - Two nested loops, each iterating up to n times"
-
-// Analyze quicksort
-let quick_time = analyzer.estimate_time_complexity(&cpg, quicksort_id);
-assert!(matches!(quick_time.class, ComplexityClass::Linearithmic));
-println!("Quicksort: {} - {}", quick_time.class, quick_time.justification);
-// Output: "Quicksort: O(n log n) - Binary recursion with n/2 reduction"
-```
-
-### Finding Inefficient Code
-
-```rust
-fn find_inefficient_functions(cpg: &CodePropertyGraph) -> Vec<(String, ComplexityEstimate)> {
-    let analyzer = ComplexityAnalyzer::new();
-    let mut warnings = Vec::new();
-
-    for func in cpg.functions() {
-        let time = analyzer.estimate_time_complexity(cpg, func.id());
-
-        // Flag potentially inefficient algorithms
-        match time.class {
-            ComplexityClass::Exponential | ComplexityClass::Factorial => {
-                warnings.push((func.name().to_string(), time));
-            }
-            ComplexityClass::Polynomial(k) if k >= 3 => {
-                warnings.push((func.name().to_string(), time));
-            }
-            _ => {}
-        }
-    }
-
-    warnings
-}
-
-// Usage
-let warnings = find_inefficient_functions(&cpg);
-for (name, estimate) in warnings {
-    println!("Warning: {} has {} complexity", name, estimate.class);
-    println!("  Reason: {}", estimate.justification);
-}
-```
-
-### Comparing Implementations
-
-```rust
-fn compare_implementations(
-    cpg: &CodePropertyGraph,
-    func1: NodeId,
-    func2: NodeId,
-) {
-    let analyzer = ComplexityAnalyzer::new();
-
-    let time1 = analyzer.estimate_time_complexity(cpg, func1);
-    let time2 = analyzer.estimate_time_complexity(cpg, func2);
-
-    println!("Implementation 1: {}", time1.class);
-    println!("Implementation 2: {}", time2.class);
-
-    if time1.class < time2.class {
-        println!("Implementation 1 is asymptotically faster");
-    } else if time2.class < time1.class {
-        println!("Implementation 2 is asymptotically faster");
-    } else {
-        println!("Both have the same asymptotic complexity");
-    }
-}
-```
-
-## Limitations
-
-### What the Analyzer Cannot Determine
-
-1. **Input distribution**: Average-case vs. worst-case requires knowing input distribution
-2. **Constant factors**: O(100n) vs O(n) both appear as O(n)
-3. **Amortized complexity**: Requires understanding of operation sequences
-4. **Cache effects**: Memory hierarchy not modeled
-5. **Parallelism**: Assumes sequential execution
-
-### Improving Accuracy
-
-```rust
-// Provide hints for better analysis
-let analyzer = ComplexityAnalyzer::new()
-    // Hint: main input is first parameter
-    .with_input_parameter(0)
-    // Hint: this is a graph algorithm, edges ≈ O(V²)
-    .with_graph_assumption(GraphAssumption::Dense)
-    // Hint: hash operations are O(1) amortized
-    .with_hash_assumption(HashAssumption::Amortized);
-```
-
-## Complexity Class Operations
-
-### Ordering and Comparison
-
-```rust
-impl PartialOrd for ComplexityClass {
-    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
-        Some(self.order_value().cmp(&other.order_value()))
-    }
-}
-
-impl ComplexityClass {
-    fn order_value(&self) -> u32 {
-        match self {
-            Self::Constant => 0,
-            Self::Logarithmic => 1,
-            Self::Linear => 2,
-            Self::Linearithmic => 3,
-            Self::Quadratic => 4,
-            Self::Polynomial(k) => 4 + k,
-            Self::Exponential => 100,
-            Self::Factorial => 101,
-        }
-    }
-}
-```
-
-### Multiplication (Nested Loops)
-
-```rust
-impl ComplexityClass {
-    pub fn multiply(&self, other: &Self) -> Self {
-        match (self, other) {
-            (Self::Constant, x) | (x, Self::Constant) => x.clone(),
-            (Self::Logarithmic, Self::Linear) | (Self::Linear, Self::Logarithmic) =>
-                Self::Linearithmic,
-            (Self::Linear, Self::Linear) => Self::Quadratic,
-            (Self::Linear, Self::Quadratic) | (Self::Quadratic, Self::Linear) =>
-                Self::Polynomial(3),
-            (Self::Polynomial(a), Self::Polynomial(b)) => Self::Polynomial(a + b),
-            (Self::Exponential, _) | (_, Self::Exponential) => Self::Exponential,
-            (Self::Factorial, _) | (_, Self::Factorial) => Self::Factorial,
-            _ => Self::Polynomial(2),  // Conservative estimate
-        }
-    }
-}
-```
-
-### Addition (Sequential Blocks)
-
-```rust
-impl ComplexityClass {
-    pub fn add(&self, other: &Self) -> Self {
-        // Take the larger complexity
-        if self > other { self.clone() } else { other.clone() }
-    }
-}
-```
-
-## Display Formatting
-
-```rust
-impl std::fmt::Display for ComplexityClass {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Self::Constant => write!(f, "O(1)"),
-            Self::Logarithmic => write!(f, "O(log n)"),
-            Self::Linear => write!(f, "O(n)"),
-            Self::Linearithmic => write!(f, "O(n log n)"),
-            Self::Quadratic => write!(f, "O(n²)"),
-            Self::Polynomial(k) => write!(f, "O(n^{})", k),
-            Self::Exponential => write!(f, "O(2^n)"),
-            Self::Factorial => write!(f, "O(n!)"),
-        }
-    }
-}
-```
-
-## Next Steps
-
-- [Algorithm Families](families.md) - Algorithm categories
-- [Algorithm Overview](overview.md) - Detection concepts
-- [GNN Embeddings](../gnn/embeddings.md) - Code similarity
+by comparing the per-call work $`f(n)`$ against $`n^{\log_b a}`$. For example $`a = b = 2`$ with $`f(n) = O(n)`$ yields $`T(n) = O(n \log n)`$ — the merge-sort case.
+
+`ComplexityAnalyzer` does **not** evaluate $`\log_b a`$ numerically. It has no view of $`b`$ beyond "is there a `/2` or a `mid`/`pivot`", and it approximates $`a`$ by counting recursive call sites. So it recognises the *shape* $`a\,T(n/b)+f(n)`$ and maps one call to $`O(\log n)`$ and two to $`O(n \log n)`$, but it cannot classify, say, Karatsuba's three-way split or Strassen's seven-way split correctly — both fall into the $`\ge 3`$ bucket as `Polynomial(calls)`.
+
+### Honesty: `Factorial` is never emitted
+
+The `ComplexityClass::Factorial` variant exists (so callers can pattern-match on it and so it has a Big-O label), but **the shipped `ComplexityAnalyzer` never produces it**. Non-divide-and-conquer recursion tops out at `Exponential`, and loop nesting tops out at `Polynomial(depth)`. If you are checking for pathological cost, match on `Exponential` — a hit on `Factorial` will not occur from this analyzer.
+
+## Worked examples
+
+The table below shows real functions, the recurrence they embody, and the class the analyzer *actually* assigns.
+
+| Function | Recurrence | Emitted class |
+|---|---|---|
+| `fn factorial(n){ if n<=1 {1} else { n*factorial(n-1) } }` | $`T(n)=T(n-1)+O(1)`$ | `Linear` (0.7) |
+| `fn fib(n){ if n<=1 {n} else { fib(n-1)+fib(n-2) } }` | $`T(n)=2T(n-1)+O(1)`$ | `Exponential` (0.7) |
+| `fn merge_sort(a){ …; merge_sort(l); merge_sort(r); merge(a) }` | $`T(n)=2T(n/2)+O(n)`$ | `Linearithmic` (0.7) |
+| `fn bsearch(a,x){ let mid=(lo+hi)/2; …; bsearch(...) }` | $`T(n)=T(n/2)+O(1)`$ | `Logarithmic` (0.8) |
+| two counted nested `for` loops | $`\sum O(n)\cdot O(n)`$ | `Quadratic` (0.8) |
+
+A crucial disambiguation lives in the first row: the function *called* `factorial` runs in $`O(n)`$ time (it performs $`n`$ multiplications), so the analyzer's `Linear` verdict is correct. That is completely unrelated to the `Factorial` complexity **class** $`O(n!)`$, which — as noted above — the analyzer never assigns to anything.
+
+For `merge_sort`, the merge loop also produces a `Linear` loop estimate; the combine rule keeps the worse of `Linear` and `Linearithmic`, yielding `Linearithmic`.
+
+## Space complexity
+
+`estimate_space_complexity` is a separate public method (the detection pipeline does not call it, but you can):
+
+- **Recursive** functions: `Tail` recursion → `Constant` (a compiler could reuse the frame); `Direct`/`Indirect` → `Linear` (stack depth), confidence `0.6`.
+- **Non-recursive** functions: if the body allocates a collection (an array literal, or a call whose callee name contains `vec`, `new`, `alloc`, `create`, `clone`, or `collect`) → `Linear`, confidence `0.5`; otherwise `Constant`, confidence `0.7`.
+
+## Limits
+
+The analyzer models structure, not semantics. It cannot see:
+
+1. **Input distribution** — average vs worst case are indistinguishable.
+2. **Constant factors** — $`O(100n)`$ and $`O(n)`$ both read as `Linear`.
+3. **Amortised behaviour** — it reasons per-call, not over operation sequences.
+4. **Data-dependent bounds** — a `while` without a clear counter is treated conservatively.
+5. **Genuine $`O(n!)`$ cost** — not represented in output at all.
+
+Treat every `ComplexityEstimate` as a hint whose `confidence` and `justification` fields tell you how much to trust it.
+
+## Related reading
+
+- [Overview](overview.md) — where the complexity estimate feeds the family detectors.
+- [Algorithm families](families.md) — the family gates that consume these classes.
+- [Cyclomatic complexity](../../GLOSSARY.md#cyclomatic-complexity) — a distinct, exact structural metric (`cyclomatic_complexity()` over the CFG), not to be confused with these Big-O estimates.
+- [Theory: algorithm & complexity analysis](../../theory/08-algorithm-and-complexity-analysis.md) and [API: pattern & analysis reference](../../api/pattern-reference.md).
+
+## References
+
+1. Cormen, T. H., Leiserson, C. E., Rivest, R. L., Stein, C. (2009). *Introduction to Algorithms* (3rd ed.). MIT Press. ISBN 978-0262033848 (no DOI). *(Master Theorem, Chapter 4.)*

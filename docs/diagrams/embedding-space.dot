@@ -1,0 +1,91 @@
+// embedding-space.dot — two CPG subgraphs are embedded by one shared CpgGnn,
+// then compared with cosine_similarity.  Inset: per-node embeddings cluster by node-kind.
+digraph embedding_space {
+  bgcolor="white";
+  rankdir=LR;
+  compound=true;
+  labelloc="t";
+  fontname="DejaVu Sans";
+  label="CpgGnn embedding space — subgraph embeddings compared by cosine similarity";
+  node [fontname="DejaVu Sans", fontsize=11];
+  edge [fontname="DejaVu Sans", color="#495057", arrowsize=0.8];
+
+  // --- two input subgraphs ---
+  subgraph cluster_A {
+    label="subgraph A  (e.g. quicksort CPG)";
+    style="filled"; fillcolor="#F8F9FA"; color="#868E96"; fontcolor="#495057";
+    a1 [label="fn",   shape=box, style=filled, fillcolor="#C3FAE8", color="#0CA678"];
+    a2 [label="loop", shape=box, style=filled, fillcolor="#D3F9D8", color="#2F9E44"];
+    a3 [label="cmp",  shape=box, style=filled, fillcolor="#DBE4FF", color="#4C6EF5"];
+    a1 -> a2 [color="#4C6EF5"];
+    a2 -> a3 [color="#4C6EF5"];
+  }
+  subgraph cluster_B {
+    label="subgraph B  (e.g. mergesort CPG)";
+    style="filled"; fillcolor="#F8F9FA"; color="#868E96"; fontcolor="#495057";
+    b1 [label="fn",    shape=box, style=filled, fillcolor="#C3FAE8", color="#0CA678"];
+    b2 [label="split", shape=box, style=filled, fillcolor="#DBE4FF", color="#4C6EF5"];
+    b3 [label="merge", shape=box, style=filled, fillcolor="#DBE4FF", color="#4C6EF5"];
+    b1 -> b2 [color="#4C6EF5"];
+    b2 -> b3 [color="#4C6EF5"];
+  }
+
+  // --- shared encoder ---
+  gnn [shape=box, style="filled,rounded", fillcolor="#FCC2D7", color="#C2255C", penwidth=1.8,
+       label="CpgGnn\npropagate(num_layers = 3)\nmean(AST + CFG + DFG) -> ReLU\nembedding_dim = 128"];
+
+  // --- subgraph embeddings ---
+  eA [shape=box, style=filled, fillcolor="#FCC2D7", color="#C2255C",
+      label="SubgraphEmbedding e_A\nmean pool over node embeddings"];
+  eB [shape=box, style=filled, fillcolor="#FCC2D7", color="#C2255C",
+      label="SubgraphEmbedding e_B\nmean pool over node embeddings"];
+
+  cos [shape=box, style="filled,rounded", fillcolor="#FFE3E3", color="#E03131", penwidth=1.6,
+       label="cosine_similarity(e_A, e_B)\nscore in [-1, 1]"];
+
+  a2 -> gnn [ltail=cluster_A, color="#C2255C", style=dotted, penwidth=1.4];
+  b2 -> gnn [ltail=cluster_B, color="#C2255C", style=dotted, penwidth=1.4];
+  gnn -> eA;
+  gnn -> eB;
+  eA -> cos;
+  eB -> cos;
+
+  // --- inset: node embeddings cluster by node-kind (2-D projection) ---
+  subgraph cluster_scatter {
+    label="node-embedding space (2-D projection) — points cluster by node-kind";
+    style="filled"; fillcolor="#FFFFFF"; color="#CED4DA"; fontcolor="#495057";
+
+    subgraph cluster_k_call {
+      label="Call"; style="filled"; fillcolor="#E6FCF5"; color="#0CA678"; fontcolor="#0CA678";
+      kc1 [shape=point, width=0.14, color="#0CA678"];
+      kc2 [shape=point, width=0.14, color="#0CA678"];
+      kc3 [shape=point, width=0.14, color="#0CA678"];
+    }
+    subgraph cluster_k_ident {
+      label="Identifier"; style="filled"; fillcolor="#EDF2FF"; color="#4C6EF5"; fontcolor="#4C6EF5";
+      ki1 [shape=point, width=0.14, color="#4C6EF5"];
+      ki2 [shape=point, width=0.14, color="#4C6EF5"];
+      ki3 [shape=point, width=0.14, color="#4C6EF5"];
+    }
+    subgraph cluster_k_lit {
+      label="Literal"; style="filled"; fillcolor="#FFF9DB"; color="#F08C00"; fontcolor="#F08C00";
+      kl1 [shape=point, width=0.14, color="#F08C00"];
+      kl2 [shape=point, width=0.14, color="#F08C00"];
+      kl3 [shape=point, width=0.14, color="#F08C00"];
+    }
+  }
+  gnn -> kc1 [lhead=cluster_scatter, style=dotted, color="#C2255C", penwidth=1.2,
+              label="per-node\nembeddings", fontsize=9, fontcolor="#C2255C"];
+
+  // --- legend ---
+  legend [shape=plaintext, label=<
+    <table border="0" cellborder="1" cellspacing="0" cellpadding="4">
+      <tr><td bgcolor="#FCC2D7">CpgGnn / embedding vectors</td></tr>
+      <tr><td bgcolor="#FFE3E3">cosine_similarity comparison</td></tr>
+      <tr><td bgcolor="#C3FAE8">Call node</td></tr>
+      <tr><td bgcolor="#DBE4FF">Identifier / AST node</td></tr>
+      <tr><td bgcolor="#FFF3BF">Literal node</td></tr>
+    </table>
+  >];
+  cos -> legend [style=invis];
+}

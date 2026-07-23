@@ -1,0 +1,32 @@
+@startuml
+!include _libcpg-theme.iuml
+title DPML (Design-Pattern Markup Language) --> PatternTemplate --> relaxed VF2
+start
+:DPML source (YAML / TOML);<<#FFE8CC>>
+:DpmlTemplate.parse(content)
+auto-detect YAML, then TOML;<<#E9ECEF>>
+if (parse + validate() ok?) then (ok)
+  :DpmlTemplate
+{ roles: DpmlRole[],
+  constraints / relationships: DpmlConstraint[] };<<#E9ECEF>>
+  :to_pattern_template()
+compile to PatternTemplate
+(role --> NodeConstraint, relationship --> EdgeConstraint);<<#E9ECEF>>
+  :PatternTemplate.to_pattern_graph()
+--> pattern CPG;<<#E9ECEF>>
+  :feed relaxed VF2
+(Vf2Matcher.find_matches);<<#FFE3E3>>
+  stop
+else (malformed)
+  :DpmlError
+FeatureDisabled / YamlError / TomlError / MissingField /
+InvalidRole / DuplicateRole / InvalidRelationship / InvalidSyntax;<<#FFE3E3>>
+  end
+endif
+legend right
+  |= colour |= stage |
+  |<#FFE8CC>| DPML source text |
+  |<#E9ECEF>| parse / compile / to_pattern_graph |
+  |<#FFE3E3>| VF2 match  ·  DpmlError off-ramp |
+endlegend
+@enduml

@@ -1,0 +1,81 @@
+// cpg-vs-traditional.dot — three classical single-purpose graphs (AST, CFG, DFG)
+// on the LEFT versus the unified CPG on the RIGHT, for the snippet  y = x + 1.
+// The CPG reuses the SAME node set and overlays all three edge layers in colour,
+// conveying "three views unified on one node set".
+//   AST  solid  blue   #4C6EF5     CFG  solid  green  #2F9E44     DFG  dashed amber #F08C00
+digraph CpgVsTraditional {
+  bgcolor="white"; rankdir=LR; compound=true;
+  labelloc="t";
+  label="Three classical views  vs.  the unified CPG      (snippet:  y = x + 1)";
+  fontname="DejaVu Sans"; fontsize=15;
+  node[shape=box, style="rounded,filled", fontname="DejaVu Sans", fontsize=10, margin="0.09,0.05"];
+  edge[fontname="DejaVu Sans", fontsize=9];
+
+  // ================= LEFT: three separate single-layer graphs =================
+  subgraph cluster_ast {
+    label="AST — syntax tree"; fontsize=12; fontcolor="#3B5BDB";
+    color="#4C6EF5"; style="rounded"; bgcolor="#F5F7FF";
+    node[fillcolor="#F1F3F5", color="#495057"];
+    a_assign[label="Assignment  ="]; a_y[label="Variable  y"];
+    a_binop[label="BinaryOp  +"];    a_x[label="Identifier  x"]; a_1[label="Literal  1"];
+    edge[color="#4C6EF5", penwidth=1.3, style=solid];
+    a_assign -> a_y; a_assign -> a_binop; a_binop -> a_x; a_binop -> a_1;
+  }
+  subgraph cluster_cfg {
+    label="CFG — evaluation order"; fontsize=12; fontcolor="#2F9E44";
+    color="#2F9E44"; style="rounded"; bgcolor="#F4FFF7";
+    node[fillcolor="#F1F3F5", color="#495057"];
+    c_x[label="Identifier  x"]; c_1[label="Literal  1"];
+    c_binop[label="BinaryOp  +"]; c_assign[label="Assignment  ="];
+    edge[color="#2F9E44", penwidth=1.4, style=solid];
+    c_x -> c_1 -> c_binop -> c_assign;
+  }
+  subgraph cluster_dfg {
+    label="DFG — data flow"; fontsize=12; fontcolor="#E8590C";
+    color="#F08C00"; style="rounded"; bgcolor="#FFFDF4";
+    node[fillcolor="#F1F3F5", color="#495057"];
+    d_x[label="Identifier  x"]; d_binop[label="BinaryOp  +"]; d_y[label="Variable  y"];
+    edge[color="#F08C00", penwidth=1.4, style=dashed];
+    d_x -> d_binop [label="use"]; d_binop -> d_y [label="def"];
+  }
+
+  // ================= RIGHT: unified CPG (one node set, three overlays) ========
+  subgraph cluster_cpg {
+    label="CPG — one node set · three overlaid layers"; fontsize=12.5; fontcolor="#212529";
+    color="#495057"; style="rounded,bold"; bgcolor="#FFFFFF";
+    node[fillcolor="#F1F3F5", color="#495057"];
+    m_assign[label="Assignment  ="]; m_y[label="Variable  y"];
+    m_binop[label="BinaryOp  +"];    m_x[label="Identifier  x"]; m_1[label="Literal  1"];
+    // AST overlay (defines local tree)
+    edge[color="#4C6EF5", penwidth=1.3, style=solid, constraint=true];
+    m_assign -> m_y; m_assign -> m_binop; m_binop -> m_x; m_binop -> m_1;
+    // CFG overlay
+    edge[color="#2F9E44", penwidth=1.4, style=solid, constraint=false];
+    m_x -> m_1 [label="eval"]; m_1 -> m_binop; m_binop -> m_assign;
+    // DFG overlay
+    edge[color="#F08C00", penwidth=1.4, style=dashed, constraint=false];
+    m_x -> m_binop [label="use"]; m_binop -> m_y [label="def"];
+  }
+
+  // arrange three source graphs -> merged CPG (invisible pull edges, LR)
+  edge[style=invis, constraint=true];
+  a_binop -> m_assign;
+  c_binop -> m_assign;
+  d_binop -> m_assign;
+
+  // a single visible "unify" cue
+  a_1 -> m_x [ltail=cluster_ast, lhead=cluster_cpg, style=bold, color="#868E96",
+              constraint=false, label="⊕ merge on shared nodes", fontcolor="#495057", fontsize=11];
+
+  // ================= legend =================
+  leg [shape=plaintext, label=<
+    <table border="0" cellborder="1" cellspacing="0" cellpadding="5" bgcolor="#F8F9FA">
+      <tr><td colspan="2"><b>Legend — overlaid edge layers</b></td></tr>
+      <tr><td bgcolor="#DBE4FF"><font color="#3B5BDB"><b>———</b></font></td><td align="left">AstChild &#8212; AST (solid blue)</td></tr>
+      <tr><td bgcolor="#D3F9D8"><font color="#2F9E44"><b>———</b></font></td><td align="left">ControlFlow &#8212; CFG (solid green)</td></tr>
+      <tr><td bgcolor="#FFF3BF"><font color="#E8590C"><b>&#8211;&#8201;&#8211;&#8201;&#8211;</b></font></td><td align="left">DataFlow &#8212; DFG (dashed amber)</td></tr>
+    </table>
+  >];
+  edge[style=invis, constraint=true];
+  m_y -> leg;
+}

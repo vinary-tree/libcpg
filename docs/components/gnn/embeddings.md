@@ -1,455 +1,225 @@
 # Embeddings
 
-After message passing, each node in the CPG has a learned embedding vector. This document covers how to work with these embeddings for code analysis tasks.
+Once [message passing](message-passing.md) has run, every node carries a learned vector. `libcpg` wraps those vectors in two small value types — `NodeEmbedding` and `SubgraphEmbedding` — that add an [L2 norm](../../GLOSSARY.md#embedding) and [cosine similarity](../../GLOSSARY.md#cosine-similarity). This page covers both types, how to build them from `CpgGnn` output, how similarity behaves, and how they serialise.
 
-## Embedding Types
+> **Feature gate.** These types and their vector math require the `gnn` feature (see [Overview](overview.md)).
 
-libcpg provides two main embedding types:
+## `CpgGnn` returns raw vectors; the wrappers add behaviour
 
-### NodeEmbedding
+A subtle but important point: `CpgGnn` itself returns bare `ndarray::Array1<f32>` values —
 
-Represents the embedding for a single node:
+- `gnn.node_embedding(id) -> Option<Array1<f32>>`
+- `gnn.subgraph_embedding(&nodes) -> Array1<f32>`
+
+The `NodeEmbedding`/`SubgraphEmbedding` types are **wrappers you construct** around those vectors to get `norm()` and `cosine_similarity()`. They are not returned by the GNN directly.
+
+## `NodeEmbedding`
 
 ```rust
+// requires: features = ["gnn"]
+use libcpg::NodeId;
+use ndarray::Array1;
+
 pub struct NodeEmbedding {
-    /// The node this embedding represents
     pub node_id: NodeId,
-    /// The embedding vector
-    pub vector: Array1<f32>,
-    /// Embedding dimensionality
+    pub vector: Array1<f32>, // present only under `gnn`; skipped by serde (see below)
     pub dim: usize,
 }
 ```
 
-**Creating a NodeEmbedding:**
+Build one from a GNN result and inspect it:
 
 ```rust
-use libcpg::{NodeEmbedding, NodeId};
-use ndarray::array;
+// requires: features = ["gnn"]
+use libcpg::gnn::NodeEmbedding;
+use libcpg::{GraphNeuralNetwork, NodeId};
 
-// From GNN output
-let embedding = gnn.node_embedding(node_id)?;
-let node_emb = NodeEmbedding::new(node_id, embedding);
+// `gnn` has already had `propagate` called on it.
+let raw = gnn.node_embedding(node_id).expect("node has an embedding");
+let emb = NodeEmbedding::new(node_id, raw); // `dim` is inferred from the vector length
 
-// Check properties
-println!("Dimension: {}", node_emb.dim);
-println!("L2 norm: {}", node_emb.norm());
+println!("dim:  {}", emb.dim);
+println!("norm: {:.3}", emb.norm()); // L2 norm
 ```
 
-### SubgraphEmbedding
+`NodeEmbedding::new(node_id, vector)` records the vector and sets `dim = vector.len()`. `norm()` is the Euclidean length $`\lVert v \rVert = \sqrt{\sum_i v_i^2}`$.
 
-Represents an aggregated embedding for multiple nodes (e.g., a function, class, or code block):
+## `SubgraphEmbedding`
+
+A subgraph embedding summarises many nodes — typically a whole function — as one vector.
 
 ```rust
+// requires: features = ["gnn"]
+use libcpg::NodeId;
+use ndarray::Array1;
+use libcpg::gnn::AggregationMethod;
+
 pub struct SubgraphEmbedding {
-    /// The nodes in this subgraph
     pub node_ids: Vec<NodeId>,
-    /// The aggregated embedding vector
-    pub vector: Array1<f32>,
-    /// Embedding dimensionality
+    pub vector: Array1<f32>,           // present only under `gnn`; skipped by serde
     pub dim: usize,
-    /// Aggregation method used
-    pub aggregation: AggregationMethod,
+    pub aggregation: AggregationMethod, // a LABEL — see the honesty note below
 }
 ```
 
-**Creating a SubgraphEmbedding:**
-
 ```rust
-use libcpg::{SubgraphEmbedding, AggregationMethod};
+// requires: features = ["gnn"]
+use libcpg::gnn::{SubgraphEmbedding, AggregationMethod};
+use libcpg::{GraphNeuralNetwork, NodeId};
 
-// Get function nodes
-let func_nodes: Vec<_> = cpg.ast_descendants(func_id).collect();
+// Collect a function's nodes: the function node plus its AST descendants.
+let cpg = gnn.cpg();
+let nodes: Vec<NodeId> = std::iter::once(func_id).chain(cpg.ast_descendants(func_id)).collect();
 
-// Compute subgraph embedding
-let embedding = gnn.subgraph_embedding(&func_nodes);
-let subgraph_emb = SubgraphEmbedding::new(
-    func_nodes,
-    embedding,
-    AggregationMethod::Mean
-);
+let vector = gnn.subgraph_embedding(&nodes); // mean pooling (see below)
+let emb = SubgraphEmbedding::new(nodes, vector, AggregationMethod::Mean);
 
-println!("Nodes in subgraph: {}", subgraph_emb.node_count());
+println!("{} nodes summarised", emb.node_count());
 ```
 
-## Aggregation Methods
+`node_count()` is available even without the `gnn` feature (it just reads `node_ids.len()`); `norm()` and `cosine_similarity()` require `gnn`.
 
-When creating subgraph embeddings, several aggregation methods are available:
+## Aggregation methods — only `Mean` is computed
 
 ```rust
+// requires: features = ["gnn"]
 pub enum AggregationMethod {
-    Mean,         // Average of node embeddings
-    Sum,          // Sum of node embeddings
-    Max,          // Element-wise maximum
-    Attention,    // Attention-weighted average
-    Hierarchical, // AST-structure-aware aggregation
+    Mean,         // default
+    Sum,
+    Max,
+    Attention,    // reserved placeholder
+    Hierarchical, // reserved placeholder
 }
 ```
 
-### Mean (Default)
-
-The most common choice. Produces stable embeddings regardless of subgraph size:
+**Honesty note.** `CpgGnn::subgraph_embedding` **always mean-pools** — it sums the node vectors and divides by the count, regardless of any `AggregationMethod`. The `aggregation` field on `SubgraphEmbedding` is therefore *metadata you attach*, a label describing how you intend the vector to be read; it does not change how the GNN computed it. `Attention` and `Hierarchical` are reserved placeholders with no implementation anywhere in the crate, and even `Sum`/`Max` are not applied by the built-in GNN. If you want sum or max pooling, compute it yourself from the per-node vectors:
 
 ```rust
-// Mean: sum(embeddings) / count
-let embedding = gnn.subgraph_embedding(&nodes);  // Uses mean
-```
+// requires: features = ["gnn"]
+use ndarray::Array1;
+use libcpg::{GraphNeuralNetwork, NodeId};
 
-**Properties:**
-- Normalized by size
-- Good for comparing different-sized code fragments
-- Loses some magnitude information
-
-### Sum
-
-Preserves the "amount" of information:
-
-```rust
-fn sum_aggregate(embeddings: &[Array1<f32>]) -> Array1<f32> {
-    embeddings.iter().fold(
-        Array1::zeros(dim),
-        |acc, e| acc + e
-    )
-}
-```
-
-**Properties:**
-- Larger subgraphs = larger embeddings
-- Good when size is meaningful
-- Can cause scale issues
-
-### Max Pooling
-
-Captures the most prominent features:
-
-```rust
-fn max_aggregate(embeddings: &[Array1<f32>]) -> Array1<f32> {
-    let mut result = Array1::from_elem(dim, f32::NEG_INFINITY);
-    for emb in embeddings {
-        for i in 0..dim {
-            result[i] = result[i].max(emb[i]);
+// Element-wise MAX pooling — libcpg does not do this for you.
+fn max_pool(gnn: &impl GraphNeuralNetwork, nodes: &[NodeId]) -> Option<Array1<f32>> {
+    let mut acc: Option<Array1<f32>> = None;
+    for &id in nodes {
+        if let Some(v) = gnn.node_embedding(id) {
+            acc = Some(match acc {
+                None => v,
+                Some(a) => a.iter().zip(v.iter()).map(|(x, y)| x.max(*y)).collect(),
+            });
         }
     }
-    result
+    acc
 }
 ```
 
-**Properties:**
-- Highlights dominant patterns
-- Good for detecting specific features
-- Ignores frequency information
+## Cosine similarity
 
-### Hierarchical
+The primary way to compare embeddings is [cosine similarity](../../GLOSSARY.md#cosine-similarity):
 
-Follows AST structure for aggregation:
-
-```
-           func_emb
-          /        \
-     block_emb    params_emb
-        |
-   stmt_emb
+```math
+\cos(u, v) = \frac{u \cdot v}{\lVert u \rVert \, \lVert v \rVert}
 ```
 
-Aggregates bottom-up, preserving structural relationships.
-
-## Similarity Computation
-
-### Cosine Similarity
-
-The primary metric for comparing embeddings:
+Both `NodeEmbedding` and `SubgraphEmbedding` expose `cosine_similarity(&self, other: &Self) -> f32`. It returns `0.0` as a safe fallback when the two dimensionalities differ or when either vector has zero norm; otherwise it returns the value above.
 
 ```rust
-impl NodeEmbedding {
-    pub fn cosine_similarity(&self, other: &NodeEmbedding) -> f32 {
-        if self.dim != other.dim {
-            return 0.0;
-        }
+// requires: features = ["gnn"]
+use libcpg::gnn::NodeEmbedding;
+use libcpg::GraphNeuralNetwork;
 
-        let dot: f32 = self.vector.iter()
-            .zip(other.vector.iter())
-            .map(|(a, b)| a * b)
-            .sum();
+let a = NodeEmbedding::new(id1, gnn.node_embedding(id1).expect("embedding"));
+let b = NodeEmbedding::new(id2, gnn.node_embedding(id2).expect("embedding"));
 
-        let norm_self = self.norm();
-        let norm_other = other.norm();
-
-        if norm_self == 0.0 || norm_other == 0.0 {
-            0.0
-        } else {
-            dot / (norm_self * norm_other)
-        }
-    }
-}
+let sim = a.cosine_similarity(&b);
+println!("similarity: {sim:.3}");
 ```
 
-**Example usage:**
-
-```rust
-let emb1 = gnn.node_embedding(node1)?;
-let emb2 = gnn.node_embedding(node2)?;
-
-let node_emb1 = NodeEmbedding::new(node1, emb1);
-let node_emb2 = NodeEmbedding::new(node2, emb2);
-
-let similarity = node_emb1.cosine_similarity(&node_emb2);
-println!("Similarity: {:.3}", similarity);  // 0.0 to 1.0
-```
-
-### Interpreting Similarity Scores
+Cosine similarity is mathematically in $`[-1, 1]`$. Because `CpgGnn` applies [ReLU](../../GLOSSARY.md#relu) every round, propagated embeddings are **non-negative**, so in practice observed similarities fall in $`[0, 1]`$. A rough reading:
 
 | Score | Interpretation |
-|-------|----------------|
-| 0.95+ | Near-identical (clones, trivial differences) |
-| 0.80-0.95 | Very similar (same algorithm, minor changes) |
-| 0.60-0.80 | Related (similar structure, different details) |
-| 0.40-0.60 | Weak similarity (some common patterns) |
-| < 0.40 | Unrelated |
+|---|---|
+| $`\ge 0.95`$ | near-identical (clones, trivial edits) |
+| $`0.80`$–$`0.95`$ | very similar (same shape, minor changes) |
+| $`0.60`$–$`0.80`$ | related (similar structure, different details) |
+| $`0.40`$–$`0.60`$ | weakly related |
+| $`< 0.40`$ | unrelated |
 
-### L2 Norm
+These bands are heuristic guidance, not calibrated thresholds; tune them to your corpus.
 
-The magnitude of an embedding:
+![Subgraph embeddings placed in vector space, with cosine similarity measuring the angle between function vectors.](../../diagrams/embedding-space.svg)
 
-```rust
-pub fn norm(&self) -> f32 {
-    self.vector.iter()
-        .map(|x| x * x)
-        .sum::<f32>()
-        .sqrt()
-}
-```
+*Figure — subgraph embeddings and cosine similarity. Source: [`diagrams/embedding-space.dot`](../../diagrams/embedding-space.dot).*
 
-Useful for detecting unusual nodes or normalizing embeddings.
+## Patterns
 
-## Common Patterns
+### Finding similar functions
 
-### Finding Similar Functions
+Uses only real API — `functions()` yields `&CpgNode`, whose `id` is a field:
 
 ```rust
-/// Find functions similar to a query function
-fn find_similar_functions(
-    gnn: &CpgGnn,
-    query_func_id: NodeId,
-    threshold: f32,
-) -> Vec<(NodeId, f32)> {
-    let cpg = gnn.cpg();
+// requires: features = ["gnn"]
+use libcpg::gnn::{CpgGnn, SubgraphEmbedding};
+use libcpg::{GraphNeuralNetwork, NodeId};
 
-    // Get query function embedding
-    let query_nodes: Vec<_> = std::iter::once(query_func_id)
-        .chain(cpg.ast_descendants(query_func_id))
+fn subgraph(gnn: &CpgGnn, func: NodeId) -> SubgraphEmbedding {
+    let nodes: Vec<NodeId> = std::iter::once(func)
+        .chain(gnn.cpg().ast_descendants(func))
         .collect();
-    let query_emb = gnn.subgraph_embedding(&query_nodes);
-    let query = SubgraphEmbedding::new(
-        query_nodes,
-        query_emb,
-        AggregationMethod::Mean
-    );
-
-    // Compare to all other functions
-    let mut results = Vec::new();
-
-    for func in cpg.nodes_of_kind(CpgNodeKind::Function) {
-        if func.id() == query_func_id {
-            continue;
-        }
-
-        let func_nodes: Vec<_> = std::iter::once(func.id())
-            .chain(cpg.ast_descendants(func.id()))
-            .collect();
-        let func_emb = gnn.subgraph_embedding(&func_nodes);
-        let candidate = SubgraphEmbedding::new(
-            func_nodes,
-            func_emb,
-            AggregationMethod::Mean
-        );
-
-        let similarity = query.cosine_similarity(&candidate);
-        if similarity >= threshold {
-            results.push((func.id(), similarity));
-        }
-    }
-
-    // Sort by similarity (descending)
-    results.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap());
-    results
+    let vector = gnn.subgraph_embedding(&nodes);
+    SubgraphEmbedding::new(nodes, vector, Default::default()) // AggregationMethod::Mean
 }
-```
 
-### Clustering Code
-
-```rust
-/// Cluster nodes by embedding similarity
-fn cluster_by_embedding(
-    gnn: &CpgGnn,
-    node_ids: &[NodeId],
-    num_clusters: usize,
-) -> Vec<Vec<NodeId>> {
-    // Extract embeddings
-    let embeddings: Vec<_> = node_ids.iter()
-        .filter_map(|&id| gnn.node_embedding(id).map(|e| (id, e)))
+/// Rank every other function by similarity to `query`, keeping those at or above `threshold`.
+fn find_similar(gnn: &CpgGnn, query: NodeId, threshold: f32) -> Vec<(NodeId, f32)> {
+    let q = subgraph(gnn, query);
+    let mut hits: Vec<(NodeId, f32)> = gnn
+        .cpg()
+        .functions()
+        .filter(|f| f.id != query)
+        .map(|f| (f.id, q.cosine_similarity(&subgraph(gnn, f.id))))
+        .filter(|(_, s)| *s >= threshold)
         .collect();
-
-    // Simple k-means clustering (pseudocode)
-    // In practice, use a library like linfa
-    let clusters = kmeans(&embeddings, num_clusters);
-
-    clusters
+    hits.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
+    hits
 }
 ```
 
-### Building a Search Index
+### Clustering
+
+`libcpg` does not ship a clustering routine. Extract per-node (or per-function) vectors with `gnn.node_embedding`/`gnn.subgraph_embedding`, then hand them to an external clusterer — e.g. k-means from the `linfa` ecosystem (reachable via the `ml-linfa` feature) — treating each `Array1<f32>` as a sample. The GNN's job ends at producing the vectors.
+
+## Serialization — the vector is skipped
+
+`NodeEmbedding` and `SubgraphEmbedding` derive `serde` when the `serde` feature is on, but the `vector` field is annotated `#[serde(skip)]`. Only the lightweight metadata round-trips:
+
+- `NodeEmbedding` → `node_id`, `dim`.
+- `SubgraphEmbedding` → `node_ids`, `dim`, `aggregation`.
 
 ```rust
-use std::collections::HashMap;
+// requires: features = ["gnn", "serde"]
+use libcpg::gnn::NodeEmbedding;
+use libcpg::GraphNeuralNetwork;
 
-/// Simple embedding index for similarity search
-struct EmbeddingIndex {
-    embeddings: HashMap<NodeId, Array1<f32>>,
-    dim: usize,
-}
+let emb = NodeEmbedding::new(node_id, gnn.node_embedding(node_id).expect("embedding"));
 
-impl EmbeddingIndex {
-    fn new(dim: usize) -> Self {
-        Self {
-            embeddings: HashMap::new(),
-            dim,
-        }
-    }
+let json = serde_json::to_string(&emb)?;      // stores node_id + dim only
+let restored: NodeEmbedding = serde_json::from_str(&json)?;
 
-    fn add(&mut self, id: NodeId, embedding: Array1<f32>) {
-        self.embeddings.insert(id, embedding);
-    }
-
-    fn search(&self, query: &Array1<f32>, k: usize) -> Vec<(NodeId, f32)> {
-        let mut scores: Vec<_> = self.embeddings.iter()
-            .map(|(&id, emb)| {
-                let sim = cosine_similarity(query, emb);
-                (id, sim)
-            })
-            .collect();
-
-        scores.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap());
-        scores.truncate(k);
-        scores
-    }
-}
-
-fn cosine_similarity(a: &Array1<f32>, b: &Array1<f32>) -> f32 {
-    let dot: f32 = a.iter().zip(b.iter()).map(|(x, y)| x * y).sum();
-    let norm_a: f32 = a.iter().map(|x| x * x).sum::<f32>().sqrt();
-    let norm_b: f32 = b.iter().map(|x| x * x).sum::<f32>().sqrt();
-
-    if norm_a == 0.0 || norm_b == 0.0 {
-        0.0
-    } else {
-        dot / (norm_a * norm_b)
-    }
-}
+// `restored.vector` comes back EMPTY (the field was skipped); `restored.dim` is preserved.
+// Recompute the vector from the GNN before calling norm()/cosine_similarity() on it.
 ```
 
-## Serialization
+This is a deliberate choice: embeddings are cheap to recompute from a CPG and expensive to store, and they depend on the (currently untrained) network, so the format keeps only the identifiers needed to recompute. There is **no** bespoke on-disk embedding format — round-tripping goes through your own `serde_json` (or any `serde` backend). To persist full vectors, write the `Array1<f32>` components yourself alongside the metadata.
 
-Embeddings can be serialized with the `serde` feature:
+## Related reading
 
-```rust
-#[cfg(feature = "serde")]
-{
-    // Save embeddings
-    let serialized = serde_json::to_string(&node_embedding)?;
+- [Overview](overview.md) — `CpgGnn`, configuration, and use cases.
+- [Message passing](message-passing.md) — how the vectors these types wrap are produced.
+- [Similarity metrics](../patterns/vf2-matching.md) — graph-level `GraphSimilarity` (Jaccard/Cosine/Weisfeiler-Lehman/GraphEdit), a structural alternative to embedding similarity.
+- [Theory: graph neural networks](../../theory/09-graph-neural-networks.md) and [API: pattern & analysis reference](../../api/pattern-reference.md).
 
-    // Note: vector is skipped during serialization
-    // Only metadata (node_id, dim) is saved
-    // Embeddings must be recomputed after loading
-}
-```
+## References
 
-To persist full embeddings, save the vector separately:
-
-```rust
-use std::fs::File;
-use std::io::Write;
-
-fn save_embeddings(
-    gnn: &CpgGnn,
-    node_ids: &[NodeId],
-    path: &str,
-) -> std::io::Result<()> {
-    let mut file = File::create(path)?;
-
-    for &id in node_ids {
-        if let Some(emb) = gnn.node_embedding(id) {
-            // Format: node_id,dim,values...
-            write!(file, "{},{}", id.index(), emb.len())?;
-            for val in emb.iter() {
-                write!(file, ",{}", val)?;
-            }
-            writeln!(file)?;
-        }
-    }
-
-    Ok(())
-}
-```
-
-## Performance Tips
-
-### 1. Batch Operations
-
-Process multiple nodes together when possible:
-
-```rust
-// Slower: individual queries
-for id in node_ids {
-    let emb = gnn.node_embedding(id);
-    // process...
-}
-
-// Faster: collect all embeddings first
-let embeddings: Vec<_> = node_ids.iter()
-    .filter_map(|&id| gnn.node_embedding(id).map(|e| (id, e)))
-    .collect();
-// then process...
-```
-
-### 2. Cache Subgraph Embeddings
-
-Subgraph embeddings require aggregation; cache when reusing:
-
-```rust
-use rustc_hash::FxHashMap;
-
-struct EmbeddingCache {
-    node_embeddings: FxHashMap<NodeId, Array1<f32>>,
-    subgraph_embeddings: FxHashMap<Vec<NodeId>, Array1<f32>>,
-}
-
-impl EmbeddingCache {
-    fn get_subgraph(&mut self, gnn: &CpgGnn, nodes: &[NodeId]) -> &Array1<f32> {
-        self.subgraph_embeddings.entry(nodes.to_vec())
-            .or_insert_with(|| gnn.subgraph_embedding(nodes))
-    }
-}
-```
-
-### 3. Reduce Dimensionality for Storage
-
-If storing many embeddings, consider PCA or random projection:
-
-```rust
-// Reduce 128-dim to 32-dim for storage
-fn reduce_dimension(embedding: &Array1<f32>, target_dim: usize) -> Array1<f32> {
-    // Simple random projection (in practice, use trained projection)
-    let mut result = Array1::zeros(target_dim);
-    let step = embedding.len() / target_dim;
-    for i in 0..target_dim {
-        result[i] = embedding[i * step];
-    }
-    result
-}
-```
-
-## Next Steps
-
-- [Message Passing](message-passing.md) - How embeddings are computed
-- [GNN Overview](overview.md) - Back to overview
-- [Pattern Detection](../patterns/overview.md) - Using embeddings for patterns
+1. Scarselli, F., Gori, M., Tsoi, A. C., Hagenbuchner, M., Monfardini, G. (2009). *The Graph Neural Network Model.* IEEE Transactions on Neural Networks 20(1). DOI: [10.1109/TNN.2008.2005605](https://doi.org/10.1109/TNN.2008.2005605)

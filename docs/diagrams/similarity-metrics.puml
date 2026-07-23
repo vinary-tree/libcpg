@@ -1,0 +1,13 @@
+@startmindmap
+!include _libcpg-theme.iuml
+caption GraphSimilarity — SimilarityMetric variants (weights: structural 0.7 / label 0.3)
+*[#F1F3F5] GraphSimilarity\nstructural 0.7 · label 0.3
+**[#FFF3BF] Jaccard\n(default)
+***[#FFF3BF] node-kind multiset overlap
+**[#DBE4FF] Cosine
+***[#DBE4FF] 9-element graph feature vector
+**[#E5DBFF] WeisfeilerLehman
+***[#E5DBFF] graph kernel\n3 label-refinement iterations
+**[#C3FAE8] GraphEdit
+***[#C3FAE8] approximate edit-distance blend
+@endmindmap
