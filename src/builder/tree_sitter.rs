@@ -343,7 +343,7 @@ mod tests {
         let cpg = builder.build(source, Language::Rust).expect("build should succeed");
 
         // Should have CFG entry points for both functions
-        let entry_points: Vec<_> = cpg.cfg_entries().iter().copied().collect();
+        let entry_points: Vec<_> = cpg.cfg_entries().to_vec();
         assert_eq!(entry_points.len(), 2);
     }
 
@@ -388,5 +388,204 @@ mod tests {
 
         assert!(cpg.source_code().is_some());
         assert_eq!(cpg.source_code().unwrap(), source);
+    }
+
+    // ================================================================
+    // Per-language mapper coverage: build one small snippet per grammar
+    // (under `lang-all`) and assert node_count > 1 + a plausible kind.
+    // ================================================================
+
+    /// True if the CPG carries at least one *semantic* node — not merely the
+    /// Root, an Unknown fall-through, an Error, or a Comment.
+    /// Used only by the `lang-rust`-gated tests below.
+    #[allow(dead_code)]
+    fn has_meaningful_kind(cpg: &CodePropertyGraph) -> bool {
+        cpg.nodes().any(|n| {
+            !matches!(
+                n.kind,
+                CpgNodeKind::Root
+                    | CpgNodeKind::Unknown { .. }
+                    | CpgNodeKind::Error { .. }
+                    | CpgNodeKind::Comment { .. }
+            )
+        })
+    }
+
+    #[test]
+    #[cfg(feature = "lang-go")]
+    fn build_go_maps_function() {
+        let cpg = TreeSitterCpgBuilder::new()
+            .build("package main\nfunc main() {}\n", Language::Go)
+            .expect("build go");
+        assert!(cpg.node_count() > 1);
+        assert!(cpg.functions().count() >= 1, "go `func` ⇒ Function");
+    }
+
+    #[test]
+    #[cfg(feature = "lang-java")]
+    fn build_java_maps_class() {
+        let cpg = TreeSitterCpgBuilder::new()
+            .build("class A { void m() {} }", Language::Java)
+            .expect("build java");
+        assert!(cpg.node_count() > 1);
+        assert!(cpg.classes().count() >= 1, "java `class` ⇒ Class");
+    }
+
+    #[test]
+    #[cfg(feature = "lang-c")]
+    fn build_c_maps_function() {
+        let cpg = TreeSitterCpgBuilder::new()
+            .build("int main() { return 0; }", Language::C)
+            .expect("build c");
+        assert!(cpg.node_count() > 1);
+        assert!(cpg.functions().count() >= 1, "C function ⇒ Function");
+    }
+
+    #[test]
+    #[cfg(feature = "lang-cpp")]
+    fn build_cpp_maps_function() {
+        let cpg = TreeSitterCpgBuilder::new()
+            .build("int main() { return 0; }", Language::Cpp)
+            .expect("build cpp");
+        assert!(cpg.node_count() > 1);
+        assert!(cpg.functions().count() >= 1, "C++ function ⇒ Function");
+    }
+
+    #[test]
+    #[cfg(feature = "lang-ruby")]
+    fn build_ruby_maps_method() {
+        let cpg = TreeSitterCpgBuilder::new()
+            .build("def m\n  1\nend\n", Language::Ruby)
+            .expect("build ruby");
+        assert!(cpg.node_count() > 1);
+        assert!(cpg.functions().count() >= 1, "ruby `def` ⇒ Function");
+    }
+
+    #[test]
+    #[cfg(feature = "lang-bash")]
+    fn build_bash_maps_command() {
+        let cpg = TreeSitterCpgBuilder::new()
+            .build("echo hi\n", Language::Bash)
+            .expect("build bash");
+        assert!(cpg.node_count() > 1);
+        assert!(cpg.calls().count() >= 1, "bash command ⇒ Call");
+    }
+
+    #[test]
+    #[cfg(feature = "lang-json")]
+    fn build_json_maps_meaningfully() {
+        let cpg = TreeSitterCpgBuilder::new()
+            .build("{\"a\": 1, \"b\": [true, null]}", Language::Json)
+            .expect("build json");
+        assert!(cpg.node_count() > 1);
+        assert!(has_meaningful_kind(&cpg), "json ⇒ Object/Field/Literal");
+    }
+
+    #[test]
+    #[cfg(feature = "lang-html")]
+    fn build_html_maps_meaningfully() {
+        let cpg = TreeSitterCpgBuilder::new()
+            .build("<div class=\"x\">hi</div>", Language::Html)
+            .expect("build html");
+        assert!(cpg.node_count() > 1);
+        assert!(has_meaningful_kind(&cpg), "html text/attribute ⇒ Literal/Attribute");
+    }
+
+    #[test]
+    #[cfg(feature = "lang-css")]
+    fn build_css_maps_meaningfully() {
+        let cpg = TreeSitterCpgBuilder::new()
+            .build("a { color: red; }", Language::Css)
+            .expect("build css");
+        assert!(cpg.node_count() > 1);
+        assert!(has_meaningful_kind(&cpg), "css rule ⇒ Block/Identifier/Variable");
+    }
+
+    #[test]
+    #[cfg(feature = "lang-toml")]
+    fn build_toml_maps_meaningfully() {
+        let cpg = TreeSitterCpgBuilder::new()
+            .build("a = 1\nb = \"s\"\n", Language::Toml)
+            .expect("build toml");
+        assert!(cpg.node_count() > 1);
+        assert!(has_meaningful_kind(&cpg), "toml pair ⇒ Field/Literal");
+    }
+
+    #[test]
+    #[cfg(feature = "lang-yaml")]
+    fn build_yaml_maps_meaningfully() {
+        let cpg = TreeSitterCpgBuilder::new()
+            .build("a: 1\nb: s\n", Language::Yaml)
+            .expect("build yaml");
+        assert!(cpg.node_count() > 1);
+        assert!(has_meaningful_kind(&cpg), "yaml mapping ⇒ Field/Literal");
+    }
+
+    #[test]
+    #[cfg(feature = "lang-markdown")]
+    fn build_markdown_maps_meaningfully() {
+        let cpg = TreeSitterCpgBuilder::new()
+            .build("# Title\n\nSome text.\n", Language::Markdown)
+            .expect("build markdown");
+        assert!(cpg.node_count() > 1);
+        assert!(has_meaningful_kind(&cpg), "markdown section/paragraph ⇒ Block");
+    }
+}
+
+#[cfg(all(test, feature = "lang-rust"))]
+mod proptests {
+    use super::*;
+    use crate::testutil::*;
+    use proptest::prelude::*;
+
+    proptest! {
+        #![proptest_config(ProptestConfig::with_cases(64))]
+
+        /// `build` ≡ `build_from_tree`: a caller-supplied tree (parsed with
+        /// `tree_sitter_rust::LANGUAGE`) yields a graph identical in node count,
+        /// edge count, and language to the internal-parse path.
+        #[test]
+        fn prop_build_eq_build_from_tree(src in arb_rust_source()) {
+            let mut parser = tree_sitter::Parser::new();
+            parser
+                .set_language(&tree_sitter_rust::LANGUAGE.into())
+                .expect("set rust grammar");
+            let tree = parser.parse(&src, None).expect("parse");
+
+            let builder = TreeSitterCpgBuilder::new();
+            let from_tree = builder
+                .build_from_tree(&tree, &src, Language::Rust)
+                .expect("build_from_tree");
+            let from_source = builder.build(&src, Language::Rust).expect("build");
+
+            prop_assert_eq!(from_tree.node_count(), from_source.node_count());
+            prop_assert_eq!(from_tree.edge_count(), from_source.edge_count());
+            prop_assert_eq!(from_tree.language(), from_source.language());
+            prop_assert_eq!(from_tree.language(), Language::Rust);
+        }
+
+        /// Parent ↔ AstChild consistency in a `build`-produced CPG: every
+        /// `AstChild` edge `p→c` has `node(c).parent == Some(p)`, and no node has
+        /// more than one incoming AST-child (parent) edge.
+        #[test]
+        fn prop_parent_astchild_consistent(src in arb_rust_source()) {
+            let cpg = TreeSitterCpgBuilder::new()
+                .build(&src, Language::Rust)
+                .expect("build");
+
+            for e in cpg.edges() {
+                if matches!(e.kind, CpgEdgeKind::AstChild) {
+                    let child = cpg.node(e.target).expect("edge target exists");
+                    prop_assert_eq!(child.parent, Some(e.source));
+                }
+            }
+            for id in cpg.node_ids() {
+                let ast_parents = cpg
+                    .incoming_edges(id)
+                    .filter(|e| matches!(e.kind, CpgEdgeKind::AstChild))
+                    .count();
+                prop_assert!(ast_parents <= 1);
+            }
+        }
     }
 }

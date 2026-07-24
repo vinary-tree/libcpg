@@ -1,0 +1,9 @@
+# Coverage aliases (cargo-llvm-cov + llvm-tools + cargo-nextest are installed).
+# The full test matrix needs the `full` feature set plus the Mode-B `rholang`
+# and `metta` toggles (which `full` deliberately excludes); `--all-features`
+# would additionally pull the reserved `gpu` and heavy `ml-linfa` stacks.
+[alias]
+cov = ["llvm-cov", "--branch", "--features", "full rholang metta", "--html", "--output-dir", "target/coverage"]
+cov-text = ["llvm-cov", "--branch", "--features", "full rholang metta", "--summary-only"]
+cov-open = ["llvm-cov", "--branch", "--features", "full rholang metta", "--html", "--open"]
+cov-nextest = ["llvm-cov", "nextest", "--branch", "--features", "full rholang metta", "--summary-only"]

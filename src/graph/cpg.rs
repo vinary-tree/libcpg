@@ -215,6 +215,29 @@ impl CodePropertyGraph {
         self.add_edge(edge)
     }
 
+    /// Connects `source` to `target` with `kind`, but only if no identical edge
+    /// (same endpoints and same kind) already exists.
+    ///
+    /// This makes repeated calls idempotent: re-running a builder that uses it
+    /// adds no duplicate edges. Returns the id of the existing or newly-created
+    /// edge, or `None` if either endpoint is absent.
+    pub fn connect_unique(
+        &mut self,
+        source: NodeId,
+        target: NodeId,
+        kind: CpgEdgeKind,
+    ) -> Option<EdgeId> {
+        let existing = self
+            .edges_between(source, target)
+            .into_iter()
+            .find(|e| e.kind == kind)
+            .map(|e| e.id);
+        match existing {
+            Some(id) => Some(id),
+            None => self.connect(source, target, kind),
+        }
+    }
+
     /// Returns edges between two nodes.
     pub fn edges_between(&self, source: NodeId, target: NodeId) -> Vec<&CpgEdge> {
         let source_idx = match self.node_index_map.get(&source) {
@@ -263,14 +286,23 @@ impl CodePropertyGraph {
     }
 
     /// Returns AST descendants of a node (depth-first).
+    ///
+    /// A `visited` set guards against cycles in `AstChild` edges (which a
+    /// well-formed, parser-built AST never has, but a hand-constructed graph
+    /// might): each node is emitted at most once and the traversal always
+    /// terminates.
     pub fn ast_descendants(&self, id: NodeId) -> Vec<NodeId> {
         let mut result = Vec::new();
+        let mut visited: rustc_hash::FxHashSet<NodeId> = rustc_hash::FxHashSet::default();
+        visited.insert(id);
         let mut stack = vec![id];
 
         while let Some(current) = stack.pop() {
             for child in self.ast_children(current) {
-                result.push(child);
-                stack.push(child);
+                if visited.insert(child) {
+                    result.push(child);
+                    stack.push(child);
+                }
             }
         }
 
@@ -278,11 +310,26 @@ impl CodePropertyGraph {
     }
 
     /// Returns AST ancestors of a node (towards root).
+    ///
+    /// A `visited` set guards against cycles in the parent-pointer chain, so the
+    /// walk always terminates even on a malformed graph.
     pub fn ast_ancestors(&self, id: NodeId) -> Vec<NodeId> {
         let mut result = Vec::new();
+        let mut visited: rustc_hash::FxHashSet<NodeId> = rustc_hash::FxHashSet::default();
+        visited.insert(id);
         let mut current = self.ast_parent(id);
 
         while let Some(parent) = current {
+            // A hand-built graph may hold a parent pointer to a node that was
+            // never added. Such an id is not an ancestor — it is not in the
+            // graph at all — so the chain ends here rather than handing the
+            // caller an id that `node()` will not resolve.
+            if self.node(parent).is_none() {
+                break;
+            }
+            if !visited.insert(parent) {
+                break; // cycle detected
+            }
             result.push(parent);
             current = self.ast_parent(parent);
         }
@@ -542,22 +589,41 @@ impl CodePropertyGraph {
     // ========== Graph Metrics ==========
 
     /// Returns the depth of the AST (longest path from root).
+    ///
+    /// The recursion tracks the current root-to-node path in `visited` so a
+    /// cyclic `AstChild` edge cannot cause unbounded recursion (stack overflow);
+    /// a node already on the path is treated as a leaf. For a well-formed tree
+    /// this is exactly the longest root-to-leaf path.
     pub fn ast_depth(&self) -> usize {
         let root = match self.root {
             Some(r) => r,
             None => return 0,
         };
 
-        fn depth_from(cpg: &CodePropertyGraph, id: NodeId) -> usize {
+        fn depth_from(
+            cpg: &CodePropertyGraph,
+            id: NodeId,
+            visited: &mut rustc_hash::FxHashSet<NodeId>,
+        ) -> usize {
+            if !visited.insert(id) {
+                return 0; // already on the current path: cycle, stop descending
+            }
             let children = cpg.ast_children(id);
-            if children.is_empty() {
+            let depth = if children.is_empty() {
                 1
             } else {
-                1 + children.iter().map(|&c| depth_from(cpg, c)).max().unwrap_or(0)
-            }
+                1 + children
+                    .iter()
+                    .map(|&c| depth_from(cpg, c, visited))
+                    .max()
+                    .unwrap_or(0)
+            };
+            visited.remove(&id);
+            depth
         }
 
-        depth_from(self, root)
+        let mut visited: rustc_hash::FxHashSet<NodeId> = rustc_hash::FxHashSet::default();
+        depth_from(self, root, &mut visited)
     }
 
     /// Returns the cyclomatic complexity (number of linearly independent paths).
@@ -768,5 +834,705 @@ mod tests {
 
         let successors = cpg.cfg_successors(entry);
         assert_eq!(successors.len(), 2);
+    }
+}
+
+#[cfg(test)]
+mod ext_tests {
+    use super::*;
+    use crate::graph::{MethodSignature, ScopeId, Visibility};
+    use crate::CfgExtractor;
+
+    fn mk(kind: CpgNodeKind) -> CpgNode {
+        CpgNode::new(NodeId::new(0), kind, SourceRange::default())
+    }
+
+    fn mk_r(kind: CpgNodeKind, start: u32, end: u32) -> CpgNode {
+        CpgNode::new(NodeId::new(0), kind, SourceRange::from_bytes(start, end))
+    }
+
+    fn func(name: &str) -> CpgNodeKind {
+        CpgNodeKind::Function {
+            signature: MethodSignature {
+                name: name.into(),
+                params: Default::default(),
+                return_type: None,
+                is_static: false,
+                is_async: false,
+                visibility: Visibility::Public,
+            },
+        }
+    }
+
+    fn block() -> CpgNodeKind {
+        CpgNodeKind::Block { scope: ScopeId::GLOBAL }
+    }
+
+    /// Wires an AST child edge (edges alone suffice for `ast_children`).
+    fn ast_edge(g: &mut CodePropertyGraph, parent: NodeId, child: NodeId) {
+        g.connect(parent, child, CpgEdgeKind::AstChild);
+    }
+
+    #[test]
+    fn cyclomatic_no_cfg_is_one() {
+        let mut g = CodePropertyGraph::new(Language::Rust);
+        let a = g.add_node(mk(CpgNodeKind::Root));
+        let b = g.add_node(mk(CpgNodeKind::Return));
+        ast_edge(&mut g, a, b); // only AST, no CFG edges
+        assert_eq!(g.cyclomatic_complexity(), 1);
+
+        let empty = CodePropertyGraph::new(Language::Rust);
+        assert_eq!(empty.cyclomatic_complexity(), 1);
+    }
+
+    #[test]
+    fn cyclomatic_diamond_is_two() {
+        let mut g = CodePropertyGraph::new(Language::Rust);
+        let entry = g.add_node(mk(CpgNodeKind::If));
+        let then_b = g.add_node(mk(block()));
+        let else_b = g.add_node(mk(block()));
+        let merge = g.add_node(mk(block()));
+        g.connect(entry, then_b, CpgEdgeKind::ControlFlow(CfgEdgeKind::ConditionalTrue));
+        g.connect(entry, else_b, CpgEdgeKind::ControlFlow(CfgEdgeKind::ConditionalFalse));
+        g.connect(then_b, merge, CpgEdgeKind::ControlFlow(CfgEdgeKind::Sequential));
+        g.connect(else_b, merge, CpgEdgeKind::ControlFlow(CfgEdgeKind::Sequential));
+        // 4 CFG edges, 4 CFG nodes -> 4 - 4 + 2 = 2.
+        assert_eq!(g.cyclomatic_complexity(), 2);
+    }
+
+    #[test]
+    fn cyclomatic_dense_uses_documented_formula() {
+        let mut g = CodePropertyGraph::new(Language::Rust);
+        let a = g.add_node(mk(block()));
+        let b = g.add_node(mk(block()));
+        let c = g.add_node(mk(block()));
+        // 5 CFG edges across 3 CFG nodes -> 5 - 3 + 2 = 4.
+        g.connect(a, b, CpgEdgeKind::ControlFlow(CfgEdgeKind::Sequential));
+        g.connect(b, c, CpgEdgeKind::ControlFlow(CfgEdgeKind::Sequential));
+        g.connect(c, a, CpgEdgeKind::ControlFlow(CfgEdgeKind::LoopBack));
+        g.connect(a, c, CpgEdgeKind::ControlFlow(CfgEdgeKind::ConditionalTrue));
+        g.connect(b, a, CpgEdgeKind::ControlFlow(CfgEdgeKind::ConditionalFalse));
+        assert_eq!(g.cyclomatic_complexity(), 4);
+    }
+
+    #[test]
+    fn stats_all_fields() {
+        let mut g = CodePropertyGraph::new(Language::Rust);
+        let f = g.add_node(mk(func("f"))); // Function (also the root)
+        let blk = g.add_node(mk(block()));
+        let cls = g.add_node(mk(CpgNodeKind::Class { name: "C".into(), is_abstract: false }));
+        let call = g.add_node(mk(CpgNodeKind::Call { target: None, is_method: false }));
+        let var = g.add_node(mk(CpgNodeKind::Variable {
+            name: "v".into(),
+            var_type: None,
+            scope: ScopeId::GLOBAL,
+            is_mutable: false,
+        }));
+        let idn = g.add_node(mk(CpgNodeKind::Identifier { name: "x".into(), definition: None }));
+
+        // 4 AST edges.
+        g.connect(f, blk, CpgEdgeKind::AstChild);
+        g.connect(f, cls, CpgEdgeKind::AstChild);
+        g.connect(blk, call, CpgEdgeKind::AstChild);
+        g.connect(blk, var, CpgEdgeKind::AstChild);
+        // 1 CFG edge (f, blk are the only CFG nodes).
+        g.connect(f, blk, CpgEdgeKind::ControlFlow(CfgEdgeKind::Sequential));
+        // 1 DFG edge.
+        g.connect(var, idn, CpgEdgeKind::DataFlow(DfgEdgeKind::DefUse));
+        // 1 call edge.
+        g.connect(call, f, CpgEdgeKind::CallSite);
+
+        let s = g.stats();
+        assert_eq!(s.node_count, 6);
+        assert_eq!(s.edge_count, 7);
+        assert_eq!(s.ast_edges, 4);
+        assert_eq!(s.cfg_edges, 1);
+        assert_eq!(s.dfg_edges, 1);
+        assert_eq!(s.call_edges, 1);
+        assert_eq!(s.function_count, 1);
+        assert_eq!(s.class_count, 1);
+        assert_eq!(s.cyclomatic_complexity, g.cyclomatic_complexity());
+        // cfg_nodes = {f, blk} -> 1.saturating_sub(2) + 2 = 2.
+        assert_eq!(s.cyclomatic_complexity, 2);
+    }
+
+    #[test]
+    fn subgraph_full_preserves_everything() {
+        let mut g = CodePropertyGraph::new(Language::Rust);
+        let a = g.add_node(mk(CpgNodeKind::Root));
+        let b = g.add_node(mk(CpgNodeKind::Return));
+        let c = g.add_node(mk(CpgNodeKind::Break));
+        g.connect(a, b, CpgEdgeKind::AstChild);
+        g.connect(a, c, CpgEdgeKind::AstChild);
+
+        let ids: Vec<NodeId> = g.node_ids().collect();
+        let sub = g.subgraph(&ids);
+        assert_eq!(sub.node_count(), g.node_count());
+        assert_eq!(sub.edge_count(), g.edge_count());
+        for id in g.node_ids() {
+            assert_eq!(
+                sub.node(id).map(|n| n.kind.clone()),
+                g.node(id).map(|n| n.kind.clone())
+            );
+        }
+    }
+
+    #[test]
+    fn subgraph_subset_keeps_internal_edges_only() {
+        let mut g = CodePropertyGraph::new(Language::Rust);
+        let a = g.add_node(mk(CpgNodeKind::Root));
+        let b = g.add_node(mk(CpgNodeKind::Return));
+        let c = g.add_node(mk(CpgNodeKind::Break));
+        g.connect(a, b, CpgEdgeKind::AstChild); // internal to {a, b}
+        g.connect(b, c, CpgEdgeKind::AstChild); // leaves {a, b}
+
+        let sub = g.subgraph(&[a, b]);
+        assert_eq!(sub.node_count(), 2);
+        assert_eq!(sub.edge_count(), 1); // only a -> b survives
+        assert!(sub.contains_node(a));
+        assert!(sub.contains_node(b));
+        assert!(!sub.contains_node(c));
+    }
+
+    #[test]
+    fn function_cfg_keeps_control_and_expression_nodes() {
+        let mut g = CodePropertyGraph::new(Language::Rust);
+        let f = g.add_node(mk(func("f")));
+        let blk = g.add_node(mk(block()));
+        let iff = g.add_node(mk(CpgNodeKind::If));
+        let idn = g.add_node(mk(CpgNodeKind::Identifier { name: "x".into(), definition: None }));
+        let var = g.add_node(mk(CpgNodeKind::Variable {
+            name: "v".into(),
+            var_type: None,
+            scope: ScopeId::GLOBAL,
+            is_mutable: false,
+        }));
+        let call = g.add_node(mk(CpgNodeKind::Call { target: None, is_method: false }));
+        ast_edge(&mut g, f, blk);
+        ast_edge(&mut g, blk, iff);
+        ast_edge(&mut g, iff, idn);
+        ast_edge(&mut g, blk, var);
+        ast_edge(&mut g, blk, call);
+
+        let cfg = g.function_cfg(f);
+        // Kept: f (always pushed), iff (control flow), idn + call (expressions).
+        assert!(cfg.contains_node(f));
+        assert!(cfg.contains_node(iff));
+        assert!(cfg.contains_node(idn));
+        assert!(cfg.contains_node(call));
+        // Dropped: blk (neither) and var (a declaration).
+        assert!(!cfg.contains_node(blk));
+        assert!(!cfg.contains_node(var));
+        assert_eq!(cfg.node_count(), 4);
+        // The only internal AST edge among the kept nodes is iff -> idn.
+        assert_eq!(cfg.edge_count(), 1);
+    }
+
+    #[test]
+    fn function_dfg_keeps_only_dataflow_nodes() {
+        let mut g = CodePropertyGraph::new(Language::Rust);
+        let f = g.add_node(mk(func("f")));
+        let blk = g.add_node(mk(block()));
+        let def = g.add_node(mk(CpgNodeKind::Variable {
+            name: "v".into(),
+            var_type: None,
+            scope: ScopeId::GLOBAL,
+            is_mutable: false,
+        }));
+        let use_site = g.add_node(mk(CpgNodeKind::Identifier { name: "v".into(), definition: None }));
+        let other = g.add_node(mk(CpgNodeKind::Return));
+        ast_edge(&mut g, f, blk);
+        ast_edge(&mut g, blk, def);
+        ast_edge(&mut g, blk, use_site);
+        ast_edge(&mut g, blk, other);
+        g.connect(def, use_site, CpgEdgeKind::DataFlow(DfgEdgeKind::DefUse));
+
+        let dfg = g.function_dfg(f);
+        assert!(dfg.contains_node(def));
+        assert!(dfg.contains_node(use_site));
+        assert!(!dfg.contains_node(other)); // no DFG edge
+        assert!(!dfg.contains_node(blk)); // no DFG edge
+        assert!(!dfg.contains_node(f)); // the function is not among its own descendants
+        assert_eq!(dfg.node_count(), 2);
+        assert_eq!(dfg.edge_count(), 1);
+    }
+
+    #[test]
+    fn ast_depth_linear_and_empty() {
+        let empty = CodePropertyGraph::new(Language::Rust);
+        assert_eq!(empty.ast_depth(), 0);
+
+        let mut g = CodePropertyGraph::new(Language::Rust);
+        let a = g.add_node(mk(CpgNodeKind::Root));
+        assert_eq!(g.ast_depth(), 1); // a single node
+        let b = g.add_node(mk(block()));
+        let c = g.add_node(mk(CpgNodeKind::Return));
+        ast_edge(&mut g, a, b);
+        ast_edge(&mut g, b, c);
+        assert_eq!(g.ast_depth(), 3); // a -> b -> c
+    }
+
+    #[test]
+    fn ast_depth_terminates_on_cycle() {
+        let mut g = CodePropertyGraph::new(Language::Rust);
+        let a = g.add_node(mk(CpgNodeKind::Root)); // root = a (first node)
+        let b = g.add_node(mk(block()));
+        ast_edge(&mut g, a, b);
+        ast_edge(&mut g, b, a); // cycle a -> b -> a
+        ast_edge(&mut g, a, a); // self-loop
+        // The visited-set guard makes this terminate; the value stays bounded.
+        let d = g.ast_depth();
+        assert!(d >= 1);
+        assert!(d <= g.node_count());
+    }
+
+    #[test]
+    fn node_at_offset_picks_smallest_enclosing() {
+        let mut g = CodePropertyGraph::new(Language::Rust);
+        let big = g.add_node(mk_r(CpgNodeKind::Root, 0, 100));
+        let mid = g.add_node(mk_r(block(), 10, 20));
+        let small = g.add_node(mk_r(block(), 50, 60));
+        assert_eq!(g.node_at_offset(15).map(|n| n.id), Some(mid));
+        assert_eq!(g.node_at_offset(55).map(|n| n.id), Some(small));
+        assert_eq!(g.node_at_offset(5).map(|n| n.id), Some(big));
+        assert!(g.node_at_offset(200).is_none());
+    }
+
+    #[test]
+    fn nodes_in_range_returns_overlaps() {
+        let mut g = CodePropertyGraph::new(Language::Rust);
+        let a = g.add_node(mk_r(CpgNodeKind::Root, 0, 100));
+        let b = g.add_node(mk_r(CpgNodeKind::Return, 10, 20));
+        let c = g.add_node(mk_r(CpgNodeKind::Break, 50, 60));
+
+        // [21, 49) overlaps only the enclosing `a`.
+        let hits: Vec<NodeId> = g
+            .nodes_in_range(SourceRange::from_bytes(21, 49))
+            .into_iter()
+            .map(|n| n.id)
+            .collect();
+        assert_eq!(hits, vec![a]);
+
+        // [0, 100) overlaps all three.
+        let mut all: Vec<NodeId> = g
+            .nodes_in_range(SourceRange::from_bytes(0, 100))
+            .into_iter()
+            .map(|n| n.id)
+            .collect();
+        all.sort_by_key(|id| id.0);
+        assert_eq!(all, vec![a, b, c]);
+    }
+
+    #[test]
+    fn scope_at_offset_only_blocks_and_functions() {
+        let mut g = CodePropertyGraph::new(Language::Rust);
+        let f = g.add_node(mk_r(func("f"), 0, 100));
+        let blk = g.add_node(mk_r(block(), 10, 50));
+        let _idn =
+            g.add_node(mk_r(CpgNodeKind::Identifier { name: "x".into(), definition: None }, 20, 30));
+        // At 25 the innermost *scope* is the block (the identifier is not a scope).
+        assert_eq!(g.scope_at_offset(25).map(|n| n.id), Some(blk));
+        // At 5 only the function encloses.
+        assert_eq!(g.scope_at_offset(5).map(|n| n.id), Some(f));
+        assert!(g.scope_at_offset(200).is_none());
+    }
+
+    #[test]
+    fn edges_by_kind_filters() {
+        let mut g = CodePropertyGraph::new(Language::Rust);
+        let a = g.add_node(mk(CpgNodeKind::Root));
+        let b = g.add_node(mk(CpgNodeKind::Return));
+        g.connect(a, b, CpgEdgeKind::AstChild);
+        g.connect(a, b, CpgEdgeKind::ControlFlow(CfgEdgeKind::Sequential));
+        g.connect(a, b, CpgEdgeKind::DataFlow(DfgEdgeKind::DefUse));
+        assert_eq!(g.edges_by_kind(|k| k.is_ast()).count(), 1);
+        assert_eq!(g.edges_by_kind(|k| k.is_cfg()).count(), 1);
+        assert_eq!(g.edges_by_kind(|k| k.is_dfg()).count(), 1);
+        assert_eq!(g.edges_by_kind(|k| k.is_call()).count(), 0);
+    }
+
+    #[test]
+    fn call_graph_queries() {
+        let mut g = CodePropertyGraph::new(Language::Rust);
+        let f = g.add_node(mk(func("f")));
+        let blk = g.add_node(mk(block()));
+        let call = g.add_node(mk(CpgNodeKind::Call { target: None, is_method: false }));
+        let g2 = g.add_node(mk(func("g")));
+        ast_edge(&mut g, f, blk);
+        ast_edge(&mut g, blk, call);
+        g.connect(call, g2, CpgEdgeKind::CallSite);
+
+        assert_eq!(g.call_sites(f), vec![call]);
+        assert_eq!(g.callees(call), vec![g2]);
+        assert_eq!(g.callers(g2), vec![call]);
+        assert!(g.callers(f).is_empty());
+    }
+
+    #[test]
+    fn query_by_kind() {
+        let mut g = CodePropertyGraph::new(Language::Rust);
+        g.add_node(mk(CpgNodeKind::Class { name: "C".into(), is_abstract: false }));
+        g.add_node(mk(CpgNodeKind::Class { name: "D".into(), is_abstract: true }));
+        g.add_node(mk(CpgNodeKind::Variable {
+            name: "v".into(),
+            var_type: None,
+            scope: ScopeId::GLOBAL,
+            is_mutable: false,
+        }));
+        g.add_node(mk(CpgNodeKind::Call { target: None, is_method: false }));
+        g.add_node(mk(func("f")));
+        assert_eq!(g.classes().count(), 2);
+        assert_eq!(g.variables().count(), 1);
+        assert_eq!(g.calls().count(), 1);
+        assert_eq!(g.functions().count(), 1);
+        assert_eq!(g.nodes_by_kind(|k| matches!(k, CpgNodeKind::Class { .. })).count(), 2);
+        assert_eq!(g.nodes_by_kind(|k| matches!(k, CpgNodeKind::Return)).count(), 0);
+    }
+
+    #[test]
+    fn add_node_with_id_advances_counter() {
+        let mut g = CodePropertyGraph::new(Language::Rust);
+        let id5 = g.add_node_with_id(CpgNode::new(
+            NodeId::new(5),
+            CpgNodeKind::Root,
+            SourceRange::default(),
+        ));
+        assert_eq!(id5, NodeId::new(5));
+        assert!(g.contains_node(NodeId::new(5)));
+        assert_eq!(g.root(), Some(NodeId::new(5))); // first node becomes the root
+        // The auto-assigned id must be strictly greater than the reserved id.
+        let auto = g.add_node(mk(CpgNodeKind::Return));
+        assert_eq!(auto, NodeId::new(6));
+    }
+
+    #[test]
+    fn add_edge_with_id_advances_counter() {
+        let mut g = CodePropertyGraph::new(Language::Rust);
+        let a = g.add_node(mk(CpgNodeKind::Root));
+        let b = g.add_node(mk(CpgNodeKind::Return));
+        let e10 = g.add_edge_with_id(CpgEdge::new(EdgeId::new(10), a, b, CpgEdgeKind::AstChild));
+        assert_eq!(e10, Some(EdgeId::new(10)));
+        assert_eq!(g.edge_count(), 1);
+        let auto = g.connect(a, b, CpgEdgeKind::AstNextSibling);
+        assert_eq!(auto, Some(EdgeId::new(11)));
+        // An edge referencing a missing endpoint is rejected.
+        let bad =
+            g.add_edge_with_id(CpgEdge::new(EdgeId::new(20), a, NodeId::new(999), CpgEdgeKind::AstChild));
+        assert_eq!(bad, None);
+    }
+
+    #[test]
+    fn edges_between_returns_all_kinds() {
+        let mut g = CodePropertyGraph::new(Language::Rust);
+        let a = g.add_node(mk(CpgNodeKind::Root));
+        let b = g.add_node(mk(CpgNodeKind::Return));
+        g.connect(a, b, CpgEdgeKind::AstChild);
+        g.connect(a, b, CpgEdgeKind::ControlFlow(CfgEdgeKind::Sequential));
+        assert_eq!(g.edges_between(a, b).len(), 2);
+        // Edges are directed: nothing runs b -> a.
+        assert!(g.edges_between(b, a).is_empty());
+        // A missing endpoint yields no edges.
+        assert!(g.edges_between(a, NodeId::new(999)).is_empty());
+    }
+
+    #[test]
+    fn connect_unique_is_idempotent() {
+        let mut g = CodePropertyGraph::new(Language::Rust);
+        let a = g.add_node(mk(CpgNodeKind::Root));
+        let b = g.add_node(mk(CpgNodeKind::Return));
+        let e1 = g.connect_unique(a, b, CpgEdgeKind::AstChild);
+        let e2 = g.connect_unique(a, b, CpgEdgeKind::AstChild);
+        assert_eq!(e1, e2); // the same edge id is returned
+        assert_eq!(g.edge_count(), 1); // and no duplicate is created
+        // A different kind between the same endpoints IS added.
+        g.connect_unique(a, b, CpgEdgeKind::ControlFlow(CfgEdgeKind::Sequential));
+        assert_eq!(g.edge_count(), 2);
+        // A missing endpoint returns None and changes nothing.
+        assert_eq!(g.connect_unique(a, NodeId::new(999), CpgEdgeKind::AstChild), None);
+        assert_eq!(g.edge_count(), 2);
+    }
+
+    #[test]
+    fn cfg_extractor_extract_is_idempotent() {
+        // A minimal well-formed function: f -> block -> return.
+        let mut g = CodePropertyGraph::new(Language::Rust);
+        let f = g.add_node(mk(func("f")));
+        let blk = g.add_node(mk(block()));
+        let ret = g.add_node(mk(CpgNodeKind::Return));
+        ast_edge(&mut g, f, blk);
+        ast_edge(&mut g, blk, ret);
+
+        let extractor = CfgExtractor::new();
+        extractor.extract(&mut g);
+        let after_first = g.edge_count();
+        extractor.extract(&mut g);
+        let after_second = g.edge_count();
+        assert_eq!(
+            after_first, after_second,
+            "CFG extraction routes through connect_unique and must be idempotent"
+        );
+    }
+
+    #[test]
+    fn clone_preserves_shape_and_is_independent() {
+        let mut g = CodePropertyGraph::new(Language::Rust);
+        let a = g.add_node(mk(func("f")));
+        let b = g.add_node(mk(CpgNodeKind::Return));
+        g.connect(a, b, CpgEdgeKind::AstChild);
+
+        let c = g.clone();
+        assert_eq!(c.node_count(), g.node_count());
+        assert_eq!(c.edge_count(), g.edge_count());
+        assert_eq!(c.language(), g.language());
+        for id in g.node_ids() {
+            assert_eq!(
+                c.node(id).map(|n| n.kind.clone()),
+                g.node(id).map(|n| n.kind.clone())
+            );
+        }
+
+        // Mutating the clone leaves the original untouched.
+        let mut c2 = c;
+        c2.add_node(mk(CpgNodeKind::Break));
+        assert_eq!(g.node_count(), 2);
+        assert_eq!(c2.node_count(), 3);
+    }
+
+    #[test]
+    fn default_is_empty_unknown() {
+        let g = CodePropertyGraph::default();
+        assert_eq!(g.node_count(), 0);
+        assert_eq!(g.edge_count(), 0);
+        assert_eq!(g.language(), Language::Unknown);
+        assert!(g.root().is_none());
+    }
+}
+
+/// REGRESSION: `ast_ancestors` follows raw `parent` pointers. A hand-built
+/// graph may point at a node that was never added, and the walk used to return
+/// that id — handing the caller an "ancestor" that `node()` cannot resolve.
+/// Found by the `tests/robustness.rs` corruption suite.
+#[cfg(test)]
+mod dangling_parent_regression {
+    use super::*;
+    use crate::{CpgNode, Language, ScopeId, SourceRange};
+
+    #[test]
+    fn ast_ancestors_stops_at_a_dangling_parent() {
+        let mut cpg = CodePropertyGraph::new(Language::Rust);
+        let root = cpg.add_node(CpgNode::new(
+            NodeId::new(0),
+            CpgNodeKind::Block { scope: ScopeId::GLOBAL },
+            SourceRange::default(),
+        ));
+        let child = cpg.add_node(CpgNode::new(
+            NodeId::new(0),
+            CpgNodeKind::Return,
+            SourceRange::default(),
+        ));
+        cpg.connect(root, child, CpgEdgeKind::AstChild);
+        cpg.node_mut(child).expect("child").parent = Some(root);
+        // The root's parent points at a node that does not exist.
+        let absent = NodeId::new(9_999);
+        cpg.node_mut(root).expect("root").parent = Some(absent);
+        assert!(cpg.node(absent).is_none(), "the id really is absent");
+
+        let ancestors = cpg.ast_ancestors(child);
+        assert_eq!(ancestors, vec![root], "the chain stops before the absent id");
+        for id in &ancestors {
+            assert!(cpg.node(*id).is_some(), "every ancestor resolves");
+        }
+        // The raw accessor still reports the pointer as stored.
+        assert_eq!(cpg.ast_parent(root), Some(absent));
+    }
+}
+
+#[cfg(test)]
+mod proptests {
+    use super::*;
+    use crate::testutil::*;
+    use crate::CfgExtractor;
+    use proptest::prelude::*;
+
+    proptest! {
+        #![proptest_config(ProptestConfig::with_cases(256))]
+
+        #[test]
+        fn prop_add_node_count(kinds in prop::collection::vec(arb_node_kind(), 0..=16)) {
+            let mut g = CodePropertyGraph::new(Language::Rust);
+            let n = kinds.len();
+            for k in kinds {
+                g.add_node(CpgNode::new(NodeId::new(0), k, SourceRange::default()));
+            }
+            prop_assert_eq!(g.node_count(), n);
+            prop_assert_eq!(g.node_ids().count(), n);
+            for id in g.node_ids() {
+                prop_assert!(g.node(id).is_some());
+            }
+        }
+
+        #[test]
+        fn prop_node_ids_resolve(g in arb_cpg_raw()) {
+            prop_assert_eq!(g.node_ids().count(), g.node_count());
+            for id in g.node_ids() {
+                prop_assert!(g.node(id).is_some());
+            }
+        }
+
+        #[test]
+        fn prop_ast_children_match_child_list(g in arb_well_formed_cpg()) {
+            // `wf_child` appends to `children` and inserts the AstChild edge in
+            // the same order, so the edge-id-ordered `ast_children` reproduces
+            // the stored child list exactly.
+            for id in g.node_ids() {
+                let listed: Vec<NodeId> = g.node(id).expect("node").children.to_vec();
+                prop_assert_eq!(g.ast_children(id), listed);
+            }
+        }
+
+        #[test]
+        fn prop_subgraph_full_is_isomorphic(g in arb_well_formed_cpg()) {
+            let ids: Vec<NodeId> = g.node_ids().collect();
+            let sub = g.subgraph(&ids);
+            prop_assert_eq!(sub.node_count(), g.node_count());
+            prop_assert_eq!(sub.edge_count(), g.edge_count());
+            for id in g.node_ids() {
+                prop_assert_eq!(
+                    sub.node(id).map(|n| n.kind.clone()),
+                    g.node(id).map(|n| n.kind.clone())
+                );
+            }
+        }
+
+        #[test]
+        fn prop_ast_depth_bounds(g in arb_well_formed_cpg()) {
+            let d = g.ast_depth();
+            prop_assert!(d >= 1);
+            prop_assert!(d <= g.node_count());
+        }
+
+        #[test]
+        fn prop_cyclomatic_matches_formula(g in arb_well_formed_cpg()) {
+            let mut g = g;
+            CfgExtractor::new().extract(&mut g);
+            let cfg_edges = g.edges_by_kind(|k| k.is_cfg()).count();
+            let cfg_nodes = g.cfg_nodes().count();
+            let expected = if cfg_nodes == 0 {
+                1
+            } else {
+                cfg_edges.saturating_sub(cfg_nodes) + 2
+            };
+            prop_assert_eq!(g.cyclomatic_complexity(), expected);
+            prop_assert!(g.cyclomatic_complexity() >= 1);
+        }
+
+        #[test]
+        fn prop_stats_consistency(g in arb_cpg_raw()) {
+            let s = g.stats();
+            prop_assert_eq!(s.node_count, g.node_count());
+            prop_assert_eq!(s.edge_count, g.edge_count());
+            prop_assert!(
+                s.ast_edges + s.cfg_edges + s.dfg_edges + s.call_edges <= g.edge_count()
+            );
+            prop_assert_eq!(s.function_count, g.functions().count());
+            prop_assert_eq!(s.class_count, g.classes().count());
+            prop_assert_eq!(s.cyclomatic_complexity, g.cyclomatic_complexity());
+        }
+
+        #[test]
+        fn prop_connect_unique_idempotent(g in arb_cpg_raw()) {
+            let mut g = g;
+            let ids: Vec<NodeId> = g.node_ids().collect();
+            // `arb_cpg_raw` always produces at least one node.
+            let s = ids[0];
+            let t = ids[ids.len() - 1];
+            g.connect_unique(s, t, CpgEdgeKind::TypeOf);
+            let after_first = g.edge_count();
+            g.connect_unique(s, t, CpgEdgeKind::TypeOf);
+            prop_assert_eq!(g.edge_count(), after_first);
+        }
+    }
+}
+
+#[cfg(all(test, feature = "serde"))]
+mod serde_tests {
+    use super::*;
+    use crate::testutil::*;
+    use proptest::prelude::*;
+
+    /// The full `arb_cpg_raw` strategy — no float exclusion. `serde_json` is
+    /// built with the `float_roundtrip` feature, so finite float literals
+    /// round-trip exactly through a whole-graph JSON serialization.
+    fn arb_serdeable_cpg() -> impl Strategy<Value = CodePropertyGraph> {
+        arb_cpg_raw()
+    }
+
+    /// Two graphs agree up to node ordering: same counts and same kind per id.
+    fn same_shape(a: &CodePropertyGraph, b: &CodePropertyGraph) -> bool {
+        if a.node_count() != b.node_count() || a.edge_count() != b.edge_count() {
+            return false;
+        }
+        for id in a.node_ids() {
+            match (a.node(id), b.node(id)) {
+                (Some(na), Some(nb)) if na.kind == nb.kind => {}
+                _ => return false,
+            }
+        }
+        true
+    }
+
+    #[test]
+    fn serde_stats_round_trip() {
+        let stats = CpgStats {
+            node_count: 5,
+            edge_count: 7,
+            ast_edges: 3,
+            cfg_edges: 1,
+            dfg_edges: 1,
+            call_edges: 1,
+            function_count: 1,
+            class_count: 1,
+            cyclomatic_complexity: 2,
+        };
+        let s = serde_json::to_string(&stats).expect("serialize stats");
+        let back: CpgStats = serde_json::from_str(&s).expect("deserialize stats");
+        assert_eq!(stats.node_count, back.node_count);
+        assert_eq!(stats.edge_count, back.edge_count);
+        assert_eq!(stats.ast_edges, back.ast_edges);
+        assert_eq!(stats.cfg_edges, back.cfg_edges);
+        assert_eq!(stats.dfg_edges, back.dfg_edges);
+        assert_eq!(stats.call_edges, back.call_edges);
+        assert_eq!(stats.function_count, back.function_count);
+        assert_eq!(stats.class_count, back.class_count);
+        assert_eq!(stats.cyclomatic_complexity, back.cyclomatic_complexity);
+    }
+
+    #[test]
+    fn serde_whole_graph_example() {
+        let mut g = CodePropertyGraph::new(Language::Rust);
+        let a = g.add_node(CpgNode::new(NodeId::new(0), CpgNodeKind::Root, SourceRange::from_bytes(0, 10)));
+        let b = g.add_node(CpgNode::new(NodeId::new(0), CpgNodeKind::Return, SourceRange::from_bytes(2, 4)));
+        g.connect(a, b, CpgEdgeKind::AstChild);
+        g.connect(a, b, CpgEdgeKind::ControlFlow(CfgEdgeKind::Sequential));
+
+        let s = serde_json::to_string(&g).expect("serialize graph");
+        let back: CodePropertyGraph = serde_json::from_str(&s).expect("deserialize graph");
+        assert_eq!(back.node_count(), 2);
+        assert_eq!(back.edge_count(), 2);
+        assert_eq!(back.language(), Language::Rust);
+        assert!(same_shape(&g, &back));
+    }
+
+    proptest! {
+        #![proptest_config(ProptestConfig::with_cases(256))]
+
+        #[test]
+        fn prop_whole_graph_round_trip(g in arb_serdeable_cpg()) {
+            let s = serde_json::to_string(&g).expect("serialize graph");
+            let back: CodePropertyGraph = serde_json::from_str(&s).expect("deserialize graph");
+            prop_assert_eq!(g.node_count(), back.node_count());
+            prop_assert_eq!(g.edge_count(), back.edge_count());
+            prop_assert!(same_shape(&g, &back));
+        }
     }
 }

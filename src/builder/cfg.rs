@@ -76,7 +76,7 @@ impl CfgExtractor {
         let children = cpg.ast_children(function);
         if let Some(&body) = children.last() {
             // Connect function to body entry
-            cpg.connect(function, body, CpgEdgeKind::ControlFlow(CfgEdgeKind::Sequential));
+            cpg.connect_unique(function, body, CpgEdgeKind::ControlFlow(CfgEdgeKind::Sequential));
 
             // Process the function body
             let exits = self.process_node(cpg, body, &mut ctx);
@@ -100,7 +100,22 @@ impl CfgExtractor {
             None => return smallvec::smallvec![node_id],
         };
 
-        match &kind {
+        // `process_node` and the `process_*` handlers are mutually recursive
+        // over `ast_children`. A well-formed AST is a tree, so every node is
+        // entered exactly once and this guard never fires. A *malformed* graph
+        // can contain an `AstChild` cycle, which would otherwise send the
+        // descent into unbounded recursion and overflow the stack — a crash
+        // reachable from any caller that hand-builds a CPG. Refusing to
+        // re-enter a node already on the current path cuts the cycle (the node
+        // becomes its own exit) and leaves tree inputs bit-for-bit unchanged.
+        // A *path* set rather than a global visited set is used so that a node
+        // legitimately reachable twice from disjoint branches is still
+        // processed each time.
+        if !ctx.on_path.insert(node_id) {
+            return smallvec::smallvec![node_id];
+        }
+
+        let exits = match &kind {
             CpgNodeKind::Block { .. } => self.process_block(cpg, node_id, ctx),
             CpgNodeKind::If => self.process_if(cpg, node_id, ctx),
             CpgNodeKind::While => self.process_while(cpg, node_id, ctx),
@@ -119,7 +134,10 @@ impl CfgExtractor {
                 // For other nodes, process children sequentially
                 self.process_sequential(cpg, node_id, ctx)
             }
-        }
+        };
+
+        ctx.on_path.remove(&node_id);
+        exits
     }
 
     /// Processes a block (sequence of statements).
@@ -137,7 +155,7 @@ impl CfgExtractor {
 
         // Connect block entry to first child
         if let Some(&first) = children.first() {
-            cpg.connect(block_id, first, CpgEdgeKind::ControlFlow(CfgEdgeKind::Sequential));
+            cpg.connect_unique(block_id, first, CpgEdgeKind::ControlFlow(CfgEdgeKind::Sequential));
         }
 
         // Process each child and chain them together
@@ -148,7 +166,7 @@ impl CfgExtractor {
         for (i, &child_id) in children.iter().enumerate() {
             // Connect previous exits to this child
             for &exit in &current_exits {
-                cpg.connect(exit, child_id, CpgEdgeKind::ControlFlow(CfgEdgeKind::Sequential));
+                cpg.connect_unique(exit, child_id, CpgEdgeKind::ControlFlow(CfgEdgeKind::Sequential));
             }
 
             // Process this child
@@ -209,7 +227,7 @@ impl CfgExtractor {
             }
             1 => {
                 // Just condition, no branches - unusual but handle it
-                cpg.connect(if_id, children[0], CpgEdgeKind::ControlFlow(CfgEdgeKind::Sequential));
+                cpg.connect_unique(if_id, children[0], CpgEdgeKind::ControlFlow(CfgEdgeKind::Sequential));
                 exits.push(children[0]);
             }
             2 => {
@@ -218,10 +236,10 @@ impl CfgExtractor {
                 let then_branch = children[1];
 
                 // if -> condition
-                cpg.connect(if_id, condition, CpgEdgeKind::ControlFlow(CfgEdgeKind::Sequential));
+                cpg.connect_unique(if_id, condition, CpgEdgeKind::ControlFlow(CfgEdgeKind::Sequential));
 
                 // condition -> then (true)
-                cpg.connect(condition, then_branch, CpgEdgeKind::ControlFlow(CfgEdgeKind::ConditionalTrue));
+                cpg.connect_unique(condition, then_branch, CpgEdgeKind::ControlFlow(CfgEdgeKind::ConditionalTrue));
 
                 // Process then branch
                 let then_exits = self.process_node(cpg, then_branch, ctx);
@@ -236,10 +254,10 @@ impl CfgExtractor {
                 let then_branch = children[1];
 
                 // if -> condition
-                cpg.connect(if_id, condition, CpgEdgeKind::ControlFlow(CfgEdgeKind::Sequential));
+                cpg.connect_unique(if_id, condition, CpgEdgeKind::ControlFlow(CfgEdgeKind::Sequential));
 
                 // condition -> then (true)
-                cpg.connect(condition, then_branch, CpgEdgeKind::ControlFlow(CfgEdgeKind::ConditionalTrue));
+                cpg.connect_unique(condition, then_branch, CpgEdgeKind::ControlFlow(CfgEdgeKind::ConditionalTrue));
 
                 // Process then branch
                 let then_exits = self.process_node(cpg, then_branch, ctx);
@@ -258,7 +276,7 @@ impl CfgExtractor {
                 };
 
                 // condition -> else (false)
-                cpg.connect(condition, actual_else, CpgEdgeKind::ControlFlow(CfgEdgeKind::ConditionalFalse));
+                cpg.connect_unique(condition, actual_else, CpgEdgeKind::ControlFlow(CfgEdgeKind::ConditionalFalse));
 
                 // Process else branch
                 let else_exits = self.process_node(cpg, actual_else, ctx);
@@ -293,17 +311,17 @@ impl CfgExtractor {
         ctx.push_loop(while_id, condition);
 
         // while -> condition
-        cpg.connect(while_id, condition, CpgEdgeKind::ControlFlow(CfgEdgeKind::Sequential));
+        cpg.connect_unique(while_id, condition, CpgEdgeKind::ControlFlow(CfgEdgeKind::Sequential));
 
         // condition -> body (true)
-        cpg.connect(condition, body, CpgEdgeKind::ControlFlow(CfgEdgeKind::ConditionalTrue));
+        cpg.connect_unique(condition, body, CpgEdgeKind::ControlFlow(CfgEdgeKind::ConditionalTrue));
 
         // Process body
         let body_exits = self.process_node(cpg, body, ctx);
 
         // body exits -> condition (loop back)
         for &exit in &body_exits {
-            cpg.connect(exit, condition, CpgEdgeKind::ControlFlow(CfgEdgeKind::LoopBack));
+            cpg.connect_unique(exit, condition, CpgEdgeKind::ControlFlow(CfgEdgeKind::LoopBack));
         }
 
         // Pop loop context and collect break targets
@@ -341,14 +359,14 @@ impl CfgExtractor {
         ctx.push_loop(for_id, header);
 
         // for -> body (enter loop)
-        cpg.connect(for_id, body, CpgEdgeKind::ControlFlow(CfgEdgeKind::ConditionalTrue));
+        cpg.connect_unique(for_id, body, CpgEdgeKind::ControlFlow(CfgEdgeKind::ConditionalTrue));
 
         // Process body
         let body_exits = self.process_node(cpg, body, ctx);
 
         // body exits -> header (loop back)
         for &exit in &body_exits {
-            cpg.connect(exit, header, CpgEdgeKind::ControlFlow(CfgEdgeKind::LoopBack));
+            cpg.connect_unique(exit, header, CpgEdgeKind::ControlFlow(CfgEdgeKind::LoopBack));
         }
 
         let loop_ctx = ctx.pop_loop();
@@ -378,14 +396,14 @@ impl CfgExtractor {
         ctx.push_loop(loop_id, loop_id);
 
         // loop -> body
-        cpg.connect(loop_id, body, CpgEdgeKind::ControlFlow(CfgEdgeKind::Sequential));
+        cpg.connect_unique(loop_id, body, CpgEdgeKind::ControlFlow(CfgEdgeKind::Sequential));
 
         // Process body
         let body_exits = self.process_node(cpg, body, ctx);
 
         // body exits -> loop (loop back)
         for &exit in &body_exits {
-            cpg.connect(exit, loop_id, CpgEdgeKind::ControlFlow(CfgEdgeKind::LoopBack));
+            cpg.connect_unique(exit, loop_id, CpgEdgeKind::ControlFlow(CfgEdgeKind::LoopBack));
         }
 
         let loop_ctx = ctx.pop_loop();
@@ -416,7 +434,7 @@ impl CfgExtractor {
             if matches!(first_kind.as_ref(), Some(CpgNodeKind::MatchArm)) {
                 (None, 0)
             } else {
-                cpg.connect(match_id, first, CpgEdgeKind::ControlFlow(CfgEdgeKind::Sequential));
+                cpg.connect_unique(match_id, first, CpgEdgeKind::ControlFlow(CfgEdgeKind::Sequential));
                 (Some(first), 1)
             }
         } else {
@@ -431,12 +449,12 @@ impl CfgExtractor {
 
             if matches!(arm_kind.as_ref(), Some(CpgNodeKind::MatchArm)) {
                 // Connect source to arm
-                cpg.connect(source, arm, CpgEdgeKind::ControlFlow(CfgEdgeKind::Case));
+                cpg.connect_unique(source, arm, CpgEdgeKind::ControlFlow(CfgEdgeKind::Case));
 
                 // Process arm body
                 let arm_children = cpg.ast_children(arm);
                 if let Some(&arm_body) = arm_children.last() {
-                    cpg.connect(arm, arm_body, CpgEdgeKind::ControlFlow(CfgEdgeKind::Sequential));
+                    cpg.connect_unique(arm, arm_body, CpgEdgeKind::ControlFlow(CfgEdgeKind::Sequential));
                     let arm_exits = self.process_node(cpg, arm_body, ctx);
                     exits.extend(arm_exits);
                 } else {
@@ -463,7 +481,7 @@ impl CfgExtractor {
 
         // Process return value expression if present
         if let Some(&expr) = children.first() {
-            cpg.connect(return_id, expr, CpgEdgeKind::ControlFlow(CfgEdgeKind::Sequential));
+            cpg.connect_unique(return_id, expr, CpgEdgeKind::ControlFlow(CfgEdgeKind::Sequential));
             let _ = self.process_node(cpg, expr, ctx);
         }
 
@@ -484,7 +502,7 @@ impl CfgExtractor {
             loop_ctx.break_targets.push(break_id);
 
             // Create break edge to loop header
-            cpg.connect(break_id, loop_ctx.loop_id, CpgEdgeKind::ControlFlow(CfgEdgeKind::Break));
+            cpg.connect_unique(break_id, loop_ctx.loop_id, CpgEdgeKind::ControlFlow(CfgEdgeKind::Break));
         }
 
         // Break has no normal exits
@@ -500,7 +518,7 @@ impl CfgExtractor {
     ) -> SmallVec<[NodeId; 4]> {
         // Create continue edge to loop condition
         if let Some(loop_ctx) = ctx.loop_stack.last() {
-            cpg.connect(
+            cpg.connect_unique(
                 continue_id,
                 loop_ctx.continue_target,
                 CpgEdgeKind::ControlFlow(CfgEdgeKind::Continue),
@@ -548,7 +566,7 @@ impl CfgExtractor {
 
         // Process try body
         if let Some(body) = try_body {
-            cpg.connect(try_id, body, CpgEdgeKind::ControlFlow(CfgEdgeKind::Sequential));
+            cpg.connect_unique(try_id, body, CpgEdgeKind::ControlFlow(CfgEdgeKind::Sequential));
 
             // Push try context for exception handling
             ctx.push_try(try_id, catch_blocks.clone());
@@ -560,7 +578,7 @@ impl CfgExtractor {
             // Connect body exits to finally (if present) or add to exits
             if let Some(finally) = finally_block {
                 for &exit in &body_exits {
-                    cpg.connect(exit, finally, CpgEdgeKind::ControlFlow(CfgEdgeKind::Sequential));
+                    cpg.connect_unique(exit, finally, CpgEdgeKind::ControlFlow(CfgEdgeKind::Sequential));
                 }
             } else {
                 exits.extend(body_exits);
@@ -571,12 +589,12 @@ impl CfgExtractor {
         for &catch in &catch_blocks {
             let catch_children = cpg.ast_children(catch);
             if let Some(&catch_body) = catch_children.last() {
-                cpg.connect(catch, catch_body, CpgEdgeKind::ControlFlow(CfgEdgeKind::Sequential));
+                cpg.connect_unique(catch, catch_body, CpgEdgeKind::ControlFlow(CfgEdgeKind::Sequential));
                 let catch_exits = self.process_node(cpg, catch_body, ctx);
 
                 if let Some(finally) = finally_block {
                     for &exit in &catch_exits {
-                        cpg.connect(exit, finally, CpgEdgeKind::ControlFlow(CfgEdgeKind::Sequential));
+                        cpg.connect_unique(exit, finally, CpgEdgeKind::ControlFlow(CfgEdgeKind::Sequential));
                     }
                 } else {
                     exits.extend(catch_exits);
@@ -612,14 +630,14 @@ impl CfgExtractor {
 
         // Process thrown expression
         if let Some(&expr) = children.first() {
-            cpg.connect(throw_id, expr, CpgEdgeKind::ControlFlow(CfgEdgeKind::Sequential));
+            cpg.connect_unique(throw_id, expr, CpgEdgeKind::ControlFlow(CfgEdgeKind::Sequential));
             let _ = self.process_node(cpg, expr, ctx);
         }
 
         // Connect to catch handlers in the try stack
         if let Some(try_ctx) = ctx.try_stack.last() {
             for &catch in &try_ctx.catch_handlers {
-                cpg.connect(throw_id, catch, CpgEdgeKind::ControlFlow(CfgEdgeKind::Throw));
+                cpg.connect_unique(throw_id, catch, CpgEdgeKind::ControlFlow(CfgEdgeKind::Throw));
             }
         }
 
@@ -638,7 +656,7 @@ impl CfgExtractor {
 
         // Process arguments
         for &arg in &children {
-            cpg.connect(call_id, arg, CpgEdgeKind::ControlFlow(CfgEdgeKind::Sequential));
+            cpg.connect_unique(call_id, arg, CpgEdgeKind::ControlFlow(CfgEdgeKind::Sequential));
             let _ = self.process_node(cpg, arg, ctx);
         }
 
@@ -647,7 +665,7 @@ impl CfgExtractor {
             if let CpgNodeKind::Call { target: Some(target), .. } = &node.kind {
                 let target = *target;
                 // Create call edge
-                cpg.connect(call_id, target, CpgEdgeKind::ControlFlow(CfgEdgeKind::Call));
+                cpg.connect_unique(call_id, target, CpgEdgeKind::ControlFlow(CfgEdgeKind::Call));
             }
         }
 
@@ -669,7 +687,7 @@ impl CfgExtractor {
 
         // Connect to first child
         if let Some(&first) = children.first() {
-            cpg.connect(node_id, first, CpgEdgeKind::ControlFlow(CfgEdgeKind::Sequential));
+            cpg.connect_unique(node_id, first, CpgEdgeKind::ControlFlow(CfgEdgeKind::Sequential));
         }
 
         // Process all children
@@ -695,6 +713,9 @@ struct CfgContext {
     loop_stack: Vec<LoopContext>,
     /// Stack of enclosing try blocks.
     try_stack: Vec<TryContext>,
+    /// Nodes currently on the `process_node` recursion path, used to cut
+    /// `AstChild` cycles in malformed graphs (see `process_node`).
+    on_path: FxHashSet<NodeId>,
 }
 
 impl CfgContext {
@@ -872,7 +893,7 @@ mod tests {
             SourceRange::default(),
         ));
 
-        cpg.connect(func, body, CpgEdgeKind::AstChild);
+        cpg.connect_unique(func, body, CpgEdgeKind::AstChild);
         cpg.node_mut(body).unwrap().parent = Some(func);
 
         func
@@ -902,7 +923,7 @@ mod tests {
             CpgNodeKind::If,
             SourceRange::default(),
         ).with_parent(body));
-        cpg.connect(body, if_node, CpgEdgeKind::AstChild);
+        cpg.connect_unique(body, if_node, CpgEdgeKind::AstChild);
 
         // Update body's children list
         if let Some(body_node) = cpg.node_mut(body) {
@@ -915,7 +936,7 @@ mod tests {
             CpgNodeKind::Identifier { name: "x".into(), definition: None },
             SourceRange::default(),
         ).with_parent(if_node));
-        cpg.connect(if_node, cond, CpgEdgeKind::AstChild);
+        cpg.connect_unique(if_node, cond, CpgEdgeKind::AstChild);
 
         // Update if's children list
         if let Some(if_node_ref) = cpg.node_mut(if_node) {
@@ -928,7 +949,7 @@ mod tests {
             CpgNodeKind::Block { scope: ScopeId::GLOBAL },
             SourceRange::default(),
         ).with_parent(if_node));
-        cpg.connect(if_node, then_branch, CpgEdgeKind::AstChild);
+        cpg.connect_unique(if_node, then_branch, CpgEdgeKind::AstChild);
 
         // Update if's children list
         if let Some(if_node_ref) = cpg.node_mut(if_node) {
@@ -954,5 +975,708 @@ mod tests {
 
         // Should have at least the function as a leader
         assert!(blocks.contains_key(&func));
+    }
+
+    // ---- helpers for the new tests (mirror the hand-built AST shape) ----
+
+    fn ast_child(cpg: &mut CodePropertyGraph, parent: NodeId, kind: CpgNodeKind) -> NodeId {
+        let id = cpg.add_node(CpgNode::new(NodeId::new(0), kind, SourceRange::default()));
+        cpg.connect(parent, id, CpgEdgeKind::AstChild);
+        if let Some(n) = cpg.node_mut(id) {
+            n.parent = Some(parent);
+        }
+        if let Some(p) = cpg.node_mut(parent) {
+            p.children.push(id);
+        }
+        id
+    }
+
+    fn ident(name: &str) -> CpgNodeKind {
+        CpgNodeKind::Identifier { name: name.into(), definition: None }
+    }
+
+    fn block() -> CpgNodeKind {
+        CpgNodeKind::Block { scope: ScopeId::GLOBAL }
+    }
+
+    /// `CfgExtractorConfig` field defaults and `CfgExtractor::with_config`
+    /// construction. There is no public config getter, so `with_config` is
+    /// exercised by confirming the custom extractor still runs and marks the
+    /// function entry.
+    #[test]
+    fn cfg_extractor_config_fields_and_with_config() {
+        let d = CfgExtractorConfig::default();
+        assert!(d.include_fallthrough);
+        assert!(d.include_exceptions);
+        assert!(d.include_call_edges);
+
+        let custom = CfgExtractorConfig {
+            include_fallthrough: false,
+            include_exceptions: false,
+            include_call_edges: false,
+        };
+        let extractor = CfgExtractor::with_config(custom);
+
+        let mut cpg = CodePropertyGraph::new(Language::Rust);
+        let func = create_test_function(&mut cpg);
+        extractor.extract(&mut cpg);
+        assert!(cpg.cfg_entries().contains(&func));
+    }
+
+    /// `BasicBlockIdentifier::identify` leaders: the function is always a leader,
+    /// every block is non-empty and headed by its leader, and a conditional
+    /// branch target (an `if`'s then-branch) is a leader.
+    #[test]
+    fn basic_block_leaders_include_function_and_branch_target() {
+        let mut cpg = CodePropertyGraph::new(Language::Rust);
+        let func = create_test_function(&mut cpg);
+        let body = cpg.ast_children(func)[0];
+
+        // body: if (x) { y }
+        let if_node = ast_child(&mut cpg, body, CpgNodeKind::If);
+        let _cond = ast_child(&mut cpg, if_node, ident("x"));
+        let then_b = ast_child(&mut cpg, if_node, block());
+        let _then_stmt = ast_child(&mut cpg, then_b, ident("y"));
+
+        CfgExtractor::new().extract(&mut cpg);
+        let blocks = BasicBlockIdentifier::new().identify(&cpg, func);
+
+        assert!(blocks.contains_key(&func), "the function is always a leader");
+        for (leader, nodes) in &blocks {
+            assert!(!nodes.is_empty(), "each basic block is non-empty");
+            assert_eq!(nodes[0], *leader, "each block is headed by its leader");
+        }
+        // The then-branch is reached by a ConditionalTrue edge ⇒ it is a leader.
+        assert!(
+            blocks.contains_key(&then_b),
+            "a conditional branch target must be a basic-block leader"
+        );
+    }
+
+    /// The FIXED behavior: `CfgExtractor::extract` routes every edge through
+    /// `connect_unique`, so a second extraction on a graph with a branch adds no
+    /// new CFG edges.
+    #[test]
+    fn cfg_extract_is_idempotent_on_branchy_graph() {
+        let mut cpg = CodePropertyGraph::new(Language::Rust);
+        let func = create_test_function(&mut cpg);
+        let body = cpg.ast_children(func)[0];
+        let while_node = ast_child(&mut cpg, body, CpgNodeKind::While);
+        let _guard = ast_child(&mut cpg, while_node, ident("c"));
+        let loop_body = ast_child(&mut cpg, while_node, block());
+        let _work = ast_child(&mut cpg, loop_body, ident("w"));
+
+        CfgExtractor::new().extract(&mut cpg);
+        let after_first = cpg.stats().cfg_edges;
+        assert!(after_first > 0, "the while loop must produce CFG edges");
+        CfgExtractor::new().extract(&mut cpg);
+        assert_eq!(
+            after_first,
+            cpg.stats().cfg_edges,
+            "extract must be idempotent (connect_unique)"
+        );
+    }
+
+    // ================= per-handler control-flow semantics =================
+    //
+    // One test per `process_*` handler, asserting the *edges* the handler is
+    // specified to produce rather than merely that it ran. Together these pin
+    // the CFG construction rules of §2 of `docs/theory/02-control-flow-and-
+    // complexity.md`: a loop back-edge returns to the loop header, `break`
+    // leaves via the header, `continue` returns to the continue target, a
+    // `switch` fans out `Case` edges, and an exception propagates to every
+    // enclosing handler.
+
+    /// True iff a CFG edge of exactly `kind` runs from `from` to `to`.
+    fn has_cfg(cpg: &CodePropertyGraph, from: NodeId, to: NodeId, kind: CfgEdgeKind) -> bool {
+        cpg.cfg_successors(from)
+            .into_iter()
+            .any(|(succ, k)| succ == to && k == kind)
+    }
+
+    /// A minimal `Function → Block` shell plus the body id.
+    fn shell(cpg: &mut CodePropertyGraph) -> (NodeId, NodeId) {
+        let func = create_test_function(cpg);
+        let body = cpg.ast_children(func)[0];
+        (func, body)
+    }
+
+    /// `loop { … }`: the body's exits loop back to the loop header, and the
+    /// loop's only way out is a `break` (an infinite loop has no fallthrough).
+    #[test]
+    fn loop_back_edges_to_header_and_exits_only_via_break() {
+        let mut cpg = CodePropertyGraph::new(Language::Rust);
+        let (func, body) = shell(&mut cpg);
+
+        let loop_node = ast_child(&mut cpg, body, CpgNodeKind::Loop);
+        let loop_body = ast_child(&mut cpg, loop_node, block());
+        let work = ast_child(&mut cpg, loop_body, ident("w"));
+        let brk = ast_child(&mut cpg, loop_body, CpgNodeKind::Break);
+
+        CfgExtractor::new().extract_function_cfg(&mut cpg, func);
+
+        assert!(
+            has_cfg(&cpg, loop_node, loop_body, CfgEdgeKind::Sequential),
+            "loop enters its body"
+        );
+        assert!(
+            has_cfg(&cpg, work, loop_node, CfgEdgeKind::LoopBack)
+                || has_cfg(&cpg, loop_body, loop_node, CfgEdgeKind::LoopBack),
+            "the body's exit loops back to the header"
+        );
+        assert!(
+            has_cfg(&cpg, brk, loop_node, CfgEdgeKind::Break),
+            "`break` leaves through the loop header"
+        );
+        // The break is the loop's only exit, so it is the function's exit too.
+        assert!(cpg.cfg_exits().contains(&brk), "break is the loop's exit");
+    }
+
+    /// `while cond { … continue … }`: `continue` returns to the *condition*
+    /// (the continue target), not to the `while` node itself.
+    #[test]
+    fn continue_targets_the_loop_condition() {
+        let mut cpg = CodePropertyGraph::new(Language::Rust);
+        let (func, body) = shell(&mut cpg);
+
+        let while_node = ast_child(&mut cpg, body, CpgNodeKind::While);
+        let cond = ast_child(&mut cpg, while_node, ident("c"));
+        let loop_body = ast_child(&mut cpg, while_node, block());
+        let cont = ast_child(&mut cpg, loop_body, CpgNodeKind::Continue);
+
+        CfgExtractor::new().extract_function_cfg(&mut cpg, func);
+
+        assert!(
+            has_cfg(&cpg, while_node, cond, CfgEdgeKind::Sequential),
+            "the loop evaluates its condition first"
+        );
+        assert!(
+            has_cfg(&cpg, cond, loop_body, CfgEdgeKind::ConditionalTrue),
+            "a true condition enters the body"
+        );
+        assert!(
+            has_cfg(&cpg, cont, cond, CfgEdgeKind::Continue),
+            "`continue` jumps to the continue target (the condition)"
+        );
+    }
+
+    /// `break`/`continue` outside any loop have no enclosing loop context, so
+    /// they emit no jump edge (rather than panicking or targeting node 0).
+    #[test]
+    fn break_and_continue_outside_a_loop_emit_no_jump() {
+        let mut cpg = CodePropertyGraph::new(Language::Rust);
+        let (func, body) = shell(&mut cpg);
+        let brk = ast_child(&mut cpg, body, CpgNodeKind::Break);
+        let cont = ast_child(&mut cpg, body, CpgNodeKind::Continue);
+
+        CfgExtractor::new().extract_function_cfg(&mut cpg, func);
+
+        assert!(
+            !cpg.cfg_successors(brk)
+                .iter()
+                .any(|(_, k)| *k == CfgEdgeKind::Break),
+            "a loop-less `break` has no target"
+        );
+        assert!(
+            !cpg.cfg_successors(cont)
+                .iter()
+                .any(|(_, k)| *k == CfgEdgeKind::Continue),
+            "a loop-less `continue` has no target"
+        );
+    }
+
+    /// `for … { … }`: the header both enters the body and receives the
+    /// back-edge, and the `for` node itself is the loop exit.
+    #[test]
+    fn for_loop_enters_body_and_receives_the_back_edge() {
+        let mut cpg = CodePropertyGraph::new(Language::Rust);
+        let (func, body) = shell(&mut cpg);
+
+        let for_node = ast_child(&mut cpg, body, CpgNodeKind::For);
+        let _binding = ast_child(&mut cpg, for_node, ident("i"));
+        let loop_body = ast_child(&mut cpg, for_node, block());
+        let work = ast_child(&mut cpg, loop_body, ident("w"));
+
+        CfgExtractor::new().extract_function_cfg(&mut cpg, func);
+
+        assert!(
+            has_cfg(&cpg, for_node, loop_body, CfgEdgeKind::ConditionalTrue),
+            "the header enters the body when the iterator yields"
+        );
+        assert!(
+            has_cfg(&cpg, work, for_node, CfgEdgeKind::LoopBack),
+            "the body loops back to the header"
+        );
+    }
+
+    /// `match e { arm … }`: the scrutinee fans out one `Case` edge per arm, and
+    /// each arm flows into its body.
+    #[test]
+    fn match_fans_out_case_edges_from_the_scrutinee() {
+        let mut cpg = CodePropertyGraph::new(Language::Rust);
+        let (func, body) = shell(&mut cpg);
+
+        let match_node = ast_child(&mut cpg, body, CpgNodeKind::Match);
+        let scrutinee = ast_child(&mut cpg, match_node, ident("e"));
+        let arm_a = ast_child(&mut cpg, match_node, CpgNodeKind::MatchArm);
+        let body_a = ast_child(&mut cpg, arm_a, block());
+        let arm_b = ast_child(&mut cpg, match_node, CpgNodeKind::MatchArm);
+        let body_b = ast_child(&mut cpg, arm_b, block());
+
+        CfgExtractor::new().extract_function_cfg(&mut cpg, func);
+
+        assert!(
+            has_cfg(&cpg, match_node, scrutinee, CfgEdgeKind::Sequential),
+            "the scrutinee is evaluated first"
+        );
+        for arm in [arm_a, arm_b] {
+            assert!(
+                has_cfg(&cpg, scrutinee, arm, CfgEdgeKind::Case),
+                "every arm is a case successor of the scrutinee"
+            );
+        }
+        assert!(has_cfg(&cpg, arm_a, body_a, CfgEdgeKind::Sequential));
+        assert!(has_cfg(&cpg, arm_b, body_b, CfgEdgeKind::Sequential));
+    }
+
+    /// A `match` whose first child is already an arm (no separate scrutinee
+    /// node) fans out from the `match` node itself. An arm with no body is its
+    /// own exit.
+    #[test]
+    fn match_without_a_scrutinee_fans_out_from_itself() {
+        let mut cpg = CodePropertyGraph::new(Language::Rust);
+        let (func, body) = shell(&mut cpg);
+
+        let match_node = ast_child(&mut cpg, body, CpgNodeKind::Match);
+        let arm_a = ast_child(&mut cpg, match_node, CpgNodeKind::MatchArm);
+        let arm_b = ast_child(&mut cpg, match_node, CpgNodeKind::MatchArm);
+
+        CfgExtractor::new().extract_function_cfg(&mut cpg, func);
+
+        assert!(has_cfg(&cpg, match_node, arm_a, CfgEdgeKind::Case));
+        assert!(has_cfg(&cpg, match_node, arm_b, CfgEdgeKind::Case));
+        // Body-less arms are their own exits.
+        assert!(cpg.cfg_exits().contains(&arm_a) || cpg.cfg_exits().contains(&arm_b));
+    }
+
+    /// A childless `match` is inert: it is its own exit and adds no edges.
+    #[test]
+    fn empty_match_is_its_own_exit() {
+        let mut cpg = CodePropertyGraph::new(Language::Rust);
+        let (func, body) = shell(&mut cpg);
+        let match_node = ast_child(&mut cpg, body, CpgNodeKind::Match);
+
+        CfgExtractor::new().extract_function_cfg(&mut cpg, func);
+
+        assert!(cpg.cfg_successors(match_node).is_empty());
+        assert!(cpg.cfg_exits().contains(&match_node));
+    }
+
+    /// `return e`: the return flows into its value expression, and the return
+    /// itself terminates the enclosing block (statements after it are not
+    /// chained onto it).
+    #[test]
+    fn return_evaluates_its_value_and_terminates_the_block() {
+        let mut cpg = CodePropertyGraph::new(Language::Rust);
+        let (func, body) = shell(&mut cpg);
+
+        let ret = ast_child(&mut cpg, body, CpgNodeKind::Return);
+        let value = ast_child(&mut cpg, ret, ident("v"));
+        let after = ast_child(&mut cpg, body, ident("dead"));
+
+        CfgExtractor::new().extract_function_cfg(&mut cpg, func);
+
+        assert!(
+            has_cfg(&cpg, ret, value, CfgEdgeKind::Sequential),
+            "the returned expression is evaluated"
+        );
+        assert!(
+            !has_cfg(&cpg, ret, after, CfgEdgeKind::Sequential),
+            "control does not fall through a `return`"
+        );
+        assert!(cpg.cfg_exits().contains(&ret), "`return` exits the function");
+    }
+
+    /// `try { … } catch { … } finally { … }`: the try body and every catch body
+    /// funnel into the `finally`, which is the construct's single exit.
+    #[test]
+    fn try_catch_finally_funnels_both_paths_into_finally() {
+        let mut cpg = CodePropertyGraph::new(Language::Rust);
+        let (func, body) = shell(&mut cpg);
+
+        let try_node = ast_child(&mut cpg, body, CpgNodeKind::Try);
+        let try_body = ast_child(&mut cpg, try_node, block());
+        let try_stmt = ast_child(&mut cpg, try_body, ident("t"));
+        let catch = ast_child(&mut cpg, try_node, CpgNodeKind::Catch);
+        let catch_body = ast_child(&mut cpg, catch, block());
+        let catch_stmt = ast_child(&mut cpg, catch_body, ident("c"));
+        let finally = ast_child(&mut cpg, try_node, CpgNodeKind::Finally);
+
+        CfgExtractor::new().extract_function_cfg(&mut cpg, func);
+
+        assert!(has_cfg(&cpg, try_node, try_body, CfgEdgeKind::Sequential));
+        assert!(has_cfg(&cpg, catch, catch_body, CfgEdgeKind::Sequential));
+        assert!(
+            has_cfg(&cpg, try_stmt, finally, CfgEdgeKind::Sequential),
+            "the try body's exit reaches `finally`"
+        );
+        assert!(
+            has_cfg(&cpg, catch_stmt, finally, CfgEdgeKind::Sequential),
+            "the catch body's exit reaches `finally`"
+        );
+    }
+
+    /// Without a `finally`, the try and catch exits are the construct's exits.
+    #[test]
+    fn try_without_finally_exits_through_its_bodies() {
+        let mut cpg = CodePropertyGraph::new(Language::Rust);
+        let (func, body) = shell(&mut cpg);
+
+        let try_node = ast_child(&mut cpg, body, CpgNodeKind::Try);
+        let try_body = ast_child(&mut cpg, try_node, block());
+        let try_stmt = ast_child(&mut cpg, try_body, ident("t"));
+        let catch = ast_child(&mut cpg, try_node, CpgNodeKind::Catch);
+        let catch_body = ast_child(&mut cpg, catch, block());
+        let catch_stmt = ast_child(&mut cpg, catch_body, ident("c"));
+
+        CfgExtractor::new().extract_function_cfg(&mut cpg, func);
+
+        let exits = cpg.cfg_exits();
+        assert!(
+            exits.contains(&try_stmt) && exits.contains(&catch_stmt),
+            "both the normal and the handler path exit the construct"
+        );
+        assert!(has_cfg(&cpg, try_node, try_body, CfgEdgeKind::Sequential));
+        assert!(has_cfg(&cpg, catch, catch_body, CfgEdgeKind::Sequential));
+    }
+
+    /// `throw e` inside a `try` connects to every enclosing handler and, like
+    /// `return`, evaluates its operand and terminates the block.
+    #[test]
+    fn throw_reaches_every_enclosing_handler() {
+        let mut cpg = CodePropertyGraph::new(Language::Rust);
+        let (func, body) = shell(&mut cpg);
+
+        let try_node = ast_child(&mut cpg, body, CpgNodeKind::Try);
+        let try_body = ast_child(&mut cpg, try_node, block());
+        let throw = ast_child(&mut cpg, try_body, CpgNodeKind::Throw);
+        let operand = ast_child(&mut cpg, throw, ident("e"));
+        let catch_a = ast_child(&mut cpg, try_node, CpgNodeKind::Catch);
+        let _catch_a_body = ast_child(&mut cpg, catch_a, block());
+        let catch_b = ast_child(&mut cpg, try_node, CpgNodeKind::Catch);
+        let _catch_b_body = ast_child(&mut cpg, catch_b, block());
+
+        CfgExtractor::new().extract_function_cfg(&mut cpg, func);
+
+        assert!(
+            has_cfg(&cpg, throw, operand, CfgEdgeKind::Sequential),
+            "the thrown expression is evaluated"
+        );
+        for catch in [catch_a, catch_b] {
+            assert!(
+                has_cfg(&cpg, throw, catch, CfgEdgeKind::Throw),
+                "the exception may be taken by any enclosing handler"
+            );
+        }
+    }
+
+    /// With `include_exceptions = false`, `try` degrades to a plain sequential
+    /// node and `throw` emits no handler edges.
+    #[test]
+    fn exceptions_disabled_degrades_try_and_throw_to_plain_flow() {
+        let config = CfgExtractorConfig {
+            include_exceptions: false,
+            ..CfgExtractorConfig::default()
+        };
+        let mut cpg = CodePropertyGraph::new(Language::Rust);
+        let (func, body) = shell(&mut cpg);
+
+        let try_node = ast_child(&mut cpg, body, CpgNodeKind::Try);
+        let try_body = ast_child(&mut cpg, try_node, block());
+        let throw = ast_child(&mut cpg, try_body, CpgNodeKind::Throw);
+        let catch = ast_child(&mut cpg, try_node, CpgNodeKind::Catch);
+        let _catch_body = ast_child(&mut cpg, catch, block());
+
+        CfgExtractor::with_config(config).extract_function_cfg(&mut cpg, func);
+
+        assert!(
+            !cpg.cfg_successors(throw)
+                .iter()
+                .any(|(_, k)| *k == CfgEdgeKind::Throw),
+            "no handler edges when exception tracking is off"
+        );
+        assert!(
+            has_cfg(&cpg, try_node, try_body, CfgEdgeKind::Sequential),
+            "`try` still flows into its first child sequentially"
+        );
+    }
+
+    /// A `Call` with a resolved target gets a `Call` edge to the callee and
+    /// evaluates its arguments; with `include_call_edges = false` the call is
+    /// treated as an ordinary node instead.
+    #[test]
+    fn call_edges_follow_the_resolved_target_and_the_config() {
+        let mut cpg = CodePropertyGraph::new(Language::Rust);
+        let (func, body) = shell(&mut cpg);
+        let callee = create_test_function(&mut cpg);
+
+        let call = ast_child(
+            &mut cpg,
+            body,
+            CpgNodeKind::Call { target: Some(callee), is_method: false },
+        );
+        let arg = ast_child(&mut cpg, call, ident("a"));
+
+        CfgExtractor::new().extract_function_cfg(&mut cpg, func);
+
+        assert!(
+            has_cfg(&cpg, call, arg, CfgEdgeKind::Sequential),
+            "arguments are evaluated before the call"
+        );
+        assert!(
+            has_cfg(&cpg, call, callee, CfgEdgeKind::Call),
+            "a resolved call reaches its callee"
+        );
+
+        // Same graph shape, call edges disabled.
+        let mut plain = CodePropertyGraph::new(Language::Rust);
+        let (func2, body2) = shell(&mut plain);
+        let callee2 = create_test_function(&mut plain);
+        let call2 = ast_child(
+            &mut plain,
+            body2,
+            CpgNodeKind::Call { target: Some(callee2), is_method: false },
+        );
+        let config = CfgExtractorConfig {
+            include_call_edges: false,
+            ..CfgExtractorConfig::default()
+        };
+        CfgExtractor::with_config(config).extract_function_cfg(&mut plain, func2);
+        assert!(
+            !has_cfg(&plain, call2, callee2, CfgEdgeKind::Call),
+            "call edges are suppressed when the config disables them"
+        );
+    }
+
+    /// `if` with an `Else` wrapper: the false edge targets the block *inside*
+    /// the `Else`, not the wrapper node.
+    #[test]
+    fn if_else_resolves_through_the_else_wrapper() {
+        let mut cpg = CodePropertyGraph::new(Language::Rust);
+        let (func, body) = shell(&mut cpg);
+
+        let if_node = ast_child(&mut cpg, body, CpgNodeKind::If);
+        let cond = ast_child(&mut cpg, if_node, ident("c"));
+        let then_b = ast_child(&mut cpg, if_node, block());
+        let else_node = ast_child(&mut cpg, if_node, CpgNodeKind::Else);
+        let else_b = ast_child(&mut cpg, else_node, block());
+
+        CfgExtractor::new().extract_function_cfg(&mut cpg, func);
+
+        assert!(has_cfg(&cpg, cond, then_b, CfgEdgeKind::ConditionalTrue));
+        assert!(
+            has_cfg(&cpg, cond, else_b, CfgEdgeKind::ConditionalFalse),
+            "the false edge skips the `Else` wrapper and targets its block"
+        );
+    }
+
+    /// An `if` with a bare else branch (no `Else` wrapper) targets that branch
+    /// directly.
+    #[test]
+    fn if_else_without_a_wrapper_targets_the_branch_directly() {
+        let mut cpg = CodePropertyGraph::new(Language::Rust);
+        let (func, body) = shell(&mut cpg);
+
+        let if_node = ast_child(&mut cpg, body, CpgNodeKind::If);
+        let cond = ast_child(&mut cpg, if_node, ident("c"));
+        let then_b = ast_child(&mut cpg, if_node, block());
+        let else_b = ast_child(&mut cpg, if_node, block());
+
+        CfgExtractor::new().extract_function_cfg(&mut cpg, func);
+
+        assert!(has_cfg(&cpg, cond, then_b, CfgEdgeKind::ConditionalTrue));
+        assert!(has_cfg(&cpg, cond, else_b, CfgEdgeKind::ConditionalFalse));
+    }
+
+    /// Degenerate shapes are inert rather than panicking. "Inert" means they
+    /// never *branch* or *loop*: each such node still takes part in ordinary
+    /// sequential block chaining (it is its own exit, so the next statement is
+    /// linked onto it), but emits none of the conditional or back-edges its
+    /// well-formed counterpart would.
+    #[test]
+    fn degenerate_constructs_are_inert() {
+        let mut cpg = CodePropertyGraph::new(Language::Rust);
+        let (func, body) = shell(&mut cpg);
+
+        let bare_if = ast_child(&mut cpg, body, CpgNodeKind::If);
+        let cond_only_if = ast_child(&mut cpg, body, CpgNodeKind::If);
+        let lone_cond = ast_child(&mut cpg, cond_only_if, ident("c"));
+        let bare_while = ast_child(&mut cpg, body, CpgNodeKind::While);
+        let _while_cond = ast_child(&mut cpg, bare_while, ident("c"));
+        let bare_for = ast_child(&mut cpg, body, CpgNodeKind::For);
+        let bare_loop = ast_child(&mut cpg, body, CpgNodeKind::Loop);
+        let empty_block = ast_child(&mut cpg, body, block());
+
+        CfgExtractor::new().extract_function_cfg(&mut cpg, func);
+
+        let branches = |id: NodeId| {
+            cpg.cfg_successors(id)
+                .iter()
+                .any(|(_, k)| k.is_conditional() || k.is_loop())
+        };
+
+        assert!(!branches(bare_if), "a childless `if` never branches");
+        assert!(
+            has_cfg(&cpg, cond_only_if, lone_cond, CfgEdgeKind::Sequential),
+            "a condition-only `if` still evaluates its condition"
+        );
+        assert!(!branches(cond_only_if), "with no branches there is nothing to branch to");
+        assert!(!branches(bare_while), "a `while` without a body never branches or loops");
+        assert!(!branches(bare_for), "a childless `for` has no back-edge");
+        assert!(!branches(bare_loop), "a childless `loop` has no back-edge");
+        assert!(
+            cpg.cfg_successors(empty_block).is_empty(),
+            "an empty trailing block is a dead end"
+        );
+    }
+
+    /// A function with no body produces an entry and nothing else, and the
+    /// `Default` impls agree with `new`.
+    #[test]
+    fn bodyless_function_and_default_constructors() {
+        let mut cpg = CodePropertyGraph::new(Language::Rust);
+        let func = cpg.add_node(CpgNode::new(
+            NodeId::new(0),
+            CpgNodeKind::Function {
+                signature: MethodSignature {
+                    name: "empty".into(),
+                    params: Default::default(),
+                    return_type: None,
+                    is_static: false,
+                    is_async: false,
+                    visibility: Visibility::Private,
+                },
+            },
+            SourceRange::default(),
+        ));
+
+        CfgExtractor::default().extract(&mut cpg);
+
+        assert!(cpg.cfg_entries().contains(&func));
+        assert!(cpg.cfg_exits().is_empty(), "no body ⇒ no exit points");
+        // `::default()` rather than the unit literal on purpose: the `Default`
+        // impl is what this assertion exercises.
+        #[allow(clippy::default_constructed_unit_structs)]
+        let identifier = BasicBlockIdentifier::default();
+        assert!(identifier.identify(&cpg, func).contains_key(&func));
+    }
+
+    /// REGRESSION (malformed input): a cyclic `AstChild` edge used to send the
+    /// mutually-recursive `process_*` handlers into an unbounded descent that
+    /// overflowed the stack and aborted the process. The path guard in
+    /// `process_node` cuts the cycle, so extraction terminates.
+    ///
+    /// Found by the `tests/robustness.rs` corruption suite.
+    #[test]
+    fn extraction_terminates_on_a_cyclic_ast() {
+        let mut cpg = CodePropertyGraph::new(Language::Rust);
+        let (func, body) = shell(&mut cpg);
+        let inner = ast_child(&mut cpg, body, block());
+        // The inner block claims the function as its own AST child.
+        cpg.connect(inner, func, CpgEdgeKind::AstChild);
+        if let Some(n) = cpg.node_mut(inner) {
+            n.children.push(func);
+        }
+
+        CfgExtractor::new().extract_function_cfg(&mut cpg, func);
+
+        // Termination is the property under test; the graph must also stay sane.
+        assert!(cpg.cfg_entries().contains(&func));
+        for edge in cpg.edges() {
+            assert!(cpg.node(edge.source).is_some());
+            assert!(cpg.node(edge.target).is_some());
+        }
+    }
+
+    /// A node reachable twice from *disjoint* branches is still processed on
+    /// each path — the guard tracks the current path, not a global visited set.
+    #[test]
+    fn a_shared_node_is_processed_on_every_path() {
+        let mut cpg = CodePropertyGraph::new(Language::Rust);
+        let (func, body) = shell(&mut cpg);
+
+        let if_node = ast_child(&mut cpg, body, CpgNodeKind::If);
+        let cond = ast_child(&mut cpg, if_node, ident("c"));
+        let then_b = ast_child(&mut cpg, if_node, block());
+        let else_b = ast_child(&mut cpg, if_node, block());
+        // One statement shared by both branches (a DAG, not a tree).
+        let shared = ast_child(&mut cpg, then_b, ident("shared"));
+        cpg.connect(else_b, shared, CpgEdgeKind::AstChild);
+        if let Some(n) = cpg.node_mut(else_b) {
+            n.children.push(shared);
+        }
+
+        CfgExtractor::new().extract_function_cfg(&mut cpg, func);
+
+        assert!(has_cfg(&cpg, cond, then_b, CfgEdgeKind::ConditionalTrue));
+        assert!(has_cfg(&cpg, cond, else_b, CfgEdgeKind::ConditionalFalse));
+        assert!(
+            has_cfg(&cpg, then_b, shared, CfgEdgeKind::Sequential)
+                && has_cfg(&cpg, else_b, shared, CfgEdgeKind::Sequential),
+            "both branches flow into the shared statement"
+        );
+    }
+
+    /// Nested loops: the inner `break` binds to the *innermost* loop.
+    #[test]
+    fn break_binds_to_the_innermost_loop() {
+        let mut cpg = CodePropertyGraph::new(Language::Rust);
+        let (func, body) = shell(&mut cpg);
+
+        let outer = ast_child(&mut cpg, body, CpgNodeKind::While);
+        let outer_cond = ast_child(&mut cpg, outer, ident("o"));
+        let outer_body = ast_child(&mut cpg, outer, block());
+        let inner = ast_child(&mut cpg, outer_body, CpgNodeKind::While);
+        let _inner_cond = ast_child(&mut cpg, inner, ident("i"));
+        let inner_body = ast_child(&mut cpg, inner, block());
+        let brk = ast_child(&mut cpg, inner_body, CpgNodeKind::Break);
+
+        CfgExtractor::new().extract_function_cfg(&mut cpg, func);
+
+        assert!(
+            has_cfg(&cpg, brk, inner, CfgEdgeKind::Break),
+            "`break` leaves the innermost loop"
+        );
+        assert!(
+            !has_cfg(&cpg, brk, outer, CfgEdgeKind::Break),
+            "`break` does not leave the outer loop"
+        );
+        assert!(
+            has_cfg(&cpg, outer, outer_cond, CfgEdgeKind::Sequential),
+            "the outer loop is still wired normally"
+        );
+    }
+}
+
+#[cfg(test)]
+mod proptests {
+    use super::*;
+    use crate::testutil::*;
+    use proptest::prelude::*;
+
+    proptest! {
+        #![proptest_config(ProptestConfig::with_cases(128))]
+
+        /// On a well-formed CPG, a second `CfgExtractor::extract` leaves the CFG
+        /// edge count unchanged — the fixed idempotency (all edges are added via
+        /// `connect_unique`).
+        #[test]
+        fn prop_cfg_extract_idempotent(cpg in arb_well_formed_cpg()) {
+            let mut cpg = cpg;
+            CfgExtractor::new().extract(&mut cpg);
+            let after_first = cpg.stats().cfg_edges;
+            CfgExtractor::new().extract(&mut cpg);
+            prop_assert_eq!(after_first, cpg.stats().cfg_edges);
+        }
     }
 }

@@ -155,14 +155,20 @@ fn build_singleton_pattern() -> CodePropertyGraph {
 }
 
 fn singleton_template() -> PatternTemplate {
+    // Node 4 (the `return` inside `getInstance`) mirrors `build_singleton_pattern`
+    // so `node_constraints.len()` equals the pattern CPG's `node_count()` (5).
+    // VF2 emits only complete mappings, so a full match then scores
+    // `completeness == 1.0` (confidence == base), never > 1.0.
     PatternTemplate::new("Singleton", "Class with private constructor and single static instance")
         .with_node(NodeConstraint::new(0).with_kind(NodeKindMatcher::Exact(NodeKindTag::Class)))
         .with_node(NodeConstraint::new(1).with_kind(NodeKindMatcher::Exact(NodeKindTag::Field)))
         .with_node(NodeConstraint::new(2).with_kind(NodeKindMatcher::Exact(NodeKindTag::Function)))
         .with_node(NodeConstraint::new(3).with_kind(NodeKindMatcher::Exact(NodeKindTag::Function)))
+        .with_node(NodeConstraint::new(4).with_kind(NodeKindMatcher::Exact(NodeKindTag::Return)))
         .with_edge(EdgeConstraint::new(0, 1).with_kind(EdgeKindMatcher::AnyAst))
         .with_edge(EdgeConstraint::new(0, 2).with_kind(EdgeKindMatcher::AnyAst))
         .with_edge(EdgeConstraint::new(0, 3).with_kind(EdgeKindMatcher::AnyAst))
+        .with_edge(EdgeConstraint::new(3, 4).with_kind(EdgeKindMatcher::AnyAst))
         .with_min_confidence(0.8)
 }
 
@@ -548,11 +554,15 @@ fn build_bridge_pattern() -> CodePropertyGraph {
 }
 
 fn bridge_template() -> PatternTemplate {
+    // Node 3 (the abstraction's `operation` method) mirrors `build_bridge_pattern`
+    // so `node_constraints.len()` matches the pattern CPG's `node_count()` (4).
     PatternTemplate::new("Bridge", "Abstraction with field referencing Implementor interface")
         .with_node(NodeConstraint::new(0).with_kind(NodeKindMatcher::Exact(NodeKindTag::Class)))
         .with_node(NodeConstraint::new(1).with_kind(NodeKindMatcher::Exact(NodeKindTag::Trait)))
         .with_node(NodeConstraint::new(2).with_kind(NodeKindMatcher::Exact(NodeKindTag::Field)))
+        .with_node(NodeConstraint::new(3).with_kind(NodeKindMatcher::Exact(NodeKindTag::Function)))
         .with_edge(EdgeConstraint::new(0, 2).with_kind(EdgeKindMatcher::AnyAst))
+        .with_edge(EdgeConstraint::new(0, 3).with_kind(EdgeKindMatcher::AnyAst))
         .with_min_confidence(0.7)
 }
 
@@ -624,13 +634,17 @@ fn build_composite_pattern() -> CodePropertyGraph {
 }
 
 fn composite_template() -> PatternTemplate {
+    // Node 4 (the composite's `add` method) mirrors `build_composite_pattern`
+    // so `node_constraints.len()` matches the pattern CPG's `node_count()` (5).
     PatternTemplate::new("Composite", "Component interface with Composite holding children collection")
         .with_node(NodeConstraint::new(0).with_kind(NodeKindMatcher::Exact(NodeKindTag::Trait)))
         .with_node(NodeConstraint::new(1).with_kind(NodeKindMatcher::Exact(NodeKindTag::Function)))
         .with_node(NodeConstraint::new(2).with_kind(NodeKindMatcher::Exact(NodeKindTag::Class)))
         .with_node(NodeConstraint::new(3).with_kind(NodeKindMatcher::Exact(NodeKindTag::Field)))
+        .with_node(NodeConstraint::new(4).with_kind(NodeKindMatcher::Exact(NodeKindTag::Function)))
         .with_edge(EdgeConstraint::new(0, 1).with_kind(EdgeKindMatcher::AnyAst))
         .with_edge(EdgeConstraint::new(2, 3).with_kind(EdgeKindMatcher::AnyAst))
+        .with_edge(EdgeConstraint::new(2, 4).with_kind(EdgeKindMatcher::AnyAst))
         .with_min_confidence(0.7)
 }
 
@@ -837,13 +851,17 @@ fn build_flyweight_pattern() -> CodePropertyGraph {
 }
 
 fn flyweight_template() -> PatternTemplate {
+    // Node 4 (the factory's `getFlyweight` method) mirrors `build_flyweight_pattern`
+    // so `node_constraints.len()` matches the pattern CPG's `node_count()` (5).
     PatternTemplate::new("Flyweight", "Factory with cache returning shared Flyweight instances")
         .with_node(NodeConstraint::new(0).with_kind(NodeKindMatcher::Exact(NodeKindTag::Trait)))
         .with_node(NodeConstraint::new(1).with_kind(NodeKindMatcher::Exact(NodeKindTag::Function)))
         .with_node(NodeConstraint::new(2).with_kind(NodeKindMatcher::Exact(NodeKindTag::Class)))
         .with_node(NodeConstraint::new(3).with_kind(NodeKindMatcher::Exact(NodeKindTag::Field)))
+        .with_node(NodeConstraint::new(4).with_kind(NodeKindMatcher::Exact(NodeKindTag::Function)))
         .with_edge(EdgeConstraint::new(0, 1).with_kind(EdgeKindMatcher::AnyAst))
         .with_edge(EdgeConstraint::new(2, 3).with_kind(EdgeKindMatcher::AnyAst))
+        .with_edge(EdgeConstraint::new(2, 4).with_kind(EdgeKindMatcher::AnyAst))
         .with_min_confidence(0.7)
 }
 
@@ -1127,6 +1145,12 @@ fn interpreter_template() -> PatternTemplate {
                 .with_name_pattern("interpret"),
         )
         .with_node(NodeConstraint::new(2).with_kind(NodeKindMatcher::Exact(NodeKindTag::Class)))
+        // Node 3 (NonTerminalExpression) mirrors `build_interpreter_pattern` so
+        // `node_constraints.len()` matches the pattern CPG's `node_count()` (4).
+        // Like node 2 (TerminalExpression), it is related to the interface only
+        // by an `Implements` edge, which the template's AnyAst edges do not
+        // constrain — so it carries a node constraint but no edge constraint.
+        .with_node(NodeConstraint::new(3).with_kind(NodeKindMatcher::Exact(NodeKindTag::Class)))
         .with_edge(EdgeConstraint::new(0, 1).with_kind(EdgeKindMatcher::AnyAst))
         .with_min_confidence(0.7)
 }
@@ -1486,13 +1510,17 @@ fn build_state_pattern() -> CodePropertyGraph {
 }
 
 fn state_template() -> PatternTemplate {
+    // Node 4 (the context's `setState` method) mirrors `build_state_pattern` so
+    // `node_constraints.len()` matches the pattern CPG's `node_count()` (5).
     PatternTemplate::new("State", "Context with State field and setState method")
         .with_node(NodeConstraint::new(0).with_kind(NodeKindMatcher::Exact(NodeKindTag::Trait)))
         .with_node(NodeConstraint::new(1).with_kind(NodeKindMatcher::Exact(NodeKindTag::Function)))
         .with_node(NodeConstraint::new(2).with_kind(NodeKindMatcher::Exact(NodeKindTag::Class)))
         .with_node(NodeConstraint::new(3).with_kind(NodeKindMatcher::Exact(NodeKindTag::Field)))
+        .with_node(NodeConstraint::new(4).with_kind(NodeKindMatcher::Exact(NodeKindTag::Function)))
         .with_edge(EdgeConstraint::new(0, 1).with_kind(EdgeKindMatcher::AnyAst))
         .with_edge(EdgeConstraint::new(2, 3).with_kind(EdgeKindMatcher::AnyAst))
+        .with_edge(EdgeConstraint::new(2, 4).with_kind(EdgeKindMatcher::AnyAst))
         .with_min_confidence(0.7)
 }
 
@@ -1564,13 +1592,17 @@ fn build_strategy_pattern() -> CodePropertyGraph {
 }
 
 fn strategy_template() -> PatternTemplate {
+    // Node 4 (the context's `setStrategy` method) mirrors `build_strategy_pattern`
+    // so `node_constraints.len()` matches the pattern CPG's `node_count()` (5).
     PatternTemplate::new("Strategy", "Context with Strategy field and setStrategy method")
         .with_node(NodeConstraint::new(0).with_kind(NodeKindMatcher::Exact(NodeKindTag::Trait)))
         .with_node(NodeConstraint::new(1).with_kind(NodeKindMatcher::Exact(NodeKindTag::Function)))
         .with_node(NodeConstraint::new(2).with_kind(NodeKindMatcher::Exact(NodeKindTag::Class)))
         .with_node(NodeConstraint::new(3).with_kind(NodeKindMatcher::Exact(NodeKindTag::Field)))
+        .with_node(NodeConstraint::new(4).with_kind(NodeKindMatcher::Exact(NodeKindTag::Function)))
         .with_edge(EdgeConstraint::new(0, 1).with_kind(EdgeKindMatcher::AnyAst))
         .with_edge(EdgeConstraint::new(2, 3).with_kind(EdgeKindMatcher::AnyAst))
+        .with_edge(EdgeConstraint::new(2, 4).with_kind(EdgeKindMatcher::AnyAst))
         .with_min_confidence(0.7)
 }
 
@@ -1773,5 +1805,151 @@ mod tests {
         let template = singleton_template();
         assert_eq!(template.name, "Singleton");
         assert!(!template.node_constraints.is_empty());
+    }
+
+    /// All 23 GoF patterns, in a single place for exhaustive coverage.
+    const ALL_PATTERNS: [GofPattern; 23] = [
+        GofPattern::Singleton,
+        GofPattern::FactoryMethod,
+        GofPattern::AbstractFactory,
+        GofPattern::Builder,
+        GofPattern::Prototype,
+        GofPattern::Adapter,
+        GofPattern::Bridge,
+        GofPattern::Composite,
+        GofPattern::Decorator,
+        GofPattern::Facade,
+        GofPattern::Flyweight,
+        GofPattern::Proxy,
+        GofPattern::ChainOfResponsibility,
+        GofPattern::Command,
+        GofPattern::Interpreter,
+        GofPattern::Iterator,
+        GofPattern::Mediator,
+        GofPattern::Memento,
+        GofPattern::Observer,
+        GofPattern::State,
+        GofPattern::Strategy,
+        GofPattern::TemplateMethod,
+        GofPattern::Visitor,
+    ];
+
+    /// `build_pattern_template` must produce a well-formed template for ALL 23
+    /// patterns (the pre-existing suite only exercised Singleton).
+    #[test]
+    fn test_build_pattern_template_all_23() {
+        for pattern in ALL_PATTERNS {
+            let template = build_pattern_template(pattern);
+            assert!(
+                !template.name.is_empty(),
+                "{pattern:?}: template name must be non-empty"
+            );
+            assert!(
+                !template.node_constraints.is_empty(),
+                "{pattern:?}: template must have node constraints"
+            );
+            assert!(
+                template.min_confidence > 0.0 && template.min_confidence <= 1.0,
+                "{pattern:?}: min_confidence {} out of (0, 1]",
+                template.min_confidence
+            );
+            // The node constraint indices are exactly 0..len, matching the
+            // pattern CPG's node ids.
+            let mut indices: Vec<usize> =
+                template.node_constraints.iter().map(|c| c.index).collect();
+            indices.sort_unstable();
+            let expected: Vec<usize> = (0..template.node_constraints.len()).collect();
+            assert_eq!(indices, expected, "{pattern:?}: node indices must be 0..n");
+        }
+    }
+
+    /// `build_pattern_cpg` must yield a non-empty graph WITH edges for ALL 23
+    /// patterns (the pre-existing suite only asserted `edge_count > 0` for
+    /// Singleton).
+    #[test]
+    fn test_build_pattern_cpg_edges_all_23() {
+        for pattern in ALL_PATTERNS {
+            let cpg = build_pattern_cpg(pattern);
+            assert!(cpg.node_count() > 0, "{pattern:?}: expected nodes");
+            assert!(cpg.edge_count() > 0, "{pattern:?}: expected edges");
+        }
+    }
+
+    /// Core invariant restored by the boy-scout template fixes: the pattern CPG
+    /// (what VF2 searches with) and the pattern template (what
+    /// `calculate_confidence` divides by) describe the same node set, so a
+    /// complete VF2 match scores `completeness == 1.0`.
+    #[test]
+    fn test_template_cpg_node_parity_all_23() {
+        for pattern in ALL_PATTERNS {
+            let cpg = build_pattern_cpg(pattern);
+            let template = build_pattern_template(pattern);
+            assert_eq!(
+                cpg.node_count(),
+                template.node_constraints.len(),
+                "{pattern:?}: pattern CPG node_count must equal template node_constraints.len()"
+            );
+        }
+    }
+}
+
+#[cfg(test)]
+mod proptests {
+    use super::*;
+    use proptest::prelude::*;
+
+    /// All 23 patterns as a proptest strategy.
+    fn arb_gof_pattern() -> impl Strategy<Value = GofPattern> {
+        prop_oneof![
+            Just(GofPattern::Singleton),
+            Just(GofPattern::FactoryMethod),
+            Just(GofPattern::AbstractFactory),
+            Just(GofPattern::Builder),
+            Just(GofPattern::Prototype),
+            Just(GofPattern::Adapter),
+            Just(GofPattern::Bridge),
+            Just(GofPattern::Composite),
+            Just(GofPattern::Decorator),
+            Just(GofPattern::Facade),
+            Just(GofPattern::Flyweight),
+            Just(GofPattern::Proxy),
+            Just(GofPattern::ChainOfResponsibility),
+            Just(GofPattern::Command),
+            Just(GofPattern::Interpreter),
+            Just(GofPattern::Iterator),
+            Just(GofPattern::Mediator),
+            Just(GofPattern::Memento),
+            Just(GofPattern::Observer),
+            Just(GofPattern::State),
+            Just(GofPattern::Strategy),
+            Just(GofPattern::TemplateMethod),
+            Just(GofPattern::Visitor),
+        ]
+    }
+
+    proptest! {
+        #![proptest_config(ProptestConfig::with_cases(256))]
+
+        /// For every GoF pattern: the pattern CPG and its template agree on node
+        /// count, both counts are positive, and the CPG has at least one edge.
+        #[test]
+        fn prop_template_cpg_parity(pattern in arb_gof_pattern()) {
+            let cpg = build_pattern_cpg(pattern);
+            let template = build_pattern_template(pattern);
+
+            prop_assert!(cpg.node_count() > 0, "{:?}: no nodes", pattern);
+            prop_assert!(cpg.edge_count() > 0, "{:?}: no edges", pattern);
+            prop_assert!(
+                !template.node_constraints.is_empty(),
+                "{:?}: no node constraints",
+                pattern
+            );
+            prop_assert_eq!(
+                cpg.node_count(),
+                template.node_constraints.len(),
+                "{:?}: node_count != node_constraints.len()",
+                pattern
+            );
+        }
     }
 }

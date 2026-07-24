@@ -26,3 +26,33 @@ pub enum GraphAlgorithm {
     /// Unknown graph algorithm.
     Unknown,
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_graph_algorithm_variants() {
+        let all = [
+            GraphAlgorithm::BFS,
+            GraphAlgorithm::DFS,
+            GraphAlgorithm::Dijkstra,
+            GraphAlgorithm::BellmanFord,
+            GraphAlgorithm::FloydWarshall,
+            GraphAlgorithm::Prim,
+            GraphAlgorithm::Kruskal,
+            GraphAlgorithm::TopologicalSort,
+            GraphAlgorithm::SCC,
+            GraphAlgorithm::ArticulationPoints,
+            GraphAlgorithm::Unknown,
+        ];
+        for (i, a) in all.iter().enumerate() {
+            let copied = *a;
+            assert_eq!(copied, *a);
+            assert!(!format!("{a:?}").is_empty());
+            for (j, b) in all.iter().enumerate() {
+                assert_eq!(i == j, a == b);
+            }
+        }
+    }
+}

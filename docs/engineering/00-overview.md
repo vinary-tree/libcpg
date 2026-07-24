@@ -68,7 +68,7 @@ directly from that relationship, and both are visible in `Cargo.toml`:
 | Page | What it covers |
 | --- | --- |
 | [01 — Build and features](01-build-and-features.md) | The full feature matrix: 16 `lang-*` grammars, the language groups, the analysis features, the Mode-B toggles, `serde`, the reserved `gpu` flag, and the `full` umbrella; the pgmcp grammar-pin table; how to enable a language. |
-| [02 — Testing](02-testing.md) | The 99 inline `#[cfg(test)]` tests by module; how to run them (`cargo test`, `--all-features`, feature subsets, the Mode-B `rholang`/`metta` tests); and an honest inventory of what is *not* there yet (empty `examples/` and `tests/`, no doctests, no `proptest` cases). |
+| [02 — Testing](02-testing.md) | The 474-test suite: 399 example-based tests, 63 `proptest` properties, and the `tests/integration.rs` / `tests/robustness.rs` public-API suites; the `arb_*` generators; how to run them under each feature subset; measured coverage (97.4 % lines); the fourteen defects the suite found; and an honest inventory of what is still absent (empty `examples/`, no doctests, no benches). |
 | [03 — Performance](03-performance.md) | The data-structure rationale (what is actually wired vs. merely declared), the asymptotic cost of the key operations, and the (currently unimplemented) benchmarking methodology with instructions for adding `criterion` benches. |
 | [04 — Contributing](04-contributing.md) | Step-by-step recipes: add a language mapper, add a Gang-of-Four template, add a similarity metric; plus the coding conventions the crate follows. |
 
@@ -88,9 +88,9 @@ maturity than exists. The most consequential items:
 | Aspect | Reality | Detailed in |
 | --- | --- | --- |
 | Default build | `default = []`; `build` fails without a `lang-*` feature | [01](01-build-and-features.md) |
-| `examples/`, `tests/` directories | present but **empty** — no integration tests, no runnable examples | [02](02-testing.md) |
+| `examples/` directory | present but **empty** — no runnable examples (`tests/` now holds the integration and robustness suites) | [02](02-testing.md) |
 | Benchmarks | `criterion` is a dev-dependency but both `[[bench]]` targets are **commented out** | [02](02-testing.md), [03](03-performance.md) |
-| `rayon`, `ahash`, `string_cache`, `regex`, `proptest` | declared in `Cargo.toml` but **not yet wired** into `src/` | [02](02-testing.md), [03](03-performance.md) |
+| `rayon`, `ahash`, `string_cache`, `regex` | declared in `Cargo.toml` but **not yet wired** into `src/` (`proptest` is now used throughout the test suite) | [02](02-testing.md), [03](03-performance.md) |
 | `gpu` feature | **reserved** — enables `wgpu`/`pollster` but no GPU code is written | [01](01-build-and-features.md) |
 | Detection results | pattern/algorithm/complexity outputs are **heuristics**, not proofs | [`security/00`](../security/00-threat-model.md) |
 

@@ -1,0 +1,7 @@
+# Seeds for failure cases proptest has generated in the past. It is
+# automatically read and these particular cases re-run before any
+# novel cases are generated.
+#
+# It is recommended to check this file in to source control so that
+# everyone who runs the test benefits from these saved cases.
+cc 178be07e5e0801fe64ac1be99e2a8b7729f1b2d0767e34a7eaa7625b90ebe691 # shrinks to g = CodePropertyGraph { graph: Graph { Ty: "Directed", node_count: 1, edge_count: 0, node weights: {0: CpgNode { id: NodeId(0), kind: Literal { kind: Float(4.265576306816893e84) }, range: SourceRange { start: 0, end: 0, start_line: 0, start_col: 0, end_line: 0, end_col: 0 }, text: None, properties: {}, children: [], parent: None }}, edge weights: {} }, node_index_map: {NodeId(0): NodeIndex(0)}, edge_index_map: {}, language: Rust, source_path: None, source_code: None, next_node_id: 1, next_edge_id: 0, root: Some(NodeId(0)), cfg_entries: [], cfg_exits: [] }

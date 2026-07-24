@@ -1,0 +1,5 @@
+# cargo-nextest configuration. The slow-timeout guard kills a runaway property
+# test (e.g. one that hangs on a pathological generated input) after 4x30s
+# rather than blocking the whole run.
+[profile.default]
+slow-timeout = { period = "30s", terminate-after = 4, grace-period = "5s" }

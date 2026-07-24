@@ -255,9 +255,18 @@ impl NodeMapper {
             "assignment_expression" | "compound_assignment_expr" => CpgNodeKind::Assignment {
                 operator: self.extract_operator(node, source),
             },
+            // tree-sitter-rust spells a method call as a `call_expression`
+            // whose `function` is a `field_expression` (`recv.m(…)`); it has no
+            // distinct `method_call_expression` node, so `is_method` must be
+            // read off the callee rather than off the node kind. The
+            // `method_call_expression` arm below is kept for grammars that do
+            // model the two separately.
             "call_expression" => CpgNodeKind::Call {
                 target: None,
-                is_method: false,
+                is_method: node
+                    .child_by_field_name("function")
+                    .map(|f| f.kind() == "field_expression")
+                    .unwrap_or(false),
             },
             "method_call_expression" => CpgNodeKind::Call {
                 target: None,
@@ -452,11 +461,17 @@ impl NodeMapper {
             },
 
             // Functions
-            "function_declaration" | "function" | "generator_function_declaration" => {
-                CpgNodeKind::Function {
-                    signature: self.extract_js_function_signature(node, source),
-                }
-            }
+            //
+            // `function_expression` is what tree-sitter-javascript ≥0.20 emits for
+            // an anonymous `function () {}`; the bare `"function"` kind it used
+            // before is kept so an older vendored grammar still maps.
+            "function_declaration"
+            | "function"
+            | "function_expression"
+            | "generator_function_declaration"
+            | "generator_function" => CpgNodeKind::Function {
+                signature: self.extract_js_function_signature(node, source),
+            },
             "method_definition" => CpgNodeKind::Function {
                 signature: self.extract_js_function_signature(node, source),
             },
@@ -623,7 +638,12 @@ impl NodeMapper {
             },
             "if_statement" => CpgNodeKind::If,
             "for_statement" => CpgNodeKind::For,
-            "switch_statement" | "type_switch_statement" => CpgNodeKind::Match,
+            // tree-sitter-go splits `switch` into `expression_switch_statement`
+            // (value switch) and `type_switch_statement` (`x.(type)`); the plain
+            // `switch_statement` kind is kept for older vendored grammars.
+            "switch_statement" | "expression_switch_statement" | "type_switch_statement" => {
+                CpgNodeKind::Match
+            }
             "expression_case" | "type_case" | "default_case" => CpgNodeKind::MatchArm,
             "return_statement" => CpgNodeKind::Return,
             "break_statement" => CpgNodeKind::Break,
@@ -978,9 +998,15 @@ impl NodeMapper {
             "float" => CpgNodeKind::Literal {
                 kind: self.parse_float(node, source),
             },
-            "string" | "symbol" => CpgNodeKind::Literal {
-                kind: LiteralKind::String(Arc::from(self.node_text(node, source))),
-            },
+            // tree-sitter-ruby names symbols by their syntactic position —
+            // `simple_symbol` (`:sym`), `hash_key_symbol` (`k:` in a hash), and
+            // the interpolating `delimited_symbol`; the generic `symbol` kind is
+            // kept for older vendored grammars.
+            "string" | "symbol" | "simple_symbol" | "hash_key_symbol" | "delimited_symbol" => {
+                CpgNodeKind::Literal {
+                    kind: LiteralKind::String(Arc::from(self.node_text(node, source))),
+                }
+            }
             "true" | "false" => CpgNodeKind::Literal {
                 kind: LiteralKind::Bool(ts_kind == "true"),
             },
@@ -1199,9 +1225,14 @@ impl NodeMapper {
     fn map_markdown(&self, ts_kind: &str, node: &tree_sitter::Node, source: &str) -> CpgNodeKind {
         match ts_kind {
             "document" => CpgNodeKind::Root,
-            "section" | "paragraph" | "heading" => CpgNodeKind::Block {
-                scope: ScopeId::GLOBAL,
-            },
+            // tree-sitter-md names headings by their syntax (`atx_heading` for
+            // `# h`, `setext_heading` for the underlined form); the generic
+            // `heading` kind is kept for older vendored grammars.
+            "section" | "paragraph" | "heading" | "atx_heading" | "setext_heading" => {
+                CpgNodeKind::Block {
+                    scope: ScopeId::GLOBAL,
+                }
+            }
             "code_span" | "fenced_code_block" | "indented_code_block" => CpgNodeKind::Literal {
                 kind: LiteralKind::String(Arc::from(self.node_text(node, source))),
             },
@@ -1850,6 +1881,30 @@ impl NodeMapper {
         false
     }
 
+    /// True if `node` carries `token` as a direct child **or** inside a
+    /// modifier wrapper.
+    ///
+    /// Grammars differ on whether qualifiers are direct children or grouped:
+    /// tree-sitter-rust wraps `async`/`const`/`unsafe` in a
+    /// `function_modifiers` node, while JavaScript emits `async`/`static`
+    /// directly. Checking both spellings keeps the signature extractors correct
+    /// under either shape.
+    fn has_modifier_token(&self, node: &tree_sitter::Node, token: &str) -> bool {
+        let mut cursor = node.walk();
+        for child in node.children(&mut cursor) {
+            if child.kind() == token {
+                return true;
+            }
+            if matches!(child.kind(), "function_modifiers" | "modifiers") {
+                let mut inner = child.walk();
+                if child.children(&mut inner).any(|m| m.kind() == token) {
+                    return true;
+                }
+            }
+        }
+        false
+    }
+
     fn extract_operator(&self, node: &tree_sitter::Node, source: &str) -> Arc<str> {
         let mut cursor = node.walk();
         for child in node.children(&mut cursor) {
@@ -2012,7 +2067,9 @@ impl NodeMapper {
 
     fn extract_rust_function_signature(&self, node: &tree_sitter::Node, source: &str) -> MethodSignature {
         let name = self.extract_child_text(node, "name", source);
-        let is_async = self.has_child_kind(node, "async");
+        // `async` is grouped under `function_modifiers` in tree-sitter-rust, so
+        // a direct-child check would never see it.
+        let is_async = self.has_modifier_token(node, "async");
         let visibility = self.extract_rust_visibility(node);
 
         MethodSignature {
@@ -2028,7 +2085,7 @@ impl NodeMapper {
 
     fn extract_python_function_signature(&self, node: &tree_sitter::Node, source: &str) -> MethodSignature {
         let name = self.extract_child_text(node, "name", source);
-        let is_async = self.has_child_kind(node, "async");
+        let is_async = self.has_modifier_token(node, "async");
 
         MethodSignature {
             name,
@@ -2042,8 +2099,8 @@ impl NodeMapper {
 
     fn extract_js_function_signature(&self, node: &tree_sitter::Node, source: &str) -> MethodSignature {
         let name = self.extract_child_text(node, "name", source);
-        let is_async = self.has_child_kind(node, "async");
-        let is_static = self.has_child_kind(node, "static");
+        let is_async = self.has_modifier_token(node, "async");
+        let is_static = self.has_modifier_token(node, "static");
 
         MethodSignature {
             name,
@@ -2438,5 +2495,1401 @@ mod tests {
         assert!(mapper.should_include("list", false));
         assert!(mapper.should_include("identifier", false));
         assert!(mapper.should_include("variable", false));
+    }
+
+    // ================================================================
+    // Additional mapper-arm coverage (Rholang / MeTTa / generic).
+    // ================================================================
+
+    /// Rholang control + dereference arms: `ifElse` ⇒ `If`, a `true` literal ⇒
+    /// `Bool`, an `*x` eval ⇒ `UnaryOp("*")`, and the received `@x` ⇒ `Parameter`.
+    #[test]
+    #[cfg(feature = "rholang")]
+    fn rholang_ifelse_bool_eval_and_param() {
+        let src = "new chan in { for (@x <- chan) { if (true) { Nil } else { *x } } }\n";
+        let cpg = build_rholang(src);
+        let ks = kinds(&cpg);
+
+        assert!(ks.iter().any(|k| matches!(k, CpgNodeKind::If)), "ifElse ⇒ If");
+        assert!(
+            ks.iter()
+                .any(|k| matches!(k, CpgNodeKind::Literal { kind: LiteralKind::Bool(true) })),
+            "`true` ⇒ Bool literal"
+        );
+        assert!(
+            ks.iter()
+                .any(|k| matches!(k, CpgNodeKind::UnaryOp { operator } if &**operator == "*")),
+            "`*x` eval ⇒ UnaryOp(*)"
+        );
+        assert!(
+            ks.iter()
+                .any(|k| matches!(k, CpgNodeKind::Parameter { name, .. } if &**name == "x")),
+            "received `@x` ⇒ Parameter"
+        );
+    }
+
+    /// Rholang expression arms: arithmetic operators (`+`, `*`), a list
+    /// collection ⇒ `Array` literal, and the send ⇒ `Call`.
+    #[test]
+    #[cfg(feature = "rholang")]
+    fn rholang_operators_list_and_send() {
+        let src = "new chan in { chan!([1 + 2, 3 * 4]) }\n";
+        let cpg = build_rholang(src);
+        let ks = kinds(&cpg);
+
+        assert!(
+            ks.iter()
+                .any(|k| matches!(k, CpgNodeKind::BinaryOp { operator } if &**operator == "+")),
+            "`1 + 2` ⇒ BinaryOp(+)"
+        );
+        assert!(
+            ks.iter()
+                .any(|k| matches!(k, CpgNodeKind::BinaryOp { operator } if &**operator == "*")),
+            "`3 * 4` ⇒ BinaryOp(*)"
+        );
+        assert!(
+            ks.iter()
+                .any(|k| matches!(k, CpgNodeKind::Literal { kind: LiteralKind::Array })),
+            "`[...]` ⇒ Array literal"
+        );
+        assert!(
+            ks.iter().any(|k| matches!(k, CpgNodeKind::Call { .. })),
+            "`chan!(...)` ⇒ Call"
+        );
+    }
+
+    /// MeTTa head-dispatch `if` ⇒ `If`, the atom-literal arms
+    /// (bool/int/float/string), `wildcard` ⇒ `Identifier("_")`, a variable *use*
+    /// ⇒ `Identifier("$x")`, and a plain application head ⇒ `Call`.
+    #[test]
+    #[cfg(feature = "metta")]
+    fn metta_if_atoms_wildcard_and_variable_use() {
+        let cpg = build_metta("(if True 1 2)\n(foo 1.5 \"hi\" _ $x)\n");
+        let ks = kinds(&cpg);
+
+        assert!(ks.iter().any(|k| matches!(k, CpgNodeKind::If)), "head `if` ⇒ If");
+        assert!(
+            ks.iter()
+                .any(|k| matches!(k, CpgNodeKind::Literal { kind: LiteralKind::Bool(true) })),
+            "`True` ⇒ Bool"
+        );
+        assert!(
+            ks.iter()
+                .any(|k| matches!(k, CpgNodeKind::Literal { kind: LiteralKind::Integer(1) })),
+            "`1` ⇒ Integer"
+        );
+        assert!(
+            ks.iter()
+                .any(|k| matches!(k, CpgNodeKind::Literal { kind: LiteralKind::Float(_) })),
+            "`1.5` ⇒ Float"
+        );
+        assert!(
+            ks.iter()
+                .any(|k| matches!(k, CpgNodeKind::Literal { kind: LiteralKind::String(_) })),
+            "`\"hi\"` ⇒ String"
+        );
+        assert!(
+            ks.iter()
+                .any(|k| matches!(k, CpgNodeKind::Identifier { name, .. } if &**name == "_")),
+            "`_` ⇒ Identifier(_)"
+        );
+        assert!(
+            ks.iter()
+                .any(|k| matches!(k, CpgNodeKind::Identifier { name, .. } if &**name == "$x")),
+            "`$x` (use) ⇒ Identifier($x)"
+        );
+        assert!(
+            ks.iter().any(|k| matches!(k, CpgNodeKind::Call { .. })),
+            "`(foo ...)` ⇒ Call"
+        );
+    }
+
+    /// The generic fallback: an unmapped language routes `map_kind` through
+    /// `map_generic` ⇒ `Unknown`, and a mapped language returns `Unknown` for an
+    /// unrecognized tree-sitter node kind.
+    #[test]
+    #[cfg(feature = "lang-rust")]
+    fn map_generic_fallback_for_unmapped() {
+        let mut parser = tree_sitter::Parser::new();
+        parser
+            .set_language(&tree_sitter_rust::LANGUAGE.into())
+            .expect("set rust grammar");
+        let src = "fn f() {}";
+        let tree = parser.parse(src, None).expect("parse");
+        let root = tree.root_node();
+
+        // (a) A language with no specific mapper (Zig) ⇒ map_generic ⇒ Unknown.
+        let generic = NodeMapper::new(Language::Zig);
+        assert!(matches!(
+            generic.map_kind(root.kind(), &root, src),
+            CpgNodeKind::Unknown { .. }
+        ));
+
+        // (b) A mapped language with an unrecognized ts_kind hits its `_ =>` arm.
+        let rust = NodeMapper::new(Language::Rust);
+        match rust.map_kind("a_node_kind_that_does_not_exist", &root, src) {
+            CpgNodeKind::Unknown { kind } => {
+                assert_eq!(&*kind, "a_node_kind_that_does_not_exist");
+            }
+            other => panic!("expected Unknown, got {other:?}"),
+        }
+    }
+}
+
+/// Per-language mapping tables, driven end-to-end through the real grammars.
+///
+/// Each test states the language's mapping contract as a table of
+/// `tree-sitter kind => CpgNodeKind` rows and checks every row against a
+/// snippet that exercises it (see [`crate::testutil::assert_maps`] for why both
+/// directions are asserted). Each test is gated on the `lang-*` feature that
+/// supplies its grammar, so the module compiles under any feature subset.
+#[cfg(test)]
+mod lang_mappers {
+    #[allow(unused_imports)]
+    use crate::testutil::{build_source, mapped_kinds, maps};
+    #[allow(unused_imports)]
+    use crate::{CpgNodeKind, Language, LiteralKind, Visibility};
+
+    #[cfg(feature = "lang-rust")]
+    #[test]
+    fn rust_mapping_table() {
+        const SRC: &str = r##"
+//! inner doc
+#![allow(unused)]
+use std::collections::HashMap;
+use std::io::{Read, Write};
+
+/// A documented struct.
+#[derive(Debug)]
+#[allow(dead_code)]
+pub struct S { pub f: i32, g: u8 }
+
+/* block comment */
+/** doc block */
+pub enum E { A, B }
+pub trait T { fn m(&self); }
+mod inner { }
+type Alias = i32;
+
+impl T for S {
+    fn m(&self) { }
+}
+
+pub const K: i32 = 1;
+pub static mut G: i32 = 2;
+static H: i32 = 3;
+
+pub async fn f<A>(a: i32, b: &str) -> i32 {
+    let x = 1;
+    let mut y: i32 = 2;
+    let hex = 0x1F;
+    let oct = 0o17;
+    let bin = 0b1010;
+    let big = 1_000_000;
+    let neg = -5;
+    let fl = 1.5;
+    let fl2 = 1_000.5;
+    let ch = 'c';
+    let st = "s";
+    let raw = r"raw";
+    let t = true;
+    let fa = false;
+    let arr = [1, 2, 3];
+    let map = HashMap::new();
+    y = y + 1;
+    y += 2;
+    y -= 1;
+    y *= 2;
+    y /= 2;
+    y %= 3;
+    y &= 1;
+    y |= 1;
+    y ^= 1;
+    let cmp = x < y && y > x || x == y;
+    let ne = x != y;
+    let le = x <= y;
+    let ge = x >= y;
+    let not = !t;
+    let negx = -x;
+    let sh = x << 1;
+    let sh2 = x >> 1;
+    let cl = |q: i32| q + 1;
+    let idx = arr[0];
+    let fld = self.f;
+    let mc = arr.len();
+    let mac = println!("hi");
+    if x > 0 { } else { }
+    while x > 0 { break; }
+    loop { continue; }
+    for i in 0..3 { }
+    match x { 1 => { }, _ => { } }
+    let r = g()?;
+    return x;
+}
+
+fn g() -> Result<i32, ()> { Ok(1) }
+"##;
+        let p = &mapped_kinds(SRC, Language::Rust);
+        maps!(p,
+            "source_file" => CpgNodeKind::Root,
+            "mod_item" => CpgNodeKind::Module { .. },
+            "struct_item" => CpgNodeKind::Struct { .. },
+            "enum_item" => CpgNodeKind::Enum { .. },
+            "trait_item" => CpgNodeKind::Trait { .. },
+            "impl_item" => CpgNodeKind::Impl { .. },
+            "function_item" => CpgNodeKind::Function { .. },
+            "function_signature_item" => CpgNodeKind::Function { .. },
+            "closure_expression" => CpgNodeKind::Lambda { .. },
+            "parameter" => CpgNodeKind::Parameter { .. },
+            "block" => CpgNodeKind::Block { .. },
+            "let_declaration" => CpgNodeKind::Variable { .. },
+            "const_item" => CpgNodeKind::Variable { is_mutable: false, .. },
+            "static_item" => CpgNodeKind::Variable { .. },
+            "field_declaration" => CpgNodeKind::Field { .. },
+            "if_expression" => CpgNodeKind::If,
+            "else_clause" => CpgNodeKind::Else,
+            "while_expression" => CpgNodeKind::While,
+            "for_expression" => CpgNodeKind::For,
+            "loop_expression" => CpgNodeKind::Loop,
+            "match_expression" => CpgNodeKind::Match,
+            "match_arm" => CpgNodeKind::MatchArm,
+            "return_expression" => CpgNodeKind::Return,
+            "break_expression" => CpgNodeKind::Break,
+            "continue_expression" => CpgNodeKind::Continue,
+            "try_expression" => CpgNodeKind::Try,
+            "binary_expression" => CpgNodeKind::BinaryOp { .. },
+            "unary_expression" => CpgNodeKind::UnaryOp { .. },
+            "assignment_expression" => CpgNodeKind::Assignment { .. },
+            "compound_assignment_expr" => CpgNodeKind::Assignment { .. },
+            "call_expression" => CpgNodeKind::Call { .. },
+            "field_expression" => CpgNodeKind::MemberAccess { .. },
+            "index_expression" => CpgNodeKind::IndexAccess,
+            "identifier" => CpgNodeKind::Identifier { .. },
+            "type_identifier" => CpgNodeKind::Identifier { .. },
+            "field_identifier" => CpgNodeKind::Identifier { .. },
+            "integer_literal" => CpgNodeKind::Literal { kind: LiteralKind::Integer(_) },
+            "float_literal" => CpgNodeKind::Literal { kind: LiteralKind::Float(_) },
+            "string_literal" => CpgNodeKind::Literal { kind: LiteralKind::String(_) },
+            "raw_string_literal" => CpgNodeKind::Literal { kind: LiteralKind::String(_) },
+            "char_literal" => CpgNodeKind::Literal { kind: LiteralKind::Char('c') },
+            "boolean_literal" => CpgNodeKind::Literal { kind: LiteralKind::Bool(_) },
+            "array_expression" => CpgNodeKind::Literal { kind: LiteralKind::Array },
+            "use_declaration" => CpgNodeKind::Import { .. },
+            "attribute_item" => CpgNodeKind::Attribute { .. },
+            "inner_attribute_item" => CpgNodeKind::Attribute { .. },
+            "macro_invocation" => CpgNodeKind::Macro { .. },
+            "line_comment" => CpgNodeKind::Comment { .. },
+            "block_comment" => CpgNodeKind::Comment { .. },
+            "type_item" => CpgNodeKind::TypeAnnotation { .. },
+            "generic_type" => CpgNodeKind::GenericParam { .. },
+            "type_parameters" => CpgNodeKind::GenericParam { .. },
+        );
+
+        // ---- a method call is a `call_expression` over a `field_expression` ----
+        // This grammar has no `method_call_expression` node, so `is_method` is
+        // read off the callee. Both spellings must therefore appear.
+        let call_flags: Vec<bool> = p
+            .iter()
+            .filter(|(k, _)| k == "call_expression")
+            .filter_map(|(_, v)| match v {
+                CpgNodeKind::Call { is_method, .. } => Some(*is_method),
+                _ => None,
+            })
+            .collect();
+        assert!(
+            call_flags.contains(&true),
+            "`arr.len()` is a method call; flags were {call_flags:?}"
+        );
+        assert!(
+            call_flags.contains(&false),
+            "`g()` is a free call; flags were {call_flags:?}"
+        );
+
+        // ---- integer literals are parsed in every radix the language spells ----
+        let ints: Vec<i64> = p
+            .iter()
+            .filter(|(k, _)| k == "integer_literal")
+            .filter_map(|(_, v)| match v {
+                CpgNodeKind::Literal { kind: LiteralKind::Integer(i) } => Some(*i),
+                _ => None,
+            })
+            .collect();
+        for (radix, expected) in [("hex", 0x1F), ("octal", 0o17), ("binary", 0b1010)] {
+            assert!(
+                ints.contains(&expected),
+                "the {radix} literal must parse to {expected}; parsed {ints:?}"
+            );
+        }
+        assert!(ints.contains(&1_000_000), "`_` separators are stripped");
+
+        // ---- doc comments are distinguished from ordinary ones ----
+        let comments: Vec<bool> = p
+            .iter()
+            .filter(|(k, _)| k == "line_comment" || k == "block_comment")
+            .filter_map(|(_, v)| match v {
+                CpgNodeKind::Comment { is_doc } => Some(*is_doc),
+                _ => None,
+            })
+            .collect();
+        assert!(comments.contains(&true), "`///` and `/** */` are doc comments");
+        assert!(comments.contains(&false), "`/* */` is not a doc comment");
+
+        // ---- visibility is read off the `pub` modifier ----
+        let visibilities: Vec<Visibility> = p
+            .iter()
+            .filter(|(k, _)| k == "function_item")
+            .filter_map(|(_, v)| match v {
+                CpgNodeKind::Function { signature } => Some(signature.visibility),
+                _ => None,
+            })
+            .collect();
+        assert!(visibilities.contains(&Visibility::Public), "`pub fn` is public");
+        assert!(visibilities.contains(&Visibility::Private), "a bare `fn` is private");
+
+        // ---- `async` is detected; the return type is carried ----
+        let asyncs: Vec<bool> = p
+            .iter()
+            .filter(|(k, _)| k == "function_item")
+            .filter_map(|(_, v)| match v {
+                CpgNodeKind::Function { signature } => Some(signature.is_async),
+                _ => None,
+            })
+            .collect();
+        assert!(asyncs.contains(&true));
+        assert!(asyncs.contains(&false));
+        assert!(
+            p.iter().any(|(k, v)| k == "function_item"
+                && matches!(v, CpgNodeKind::Function { signature }
+                    if signature.return_type.is_some())),
+            "a declared return type is carried into the signature"
+        );
+
+        // ---- `static mut` is mutable, plain `static`/`const` are not ----
+        let statics: Vec<bool> = p
+            .iter()
+            .filter(|(k, _)| k == "static_item")
+            .filter_map(|(_, v)| match v {
+                CpgNodeKind::Variable { is_mutable, .. } => Some(*is_mutable),
+                _ => None,
+            })
+            .collect();
+        assert!(statics.contains(&true), "`static mut` is mutable");
+        assert!(statics.contains(&false), "a plain `static` is not");
+
+        // ---- operators are extracted, not guessed ----
+        let ops: Vec<String> = p
+            .iter()
+            .filter_map(|(_, v)| match v {
+                CpgNodeKind::BinaryOp { operator }
+                | CpgNodeKind::UnaryOp { operator }
+                | CpgNodeKind::Assignment { operator } => Some(operator.to_string()),
+                _ => None,
+            })
+            .collect();
+        for op in [
+            "+", "-", "<", ">", "==", "!=", "<=", ">=", "&&", "||", "!", "<<", ">>", "=", "+=",
+            "-=", "*=", "/=", "%=", "&=", "|=", "^=",
+        ] {
+            assert!(ops.contains(&op.to_string()), "operator `{op}` was not extracted from {ops:?}");
+        }
+
+        // ---- the import path is the `use` tree, not the whole statement ----
+        assert!(
+            p.iter().any(|(k, v)| k == "use_declaration"
+                && matches!(v, CpgNodeKind::Import { path } if path.contains("std"))),
+            "the import path names the module"
+        );
+
+        // ---- the attribute name is the meta item, not the brackets ----
+        assert!(
+            p.iter().any(|(k, v)| k == "attribute_item"
+                && matches!(v, CpgNodeKind::Attribute { name } if name.contains("derive")
+                    || name.contains("allow"))),
+            "the attribute name is extracted"
+        );
+    }
+
+    #[cfg(feature = "lang-python")]
+    #[test]
+    fn python_mapping_table() {
+        const SRC: &str = r#"
+import os
+from sys import path
+
+@decorator
+class Foo:
+    """doc"""
+
+    def bar(self, a, b=1, c: int, d: int = 2):
+        # comment
+        x = 1
+        x += 2
+        y = 1.5
+        s = "hi" "there"
+        t = True
+        f = False
+        n = None
+        l = [1, 2]
+        m = {"k": 1}
+        g = lambda z: z + 1
+        if x > 0 and t:
+            return x
+        elif x < 0:
+            x = -x
+        else:
+            x = not t
+        while x:
+            break
+        for i in l:
+            continue
+        try:
+            raise ValueError()
+        except Exception:
+            pass
+        finally:
+            pass
+        match x:
+            case 1:
+                pass
+        o = self.attr
+        e = l[0]
+        return bar(1)
+
+    async def baz(self):
+        await self.bar()
+        yield 1
+"#;
+        let p = &mapped_kinds(SRC, Language::Python);
+        maps!(p,
+            "module" => CpgNodeKind::Root,
+            "class_definition" => CpgNodeKind::Class { .. },
+            "function_definition" => CpgNodeKind::Function { .. },
+            "lambda" => CpgNodeKind::Lambda { .. },
+            "parameters" => CpgNodeKind::Parameter { .. },
+            "default_parameter" => CpgNodeKind::Parameter { .. },
+            "typed_parameter" => CpgNodeKind::Parameter { .. },
+            "block" => CpgNodeKind::Block { .. },
+            "assignment" => CpgNodeKind::Assignment { .. },
+            "augmented_assignment" => CpgNodeKind::Assignment { .. },
+            "if_statement" => CpgNodeKind::If,
+            "elif_clause" => CpgNodeKind::Else,
+            "else_clause" => CpgNodeKind::Else,
+            "while_statement" => CpgNodeKind::While,
+            "for_statement" => CpgNodeKind::For,
+            "match_statement" => CpgNodeKind::Match,
+            "case_clause" => CpgNodeKind::MatchArm,
+            "return_statement" => CpgNodeKind::Return,
+            "break_statement" => CpgNodeKind::Break,
+            "continue_statement" => CpgNodeKind::Continue,
+            "try_statement" => CpgNodeKind::Try,
+            "except_clause" => CpgNodeKind::Catch,
+            "finally_clause" => CpgNodeKind::Finally,
+            "raise_statement" => CpgNodeKind::Throw,
+            "binary_operator" => CpgNodeKind::BinaryOp { .. },
+            "comparison_operator" => CpgNodeKind::BinaryOp { .. },
+            "boolean_operator" => CpgNodeKind::BinaryOp { .. },
+            "unary_operator" => CpgNodeKind::UnaryOp { .. },
+            "not_operator" => CpgNodeKind::UnaryOp { .. },
+            "call" => CpgNodeKind::Call { .. },
+            "attribute" => CpgNodeKind::MemberAccess { .. },
+            "subscript" => CpgNodeKind::IndexAccess,
+            "identifier" => CpgNodeKind::Identifier { .. },
+            "await" => CpgNodeKind::Await,
+            "yield" => CpgNodeKind::Yield,
+            "integer" => CpgNodeKind::Literal { kind: LiteralKind::Integer(_) },
+            "float" => CpgNodeKind::Literal { kind: LiteralKind::Float(_) },
+            "string" => CpgNodeKind::Literal { kind: LiteralKind::String(_) },
+            "concatenated_string" => CpgNodeKind::Literal { kind: LiteralKind::String(_) },
+            "true" => CpgNodeKind::Literal { kind: LiteralKind::Bool(true) },
+            "false" => CpgNodeKind::Literal { kind: LiteralKind::Bool(false) },
+            "none" => CpgNodeKind::Literal { kind: LiteralKind::Null },
+            "list" => CpgNodeKind::Literal { kind: LiteralKind::Array },
+            "dictionary" => CpgNodeKind::Literal { kind: LiteralKind::Object },
+            "import_statement" => CpgNodeKind::Import { .. },
+            "import_from_statement" => CpgNodeKind::Import { .. },
+            "decorator" => CpgNodeKind::Attribute { .. },
+            "comment" => CpgNodeKind::Comment { is_doc: false },
+            // The leading string statement of a body is a docstring, not code.
+            "expression_statement" => CpgNodeKind::Comment { is_doc: true },
+        );
+
+        // The mapper is also reachable through the public pipeline.
+        let cpg = build_source(SRC, Language::Python);
+        assert!(cpg.functions().count() >= 2, "bar and baz are functions");
+    }
+
+    #[cfg(feature = "lang-javascript")]
+    #[test]
+    fn javascript_mapping_table() {
+        const SRC: &str = r#"
+import fs from "fs";
+export const K = 1;
+
+function top() { return 1; }
+function* gen() { yield 1; }
+
+/** doc */
+class Foo extends Bar {
+  field = 1;
+  constructor() { super(); }
+  method(a, b) {
+    let x = 1;
+    var y = 2;
+    const z = 3;
+    x = x + 1;
+    x += 1;
+    x++;
+    let n = -x;
+    let s = "s";
+    let ts = `t${x}`;
+    let b = true, c = false;
+    let nu = null, ud = undefined;
+    let arr = [1, 2];
+    let k = 1;
+    let obj = { k };
+    let re = /ab+/;
+    let fl = 1.5;
+    let fn = function () { return 1; };
+    let ar = (q) => q + 1;
+    let g = this.prop;
+    let e = arr[0];
+    let call = top(1);
+    let nw = new Foo();
+    if (x) { } else { }
+    while (x) { break; }
+    do { continue; } while (x);
+    for (let i = 0; i < 2; i++) { }
+    for (const p in obj) { }
+    for (const v of arr) { }
+    switch (x) { case 1: break; default: break; }
+    try { throw new Error(); } catch (err) { } finally { }
+    return x;
+  }
+  static sm() { }
+  async wait() { await top(); }
+}
+"#;
+        let p = &mapped_kinds(SRC, Language::JavaScript);
+        maps!(p,
+            "program" => CpgNodeKind::Root,
+            "class_declaration" => CpgNodeKind::Class { .. },
+            "function_declaration" => CpgNodeKind::Function { .. },
+            // The FIXED arm: modern tree-sitter-javascript emits
+            // `function_expression`, not the bare `function` the table had.
+            "function_expression" => CpgNodeKind::Function { .. },
+            "generator_function_declaration" => CpgNodeKind::Function { .. },
+            "method_definition" => CpgNodeKind::Function { .. },
+            "arrow_function" => CpgNodeKind::Lambda { .. },
+            "formal_parameters" => CpgNodeKind::Parameter { .. },
+            "statement_block" => CpgNodeKind::Block { .. },
+            "variable_declaration" => CpgNodeKind::Variable { is_mutable: true, .. },
+            "lexical_declaration" => CpgNodeKind::Variable { .. },
+            "variable_declarator" => CpgNodeKind::Variable { .. },
+            "field_definition" => CpgNodeKind::Field { .. },
+            "if_statement" => CpgNodeKind::If,
+            "else_clause" => CpgNodeKind::Else,
+            "while_statement" => CpgNodeKind::While,
+            "for_statement" => CpgNodeKind::For,
+            // `for…of` shares the `for_in_statement` kind in this grammar.
+            "for_in_statement" => CpgNodeKind::For,
+            "do_statement" => CpgNodeKind::Loop,
+            "switch_statement" => CpgNodeKind::Match,
+            "switch_case" => CpgNodeKind::MatchArm,
+            "switch_default" => CpgNodeKind::MatchArm,
+            "return_statement" => CpgNodeKind::Return,
+            "break_statement" => CpgNodeKind::Break,
+            "continue_statement" => CpgNodeKind::Continue,
+            "try_statement" => CpgNodeKind::Try,
+            "catch_clause" => CpgNodeKind::Catch,
+            "finally_clause" => CpgNodeKind::Finally,
+            "throw_statement" => CpgNodeKind::Throw,
+            "binary_expression" => CpgNodeKind::BinaryOp { .. },
+            "unary_expression" => CpgNodeKind::UnaryOp { .. },
+            "update_expression" => CpgNodeKind::UnaryOp { .. },
+            "assignment_expression" => CpgNodeKind::Assignment { .. },
+            "augmented_assignment_expression" => CpgNodeKind::Assignment { .. },
+            "call_expression" => CpgNodeKind::Call { .. },
+            "new_expression" => CpgNodeKind::Call { .. },
+            "member_expression" => CpgNodeKind::MemberAccess { .. },
+            "subscript_expression" => CpgNodeKind::IndexAccess,
+            "identifier" => CpgNodeKind::Identifier { .. },
+            "property_identifier" => CpgNodeKind::Identifier { .. },
+            "shorthand_property_identifier" => CpgNodeKind::Identifier { .. },
+            "await_expression" => CpgNodeKind::Await,
+            "yield_expression" => CpgNodeKind::Yield,
+            "number" => CpgNodeKind::Literal { .. },
+            "string" => CpgNodeKind::Literal { kind: LiteralKind::String(_) },
+            "template_string" => CpgNodeKind::Literal { kind: LiteralKind::String(_) },
+            "true" => CpgNodeKind::Literal { kind: LiteralKind::Bool(true) },
+            "false" => CpgNodeKind::Literal { kind: LiteralKind::Bool(false) },
+            "null" => CpgNodeKind::Literal { kind: LiteralKind::Null },
+            "undefined" => CpgNodeKind::Literal { kind: LiteralKind::Null },
+            "array" => CpgNodeKind::Literal { kind: LiteralKind::Array },
+            "object" => CpgNodeKind::Literal { kind: LiteralKind::Object },
+            "regex" => CpgNodeKind::Literal { kind: LiteralKind::Regex(_) },
+            "import_statement" => CpgNodeKind::Import { .. },
+            "import" => CpgNodeKind::Import { .. },
+            "export_statement" => CpgNodeKind::Import { .. },
+            "comment" => CpgNodeKind::Comment { is_doc: true },
+        );
+
+        // Both integer and fractional `number` literals are classified.
+        let numbers: Vec<&CpgNodeKind> = p
+            .iter()
+            .filter(|(k, _)| k == "number")
+            .map(|(_, v)| v)
+            .collect();
+        assert!(numbers
+            .iter()
+            .any(|k| matches!(k, CpgNodeKind::Literal { kind: LiteralKind::Integer(_) })));
+        assert!(numbers
+            .iter()
+            .any(|k| matches!(k, CpgNodeKind::Literal { kind: LiteralKind::Float(_) })));
+    }
+
+    /// TypeScript reuses the JavaScript mapper, and reaches three arms the JS
+    /// grammar has no syntax for.
+    #[cfg(feature = "lang-typescript")]
+    #[test]
+    fn typescript_reuses_the_javascript_mapper() {
+        const SRC: &str = r#"
+interface I { a: number; }
+class C implements I {
+  public a: number = 1;
+  m(x: number, y?: string): number {
+    let v: number = x;
+    return v;
+  }
+}
+"#;
+        let p = &mapped_kinds(SRC, Language::TypeScript);
+        maps!(p,
+            "public_field_definition" => CpgNodeKind::Field { .. },
+            "required_parameter" => CpgNodeKind::Parameter { .. },
+            "optional_parameter" => CpgNodeKind::Parameter { .. },
+            "method_definition" => CpgNodeKind::Function { .. },
+            "class_declaration" => CpgNodeKind::Class { .. },
+        );
+    }
+
+    #[cfg(feature = "lang-go")]
+    #[test]
+    fn go_mapping_table() {
+        const SRC: &str = r#"
+package main
+
+import "fmt"
+
+// comment
+type T struct { A int }
+type I interface { M() }
+
+func f(a int, b ...string) int {
+	var v int
+	const c = 1
+	x := 1
+	x = x + 1
+	y := 1.5
+	s := "s"
+	r := `raw`
+	t := true
+	n := false
+	var p *int = nil
+	if x > 0 { } else { }
+	for i := 0; i < 2; i++ { break }
+	for { continue }
+	switch x { case 1: default: }
+	switch any(x).(type) { case int: }
+	go f(1, "a")
+	defer f(2, "b")
+	fmt.Println(x)
+	arr := []int{1}
+	_ = arr[0]
+	fn := func() {}
+	_ = -x
+	return x
+}
+
+func (t T) M() {}
+"#;
+        let p = &mapped_kinds(SRC, Language::Go);
+        maps!(p,
+            "source_file" => CpgNodeKind::Root,
+            "package_clause" => CpgNodeKind::Module { .. },
+            "type_declaration" => CpgNodeKind::Struct { .. },
+            "type_spec" => CpgNodeKind::Struct { .. },
+            "interface_type" => CpgNodeKind::Trait { .. },
+            "function_declaration" => CpgNodeKind::Function { .. },
+            "method_declaration" => CpgNodeKind::Function { .. },
+            "func_literal" => CpgNodeKind::Lambda { .. },
+            "parameter_declaration" => CpgNodeKind::Parameter { .. },
+            "variadic_parameter_declaration" => CpgNodeKind::Unknown { .. },
+            "block" => CpgNodeKind::Block { .. },
+            "short_var_declaration" => CpgNodeKind::Variable { is_mutable: true, .. },
+            "var_declaration" => CpgNodeKind::Variable { is_mutable: true, .. },
+            "const_declaration" => CpgNodeKind::Variable { is_mutable: false, .. },
+            "if_statement" => CpgNodeKind::If,
+            "for_statement" => CpgNodeKind::For,
+            // The FIXED arm: tree-sitter-go splits `switch` by flavor.
+            "expression_switch_statement" => CpgNodeKind::Match,
+            "type_switch_statement" => CpgNodeKind::Match,
+            "expression_case" => CpgNodeKind::MatchArm,
+            "type_case" => CpgNodeKind::MatchArm,
+            "default_case" => CpgNodeKind::MatchArm,
+            "return_statement" => CpgNodeKind::Return,
+            "break_statement" => CpgNodeKind::Break,
+            "continue_statement" => CpgNodeKind::Continue,
+            "go_statement" => CpgNodeKind::Await,
+            "defer_statement" => CpgNodeKind::Finally,
+            "binary_expression" => CpgNodeKind::BinaryOp { .. },
+            "unary_expression" => CpgNodeKind::UnaryOp { .. },
+            "assignment_statement" => CpgNodeKind::Assignment { .. },
+            "call_expression" => CpgNodeKind::Call { .. },
+            "selector_expression" => CpgNodeKind::MemberAccess { .. },
+            "index_expression" => CpgNodeKind::IndexAccess,
+            "identifier" => CpgNodeKind::Identifier { .. },
+            "field_identifier" => CpgNodeKind::Identifier { .. },
+            "package_identifier" => CpgNodeKind::Identifier { .. },
+            "type_identifier" => CpgNodeKind::Identifier { .. },
+            "int_literal" => CpgNodeKind::Literal { kind: LiteralKind::Integer(_) },
+            "float_literal" => CpgNodeKind::Literal { kind: LiteralKind::Float(_) },
+            "interpreted_string_literal" => CpgNodeKind::Literal { kind: LiteralKind::String(_) },
+            "raw_string_literal" => CpgNodeKind::Literal { kind: LiteralKind::String(_) },
+            "true" => CpgNodeKind::Literal { kind: LiteralKind::Bool(true) },
+            "false" => CpgNodeKind::Literal { kind: LiteralKind::Bool(false) },
+            "nil" => CpgNodeKind::Literal { kind: LiteralKind::Null },
+            "import_declaration" => CpgNodeKind::Import { .. },
+            "comment" => CpgNodeKind::Comment { is_doc: true },
+        );
+    }
+
+    #[cfg(feature = "lang-java")]
+    #[test]
+    fn java_mapping_table() {
+        const SRC: &str = r#"
+package com.example;
+
+import java.util.List;
+
+/** doc */
+@Deprecated
+public abstract class Foo extends Bar implements Baz {
+    private static final int F = 1;
+    public int g;
+
+    Foo() { }
+
+    @SuppressWarnings("x")
+    public static int m(int a, String... rest) {
+        // line comment
+        int x = 1;
+        final int y = 2;
+        double d = 1.5;
+        double hf = 0x1.8p1;
+        char ch = 'c';
+        String s = "s";
+        boolean t = true, f = false;
+        Object n = null;
+        int[] arr = {1, 2};
+        int h = 0x1F, o = 017, b = 0b1;
+        x = x + 1;
+        x++;
+        int u = -x;
+        if (x > 0) { } else { }
+        while (x > 0) { break; }
+        do { } while (false);
+        for (int i = 0; i < 2; i++) { continue; }
+        for (String r : rest) { }
+        int sw = switch (x) { case 1 -> 1; default -> 0; };
+        switch (x) { case 1: break; default: break; }
+        try { throw new RuntimeException(); } catch (Exception e) { } finally { }
+        try (AutoCloseable ac = null) { } catch (Exception e) { }
+        Foo o2 = new Foo();
+        o2.m(1);
+        int e2 = arr[0];
+        Runnable l = () -> { };
+        System.out.println(this.g);
+        return x;
+    }
+}
+interface I { }
+enum E { A }
+"#;
+        let p = &mapped_kinds(SRC, Language::Java);
+        maps!(p,
+            "program" => CpgNodeKind::Root,
+            "package_declaration" => CpgNodeKind::Module { .. },
+            "class_declaration" => CpgNodeKind::Class { is_abstract: true, .. },
+            "interface_declaration" => CpgNodeKind::Trait { .. },
+            "enum_declaration" => CpgNodeKind::Enum { .. },
+            "method_declaration" => CpgNodeKind::Function { .. },
+            "constructor_declaration" => CpgNodeKind::Function { .. },
+            "lambda_expression" => CpgNodeKind::Lambda { .. },
+            "formal_parameter" => CpgNodeKind::Parameter { is_variadic: false, .. },
+            "spread_parameter" => CpgNodeKind::Parameter { is_variadic: true, .. },
+            "block" => CpgNodeKind::Block { .. },
+            "local_variable_declaration" => CpgNodeKind::Variable { .. },
+            "variable_declarator" => CpgNodeKind::Variable { .. },
+            "field_declaration" => CpgNodeKind::Field { .. },
+            "if_statement" => CpgNodeKind::If,
+            "while_statement" => CpgNodeKind::While,
+            "for_statement" => CpgNodeKind::For,
+            "enhanced_for_statement" => CpgNodeKind::For,
+            "do_statement" => CpgNodeKind::Loop,
+            "switch_expression" => CpgNodeKind::Match,
+            "switch_block_statement_group" => CpgNodeKind::MatchArm,
+            "switch_rule" => CpgNodeKind::MatchArm,
+            "return_statement" => CpgNodeKind::Return,
+            "break_statement" => CpgNodeKind::Break,
+            "continue_statement" => CpgNodeKind::Continue,
+            "try_statement" => CpgNodeKind::Try,
+            "try_with_resources_statement" => CpgNodeKind::Try,
+            "catch_clause" => CpgNodeKind::Catch,
+            "finally_clause" => CpgNodeKind::Finally,
+            "throw_statement" => CpgNodeKind::Throw,
+            "binary_expression" => CpgNodeKind::BinaryOp { .. },
+            "unary_expression" => CpgNodeKind::UnaryOp { .. },
+            "update_expression" => CpgNodeKind::UnaryOp { .. },
+            "assignment_expression" => CpgNodeKind::Assignment { .. },
+            "method_invocation" => CpgNodeKind::Call { is_method: true, .. },
+            "object_creation_expression" => CpgNodeKind::Call { is_method: true, .. },
+            "field_access" => CpgNodeKind::MemberAccess { .. },
+            "array_access" => CpgNodeKind::IndexAccess,
+            "identifier" => CpgNodeKind::Identifier { .. },
+            "type_identifier" => CpgNodeKind::Identifier { .. },
+            "decimal_integer_literal" => CpgNodeKind::Literal { kind: LiteralKind::Integer(_) },
+            "hex_integer_literal" => CpgNodeKind::Literal { kind: LiteralKind::Integer(_) },
+            "octal_integer_literal" => CpgNodeKind::Literal { kind: LiteralKind::Integer(_) },
+            "binary_integer_literal" => CpgNodeKind::Literal { kind: LiteralKind::Integer(_) },
+            "decimal_floating_point_literal" => CpgNodeKind::Literal { kind: LiteralKind::Float(_) },
+            "hex_floating_point_literal" => CpgNodeKind::Literal { kind: LiteralKind::Float(_) },
+            "string_literal" => CpgNodeKind::Literal { kind: LiteralKind::String(_) },
+            "character_literal" => CpgNodeKind::Literal { kind: LiteralKind::Char('c') },
+            "true" => CpgNodeKind::Literal { kind: LiteralKind::Bool(true) },
+            "false" => CpgNodeKind::Literal { kind: LiteralKind::Bool(false) },
+            "null_literal" => CpgNodeKind::Literal { kind: LiteralKind::Null },
+            "array_initializer" => CpgNodeKind::Literal { kind: LiteralKind::Array },
+            "import_declaration" => CpgNodeKind::Import { .. },
+            "marker_annotation" => CpgNodeKind::Attribute { .. },
+            "annotation" => CpgNodeKind::Attribute { .. },
+            "line_comment" => CpgNodeKind::Comment { is_doc: false },
+            "block_comment" => CpgNodeKind::Comment { is_doc: true },
+        );
+
+        // Java visibility and modifiers are read off the `modifiers` child.
+        let m = p
+            .iter()
+            .find(|(k, v)| k == "method_declaration" && matches!(v, CpgNodeKind::Function { .. }))
+            .map(|(_, v)| v)
+            .expect("a method_declaration");
+        match m {
+            CpgNodeKind::Function { signature } => {
+                assert_eq!(signature.visibility, Visibility::Public);
+                assert!(signature.is_static, "`public static int m` is static");
+                assert!(signature.return_type.is_some(), "`int` return type");
+            }
+            other => panic!("expected Function, got {other:?}"),
+        }
+        // A field with no access modifier is package-private.
+        let pkg_private = p.iter().any(|(k, v)| {
+            k == "field_declaration"
+                && matches!(v, CpgNodeKind::Field { visibility: Visibility::Private, .. })
+        });
+        let public_field = p.iter().any(|(k, v)| {
+            k == "field_declaration"
+                && matches!(v, CpgNodeKind::Field { visibility: Visibility::Public, .. })
+        });
+        assert!(pkg_private, "`private static final int F` is private");
+        assert!(public_field, "`public int g` is public");
+    }
+
+    #[cfg(feature = "lang-cpp")]
+    #[test]
+    fn cpp_mapping_table() {
+        const SRC: &str = r#"
+#include <vector>
+
+namespace ns {
+
+/// doc
+class C {
+public:
+    int f;
+    int m(int a) { return a; }
+};
+
+struct S { int x; };
+enum E { A };
+
+int g(int a, char c) {
+    int x = 1;
+    double d = 1.5;
+    const char* s = "s";
+    const char* r = R"(raw)";
+    char ch = 'c';
+    bool t = true, f2 = false;
+    void* n = nullptr;
+    int arr[] = {1, 2};
+    x = x + 1;
+    x++;
+    int u = -x;
+    if (x > 0) { } else { }
+    while (x) { break; }
+    do { } while (0);
+    for (int i = 0; i < 2; i++) { continue; }
+    for (auto& v : arr) { }
+    switch (x) { case 1: break; }
+    try { throw 1; } catch (...) { }
+    C obj; obj.m(1);
+    int e = arr[0];
+    auto l = [](int q) { return q; };
+    return x;
+}
+}
+"#;
+        let p = &mapped_kinds(SRC, Language::Cpp);
+        maps!(p,
+            "translation_unit" => CpgNodeKind::Root,
+            "namespace_definition" => CpgNodeKind::Module { .. },
+            "class_specifier" => CpgNodeKind::Class { .. },
+            "struct_specifier" => CpgNodeKind::Struct { .. },
+            "enum_specifier" => CpgNodeKind::Enum { .. },
+            "function_definition" => CpgNodeKind::Function { .. },
+            "function_declarator" => CpgNodeKind::Function { .. },
+            "lambda_expression" => CpgNodeKind::Lambda { .. },
+            "parameter_declaration" => CpgNodeKind::Parameter { .. },
+            "compound_statement" => CpgNodeKind::Block { .. },
+            "declaration" => CpgNodeKind::Variable { .. },
+            "init_declarator" => CpgNodeKind::Variable { .. },
+            "field_declaration" => CpgNodeKind::Field { .. },
+            "if_statement" => CpgNodeKind::If,
+            "else_clause" => CpgNodeKind::Else,
+            "while_statement" => CpgNodeKind::While,
+            "for_statement" => CpgNodeKind::For,
+            "for_range_loop" => CpgNodeKind::For,
+            "do_statement" => CpgNodeKind::Loop,
+            "switch_statement" => CpgNodeKind::Match,
+            "case_statement" => CpgNodeKind::MatchArm,
+            "return_statement" => CpgNodeKind::Return,
+            "break_statement" => CpgNodeKind::Break,
+            "continue_statement" => CpgNodeKind::Continue,
+            "try_statement" => CpgNodeKind::Try,
+            "catch_clause" => CpgNodeKind::Catch,
+            "throw_statement" => CpgNodeKind::Throw,
+            "binary_expression" => CpgNodeKind::BinaryOp { .. },
+            "unary_expression" => CpgNodeKind::UnaryOp { .. },
+            "update_expression" => CpgNodeKind::UnaryOp { .. },
+            "assignment_expression" => CpgNodeKind::Assignment { .. },
+            "call_expression" => CpgNodeKind::Call { .. },
+            "field_expression" => CpgNodeKind::MemberAccess { .. },
+            "subscript_expression" => CpgNodeKind::IndexAccess,
+            "identifier" => CpgNodeKind::Identifier { .. },
+            "field_identifier" => CpgNodeKind::Identifier { .. },
+            "type_identifier" => CpgNodeKind::Identifier { .. },
+            "namespace_identifier" => CpgNodeKind::Identifier { .. },
+            "number_literal" => CpgNodeKind::Literal { .. },
+            "string_literal" => CpgNodeKind::Literal { kind: LiteralKind::String(_) },
+            "raw_string_literal" => CpgNodeKind::Literal { kind: LiteralKind::String(_) },
+            "char_literal" => CpgNodeKind::Literal { kind: LiteralKind::Char('c') },
+            "true" => CpgNodeKind::Literal { kind: LiteralKind::Bool(true) },
+            "false" => CpgNodeKind::Literal { kind: LiteralKind::Bool(false) },
+            "nullptr" => CpgNodeKind::Literal { kind: LiteralKind::Null },
+            "initializer_list" => CpgNodeKind::Literal { kind: LiteralKind::Array },
+            "preproc_include" => CpgNodeKind::Import { .. },
+            "comment" => CpgNodeKind::Comment { is_doc: true },
+        );
+        // `number_literal` splits on the decimal point.
+        let nums: Vec<&CpgNodeKind> = p
+            .iter()
+            .filter(|(k, _)| k == "number_literal")
+            .map(|(_, v)| v)
+            .collect();
+        assert!(nums
+            .iter()
+            .any(|k| matches!(k, CpgNodeKind::Literal { kind: LiteralKind::Integer(_) })));
+        assert!(nums
+            .iter()
+            .any(|k| matches!(k, CpgNodeKind::Literal { kind: LiteralKind::Float(_) })));
+    }
+
+    /// C shares the C++ mapper; this pins the shared arms against the C grammar.
+    #[cfg(feature = "lang-c")]
+    #[test]
+    fn c_reuses_the_cpp_mapper() {
+        const SRC: &str = r#"
+#include <stdio.h>
+struct S { int x; };
+enum E { A };
+int g(int a) {
+    int x = 1;
+    x = x + 1;
+    if (x) { } else { }
+    switch (x) { case 1: break; }
+    return x;
+}
+"#;
+        let p = &mapped_kinds(SRC, Language::C);
+        maps!(p,
+            "translation_unit" => CpgNodeKind::Root,
+            "struct_specifier" => CpgNodeKind::Struct { .. },
+            "enum_specifier" => CpgNodeKind::Enum { .. },
+            "function_definition" => CpgNodeKind::Function { .. },
+            "compound_statement" => CpgNodeKind::Block { .. },
+            "if_statement" => CpgNodeKind::If,
+            "switch_statement" => CpgNodeKind::Match,
+            "case_statement" => CpgNodeKind::MatchArm,
+            "return_statement" => CpgNodeKind::Return,
+            "break_statement" => CpgNodeKind::Break,
+            "preproc_include" => CpgNodeKind::Import { .. },
+        );
+    }
+
+    #[cfg(feature = "lang-ruby")]
+    #[test]
+    fn ruby_mapping_table() {
+        const SRC: &str = r#"
+# comment
+module M
+  class C
+    def m(a, b)
+      x = 1
+      y = 1.5
+      s = "s"
+      sym = :sym
+      t = true
+      f = false
+      n = nil
+      arr = [1, 2]
+      h = {k: 1}
+      re = /ab+/
+      @iv = 1
+      @@cv = 2
+      $gv = 3
+      K = 4
+      x = x + 1
+      z = -x
+      if x > 0 then elsif x < 0 then else end
+      unless x then end
+      while x do break end
+      until x do break end
+      for i in arr do next end
+      case x when 1 then end
+      begin
+        r2 = 1
+      rescue => e
+      ensure
+      end
+      arr.each do |v| v end
+      l = ->(q) { q }
+      arr[0]
+      yield
+      return x
+    end
+
+    def self.sm; end
+  end
+end
+"#;
+        let p = &mapped_kinds(SRC, Language::Ruby);
+        maps!(p,
+            "program" => CpgNodeKind::Root,
+            "module" => CpgNodeKind::Module { .. },
+            "class" => CpgNodeKind::Class { .. },
+            "method" => CpgNodeKind::Function { .. },
+            "singleton_method" => CpgNodeKind::Function { .. },
+            "lambda" => CpgNodeKind::Lambda { .. },
+            "block" => CpgNodeKind::Lambda { .. },
+            "do_block" => CpgNodeKind::Lambda { .. },
+            "method_parameters" => CpgNodeKind::Parameter { .. },
+            "block_parameters" => CpgNodeKind::Parameter { .. },
+            "body_statement" => CpgNodeKind::Block { .. },
+            "assignment" => CpgNodeKind::Assignment { .. },
+            "if" => CpgNodeKind::If,
+            "unless" => CpgNodeKind::If,
+            "elsif" => CpgNodeKind::Else,
+            "else" => CpgNodeKind::Else,
+            "while" => CpgNodeKind::While,
+            "until" => CpgNodeKind::While,
+            "for" => CpgNodeKind::For,
+            "case" => CpgNodeKind::Match,
+            "when" => CpgNodeKind::MatchArm,
+            "return" => CpgNodeKind::Return,
+            "break" => CpgNodeKind::Break,
+            "next" => CpgNodeKind::Continue,
+            "begin" => CpgNodeKind::Try,
+            "rescue" => CpgNodeKind::Catch,
+            "ensure" => CpgNodeKind::Finally,
+            "yield" => CpgNodeKind::Yield,
+            "binary" => CpgNodeKind::BinaryOp { .. },
+            "unary" => CpgNodeKind::UnaryOp { .. },
+            "call" => CpgNodeKind::Call { is_method: true, .. },
+            "element_reference" => CpgNodeKind::IndexAccess,
+            "identifier" => CpgNodeKind::Identifier { .. },
+            "constant" => CpgNodeKind::Identifier { .. },
+            "instance_variable" => CpgNodeKind::Identifier { .. },
+            "class_variable" => CpgNodeKind::Identifier { .. },
+            "global_variable" => CpgNodeKind::Identifier { .. },
+            "integer" => CpgNodeKind::Literal { kind: LiteralKind::Integer(_) },
+            "float" => CpgNodeKind::Literal { kind: LiteralKind::Float(_) },
+            "string" => CpgNodeKind::Literal { kind: LiteralKind::String(_) },
+            // The FIXED arms: this grammar names symbols by position.
+            "simple_symbol" => CpgNodeKind::Literal { kind: LiteralKind::String(_) },
+            "hash_key_symbol" => CpgNodeKind::Literal { kind: LiteralKind::String(_) },
+            "true" => CpgNodeKind::Literal { kind: LiteralKind::Bool(true) },
+            "false" => CpgNodeKind::Literal { kind: LiteralKind::Bool(false) },
+            "nil" => CpgNodeKind::Literal { kind: LiteralKind::Null },
+            "array" => CpgNodeKind::Literal { kind: LiteralKind::Array },
+            "hash" => CpgNodeKind::Literal { kind: LiteralKind::Object },
+            "regex" => CpgNodeKind::Literal { kind: LiteralKind::Regex(_) },
+            "comment" => CpgNodeKind::Comment { is_doc: false },
+        );
+    }
+
+    #[cfg(feature = "lang-json")]
+    #[test]
+    fn json_mapping_table() {
+        const SRC: &str =
+            r#"{"a": 1, "b": 1.5, "c": "s", "d": true, "e": false, "f": null, "g": [1], "h": {}}"#;
+        let p = &mapped_kinds(SRC, Language::Json);
+        maps!(p,
+            "document" => CpgNodeKind::Root,
+            "object" => CpgNodeKind::Literal { kind: LiteralKind::Object },
+            "array" => CpgNodeKind::Literal { kind: LiteralKind::Array },
+            "pair" => CpgNodeKind::Field { .. },
+            "string" => CpgNodeKind::Literal { kind: LiteralKind::String(_) },
+            "true" => CpgNodeKind::Literal { kind: LiteralKind::Bool(true) },
+            "false" => CpgNodeKind::Literal { kind: LiteralKind::Bool(false) },
+            "null" => CpgNodeKind::Literal { kind: LiteralKind::Null },
+        );
+        let nums: Vec<&CpgNodeKind> = p
+            .iter()
+            .filter(|(k, _)| k == "number")
+            .map(|(_, v)| v)
+            .collect();
+        assert!(nums
+            .iter()
+            .any(|k| matches!(k, CpgNodeKind::Literal { kind: LiteralKind::Integer(_) })));
+        assert!(nums
+            .iter()
+            .any(|k| matches!(k, CpgNodeKind::Literal { kind: LiteralKind::Float(_) })));
+    }
+
+    #[cfg(feature = "lang-html")]
+    #[test]
+    fn html_mapping_table() {
+        const SRC: &str = r#"<!doctype html>
+<!-- comment -->
+<html>
+  <body class="c">
+    <p>text</p>
+    <br/>
+  </body>
+</html>
+"#;
+        let p = &mapped_kinds(SRC, Language::Html);
+        maps!(p,
+            "document" => CpgNodeKind::Root,
+            "attribute" => CpgNodeKind::Attribute { .. },
+            "text" => CpgNodeKind::Literal { kind: LiteralKind::String(_) },
+            "comment" => CpgNodeKind::Comment { is_doc: false },
+        );
+        // Elements carry their tag name in the `Unknown` payload (`html:<tag>`).
+        let tags: Vec<&CpgNodeKind> = p
+            .iter()
+            .filter(|(k, _)| k == "element" || k == "self_closing_tag")
+            .map(|(_, v)| v)
+            .collect();
+        assert!(!tags.is_empty(), "the snippet has elements");
+        assert!(
+            tags.iter().any(|k| matches!(k, CpgNodeKind::Unknown { kind } if kind.starts_with("html:"))),
+            "elements map to `html:<tag>`, got {tags:?}"
+        );
+    }
+
+    #[cfg(feature = "lang-css")]
+    #[test]
+    fn css_mapping_table() {
+        const SRC: &str = r#"
+@import "other.css";
+/* comment */
+.cls, #id, div {
+  color: #fff;
+  width: 10px;
+  z-index: 3;
+  opacity: 0.5;
+  content: "s";
+}
+"#;
+        let p = &mapped_kinds(SRC, Language::Css);
+        maps!(p,
+            "stylesheet" => CpgNodeKind::Root,
+            "rule_set" => CpgNodeKind::Block { .. },
+            "declaration" => CpgNodeKind::Variable { .. },
+            "property_name" => CpgNodeKind::Identifier { .. },
+            "class_name" => CpgNodeKind::Identifier { .. },
+            "id_name" => CpgNodeKind::Identifier { .. },
+            "tag_name" => CpgNodeKind::Identifier { .. },
+            "integer_value" => CpgNodeKind::Literal { kind: LiteralKind::Float(_) },
+            "float_value" => CpgNodeKind::Literal { kind: LiteralKind::Float(_) },
+            "string_value" => CpgNodeKind::Literal { kind: LiteralKind::String(_) },
+            "color_value" => CpgNodeKind::Literal { kind: LiteralKind::String(_) },
+            "import_statement" => CpgNodeKind::Import { .. },
+            "comment" => CpgNodeKind::Comment { is_doc: false },
+        );
+    }
+
+    #[cfg(feature = "lang-bash")]
+    #[test]
+    fn bash_mapping_table() {
+        const SRC: &str = r#"
+# comment
+f() {
+  local x=1
+  y="s"
+  z='raw'
+  cc=pre$x
+  if [ "$x" -eq 1 ]; then
+    echo "$x"
+  elif [ "$x" -eq 2 ]; then
+    echo 2
+  else
+    echo 3
+  fi
+  while true; do break; done
+  until false; do break; done
+  for i in 1 2; do continue; done
+  for ((i=0;i<2;i++)); do :; done
+  case "$x" in
+    1) echo one ;;
+  esac
+}
+f
+"#;
+        let p = &mapped_kinds(SRC, Language::Bash);
+        maps!(p,
+            "program" => CpgNodeKind::Root,
+            "function_definition" => CpgNodeKind::Function { .. },
+            "compound_statement" => CpgNodeKind::Block { .. },
+            "variable_assignment" => CpgNodeKind::Variable { .. },
+            "if_statement" => CpgNodeKind::If,
+            "elif_clause" => CpgNodeKind::Else,
+            "else_clause" => CpgNodeKind::Else,
+            // `until …; do …; done` shares the `while_statement` kind in this
+            // grammar (the `until` keyword is an anonymous child), so the
+            // mapper's `until_statement` alternative is redundant here and is
+            // kept only for grammars that do split the two.
+            "while_statement" => CpgNodeKind::While,
+            "for_statement" => CpgNodeKind::For,
+            "c_style_for_statement" => CpgNodeKind::For,
+            "case_statement" => CpgNodeKind::Match,
+            "case_item" => CpgNodeKind::MatchArm,
+            "command" => CpgNodeKind::Call { .. },
+            "command_name" => CpgNodeKind::Identifier { .. },
+            "variable_name" => CpgNodeKind::Identifier { .. },
+            "word" => CpgNodeKind::Identifier { .. },
+            "raw_string" => CpgNodeKind::Literal { kind: LiteralKind::String(_) },
+            "string" => CpgNodeKind::Literal { kind: LiteralKind::String(_) },
+            "concatenation" => CpgNodeKind::Literal { kind: LiteralKind::String(_) },
+            "number" => CpgNodeKind::Literal { kind: LiteralKind::Integer(_) },
+            "comment" => CpgNodeKind::Comment { is_doc: false },
+        );
+    }
+
+    #[cfg(feature = "lang-yaml")]
+    #[test]
+    fn yaml_mapping_table() {
+        const SRC: &str = r#"
+# comment
+a: 1
+b: 1.5
+c: "s"
+d: 's'
+e: plain
+f: true
+g: null
+h:
+  - 1
+  - 2
+i: {k: v}
+j: [1, 2]
+"#;
+        let p = &mapped_kinds(SRC, Language::Yaml);
+        maps!(p,
+            "stream" => CpgNodeKind::Root,
+            "document" => CpgNodeKind::Root,
+            "block_mapping" => CpgNodeKind::Literal { kind: LiteralKind::Object },
+            "flow_mapping" => CpgNodeKind::Literal { kind: LiteralKind::Object },
+            "block_sequence" => CpgNodeKind::Literal { kind: LiteralKind::Array },
+            "flow_sequence" => CpgNodeKind::Literal { kind: LiteralKind::Array },
+            "block_mapping_pair" => CpgNodeKind::Field { .. },
+            "string_scalar" => CpgNodeKind::Literal { kind: LiteralKind::String(_) },
+            "single_quote_scalar" => CpgNodeKind::Literal { kind: LiteralKind::String(_) },
+            "double_quote_scalar" => CpgNodeKind::Literal { kind: LiteralKind::String(_) },
+            "integer_scalar" => CpgNodeKind::Literal { kind: LiteralKind::Integer(_) },
+            "float_scalar" => CpgNodeKind::Literal { kind: LiteralKind::Float(_) },
+            "boolean_scalar" => CpgNodeKind::Literal { kind: LiteralKind::Bool(true) },
+            "null_scalar" => CpgNodeKind::Literal { kind: LiteralKind::Null },
+            "comment" => CpgNodeKind::Comment { is_doc: false },
+        );
+    }
+
+    #[cfg(feature = "lang-toml")]
+    #[test]
+    fn toml_mapping_table() {
+        const SRC: &str = r#"
+# comment
+a = 1
+b = 1.5
+c = "s"
+d = 'lit'
+e = true
+f = [1, 2]
+
+[tbl]
+g = 1
+h = {k = 1}
+"#;
+        let p = &mapped_kinds(SRC, Language::Toml);
+        maps!(p,
+            "document" => CpgNodeKind::Root,
+            "table" => CpgNodeKind::Literal { kind: LiteralKind::Object },
+            "inline_table" => CpgNodeKind::Literal { kind: LiteralKind::Object },
+            "array" => CpgNodeKind::Literal { kind: LiteralKind::Array },
+            "pair" => CpgNodeKind::Field { .. },
+            "string" => CpgNodeKind::Literal { kind: LiteralKind::String(_) },
+            "integer" => CpgNodeKind::Literal { kind: LiteralKind::Integer(_) },
+            "float" => CpgNodeKind::Literal { kind: LiteralKind::Float(_) },
+            "boolean" => CpgNodeKind::Literal { kind: LiteralKind::Bool(true) },
+            "comment" => CpgNodeKind::Comment { is_doc: false },
+        );
+    }
+
+    #[cfg(feature = "lang-markdown")]
+    #[test]
+    fn markdown_mapping_table() {
+        const SRC: &str = r#"
+# Heading
+
+A paragraph with `code span` and a [link](http://x).
+
+```rust
+fn main() {}
+```
+
+    indented code
+
+<div>html block</div>
+"#;
+        let p = &mapped_kinds(SRC, Language::Markdown);
+        maps!(p,
+            "document" => CpgNodeKind::Root,
+            "section" => CpgNodeKind::Block { .. },
+            "paragraph" => CpgNodeKind::Block { .. },
+            // The FIXED arm: tree-sitter-md names headings by their syntax.
+            "atx_heading" => CpgNodeKind::Block { .. },
+            "fenced_code_block" => CpgNodeKind::Literal { kind: LiteralKind::String(_) },
+            "indented_code_block" => CpgNodeKind::Literal { kind: LiteralKind::String(_) },
+            "html_block" => CpgNodeKind::Comment { is_doc: false },
+        );
     }
 }

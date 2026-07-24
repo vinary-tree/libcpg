@@ -51,6 +51,10 @@ pub mod algorithms;
 #[cfg(feature = "design-patterns")]
 pub mod patterns;
 
+/// Shared proptest strategies and helpers for the crate's own tests.
+#[cfg(test)]
+pub(crate) mod testutil;
+
 // Re-export commonly used types
 pub use graph::{
     CodePropertyGraph,

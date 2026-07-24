@@ -4,7 +4,7 @@
 use serde::{Deserialize, Serialize};
 
 /// Supported programming languages.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[non_exhaustive]
 pub enum Language {
@@ -112,6 +112,7 @@ pub enum Language {
 
     // === Other ===
     /// Unknown or unsupported language.
+    #[default]
     Unknown,
 }
 
@@ -351,12 +352,6 @@ impl std::fmt::Display for Language {
     }
 }
 
-impl Default for Language {
-    fn default() -> Self {
-        Self::Unknown
-    }
-}
-
 /// Programming paradigms.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
@@ -404,5 +399,194 @@ impl Paradigm {
 impl std::fmt::Display for Paradigm {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}", self.name())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// Every language variant that declares at least one file extension
+    /// (i.e. everything except `Unknown`).
+    const WITH_EXT: &[Language] = &[
+        Language::Rust,
+        Language::C,
+        Language::Cpp,
+        Language::Go,
+        Language::Zig,
+        Language::Java,
+        Language::Kotlin,
+        Language::Scala,
+        Language::Groovy,
+        Language::Python,
+        Language::JavaScript,
+        Language::TypeScript,
+        Language::Ruby,
+        Language::Php,
+        Language::Perl,
+        Language::Lua,
+        Language::Haskell,
+        Language::OCaml,
+        Language::FSharp,
+        Language::Elixir,
+        Language::Erlang,
+        Language::Clojure,
+        Language::CommonLisp,
+        Language::Scheme,
+        Language::CSharp,
+        Language::VbNet,
+        Language::Swift,
+        Language::ObjectiveC,
+        Language::Bash,
+        Language::PowerShell,
+        Language::Sql,
+        Language::GraphQL,
+        Language::Json,
+        Language::Yaml,
+        Language::Toml,
+        Language::Xml,
+        Language::Html,
+        Language::Css,
+        Language::Markdown,
+        Language::Rholang,
+        Language::MeTTa,
+    ];
+
+    #[test]
+    fn names_are_non_empty() {
+        for l in WITH_EXT {
+            assert!(!l.name().is_empty(), "{l:?} has an empty name");
+        }
+        assert_eq!(Language::Rust.name(), "Rust");
+        assert_eq!(Language::Cpp.name(), "C++");
+        assert_eq!(Language::CSharp.name(), "C#");
+        assert_eq!(Language::Unknown.name(), "Unknown");
+    }
+
+    #[test]
+    fn extension_round_trip() {
+        for &l in WITH_EXT {
+            let exts = l.extensions();
+            assert!(!exts.is_empty(), "{l:?} declares no extensions");
+            for &ext in exts {
+                assert_eq!(Language::from_extension(ext), l, "ext {ext:?}");
+                // A leading dot and upper-casing are both normalized away.
+                assert_eq!(Language::from_extension(&format!(".{ext}")), l);
+                assert_eq!(Language::from_extension(&ext.to_uppercase()), l);
+            }
+        }
+        assert_eq!(Language::Unknown.extensions().len(), 0);
+        assert_eq!(Language::from_extension("nonsense_xyz"), Language::Unknown);
+    }
+
+    #[test]
+    fn category_predicates() {
+        for l in [Language::Rust, Language::C, Language::Cpp, Language::Go, Language::Zig] {
+            assert!(l.is_systems(), "{l:?} should be a systems language");
+        }
+        for l in [
+            Language::Java,
+            Language::Kotlin,
+            Language::Scala,
+            Language::Groovy,
+            Language::Clojure,
+        ] {
+            assert!(l.is_jvm(), "{l:?} should be a JVM language");
+        }
+        for l in [
+            Language::Python,
+            Language::JavaScript,
+            Language::TypeScript,
+            Language::Ruby,
+            Language::Php,
+            Language::Perl,
+            Language::Lua,
+        ] {
+            assert!(l.is_scripting(), "{l:?} should be a scripting language");
+        }
+        for l in [
+            Language::Haskell,
+            Language::OCaml,
+            Language::FSharp,
+            Language::Elixir,
+            Language::Erlang,
+            Language::Clojure,
+            Language::CommonLisp,
+            Language::Scheme,
+        ] {
+            assert!(l.is_functional(), "{l:?} should be a functional language");
+        }
+        for l in [
+            Language::Json,
+            Language::Yaml,
+            Language::Toml,
+            Language::Xml,
+            Language::Html,
+            Language::Css,
+            Language::Markdown,
+        ] {
+            assert!(l.is_markup(), "{l:?} should be a markup language");
+        }
+        for l in [Language::Rholang, Language::MeTTa] {
+            assert!(l.is_f1r3fly(), "{l:?} should be an F1R3FLY.io language");
+        }
+
+        // Representative negatives.
+        assert!(!Language::Python.is_systems());
+        assert!(!Language::Rust.is_jvm());
+        assert!(!Language::Rust.is_scripting());
+        assert!(!Language::Rust.is_functional());
+        assert!(!Language::Rust.is_markup());
+        assert!(!Language::Rust.is_f1r3fly());
+    }
+
+    #[test]
+    fn paradigms_representative() {
+        assert!(Language::Rust.paradigms().contains(&Paradigm::Concurrent));
+        assert!(Language::Rust.paradigms().contains(&Paradigm::Functional));
+        assert!(Language::Rholang.paradigms().contains(&Paradigm::ProcessCalculus));
+        assert!(Language::MeTTa.paradigms().contains(&Paradigm::Logic));
+        assert_eq!(Language::Haskell.paradigms().len(), 1);
+        assert!(Language::Haskell.paradigms().contains(&Paradigm::Functional));
+        // Languages that fall through to the `_ => &[]` arm have no paradigms.
+        assert!(Language::Unknown.paradigms().is_empty());
+        assert!(Language::Zig.paradigms().is_empty());
+    }
+
+    #[test]
+    fn display_matches_name() {
+        assert_eq!(format!("{}", Language::Rust), "Rust");
+        assert_eq!(format!("{}", Language::Cpp), "C++");
+        for l in WITH_EXT {
+            assert_eq!(format!("{l}"), l.name());
+        }
+        assert_eq!(format!("{}", Paradigm::ProcessCalculus), "Process Calculus");
+        assert_eq!(format!("{}", Paradigm::ObjectOriented), "Object-Oriented");
+    }
+
+    #[test]
+    fn default_is_unknown() {
+        assert_eq!(Language::default(), Language::Unknown);
+    }
+}
+
+#[cfg(all(test, feature = "serde"))]
+mod serde_tests {
+    use super::*;
+
+    #[test]
+    fn serde_language_round_trip() {
+        for l in [
+            Language::Rust,
+            Language::Cpp,
+            Language::Rholang,
+            Language::MeTTa,
+            Language::Python,
+            Language::Unknown,
+        ] {
+            let s = serde_json::to_string(&l).expect("serialize Language");
+            let back: Language = serde_json::from_str(&s).expect("deserialize Language");
+            assert_eq!(l, back);
+        }
     }
 }

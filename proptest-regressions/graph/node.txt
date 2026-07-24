@@ -1,0 +1,8 @@
+# Seeds for failure cases proptest has generated in the past. It is
+# automatically read and these particular cases re-run before any
+# novel cases are generated.
+#
+# It is recommended to check this file in to source control so that
+# everyone who runs the test benefits from these saved cases.
+cc 522fcb43a7162d4604f9afc3d2d6b4e61beb1afc1986e5933145899e33013c87 # shrinks to kind = Literal { kind: Float(7.55629466312953e-309) }
+cc 7f25b1d2e96c51147749a0c53a8ec06c19905124f858f131a201489fb2cf1a22 # shrinks to kind = Literal { kind: Float(2.0009305261185874e143) }

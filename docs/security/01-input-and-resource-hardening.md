@@ -22,6 +22,7 @@ Source: [`diagrams/resource-bounds.puml`](../diagrams/resource-bounds.puml).*
 | `Vf2Matcher` strict toggles | `strict_kinds`/`strict_edges` off | `pattern::Vf2Matcher` | tighter feasibility test prunes branches earlier |
 | `DfgExtractorConfig::max_iterations` | `100` | `DfgExtractor` | reaching-definitions sweep stops iterating (guaranteed termination) |
 | `backward_slice` / `forward_slice` `max_nodes` | *(caller-supplied argument)* | crate-root slice fns | BFS returns as soon as the slice reaches `max_nodes` |
+| AST traversal guards | *(always on)* | `ast_descendants` / `ast_ancestors` / `ast_depth`, `CfgExtractor`, DFG reaching-defs | a cyclic `AstChild` graph terminates instead of looping or overflowing the stack |
 
 All of these are on the **feature-free surface** — you can configure and use them
 with `default = []`.
@@ -161,6 +162,56 @@ bound (Mode B). The graph is a single [petgraph](../GLOSSARY.md#petgraph) arena,
 its footprint is that arena plus the per-node child vectors and `Arc<str>` text; see
 [performance](../engineering/03-performance.md) for the data-structure details.
 
+## Malformed graphs: traversal guards
+
+The bounds above cap work on *well-formed* input. A separate hazard is input
+that is not well-formed at all.
+
+`CodePropertyGraph` is an **open** data structure: `add_node`, `connect`, and
+`node_mut` are public, and `connect` deliberately wires only the petgraph edge —
+it does **not** maintain `node.parent` / `node.children`, which the caller is
+responsible for. A consumer that assembles a graph by hand (or a language
+frontend with a bug, or a deserialized graph from an untrusted source) can
+therefore hand the analyses a shape no builder would produce:
+
+- a `parent` pointer to a node that was never added;
+- a `children` entry with no corresponding edge, or an edge with no pointers;
+- an `AstChild` **cycle**, so the "tree" is not a tree;
+- a `Call` whose `target` names a node that does not exist.
+
+Several analyses walk the AST recursively, and an `AstChild` cycle turns such a
+walk into an unbounded descent. Two of them — the CFG extractor's mutually
+recursive `process_*` handlers and the DFG's reaching-definitions sweep — would
+overflow the stack and **abort the process**, which is a denial of service
+reachable from any caller that builds a graph by hand.
+
+### The contract
+
+For structurally corrupt input the library guarantees **robustness, not
+correctness**: an analysis may return a meaningless answer, but it must
+
+1. **terminate**,
+2. **not panic**, and
+3. **not overflow the stack**.
+
+### How it is enforced
+
+| Traversal | Guard |
+| --- | --- |
+| `ast_descendants`, `ast_ancestors`, `ast_depth` | a **visited set** — each node is expanded at most once, so the walk is bounded by the node count |
+| `ast_ancestors` | additionally stops at a parent pointer that names a node not in the graph, rather than returning an id `node()` cannot resolve |
+| `CfgExtractor::process_node` (and every `process_*` handler) | a **path set** on `CfgContext` — a node already on the current recursion path becomes its own exit instead of being re-entered |
+| DFG reaching definitions (`visit_reaching`) | a **path set** — same rule |
+
+A *path* set rather than a global visited set is used in the two extractors so
+that a node legitimately reachable from two disjoint branches is still processed
+on each path; only a genuine cycle is cut. Tree input is therefore unaffected.
+
+These guarantees are pinned by `tests/robustness.rs`, which injects ten distinct
+corruptions into a plausible function graph and drives **every** public analysis
+over each one — see
+[`engineering/02-testing.md`](../engineering/02-testing.md#what-the-properties-assert).
+
 ## Hardening checklist for hostile input
 
 1. **Set a strict `max_file_size`** far below the 10 MB default (e.g. tens to a few
@@ -175,6 +226,7 @@ its footprint is that arena plus the per-node child vectors and `Arc<str>` text;
 6. **Deserialize only trusted graphs** (see the [threat model](00-threat-model.md)
    and [`usage/05-serialization.md`](../usage/05-serialization.md)).
 7. **Treat detection output as advisory**, never as a security gate.
+8. **Validate graphs you did not build yourself** (deserialized or caller-assembled) if you need *meaningful* results — the traversal guards guarantee termination, not that the answer means anything.
 
 ## Related pages
 

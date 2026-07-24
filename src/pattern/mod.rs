@@ -244,7 +244,7 @@ impl NodeKindMatcher {
 
 impl NodeKindTag {
     /// Converts this tag to a CpgNodeKind.
-    fn to_cpg_node_kind(&self, name_pattern: &Option<String>) -> CpgNodeKind {
+    fn to_cpg_node_kind(self, name_pattern: &Option<String>) -> CpgNodeKind {
         use std::sync::Arc;
         use crate::{MethodSignature, Visibility, ScopeId};
         use smallvec::smallvec;
@@ -697,5 +697,517 @@ mod tests {
         assert!(has_class, "Expected a Class node");
         assert!(has_function, "Expected a Function node");
         assert!(has_field, "Expected a Field node");
+    }
+
+    // ==================== added coverage: example-based ====================
+
+    fn func_sig(name: &str) -> crate::MethodSignature {
+        crate::MethodSignature {
+            name: name.into(),
+            params: Default::default(),
+            return_type: None,
+            is_static: false,
+            is_async: false,
+            visibility: crate::Visibility::Public,
+        }
+    }
+
+    /// One representative `CpgNodeKind` per `NodeKindTag`, plus several kinds
+    /// that deliberately fold onto `NodeKindTag::Unknown` (the `_` arm of
+    /// `from_kind`). Exercises every tag category.
+    pub(super) fn representative_kinds() -> Vec<(CpgNodeKind, NodeKindTag)> {
+        use std::sync::Arc;
+        use crate::{ScopeId, Visibility, LiteralKind};
+        vec![
+            (CpgNodeKind::Root, NodeKindTag::Root),
+            (CpgNodeKind::Module { name: Arc::from("m") }, NodeKindTag::Module),
+            (CpgNodeKind::Class { name: Arc::from("C"), is_abstract: false }, NodeKindTag::Class),
+            (CpgNodeKind::Struct { name: Arc::from("S") }, NodeKindTag::Struct),
+            (CpgNodeKind::Enum { name: Arc::from("E") }, NodeKindTag::Enum),
+            (CpgNodeKind::Trait { name: Arc::from("T") }, NodeKindTag::Trait),
+            (CpgNodeKind::Impl { for_type: Some(Arc::from("C")), trait_name: None }, NodeKindTag::Impl),
+            (CpgNodeKind::Function { signature: func_sig("f") }, NodeKindTag::Function),
+            (CpgNodeKind::Parameter { name: Arc::from("p"), param_type: None, is_variadic: false }, NodeKindTag::Parameter),
+            (CpgNodeKind::Block { scope: ScopeId::GLOBAL }, NodeKindTag::Block),
+            (CpgNodeKind::Variable { name: Arc::from("v"), var_type: None, scope: ScopeId::GLOBAL, is_mutable: false }, NodeKindTag::Variable),
+            (CpgNodeKind::Field { name: Arc::from("fld"), field_type: None, visibility: Visibility::Private }, NodeKindTag::Field),
+            (CpgNodeKind::Return, NodeKindTag::Return),
+            (CpgNodeKind::If, NodeKindTag::If),
+            (CpgNodeKind::While, NodeKindTag::While),
+            (CpgNodeKind::For, NodeKindTag::For),
+            (CpgNodeKind::Loop, NodeKindTag::Loop),
+            (CpgNodeKind::Match, NodeKindTag::Match),
+            (CpgNodeKind::BinaryOp { operator: Arc::from("+") }, NodeKindTag::BinaryOp),
+            (CpgNodeKind::UnaryOp { operator: Arc::from("!") }, NodeKindTag::UnaryOp),
+            (CpgNodeKind::Assignment { operator: Arc::from("=") }, NodeKindTag::Assignment),
+            (CpgNodeKind::Call { target: None, is_method: false }, NodeKindTag::Call),
+            (CpgNodeKind::MemberAccess { member: Arc::from("x") }, NodeKindTag::MemberAccess),
+            (CpgNodeKind::IndexAccess, NodeKindTag::IndexAccess),
+            (CpgNodeKind::Identifier { name: Arc::from("id"), definition: None }, NodeKindTag::Identifier),
+            (CpgNodeKind::Literal { kind: LiteralKind::Null }, NodeKindTag::Literal),
+            (CpgNodeKind::Lambda { captures: Default::default() }, NodeKindTag::Lambda),
+            (CpgNodeKind::Import { path: Arc::from("std") }, NodeKindTag::Import),
+            // Kinds without a dedicated tag collapse onto `Unknown`.
+            (CpgNodeKind::Comment { is_doc: false }, NodeKindTag::Unknown),
+            (CpgNodeKind::Break, NodeKindTag::Unknown),
+            (CpgNodeKind::Error { message: Arc::from("e") }, NodeKindTag::Unknown),
+            (CpgNodeKind::Unknown { kind: Arc::from("x") }, NodeKindTag::Unknown),
+        ]
+    }
+
+    #[test]
+    fn test_node_kind_tag_from_kind_and_matches_all_categories() {
+        for (kind, expected) in representative_kinds() {
+            assert_eq!(NodeKindTag::from_kind(&kind), expected, "from_kind({kind:?})");
+            // `matches` agrees with `from_kind`.
+            assert!(expected.matches(&kind), "{expected:?}.matches({kind:?})");
+            // A tag different from the kind's own tag must not match it.
+            let other = if expected == NodeKindTag::Root { NodeKindTag::If } else { NodeKindTag::Root };
+            assert!(!other.matches(&kind), "{other:?} should not match {kind:?}");
+        }
+    }
+
+    #[test]
+    fn test_node_kind_matcher_all_variants() {
+        use std::sync::Arc;
+        use crate::ScopeId;
+        let class = CpgNodeKind::Class { name: Arc::from("C"), is_abstract: false };
+        let func = CpgNodeKind::Function { signature: func_sig("f") };
+        let var = CpgNodeKind::Variable { name: Arc::from("v"), var_type: None, scope: ScopeId::GLOBAL, is_mutable: false };
+        let call = CpgNodeKind::Call { target: None, is_method: false };
+        let lit = CpgNodeKind::Literal { kind: crate::LiteralKind::Null };
+        let if_kind = CpgNodeKind::If;
+        let ret = CpgNodeKind::Return;
+
+        // Exact
+        assert!(NodeKindMatcher::Exact(NodeKindTag::Function).matches(&func));
+        assert!(!NodeKindMatcher::Exact(NodeKindTag::Function).matches(&class));
+
+        // AnyOf
+        let any_of = NodeKindMatcher::AnyOf(vec![NodeKindTag::Call, NodeKindTag::Literal]);
+        assert!(any_of.matches(&call));
+        assert!(any_of.matches(&lit));
+        assert!(!any_of.matches(&class));
+        assert!(!NodeKindMatcher::AnyOf(vec![]).matches(&class), "empty AnyOf matches nothing");
+
+        // AnyDeclaration
+        let decl = NodeKindMatcher::AnyDeclaration;
+        assert!(decl.matches(&class));
+        assert!(decl.matches(&func));
+        assert!(decl.matches(&var));
+        assert!(!decl.matches(&call));
+        assert!(!decl.matches(&if_kind));
+
+        // AnyExpression
+        let expr = NodeKindMatcher::AnyExpression;
+        assert!(expr.matches(&call));
+        assert!(expr.matches(&lit));
+        assert!(!expr.matches(&class));
+        assert!(!expr.matches(&ret));
+
+        // AnyStatement
+        let stmt = NodeKindMatcher::AnyStatement;
+        assert!(stmt.matches(&if_kind));
+        assert!(stmt.matches(&ret));
+        assert!(!stmt.matches(&class));
+        assert!(!stmt.matches(&call));
+
+        // Any
+        let any = NodeKindMatcher::Any;
+        for k in [&class, &func, &var, &call, &lit, &if_kind, &ret] {
+            assert!(any.matches(k));
+        }
+    }
+
+    #[test]
+    fn test_edge_kind_matcher_all_variants() {
+        use crate::{CfgEdgeKind, DfgEdgeKind};
+        let ast = CpgEdgeKind::AstChild;
+        let cfg = CpgEdgeKind::ControlFlow(CfgEdgeKind::Sequential);
+        let dfg = CpgEdgeKind::DataFlow(DfgEdgeKind::DefUse);
+        let call = CpgEdgeKind::StaticCall;
+        let dyn_call = CpgEdgeKind::DynamicCall;
+        let call_site = CpgEdgeKind::CallSite;
+
+        assert!(EdgeKindMatcher::AnyAst.matches(&ast));
+        assert!(!EdgeKindMatcher::AnyAst.matches(&cfg));
+
+        assert!(EdgeKindMatcher::AnyCfg.matches(&cfg));
+        assert!(!EdgeKindMatcher::AnyCfg.matches(&ast));
+
+        assert!(EdgeKindMatcher::AnyDfg.matches(&dfg));
+        assert!(!EdgeKindMatcher::AnyDfg.matches(&cfg));
+
+        assert!(EdgeKindMatcher::AnyCall.matches(&call));
+        assert!(EdgeKindMatcher::AnyCall.matches(&dyn_call));
+        assert!(EdgeKindMatcher::AnyCall.matches(&call_site));
+        assert!(!EdgeKindMatcher::AnyCall.matches(&ast));
+
+        for e in [&ast, &cfg, &dfg, &call, &dyn_call, &call_site] {
+            assert!(EdgeKindMatcher::Any.matches(e));
+        }
+    }
+
+    #[test]
+    fn test_pattern_match_matched_nodes() {
+        let pm = PatternMatch::new("P", NodeId::new(100), 1.0)
+            .with_mapping(NodeId::new(0), NodeId::new(10))
+            .with_mapping(NodeId::new(1), NodeId::new(11))
+            .with_mapping(NodeId::new(2), NodeId::new(12));
+
+        let got: std::collections::HashSet<u32> = pm.matched_nodes().map(|n| n.as_u32()).collect();
+        let expected: std::collections::HashSet<u32> = [10, 11, 12].into_iter().collect();
+        assert_eq!(got, expected);
+        assert_eq!(pm.matched_nodes().count(), 3);
+        assert_eq!(pm.match_size(), 3);
+    }
+
+    #[test]
+    fn test_node_constraint_builders() {
+        let c = NodeConstraint::new(3)
+            .with_kind(NodeKindMatcher::Exact(NodeKindTag::Function))
+            .with_name_pattern("run.*")
+            .with_property("visibility", "public")
+            .with_property("static", "true");
+
+        assert_eq!(c.index, 3);
+        assert!(matches!(c.kind, Some(NodeKindMatcher::Exact(NodeKindTag::Function))));
+        assert_eq!(c.name_pattern.as_deref(), Some("run.*"));
+        assert_eq!(c.properties.get("visibility").map(|s| s.as_str()), Some("public"));
+        assert_eq!(c.properties.get("static").map(|s| s.as_str()), Some("true"));
+        assert_eq!(c.properties.len(), 2);
+
+        // Defaults on a bare constraint.
+        let bare = NodeConstraint::new(0);
+        assert!(bare.kind.is_none());
+        assert!(bare.name_pattern.is_none());
+        assert!(bare.properties.is_empty());
+    }
+
+    #[test]
+    fn test_edge_constraint_builders() {
+        let e = EdgeConstraint::new(2, 5).with_kind(EdgeKindMatcher::AnyDfg);
+        assert_eq!(e.source, 2);
+        assert_eq!(e.target, 5);
+        assert!(matches!(e.kind, Some(EdgeKindMatcher::AnyDfg)));
+
+        let e2 = EdgeConstraint::new(0, 1);
+        assert!(e2.kind.is_none(), "default edge kind is None");
+    }
+
+    #[test]
+    fn test_to_pattern_graph_name_flow_and_dangling_edge() {
+        let template = PatternTemplate::new("T", "desc")
+            .with_node(
+                NodeConstraint::new(0)
+                    .with_kind(NodeKindMatcher::Exact(NodeKindTag::Function))
+                    .with_name_pattern("run"),
+            )
+            .with_node(NodeConstraint::new(1)) // no kind -> wildcard `pattern_any`
+            .with_node(NodeConstraint::new(2).with_kind(NodeKindMatcher::AnyExpression))
+            .with_edge(EdgeConstraint::new(0, 1).with_kind(EdgeKindMatcher::AnyAst))
+            .with_edge(EdgeConstraint::new(0, 9)); // index 9 does not exist -> skipped
+
+        let cpg = template.to_pattern_graph();
+        assert_eq!(cpg.node_count(), 3);
+
+        // Only the (0 -> 1) edge survives; the dangling (0 -> 9) is skipped.
+        let edge_count: usize = cpg.node_ids().map(|id| cpg.outgoing_edges(id).count()).sum();
+        assert_eq!(edge_count, 1, "dangling edge constraint must be skipped");
+
+        // The name pattern flows into the Function node's signature name.
+        let func = cpg
+            .nodes()
+            .find(|n| matches!(n.kind, CpgNodeKind::Function { .. }))
+            .expect("a Function node");
+        assert_eq!(func.name(), Some("run"));
+
+        // A constraint with no kind matcher becomes a wildcard `Unknown`.
+        assert!(cpg.nodes().any(|n| matches!(&n.kind, CpgNodeKind::Unknown { kind } if &**kind == "pattern_any")));
+        // `AnyExpression` becomes `Unknown{"pattern_expression"}`.
+        assert!(cpg.nodes().any(|n| matches!(&n.kind, CpgNodeKind::Unknown { kind } if &**kind == "pattern_expression")));
+    }
+
+    #[test]
+    fn test_subgraph_matcher_default_methods() {
+        use crate::{CpgNode, SourceRange, Language};
+        use std::sync::Arc;
+
+        // pattern: a single `If` node.
+        let mut pattern = CodePropertyGraph::new(Language::Rust);
+        pattern.add_node(CpgNode::new(NodeId::new(0), CpgNodeKind::If, SourceRange::default()));
+
+        // target: two `If` nodes and a `While`.
+        let mut target = CodePropertyGraph::new(Language::Rust);
+        target.add_node(CpgNode::new(NodeId::new(0), CpgNodeKind::If, SourceRange::default()));
+        target.add_node(CpgNode::new(NodeId::new(0), CpgNodeKind::If, SourceRange::default()));
+        target.add_node(CpgNode::new(NodeId::new(0), CpgNodeKind::While, SourceRange::default()));
+
+        let matcher = Vf2Matcher::new().with_strict_kinds(true);
+
+        // Both `If` nodes match.
+        assert_eq!(matcher.find_matches(&pattern, &target).len(), 2);
+
+        // `find_matches_limited` (default trait method) truncates to `limit`.
+        assert_eq!(matcher.find_matches_limited(&pattern, &target, 1).len(), 1);
+        assert!(matcher.find_matches_limited(&pattern, &target, 0).is_empty());
+        assert_eq!(matcher.find_matches_limited(&pattern, &target, 10).len(), 2);
+
+        // `contains_pattern` (default trait method) is true when present.
+        assert!(matcher.contains_pattern(&pattern, &target));
+
+        // An absent pattern (a `Class` node) is not contained.
+        let mut absent = CodePropertyGraph::new(Language::Rust);
+        absent.add_node(CpgNode::new(
+            NodeId::new(0),
+            CpgNodeKind::Class { name: Arc::from("C"), is_abstract: false },
+            SourceRange::default(),
+        ));
+        assert!(!matcher.contains_pattern(&absent, &target));
+        assert!(matcher.find_matches_limited(&absent, &target, 5).is_empty());
+    }
+}
+
+/// Materialization: a [`PatternTemplate`] is a *declarative* description, and
+/// [`PatternTemplate::to_pattern_graph`] turns it into the concrete
+/// [`CodePropertyGraph`] the matchers consume. These tests pin that
+/// translation — every node tag, every matcher kind, every edge matcher, and
+/// the treatment of dangling edge constraints.
+#[cfg(test)]
+mod materialization {
+    use super::*;
+    use crate::{CfgEdgeKind, DfgEdgeKind};
+
+    /// Every `NodeKindTag` round-trips through materialization: classifying the
+    /// node a tag materializes to recovers exactly that tag
+    /// (`from_kind ∘ to_cpg_node_kind = id`). This is what lets a template and
+    /// a real CPG be compared tag-wise by the matchers.
+    #[test]
+    fn every_tag_round_trips_through_the_pattern_graph() {
+        // The distinct tags of the representative table (`Unknown` repeats).
+        let mut tags: Vec<NodeKindTag> = super::tests::representative_kinds()
+            .into_iter()
+            .map(|(_, tag)| tag)
+            .collect();
+        tags.dedup();
+
+        for tag in tags {
+            let template = PatternTemplate::new("t", "d")
+                .with_node(NodeConstraint::new(0).with_kind(NodeKindMatcher::Exact(tag)));
+            let graph = template.to_pattern_graph();
+
+            assert_eq!(graph.node_count(), 1, "one constraint ⇒ one node");
+            let kind = &graph.nodes().next().expect("the materialized node").kind.clone();
+            assert_eq!(
+                NodeKindTag::from_kind(kind),
+                tag,
+                "materializing {tag:?} produced {kind:?}, which classifies differently"
+            );
+            // The tag also *matches* the node it materializes.
+            assert!(tag.matches(kind));
+        }
+    }
+
+    /// A name pattern is threaded into every name-bearing materialized kind;
+    /// without one, a placeholder is used.
+    #[test]
+    fn name_pattern_is_threaded_into_named_kinds() {
+        let named = PatternTemplate::new("t", "d")
+            .with_node(
+                NodeConstraint::new(0)
+                    .with_kind(NodeKindMatcher::Exact(NodeKindTag::Class))
+                    .with_name_pattern("Widget"),
+            )
+            .to_pattern_graph();
+        match &named.nodes().next().expect("node").kind {
+            CpgNodeKind::Class { name, is_abstract } => {
+                assert_eq!(&**name, "Widget");
+                assert!(!is_abstract);
+            }
+            other => panic!("expected Class, got {other:?}"),
+        }
+
+        let anonymous = PatternTemplate::new("t", "d")
+            .with_node(NodeConstraint::new(0).with_kind(NodeKindMatcher::Exact(NodeKindTag::Class)))
+            .to_pattern_graph();
+        match &anonymous.nodes().next().expect("node").kind {
+            CpgNodeKind::Class { name, .. } => assert_eq!(&**name, "_", "placeholder name"),
+            other => panic!("expected Class, got {other:?}"),
+        }
+
+        // Name-bearing kinds beyond `Class`: the pattern reaches each of them.
+        for (tag, extract) in [
+            (
+                NodeKindTag::Module,
+                (|k: &CpgNodeKind| match k {
+                    CpgNodeKind::Module { name } => Some(name.to_string()),
+                    _ => None,
+                }) as fn(&CpgNodeKind) -> Option<String>,
+            ),
+            (NodeKindTag::Function, |k| match k {
+                CpgNodeKind::Function { signature } => Some(signature.name.to_string()),
+                _ => None,
+            }),
+            (NodeKindTag::Impl, |k| match k {
+                CpgNodeKind::Impl { for_type, .. } => for_type.as_ref().map(|t| t.to_string()),
+                _ => None,
+            }),
+            (NodeKindTag::Identifier, |k| match k {
+                CpgNodeKind::Identifier { name, .. } => Some(name.to_string()),
+                _ => None,
+            }),
+            (NodeKindTag::Import, |k| match k {
+                CpgNodeKind::Import { path } => Some(path.to_string()),
+                _ => None,
+            }),
+            (NodeKindTag::MemberAccess, |k| match k {
+                CpgNodeKind::MemberAccess { member } => Some(member.to_string()),
+                _ => None,
+            }),
+        ] {
+            let g = PatternTemplate::new("t", "d")
+                .with_node(
+                    NodeConstraint::new(0)
+                        .with_kind(NodeKindMatcher::Exact(tag))
+                        .with_name_pattern("Widget"),
+                )
+                .to_pattern_graph();
+            let kind = g.nodes().next().expect("node").kind.clone();
+            assert_eq!(
+                extract(&kind).as_deref(),
+                Some("Widget"),
+                "{tag:?} must carry the name pattern"
+            );
+        }
+    }
+
+    /// The non-`Exact` matchers materialize to their wildcard placeholders, and
+    /// a constraint with no kind at all is the universal wildcard.
+    #[test]
+    fn wildcard_matchers_materialize_to_placeholders() {
+        let placeholder = |matcher: Option<NodeKindMatcher>| {
+            let mut c = NodeConstraint::new(0);
+            if let Some(m) = matcher {
+                c = c.with_kind(m);
+            }
+            let g = PatternTemplate::new("t", "d").with_node(c).to_pattern_graph();
+            let kind = g.nodes().next().expect("node").kind.clone();
+            match kind {
+                CpgNodeKind::Unknown { kind } => kind.to_string(),
+                other => panic!("expected a wildcard Unknown, got {other:?}"),
+            }
+        };
+
+        assert_eq!(placeholder(None), "pattern_any", "no kind ⇒ match anything");
+        assert_eq!(placeholder(Some(NodeKindMatcher::Any)), "pattern_any");
+        assert_eq!(
+            placeholder(Some(NodeKindMatcher::AnyDeclaration)),
+            "pattern_declaration"
+        );
+        assert_eq!(
+            placeholder(Some(NodeKindMatcher::AnyExpression)),
+            "pattern_expression"
+        );
+        assert_eq!(
+            placeholder(Some(NodeKindMatcher::AnyStatement)),
+            "pattern_statement"
+        );
+        // An empty alternation has no representative, so it degrades to `any`.
+        assert_eq!(placeholder(Some(NodeKindMatcher::AnyOf(vec![]))), "pattern_any");
+        // `Unknown` is a tag in its own right, distinct from the wildcards.
+        assert_eq!(
+            placeholder(Some(NodeKindMatcher::Exact(NodeKindTag::Unknown))),
+            "pattern_unknown"
+        );
+    }
+
+    /// A non-empty alternation materializes as its first alternative — the
+    /// representative the matcher then generalizes from.
+    #[test]
+    fn alternation_materializes_as_its_first_alternative() {
+        let g = PatternTemplate::new("t", "d")
+            .with_node(NodeConstraint::new(0).with_kind(NodeKindMatcher::AnyOf(vec![
+                NodeKindTag::While,
+                NodeKindTag::For,
+            ])))
+            .to_pattern_graph();
+        assert!(matches!(
+            g.nodes().next().expect("node").kind,
+            CpgNodeKind::While
+        ));
+    }
+
+    /// Every `EdgeKindMatcher` materializes to its representative edge kind,
+    /// and an edge constraint without a matcher defaults to the AST edge.
+    #[test]
+    fn edge_matchers_materialize_to_representative_edges() {
+        let build = |matcher: Option<EdgeKindMatcher>| {
+            let mut e = EdgeConstraint::new(0, 1);
+            if let Some(m) = matcher {
+                e = e.with_kind(m);
+            }
+            let g = PatternTemplate::new("t", "d")
+                .with_node(NodeConstraint::new(0).with_kind(NodeKindMatcher::Exact(NodeKindTag::Function)))
+                .with_node(NodeConstraint::new(1).with_kind(NodeKindMatcher::Exact(NodeKindTag::Block)))
+                .with_edge(e)
+                .to_pattern_graph();
+            assert_eq!(g.edge_count(), 1, "one constraint ⇒ one edge");
+            let kind = g.edges().next().expect("the materialized edge").kind.clone();
+            kind
+        };
+
+        assert_eq!(build(None), CpgEdgeKind::AstChild, "default is the AST edge");
+        assert_eq!(build(Some(EdgeKindMatcher::Any)), CpgEdgeKind::AstChild);
+        assert_eq!(build(Some(EdgeKindMatcher::AnyAst)), CpgEdgeKind::AstChild);
+        assert_eq!(
+            build(Some(EdgeKindMatcher::AnyCfg)),
+            CpgEdgeKind::ControlFlow(CfgEdgeKind::Sequential)
+        );
+        assert_eq!(
+            build(Some(EdgeKindMatcher::AnyDfg)),
+            CpgEdgeKind::DataFlow(DfgEdgeKind::DefUse)
+        );
+        assert_eq!(build(Some(EdgeKindMatcher::AnyCall)), CpgEdgeKind::StaticCall);
+    }
+
+    /// An edge constraint naming an index with no node constraint is dropped
+    /// rather than fabricating a node — the template stays well-formed even
+    /// when it is written incorrectly.
+    #[test]
+    fn dangling_edge_constraints_are_dropped() {
+        let g = PatternTemplate::new("t", "d")
+            .with_node(NodeConstraint::new(0).with_kind(NodeKindMatcher::Exact(NodeKindTag::Function)))
+            // 7 has no node constraint: dangling on the target …
+            .with_edge(EdgeConstraint::new(0, 7))
+            // … and on the source.
+            .with_edge(EdgeConstraint::new(7, 0))
+            .to_pattern_graph();
+
+        assert_eq!(g.node_count(), 1, "no node is fabricated for index 7");
+        assert_eq!(g.edge_count(), 0, "both dangling constraints are dropped");
+    }
+
+    /// The materialized graph is language-agnostic, and its node order follows
+    /// the constraint order (so `EdgeConstraint` indices address the intended
+    /// nodes even when the indices are not contiguous).
+    #[test]
+    fn materialized_graph_is_language_agnostic_and_order_preserving() {
+        let template = PatternTemplate::new("t", "d")
+            .with_node(NodeConstraint::new(10).with_kind(NodeKindMatcher::Exact(NodeKindTag::Class)))
+            .with_node(NodeConstraint::new(20).with_kind(NodeKindMatcher::Exact(NodeKindTag::Field)))
+            .with_edge(
+                EdgeConstraint::new(10, 20).with_kind(EdgeKindMatcher::AnyAst),
+            );
+        let g = template.to_pattern_graph();
+
+        assert_eq!(g.language(), crate::Language::Unknown);
+        let kinds: Vec<_> = g.nodes().map(|n| NodeKindTag::from_kind(&n.kind)).collect();
+        assert_eq!(kinds, vec![NodeKindTag::Class, NodeKindTag::Field]);
+
+        let edge = g.edges().next().expect("edge");
+        let src = g.node(edge.source).expect("source node");
+        let tgt = g.node(edge.target).expect("target node");
+        assert_eq!(NodeKindTag::from_kind(&src.kind), NodeKindTag::Class);
+        assert_eq!(NodeKindTag::from_kind(&tgt.kind), NodeKindTag::Field);
     }
 }

@@ -162,3 +162,118 @@ impl CpgBuilderConfig {
         self
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::{CpgBuilder, CpgBuilderConfig, ParserRegistry};
+    use crate::{Language, TreeSitterCpgBuilder};
+
+    /// `CpgBuilderConfig::default` values and every `with_*` setter, including
+    /// `with_import_resolution` (the flag with no other coverage).
+    #[test]
+    fn config_default_and_builder_setters() {
+        let d = CpgBuilderConfig::default();
+        assert!(!d.retain_source);
+        assert!(d.build_cfg);
+        assert!(d.build_dfg);
+        assert!(!d.include_comments);
+        assert_eq!(d.max_file_size, 10 * 1024 * 1024);
+        assert!(!d.resolve_imports);
+
+        // `new()` == `default()`.
+        let n = CpgBuilderConfig::new();
+        assert_eq!(n.max_file_size, d.max_file_size);
+
+        // Every setter flips its field; the chain threads `self` through.
+        let cfg = CpgBuilderConfig::new()
+            .with_source(true)
+            .with_cfg(false)
+            .with_dfg(false)
+            .with_comments(true)
+            .with_max_file_size(4096)
+            .with_import_resolution(true);
+        assert!(cfg.retain_source);
+        assert!(!cfg.build_cfg);
+        assert!(!cfg.build_dfg);
+        assert!(cfg.include_comments);
+        assert_eq!(cfg.max_file_size, 4096);
+        assert!(cfg.resolve_imports, "with_import_resolution must set resolve_imports");
+    }
+
+    /// The default `CpgBuilder::supports_language` reflects `supported_languages`:
+    /// a listed language is supported, an unlisted one and `Unknown` are not.
+    #[test]
+    fn supports_language_reflects_supported_list() {
+        let builder = TreeSitterCpgBuilder::new();
+        let listed = builder.supported_languages();
+        assert!(!listed.is_empty());
+
+        assert!(builder.supports_language(Language::Rust));
+        // `Zig` is never in the static support list; `Unknown` never is either.
+        assert!(!builder.supports_language(Language::Zig));
+        assert!(!builder.supports_language(Language::Unknown));
+
+        // `supports_language` agrees with membership in `supported_languages`.
+        for &lang in listed {
+            assert!(builder.supports_language(lang));
+        }
+    }
+
+    /// `ParserRegistry::language_count` equals the length of
+    /// `supported_languages`, and (under any grammar feature) is non-empty.
+    #[test]
+    fn parser_registry_count_matches_supported_languages() {
+        let registry = ParserRegistry::global();
+        assert_eq!(
+            registry.language_count(),
+            registry.supported_languages().count(),
+            "language_count must equal the number of supported languages"
+        );
+    }
+
+    /// Under `lang-all` the registry has Rust registered and `supports`/`get`
+    /// agree with the `supported_languages` iterator.
+    #[test]
+    #[cfg(feature = "lang-rust")]
+    fn parser_registry_lists_registered_grammars() {
+        let registry = ParserRegistry::global();
+        assert!(registry.language_count() >= 1);
+        assert!(
+            registry.supported_languages().any(|l| l == Language::Rust),
+            "lang-rust ⇒ Rust must be listed"
+        );
+        assert!(registry.supports(Language::Rust));
+        assert!(registry.get(Language::Rust).is_some());
+    }
+
+    /// `CpgBuilder::build_file` infers the language from the file extension
+    /// (`.rs` ⇒ Rust) and records the source path.
+    #[test]
+    #[cfg(feature = "lang-rust")]
+    fn build_file_infers_language_from_extension() {
+        use std::time::{SystemTime, UNIX_EPOCH};
+
+        let nanos = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .expect("clock")
+            .as_nanos();
+        let path = std::env::temp_dir().join(format!(
+            "libcpg_build_file_{}_{}.rs",
+            std::process::id(),
+            nanos
+        ));
+        std::fs::write(&path, "fn main() { let x = 1; }\n").expect("write temp .rs");
+
+        let builder = TreeSitterCpgBuilder::new();
+        let cpg = builder.build_file(&path).expect("build_file should succeed");
+
+        // `.rs` maps to Rust via `Language::from_extension`.
+        assert_eq!(cpg.language(), Language::Rust);
+        assert!(cpg.node_count() > 1);
+        // build_file records the source path.
+        let recorded = cpg.source_path().expect("source path recorded");
+        assert!(recorded.ends_with(".rs"), "recorded path: {recorded}");
+
+        let _ = std::fs::remove_file(&path);
+    }
+}

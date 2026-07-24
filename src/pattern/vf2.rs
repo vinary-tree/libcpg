@@ -72,16 +72,21 @@ impl Vf2Matcher {
         if self.strict_edges {
             pattern_edge == target_edge
         } else {
-            // Relaxed matching: same category is enough
-            match (pattern_edge.is_ast(), target_edge.is_ast()) {
-                (true, true) => true,
-                (false, false) => {
-                    (pattern_edge.is_cfg() && target_edge.is_cfg())
-                        || (pattern_edge.is_dfg() && target_edge.is_dfg())
-                        || (pattern_edge.is_call() && target_edge.is_call())
-                }
-                _ => false,
-            }
+            // Relaxed matching: sharing a broad category (AST/CFG/DFG/call) is
+            // enough. The exact-equal fallback makes relaxed matching a genuine
+            // *relaxation* of strict matching (relaxed ⊇ strict) for the edge
+            // categories with no coarse bucket here — PDG (control/data
+            // dependence), type, reference, scope, and import edges. Without it
+            // two identical `ControlDependence` edges would be judged
+            // incompatible, making the relaxed matcher paradoxically *stricter*
+            // than the strict one for those kinds and breaking the superset
+            // guarantee. A cross-category pair (e.g. AST vs CFG) still fails:
+            // none of the category clauses hold and the kinds are unequal.
+            (pattern_edge.is_ast() && target_edge.is_ast())
+                || (pattern_edge.is_cfg() && target_edge.is_cfg())
+                || (pattern_edge.is_dfg() && target_edge.is_dfg())
+                || (pattern_edge.is_call() && target_edge.is_call())
+                || pattern_edge == target_edge
         }
     }
 }
@@ -221,10 +226,19 @@ impl Vf2Matcher {
         // For each pattern edge involving pattern_node, there must be
         // a compatible edge in target involving target_node
 
-        // Check outgoing edges
+        // Check outgoing edges. A self-loop (`p_edge.target == pattern_node`)
+        // references the node being mapped *right now*, which is not yet present
+        // in `mapping`; resolve it to `target_node` directly so the loop must be
+        // mirrored by a self-loop on `target_node`. Without this, pattern
+        // self-loops were never verified and could match a target node lacking
+        // one, yielding a structurally invalid embedding.
         for p_edge in state.pattern.outgoing_edges(pattern_node) {
-            // If the target of this pattern edge is already mapped
-            if let Some(&mapped_target) = state.mapping.get(&p_edge.target) {
+            let mapped_target = if p_edge.target == pattern_node {
+                Some(target_node)
+            } else {
+                state.mapping.get(&p_edge.target).copied()
+            };
+            if let Some(mapped_target) = mapped_target {
                 // There must be a compatible edge in the target
                 let has_compatible_edge = state
                     .target
@@ -238,10 +252,17 @@ impl Vf2Matcher {
             }
         }
 
-        // Check incoming edges
+        // Check incoming edges. Mirror the self-loop handling above (a self-loop
+        // appears in both the incoming and outgoing edge lists, so this is a
+        // harmless redundant re-check for that case and the essential check for
+        // ordinary incoming edges whose source is already mapped).
         for p_edge in state.pattern.incoming_edges(pattern_node) {
-            // If the source of this pattern edge is already mapped
-            if let Some(&mapped_source) = state.mapping.get(&p_edge.source) {
+            let mapped_source = if p_edge.source == pattern_node {
+                Some(target_node)
+            } else {
+                state.mapping.get(&p_edge.source).copied()
+            };
+            if let Some(mapped_source) = mapped_source {
                 // There must be a compatible edge in the target
                 let has_compatible_edge = state
                     .target
@@ -614,5 +635,304 @@ mod tests {
             "missing embedding via t2; found {:?}",
             embeddings
         );
+    }
+
+    // ==================== added coverage: example-based ====================
+
+    #[test]
+    fn test_algorithm_name() {
+        assert_eq!(Vf2Matcher::new().algorithm_name(), "VF2");
+    }
+
+    /// Relaxed matching (same *category*) finds at least as many embeddings as
+    /// strict matching (exact kind) on a same-category target.
+    #[test]
+    fn test_relaxed_finds_at_least_strict() {
+        use std::sync::Arc;
+        use crate::{MethodSignature, Visibility};
+
+        // pattern: a single `Class` node.
+        let mut pattern = CodePropertyGraph::new(Language::Rust);
+        pattern.add_node(CpgNode::new(
+            NodeId::new(0),
+            CpgNodeKind::Class { name: Arc::from("C"), is_abstract: false },
+            SourceRange::default(),
+        ));
+
+        // target: three *declaration*-category nodes of different exact kinds.
+        let mut target = CodePropertyGraph::new(Language::Rust);
+        target.add_node(CpgNode::new(
+            NodeId::new(0),
+            CpgNodeKind::Class { name: Arc::from("A"), is_abstract: false },
+            SourceRange::default(),
+        ));
+        target.add_node(CpgNode::new(
+            NodeId::new(0),
+            CpgNodeKind::Struct { name: Arc::from("B") },
+            SourceRange::default(),
+        ));
+        target.add_node(CpgNode::new(
+            NodeId::new(0),
+            CpgNodeKind::Function {
+                signature: MethodSignature {
+                    name: "f".into(),
+                    params: Default::default(),
+                    return_type: None,
+                    is_static: false,
+                    is_async: false,
+                    visibility: Visibility::Public,
+                },
+            },
+            SourceRange::default(),
+        ));
+
+        let strict = Vf2Matcher::new().with_strict_kinds(true);
+        let relaxed = Vf2Matcher::new().with_strict_kinds(false);
+
+        let strict_n = strict.find_matches(&pattern, &target).len();
+        let relaxed_n = relaxed.find_matches(&pattern, &target).len();
+
+        assert_eq!(strict_n, 1, "strict matches only the exact Class node");
+        assert_eq!(relaxed_n, 3, "relaxed matches every declaration node");
+        assert!(relaxed_n >= strict_n);
+    }
+
+    #[test]
+    fn test_max_matches_caps_results() {
+        // pattern: single `If` node.
+        let mut pattern = CodePropertyGraph::new(Language::Rust);
+        pattern.add_node(CpgNode::new(NodeId::new(0), CpgNodeKind::If, SourceRange::default()));
+
+        // target: four `If` nodes -> four unconstrained matches.
+        let mut target = CodePropertyGraph::new(Language::Rust);
+        for _ in 0..4 {
+            target.add_node(CpgNode::new(NodeId::new(0), CpgNodeKind::If, SourceRange::default()));
+        }
+
+        assert_eq!(Vf2Matcher::new().find_matches(&pattern, &target).len(), 4);
+        assert_eq!(
+            Vf2Matcher::new().with_max_matches(2).find_matches(&pattern, &target).len(),
+            2
+        );
+        assert_eq!(
+            Vf2Matcher::new().with_max_matches(1).find_matches(&pattern, &target).len(),
+            1
+        );
+    }
+
+    #[test]
+    fn test_returned_mapping_is_injective() {
+        // pattern: two `If` nodes joined by an AST edge.
+        let mut pattern = CodePropertyGraph::new(Language::Rust);
+        let p0 = pattern.add_node(CpgNode::new(NodeId::new(0), CpgNodeKind::If, SourceRange::default()));
+        let p1 = pattern.add_node(CpgNode::new(NodeId::new(0), CpgNodeKind::If, SourceRange::default()));
+        pattern.connect(p0, p1, CpgEdgeKind::AstChild);
+
+        // target: a 3-node AST path of `If` nodes.
+        let mut target = CodePropertyGraph::new(Language::Rust);
+        let t: Vec<NodeId> = (0..3)
+            .map(|_| target.add_node(CpgNode::new(NodeId::new(0), CpgNodeKind::If, SourceRange::default())))
+            .collect();
+        target.connect(t[0], t[1], CpgEdgeKind::AstChild);
+        target.connect(t[1], t[2], CpgEdgeKind::AstChild);
+
+        let matches = Vf2Matcher::new().find_matches(&pattern, &target);
+        assert!(!matches.is_empty());
+        for m in &matches {
+            let images: FxHashSet<NodeId> = m.node_mapping.values().copied().collect();
+            assert_eq!(images.len(), m.node_mapping.len(), "mapping is not injective: {:?}", m.node_mapping);
+            assert_eq!(m.node_mapping.len(), 2, "match is complete");
+            assert!(m.node_mapping.contains_key(&p0));
+            assert!(m.node_mapping.contains_key(&p1));
+        }
+    }
+
+    /// Regression test for the `is_feasible` self-loop hole: a pattern node with
+    /// a self-loop must only match a target node that also carries a compatible
+    /// self-loop.
+    #[test]
+    fn test_self_loop_must_be_mirrored() {
+        // pattern: single node with a self-loop.
+        let mut pattern = CodePropertyGraph::new(Language::Rust);
+        let p = pattern.add_node(CpgNode::new(NodeId::new(0), CpgNodeKind::If, SourceRange::default()));
+        pattern.connect(p, p, CpgEdgeKind::AstChild);
+
+        // target A: a matching-kind node WITHOUT a self-loop -> no match.
+        let mut no_loop = CodePropertyGraph::new(Language::Rust);
+        no_loop.add_node(CpgNode::new(NodeId::new(0), CpgNodeKind::If, SourceRange::default()));
+        assert!(
+            Vf2Matcher::new().find_matches(&pattern, &no_loop).is_empty(),
+            "self-loop pattern must not match a target node lacking a self-loop"
+        );
+
+        // target B: a node WITH a self-loop -> exactly one match onto it.
+        let mut with_loop = CodePropertyGraph::new(Language::Rust);
+        let t = with_loop.add_node(CpgNode::new(NodeId::new(0), CpgNodeKind::If, SourceRange::default()));
+        with_loop.connect(t, t, CpgEdgeKind::AstChild);
+        let matches = Vf2Matcher::new().find_matches(&pattern, &with_loop);
+        assert_eq!(matches.len(), 1);
+        assert_eq!(matches[0].node_mapping.get(&p), Some(&t));
+    }
+
+    /// Regression test for the relaxed `edges_compatible` fix. Relaxed matching
+    /// must stay a true *relaxation* of strict matching even for edge kinds with
+    /// no coarse AST/CFG/DFG/call bucket (here a PDG `ControlDependence` edge).
+    /// Before the fix, two identical `ControlDependence` edges were judged
+    /// incompatible under relaxed matching, so the relaxed matcher found FEWER
+    /// embeddings than the strict one — violating the superset guarantee.
+    #[test]
+    fn test_relaxed_matches_pdg_edges_like_strict() {
+        fn two_block_pdg(kind: CpgEdgeKind) -> CodePropertyGraph {
+            let mut g = CodePropertyGraph::new(Language::Rust);
+            let a = g.add_node(CpgNode::new(
+                NodeId::new(0),
+                CpgNodeKind::Block { scope: crate::ScopeId::GLOBAL },
+                SourceRange::default(),
+            ));
+            let b = g.add_node(CpgNode::new(
+                NodeId::new(0),
+                CpgNodeKind::Block { scope: crate::ScopeId::GLOBAL },
+                SourceRange::default(),
+            ));
+            g.connect(a, b, kind);
+            g
+        }
+
+        let pattern = two_block_pdg(CpgEdgeKind::ControlDependence);
+        let target = two_block_pdg(CpgEdgeKind::ControlDependence);
+
+        let strict = Vf2Matcher::new().with_strict_kinds(true).with_strict_edges(true);
+        let relaxed = Vf2Matcher::new().with_strict_kinds(false).with_strict_edges(false);
+
+        let strict_n = strict.find_matches(&pattern, &target).len();
+        let relaxed_n = relaxed.find_matches(&pattern, &target).len();
+
+        assert!(strict_n >= 1, "strict should find the identity embedding");
+        assert!(
+            relaxed_n >= strict_n,
+            "relaxed ({relaxed_n}) must be a superset of strict ({strict_n}) for PDG edges"
+        );
+    }
+}
+
+#[cfg(test)]
+mod proptests {
+    use super::*;
+    use crate::testutil::*;
+    use proptest::prelude::*;
+
+    /// The induced subgraph of `g` over its first `k` node ids (1..=k, clamped).
+    /// Preserves original ids and every edge whose endpoints are both retained.
+    fn small_pattern(g: &CodePropertyGraph, k: usize) -> CodePropertyGraph {
+        let ids: Vec<NodeId> = g.node_ids().collect();
+        let k = k.min(ids.len()).max(1);
+        g.subgraph(&ids[..k])
+    }
+
+    /// Normalizes a match set to canonical sorted `(pattern_id, target_id)`
+    /// embedding tuples, so two matchers' results can be compared as sets.
+    fn embedding_set(matches: &[PatternMatch]) -> FxHashSet<Vec<(u32, u32)>> {
+        matches
+            .iter()
+            .map(|m| {
+                let mut v: Vec<(u32, u32)> =
+                    m.node_mapping.iter().map(|(p, t)| (p.as_u32(), t.as_u32())).collect();
+                v.sort_unstable();
+                v
+            })
+            .collect()
+    }
+
+    /// Checks the three structural VF2 invariants for a single returned match
+    /// against the matcher that produced it: completeness+injectivity of the
+    /// mapping, kind compatibility of every mapped pair, and preservation of
+    /// every pattern edge by a compatible target edge.
+    fn check_match_invariants(
+        matcher: &Vf2Matcher,
+        pattern: &CodePropertyGraph,
+        target: &CodePropertyGraph,
+        m: &PatternMatch,
+    ) -> Result<(), TestCaseError> {
+        // Completeness: every pattern node is mapped.
+        prop_assert_eq!(m.node_mapping.len(), pattern.node_count());
+
+        // Injectivity: the target images are pairwise distinct.
+        let images: FxHashSet<NodeId> = m.node_mapping.values().copied().collect();
+        prop_assert_eq!(images.len(), m.node_mapping.len());
+
+        // Kind compatibility of every mapped pair (per this matcher's policy).
+        for (&p, &t) in &m.node_mapping {
+            let pk = &pattern.node(p).expect("mapped pattern node exists").kind;
+            let tk = &target.node(t).expect("mapped target node exists").kind;
+            prop_assert!(matcher.nodes_compatible(pk, tk));
+        }
+
+        // Edge preservation: each pattern edge has a compatible target edge
+        // between the images of its endpoints.
+        for e in pattern.edges() {
+            let ts = *m.node_mapping.get(&e.source).expect("edge source mapped");
+            let tt = *m.node_mapping.get(&e.target).expect("edge target mapped");
+            let preserved = target
+                .edges_between(ts, tt)
+                .iter()
+                .any(|te| matcher.edges_compatible(&e.kind, &te.kind));
+            prop_assert!(preserved, "pattern edge {:?} not preserved by any target edge", e.kind);
+        }
+        Ok(())
+    }
+
+    proptest! {
+        #![proptest_config(ProptestConfig::with_cases(64))]
+
+        /// Every embedding returned by VF2 (strict or relaxed) is a complete,
+        /// injective, kind-compatible, edge-preserving map of the pattern into
+        /// the target.
+        #[test]
+        fn prop_vf2_match_invariants(g in arb_cpg_raw(), k in 1usize..=3) {
+            let pattern = small_pattern(&g, k);
+            let matchers = [
+                Vf2Matcher::new().with_max_matches(48),                                  // relaxed
+                Vf2Matcher::new().with_strict_kinds(true).with_strict_edges(true).with_max_matches(48),
+            ];
+            for matcher in matchers {
+                for m in &matcher.find_matches(&pattern, &g) {
+                    check_match_invariants(&matcher, &pattern, &g, m)?;
+                }
+            }
+        }
+
+        /// The relaxed matcher's embedding set is a superset of the strict
+        /// matcher's: strict compatibility implies relaxed compatibility for
+        /// both nodes and edges, and candidate generation is identical.
+        #[test]
+        fn prop_relaxed_superset_of_strict(g in arb_cpg_raw(), k in 1usize..=2) {
+            let pattern = small_pattern(&g, k);
+            let strict = Vf2Matcher::new().with_strict_kinds(true).with_strict_edges(true);
+            let relaxed = Vf2Matcher::new().with_strict_kinds(false).with_strict_edges(false);
+            let strict_set = embedding_set(&strict.find_matches(&pattern, &g));
+            let relaxed_set = embedding_set(&relaxed.find_matches(&pattern, &g));
+            for e in &strict_set {
+                prop_assert!(relaxed_set.contains(e), "relaxed matcher dropped strict embedding {:?}", e);
+            }
+        }
+
+        /// `with_max_matches(k>0)` bounds the number of returned matches by `k`.
+        #[test]
+        fn prop_max_matches_caps(g in arb_cpg_raw(), k in 1usize..=2, cap in 1usize..=6) {
+            let pattern = small_pattern(&g, k);
+            let n = Vf2Matcher::new().with_max_matches(cap).find_matches(&pattern, &g).len();
+            prop_assert!(n <= cap, "returned {} matches > cap {}", n, cap);
+        }
+
+        /// A non-empty graph always embeds into itself (identity), so strict
+        /// self-matching is never empty.
+        #[test]
+        fn prop_strict_self_match_nonempty(g in arb_cpg_raw()) {
+            let matcher = Vf2Matcher::new()
+                .with_strict_kinds(true)
+                .with_strict_edges(true)
+                .with_max_matches(1);
+            prop_assert!(!matcher.find_matches(&g, &g).is_empty());
+        }
     }
 }

@@ -22,3 +22,31 @@ pub enum DPPattern {
     /// Unknown pattern.
     Unknown,
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_dp_pattern_variants() {
+        let all = [
+            DPPattern::Linear,
+            DPPattern::Matrix,
+            DPPattern::Interval,
+            DPPattern::Tree,
+            DPPattern::Digit,
+            DPPattern::Bitmask,
+            DPPattern::Knapsack,
+            DPPattern::Subsequence,
+            DPPattern::Unknown,
+        ];
+        for (i, a) in all.iter().enumerate() {
+            let copied = *a;
+            assert_eq!(copied, *a);
+            assert!(!format!("{a:?}").is_empty());
+            for (j, b) in all.iter().enumerate() {
+                assert_eq!(i == j, a == b);
+            }
+        }
+    }
+}

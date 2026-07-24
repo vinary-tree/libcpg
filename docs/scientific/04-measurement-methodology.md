@@ -1,6 +1,6 @@
 # Measurement methodology
 
-**Honest headline: `libcpg` ships no runnable benchmarks today.** The correctness pillar ([00](00-overview.md)–[03](03-vf2-completeness.md)) is fully specified by 99 inline tests, but there is *no* timing evidence in the crate — the `[[bench]]` targets are commented out, `benches/` does not exist, and the `examples/` and `tests/` directories are empty. This page does two things: it documents that gap precisely, and it specifies the **rigorous protocol** to establish performance claims once benchmarks are added, so that any future measurement is reproducible, controlled, and analyzed with scientific discipline rather than reported ad hoc.
+**Honest headline: `libcpg` ships no runnable benchmarks today.** The correctness pillar ([00](00-overview.md)–[03](03-vf2-completeness.md)) is specified by 474 automated tests — 399 example-based, 63 property-based, plus 12 public-API integration and malformed-input robustness tests (see [engineering/02 — Testing](../engineering/02-testing.md)) — but there is *no* timing evidence in the crate: the `[[bench]]` targets are commented out, `benches/` does not exist, and `examples/` is empty. This page does two things: it documents that gap precisely, and it specifies the **rigorous protocol** to establish performance claims once benchmarks are added, so that any future measurement is reproducible, controlled, and analyzed with scientific discipline rather than reported ad hoc.
 
 This is deliberately the one page in the scientific pillar with *no* corroborating experiment to quote — because none exists yet. Saying so plainly is the point.
 
@@ -28,7 +28,7 @@ Concretely, the gap is:
 - **No `benches/`** directory and **no `[[bench]]`** target active — `cargo bench` runs nothing.
 - **`examples/` and `tests/` are empty** — there are no example programs or integration harnesses to time.
 - **`criterion` is a dev-dependency only**, so the statistical harness is available the moment a bench file and stanza are added, but nothing invokes it.
-- All 99 tests are inline `#[cfg(test)]` **correctness** tests; none asserts a duration.
+- All 474 tests are **correctness** tests (inline `#[cfg(test)]` modules plus `tests/integration.rs` and `tests/robustness.rs`); none asserts a duration.
 
 Nothing below should be read as a claim about `libcpg`'s current speed. It is the method to *obtain* such claims correctly.
 

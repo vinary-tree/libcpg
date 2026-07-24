@@ -95,3 +95,101 @@ pub enum ReductionPattern {
     /// Unknown reduction pattern.
     Unknown,
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::NodeId;
+
+    #[test]
+    fn test_recursion_pattern_new_defaults() {
+        let rp = RecursionPattern::new(RecursionKind::Direct);
+        assert_eq!(rp.kind, RecursionKind::Direct);
+        assert!(rp.base_cases.is_empty());
+        assert!(rp.recursive_calls.is_empty());
+        assert!(matches!(rp.reduction, ReductionPattern::Unknown));
+        assert!(!rp.tail_optimizable);
+    }
+
+    #[test]
+    fn test_recursion_pattern_default_is_direct() {
+        let rp = RecursionPattern::default();
+        assert_eq!(rp.kind, RecursionKind::Direct);
+        assert!(rp.base_cases.is_empty());
+        assert!(rp.recursive_calls.is_empty());
+        assert!(!rp.tail_optimizable);
+    }
+
+    #[test]
+    fn test_recursion_pattern_with_base_case() {
+        let rp = RecursionPattern::new(RecursionKind::Direct)
+            .with_base_case(NodeId::new(1))
+            .with_base_case(NodeId::new(2));
+        assert_eq!(rp.base_cases, vec![NodeId::new(1), NodeId::new(2)]);
+    }
+
+    #[test]
+    fn test_recursion_pattern_with_recursive_call() {
+        let rp = RecursionPattern::new(RecursionKind::Binary)
+            .with_recursive_call(NodeId::new(5))
+            .with_recursive_call(NodeId::new(6));
+        assert_eq!(rp.kind, RecursionKind::Binary);
+        assert_eq!(rp.recursive_calls, vec![NodeId::new(5), NodeId::new(6)]);
+    }
+
+    #[test]
+    fn test_recursion_pattern_with_reduction() {
+        let rp = RecursionPattern::new(RecursionKind::Direct)
+            .with_reduction(ReductionPattern::Division(2));
+        assert!(matches!(rp.reduction, ReductionPattern::Division(2)));
+    }
+
+    #[test]
+    fn test_recursion_pattern_with_tail_optimizable() {
+        let rp = RecursionPattern::new(RecursionKind::Tail).with_tail_optimizable(true);
+        assert_eq!(rp.kind, RecursionKind::Tail);
+        assert!(rp.tail_optimizable);
+    }
+
+    #[test]
+    fn test_recursion_pattern_full_chain() {
+        let rp = RecursionPattern::new(RecursionKind::Multiple)
+            .with_base_case(NodeId::new(10))
+            .with_recursive_call(NodeId::new(11))
+            .with_recursive_call(NodeId::new(12))
+            .with_recursive_call(NodeId::new(13))
+            .with_reduction(ReductionPattern::Linear)
+            .with_tail_optimizable(false);
+        assert_eq!(rp.kind, RecursionKind::Multiple);
+        assert_eq!(rp.base_cases.len(), 1);
+        assert_eq!(rp.recursive_calls.len(), 3);
+        assert!(matches!(rp.reduction, ReductionPattern::Linear));
+        assert!(!rp.tail_optimizable);
+    }
+
+    #[test]
+    fn test_recursion_kind_variants_distinct() {
+        let kinds = [
+            RecursionKind::Direct,
+            RecursionKind::Indirect,
+            RecursionKind::Tail,
+            RecursionKind::Binary,
+            RecursionKind::Multiple,
+        ];
+        for (i, a) in kinds.iter().enumerate() {
+            for (j, b) in kinds.iter().enumerate() {
+                assert_eq!(i == j, a == b);
+            }
+        }
+    }
+
+    #[test]
+    fn test_reduction_pattern_variants_construct() {
+        // No PartialEq derive → match on each variant.
+        assert!(matches!(ReductionPattern::Constant(3), ReductionPattern::Constant(3)));
+        assert!(matches!(ReductionPattern::Linear, ReductionPattern::Linear));
+        assert!(matches!(ReductionPattern::Division(2), ReductionPattern::Division(2)));
+        assert!(matches!(ReductionPattern::Logarithmic, ReductionPattern::Logarithmic));
+        assert!(matches!(ReductionPattern::Unknown, ReductionPattern::Unknown));
+    }
+}

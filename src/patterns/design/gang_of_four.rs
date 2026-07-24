@@ -549,4 +549,277 @@ mod tests {
 
         assert_eq!(supported.len(), 23, "Should support all 23 GoF patterns");
     }
+
+    /// All 23 GoF patterns for exhaustive coverage.
+    const ALL_PATTERNS: [GofPattern; 23] = [
+        GofPattern::Singleton,
+        GofPattern::FactoryMethod,
+        GofPattern::AbstractFactory,
+        GofPattern::Builder,
+        GofPattern::Prototype,
+        GofPattern::Adapter,
+        GofPattern::Bridge,
+        GofPattern::Composite,
+        GofPattern::Decorator,
+        GofPattern::Facade,
+        GofPattern::Flyweight,
+        GofPattern::Proxy,
+        GofPattern::ChainOfResponsibility,
+        GofPattern::Command,
+        GofPattern::Interpreter,
+        GofPattern::Iterator,
+        GofPattern::Mediator,
+        GofPattern::Memento,
+        GofPattern::Observer,
+        GofPattern::State,
+        GofPattern::Strategy,
+        GofPattern::TemplateMethod,
+        GofPattern::Visitor,
+    ];
+
+    /// `category()` is total and every `name()` / `GofCategory::name()` is
+    /// non-empty, with the canonical GoF partition of 5 / 7 / 11.
+    #[test]
+    fn test_category_and_names_all_23() {
+        let (mut creational, mut structural, mut behavioral) = (0, 0, 0);
+        for pattern in ALL_PATTERNS {
+            assert!(!pattern.name().is_empty(), "{pattern:?}: empty name");
+            let category = pattern.category();
+            assert!(!category.name().is_empty(), "{pattern:?}: empty category name");
+            match category {
+                GofCategory::Creational => creational += 1,
+                GofCategory::Structural => structural += 1,
+                GofCategory::Behavioral => behavioral += 1,
+            }
+        }
+        assert_eq!(creational, 5, "expected 5 creational patterns");
+        assert_eq!(structural, 7, "expected 7 structural patterns");
+        assert_eq!(behavioral, 11, "expected 11 behavioral patterns");
+        // Every category name is stable and non-empty.
+        for category in [
+            GofCategory::Creational,
+            GofCategory::Structural,
+            GofCategory::Behavioral,
+        ] {
+            assert!(!category.name().is_empty());
+        }
+    }
+
+    /// `calculate_confidence` is bounded in `[0, 1]`, monotonically increases in
+    /// the match size, and yields exactly the template's base confidence for a
+    /// complete match (`completeness == 1.0`) — the property the boy-scout
+    /// node-parity fix guarantees.
+    #[test]
+    fn test_calculate_confidence_bounds() {
+        let detector = GofPatternDetector::new();
+        // Singleton template now has 5 node constraints, base confidence 0.8.
+        let template = build_pattern_template(GofPattern::Singleton);
+        let expected = template.node_constraints.len();
+        assert_eq!(expected, 5);
+        let base = template.min_confidence;
+
+        let mut previous = f64::NEG_INFINITY;
+        for k in 0..=expected {
+            let mut m = PatternMatch::new("Singleton", NodeId::new(0), 0.0);
+            for i in 0..k as u32 {
+                m = m.with_mapping(NodeId::new(i), NodeId::new(100 + i));
+            }
+            let confidence = detector.calculate_confidence(&m, &template);
+            assert!(
+                (0.0..=1.0).contains(&confidence),
+                "confidence {confidence} out of [0,1] at k={k}"
+            );
+            assert!(
+                confidence >= previous,
+                "confidence must not decrease as match size grows"
+            );
+            previous = confidence;
+        }
+        // A complete match scores exactly the base confidence.
+        let mut full = PatternMatch::new("Singleton", NodeId::new(0), 0.0);
+        for i in 0..expected as u32 {
+            full = full.with_mapping(NodeId::new(i), NodeId::new(100 + i));
+        }
+        let confidence_full = detector.calculate_confidence(&full, &template);
+        assert!(
+            (confidence_full - base).abs() < 1e-9,
+            "complete match confidence {confidence_full} should equal base {base}"
+        );
+    }
+
+    /// End-to-end: detecting against the Singleton pattern CPG finds Singleton,
+    /// every match is within `[min_confidence, 1.0]`, and results are sorted by
+    /// descending confidence.
+    #[test]
+    fn test_detect_sorted_and_bounded() {
+        let target = build_pattern_cpg(GofPattern::Singleton);
+        let min_confidence = 0.5;
+        let detector = GofPatternDetector::new().with_min_confidence(min_confidence);
+
+        let matches = detector.detect(&target);
+
+        assert!(
+            matches.iter().any(|m| m.pattern_name == "Singleton"),
+            "Singleton should match its own pattern CPG"
+        );
+        for m in &matches {
+            assert!(
+                m.confidence >= min_confidence,
+                "confidence {} below min_confidence {}",
+                m.confidence,
+                min_confidence
+            );
+            assert!(m.confidence <= 1.0, "confidence {} exceeds 1.0", m.confidence);
+        }
+        for pair in matches.windows(2) {
+            assert!(
+                pair[0].confidence >= pair[1].confidence,
+                "matches must be sorted by descending confidence"
+            );
+        }
+    }
+}
+
+/// Detector configuration: which patterns are searched, and which results are
+/// kept.
+#[cfg(test)]
+mod configuration {
+    use super::*;
+    use crate::testutil::{build_well_formed, StmtSpec};
+
+    fn sample() -> CodePropertyGraph {
+        build_well_formed(vec![
+            StmtSpec::Let("x".into()),
+            StmtSpec::If(vec![StmtSpec::CallStmt("g".into())]),
+        ])
+    }
+
+    /// By default every GoF pattern is searched; `with_patterns` narrows the
+    /// search, and nothing outside the list can be reported. An *empty* list
+    /// means "everything", not "nothing".
+    #[test]
+    fn with_patterns_narrows_the_search() {
+        let cpg = sample();
+
+        let all = GofPatternDetector::new().with_min_confidence(0.0).detect(&cpg);
+
+        let narrowed = GofPatternDetector::new()
+            .with_min_confidence(0.0)
+            .with_patterns(vec![GofPattern::Singleton])
+            .detect(&cpg);
+        for m in &narrowed {
+            assert_eq!(
+                m.pattern_name,
+                GofPattern::Singleton.name(),
+                "only the requested pattern may be reported"
+            );
+        }
+        assert!(
+            narrowed.len() <= all.len(),
+            "narrowing cannot report more than searching everything ({} vs {})",
+            narrowed.len(),
+            all.len()
+        );
+
+        let empty_list = GofPatternDetector::new()
+            .with_min_confidence(0.0)
+            .with_patterns(vec![])
+            .detect(&cpg);
+        assert_eq!(empty_list.len(), all.len(), "an empty list searches everything");
+    }
+
+    /// The confidence threshold filters the results, and every surviving match
+    /// carries the GoF metadata.
+    #[test]
+    fn min_confidence_filters_results_and_metadata_is_attached() {
+        let cpg = sample();
+
+        let permissive = GofPatternDetector::new().with_min_confidence(0.0).detect(&cpg);
+        for m in &permissive {
+            assert_eq!(m.metadata.get("pattern_type").map(String::as_str), Some("GoF"));
+            assert!(m.metadata.contains_key("category"), "the GoF category is recorded");
+            assert!((0.0..=1.0).contains(&m.confidence));
+        }
+
+        let strict = GofPatternDetector::new().with_min_confidence(1.01).detect(&cpg);
+        assert!(strict.is_empty(), "nothing can exceed a confidence of 1");
+
+        let mid = GofPatternDetector::new().with_min_confidence(0.5).detect(&cpg);
+        assert!(mid.len() <= permissive.len(), "raising the threshold never adds matches");
+    }
+}
+
+#[cfg(test)]
+mod proptests {
+    use super::*;
+    use crate::testutil::*;
+    use proptest::prelude::*;
+
+    fn arb_gof_pattern() -> impl Strategy<Value = GofPattern> {
+        prop_oneof![
+            Just(GofPattern::Singleton),
+            Just(GofPattern::FactoryMethod),
+            Just(GofPattern::AbstractFactory),
+            Just(GofPattern::Builder),
+            Just(GofPattern::Prototype),
+            Just(GofPattern::Adapter),
+            Just(GofPattern::Bridge),
+            Just(GofPattern::Composite),
+            Just(GofPattern::Decorator),
+            Just(GofPattern::Facade),
+            Just(GofPattern::Flyweight),
+            Just(GofPattern::Proxy),
+            Just(GofPattern::ChainOfResponsibility),
+            Just(GofPattern::Command),
+            Just(GofPattern::Interpreter),
+            Just(GofPattern::Iterator),
+            Just(GofPattern::Mediator),
+            Just(GofPattern::Memento),
+            Just(GofPattern::Observer),
+            Just(GofPattern::State),
+            Just(GofPattern::Strategy),
+            Just(GofPattern::TemplateMethod),
+            Just(GofPattern::Visitor),
+        ]
+    }
+
+    proptest! {
+        #![proptest_config(ProptestConfig::with_cases(64))]
+
+        /// Over random targets and thresholds, every detected match satisfies
+        /// `min_confidence <= confidence <= 1.0`, and the result is sorted by
+        /// descending confidence.
+        #[test]
+        fn prop_detect_sorted_and_bounded(
+            target in arb_cpg_raw(),
+            threshold in (0u32..=100).prop_map(|x| x as f64 / 100.0),
+        ) {
+            let detector = GofPatternDetector::new().with_min_confidence(threshold);
+            let matches = detector.detect(&target);
+
+            for m in &matches {
+                prop_assert!(
+                    m.confidence >= threshold,
+                    "confidence {} < min_confidence {}",
+                    m.confidence,
+                    threshold
+                );
+                prop_assert!(m.confidence <= 1.0, "confidence {} > 1.0", m.confidence);
+            }
+            for pair in matches.windows(2) {
+                prop_assert!(
+                    pair[0].confidence >= pair[1].confidence,
+                    "not sorted descending"
+                );
+            }
+        }
+
+        /// `category()` is total and both `name()` and `GofCategory::name()` are
+        /// non-empty for every pattern.
+        #[test]
+        fn prop_category_total(pattern in arb_gof_pattern()) {
+            prop_assert!(!pattern.name().is_empty());
+            prop_assert!(!pattern.category().name().is_empty());
+        }
+    }
 }

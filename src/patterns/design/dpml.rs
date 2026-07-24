@@ -30,7 +30,7 @@
 //!     type: contains
 //! ```
 
-#[cfg(feature = "serde")]
+#[cfg(any(feature = "serde", feature = "design-patterns"))]
 use serde::{Deserialize, Serialize};
 
 use crate::pattern::{PatternTemplate, NodeConstraint, EdgeConstraint, NodeKindMatcher, NodeKindTag, EdgeKindMatcher};
@@ -38,21 +38,21 @@ use rustc_hash::FxHashMap;
 
 /// DPML template for pattern matching.
 #[derive(Debug, Clone)]
-#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+#[cfg_attr(any(feature = "serde", feature = "design-patterns"), derive(Serialize, Deserialize))]
 pub struct DpmlTemplate {
     /// Template name.
     pub name: String,
     /// Pattern description.
-    #[cfg_attr(feature = "serde", serde(default))]
+    #[cfg_attr(any(feature = "serde", feature = "design-patterns"), serde(default))]
     pub description: String,
     /// Pattern category (Creational, Structural, Behavioral).
-    #[cfg_attr(feature = "serde", serde(default))]
+    #[cfg_attr(any(feature = "serde", feature = "design-patterns"), serde(default))]
     pub category: String,
     /// Role definitions.
-    #[cfg_attr(feature = "serde", serde(default))]
+    #[cfg_attr(any(feature = "serde", feature = "design-patterns"), serde(default))]
     pub roles: Vec<DpmlRole>,
     /// Constraints/relationships between roles.
-    #[cfg_attr(feature = "serde", serde(default, alias = "constraints"))]
+    #[cfg_attr(any(feature = "serde", feature = "design-patterns"), serde(default, alias = "constraints"))]
     pub relationships: Vec<DpmlConstraint>,
 }
 
@@ -319,15 +319,15 @@ fn constraint_type_to_edge_matcher(constraint_type: &str) -> EdgeKindMatcher {
 
 /// A role in a DPML template.
 #[derive(Debug, Clone)]
-#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+#[cfg_attr(any(feature = "serde", feature = "design-patterns"), derive(Serialize, Deserialize))]
 pub struct DpmlRole {
     /// Role identifier.
     pub id: String,
     /// Role type (class, interface, method, etc.).
-    #[cfg_attr(feature = "serde", serde(rename = "type"))]
+    #[cfg_attr(any(feature = "serde", feature = "design-patterns"), serde(rename = "type"))]
     pub role_type: String,
     /// Cardinality (e.g., "1", "1..*").
-    #[cfg_attr(feature = "serde", serde(default = "default_cardinality"))]
+    #[cfg_attr(any(feature = "serde", feature = "design-patterns"), serde(default = "default_cardinality"))]
     pub cardinality: String,
 }
 
@@ -354,14 +354,14 @@ impl DpmlRole {
 
 /// A constraint between roles.
 #[derive(Debug, Clone)]
-#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+#[cfg_attr(any(feature = "serde", feature = "design-patterns"), derive(Serialize, Deserialize))]
 pub struct DpmlConstraint {
     /// Source role ID.
     pub source: String,
     /// Target role ID.
     pub target: String,
     /// Constraint type.
-    #[cfg_attr(feature = "serde", serde(rename = "type", default = "default_constraint_type"))]
+    #[cfg_attr(any(feature = "serde", feature = "design-patterns"), serde(rename = "type", default = "default_constraint_type"))]
     pub constraint_type: String,
 }
 
@@ -519,5 +519,288 @@ relationships:
     fn test_dpml_error_display() {
         let err = DpmlError::MissingField("name".to_string());
         assert!(err.to_string().contains("name"));
+    }
+
+    #[test]
+    fn test_role_and_constraint_builders() {
+        let role = DpmlRole::new("subject", "class").with_cardinality("1..*");
+        assert_eq!(role.id, "subject");
+        assert_eq!(role.role_type, "class");
+        assert_eq!(role.cardinality, "1..*");
+
+        // Default cardinality is "1".
+        let default_role = DpmlRole::new("observer", "trait");
+        assert_eq!(default_role.cardinality, "1");
+
+        let constraint = DpmlConstraint::new("subject", "observer", "uses");
+        assert_eq!(constraint.source, "subject");
+        assert_eq!(constraint.target, "observer");
+        assert_eq!(constraint.constraint_type, "uses");
+    }
+
+    #[cfg(feature = "design-patterns")]
+    #[test]
+    fn test_parse_toml() {
+        let toml = r#"
+name = "Singleton"
+description = "One instance"
+category = "Creational"
+
+[[roles]]
+id = "cls"
+type = "class"
+
+[[roles]]
+id = "field"
+type = "field"
+cardinality = "1"
+
+[[relationships]]
+source = "cls"
+target = "field"
+type = "contains"
+"#;
+
+        let template = DpmlTemplate::parse_toml(toml).expect("Should parse TOML");
+        assert_eq!(template.name, "Singleton");
+        assert_eq!(template.description, "One instance");
+        assert_eq!(template.category, "Creational");
+        assert_eq!(template.roles.len(), 2);
+        assert_eq!(template.relationships.len(), 1);
+        assert_eq!(template.relationships[0].constraint_type, "contains");
+
+        template.validate().expect("Should validate");
+        let pattern = template.to_pattern_template().expect("Should convert");
+        assert_eq!(pattern.node_constraints.len(), 2);
+        assert_eq!(pattern.edge_constraints.len(), 1);
+    }
+
+    /// TOML also accepts `[[constraints]]` as an alias for `[[relationships]]`.
+    #[cfg(feature = "design-patterns")]
+    #[test]
+    fn test_parse_toml_constraints_alias() {
+        let toml = r#"
+name = "Aliased"
+
+[[roles]]
+id = "a"
+type = "class"
+
+[[roles]]
+id = "b"
+type = "field"
+
+[[constraints]]
+source = "a"
+target = "b"
+type = "contains"
+"#;
+        let template = DpmlTemplate::parse_toml(toml).expect("Should parse TOML");
+        assert_eq!(template.relationships.len(), 1);
+    }
+
+    #[cfg(feature = "design-patterns")]
+    #[test]
+    fn test_parse_autodetect_yaml_and_toml() {
+        // YAML content -> YAML branch.
+        let yaml = "name: FromYaml\nroles:\n  - id: a\n    type: class\n";
+        let from_yaml = DpmlTemplate::parse(yaml).expect("auto-detect YAML");
+        assert_eq!(from_yaml.name, "FromYaml");
+        assert_eq!(from_yaml.roles.len(), 1);
+
+        // TOML content -> falls through to the TOML branch.
+        let toml = "name = \"FromToml\"\n\n[[roles]]\nid = \"a\"\ntype = \"class\"\n";
+        let from_toml = DpmlTemplate::parse(toml).expect("auto-detect TOML");
+        assert_eq!(from_toml.name, "FromToml");
+        assert_eq!(from_toml.roles.len(), 1);
+    }
+
+    #[cfg(feature = "design-patterns")]
+    #[test]
+    fn test_parse_rejects_garbage() {
+        // `:` makes serde_yaml try (and fail on the wrong shape); TOML also fails.
+        let result = DpmlTemplate::parse("%%% not : valid = anything [[[");
+        assert!(result.is_err());
+    }
+}
+
+#[cfg(all(test, feature = "design-patterns"))]
+mod proptests {
+    use super::*;
+    use crate::testutil::*;
+    use proptest::prelude::*;
+
+    fn arb_role_type() -> impl Strategy<Value = String> {
+        prop_oneof![
+            Just("class"),
+            Just("struct"),
+            Just("trait"),
+            Just("interface"),
+            Just("method"),
+            Just("function"),
+            Just("field"),
+            Just("parameter"),
+            Just("variable"),
+            Just("block"),
+        ]
+        .prop_map(|s| s.to_string())
+    }
+
+    fn arb_constraint_type() -> impl Strategy<Value = String> {
+        prop_oneof![Just("contains"), Just("calls"), Just("uses"), Just("flows")]
+            .prop_map(|s| s.to_string())
+    }
+
+    /// A valid DPML template: non-empty name, roles with unique ids, and
+    /// relationships that only reference existing roles.
+    fn arb_valid_dpml() -> impl Strategy<Value = DpmlTemplate> {
+        (
+            arb_name(),
+            prop::collection::vec((arb_name(), arb_role_type()), 1..=5),
+        )
+            .prop_flat_map(|(name, raw_roles)| {
+                // Keep the first occurrence of each role id (ids must be unique).
+                let mut seen = std::collections::HashSet::new();
+                let roles: Vec<(String, String)> = raw_roles
+                    .into_iter()
+                    .filter(|(id, _)| seen.insert(id.clone()))
+                    .collect();
+                let n = roles.len();
+                let rels = prop::collection::vec((0..n, 0..n, arb_constraint_type()), 0..=4);
+                (Just(name), Just(roles), rels)
+            })
+            .prop_map(|(name, roles, rels)| {
+                let mut template = DpmlTemplate::new(name);
+                for (id, role_type) in &roles {
+                    template = template.with_role(DpmlRole::new(id.clone(), role_type.clone()));
+                }
+                for (s, t, ct) in rels {
+                    template = template.with_relationship(DpmlConstraint::new(
+                        roles[s].0.clone(),
+                        roles[t].0.clone(),
+                        ct,
+                    ));
+                }
+                template
+            })
+    }
+
+    fn to_yaml(t: &DpmlTemplate) -> String {
+        let mut s = format!("name: {}\n", t.name);
+        if !t.roles.is_empty() {
+            s.push_str("roles:\n");
+            for r in &t.roles {
+                s.push_str(&format!(
+                    "  - id: {}\n    type: {}\n    cardinality: \"{}\"\n",
+                    r.id, r.role_type, r.cardinality
+                ));
+            }
+        }
+        if !t.relationships.is_empty() {
+            s.push_str("relationships:\n");
+            for rel in &t.relationships {
+                s.push_str(&format!(
+                    "  - source: {}\n    target: {}\n    type: {}\n",
+                    rel.source, rel.target, rel.constraint_type
+                ));
+            }
+        }
+        s
+    }
+
+    fn to_toml(t: &DpmlTemplate) -> String {
+        let mut s = format!("name = \"{}\"\n", t.name);
+        for r in &t.roles {
+            s.push_str(&format!(
+                "\n[[roles]]\nid = \"{}\"\ntype = \"{}\"\ncardinality = \"{}\"\n",
+                r.id, r.role_type, r.cardinality
+            ));
+        }
+        for rel in &t.relationships {
+            s.push_str(&format!(
+                "\n[[relationships]]\nsource = \"{}\"\ntarget = \"{}\"\ntype = \"{}\"\n",
+                rel.source, rel.target, rel.constraint_type
+            ));
+        }
+        s
+    }
+
+    proptest! {
+        #![proptest_config(ProptestConfig::with_cases(128))]
+
+        /// A template that validates converts to a PatternTemplate whose node
+        /// constraints match its roles and edge constraints match its
+        /// relationships.
+        #[test]
+        fn prop_valid_to_pattern_template(t in arb_valid_dpml()) {
+            prop_assert!(t.validate().is_ok(), "expected valid: {:?}", t.validate().err());
+            let pattern = t.to_pattern_template();
+            prop_assert!(pattern.is_ok());
+            let pattern = pattern.expect("checked ok");
+            prop_assert_eq!(pattern.node_constraints.len(), t.roles.len());
+            prop_assert_eq!(pattern.edge_constraints.len(), t.relationships.len());
+        }
+
+        /// An empty name always fails validation.
+        #[test]
+        fn prop_empty_name_errs(t in arb_valid_dpml()) {
+            let mut t = t;
+            t.name = String::new();
+            prop_assert!(matches!(t.validate(), Err(DpmlError::MissingField(_))));
+        }
+
+        /// A duplicated role id always fails validation.
+        #[test]
+        fn prop_duplicate_role_errs(t in arb_valid_dpml()) {
+            let mut t = t;
+            let dup = t.roles[0].id.clone();
+            t = t.with_role(DpmlRole::new(dup, "class"));
+            prop_assert!(matches!(t.validate(), Err(DpmlError::DuplicateRole(_))));
+        }
+
+        /// An empty role id always fails validation.
+        #[test]
+        fn prop_empty_role_id_errs(t in arb_valid_dpml()) {
+            let mut t = t;
+            t = t.with_role(DpmlRole::new("", "class"));
+            prop_assert!(matches!(t.validate(), Err(DpmlError::InvalidRole(_))));
+        }
+
+        /// A relationship referencing a non-existent role always fails
+        /// validation. `arb_name` never starts with `_`, so the bogus id cannot
+        /// collide with a generated role id.
+        #[test]
+        fn prop_dangling_relationship_errs(t in arb_valid_dpml()) {
+            let mut t = t;
+            let existing = t.roles[0].id.clone();
+            t = t.with_relationship(DpmlConstraint::new(existing, "__nonexistent__", "contains"));
+            prop_assert!(matches!(t.validate(), Err(DpmlError::InvalidRelationship(_))));
+        }
+
+        /// YAML and TOML renderings of the same template parse back to equal
+        /// `(name, roles.len(), relationships.len())`.
+        #[test]
+        fn prop_yaml_toml_roundtrip_equal(t in arb_valid_dpml()) {
+            let yaml = to_yaml(&t);
+            let toml = to_toml(&t);
+
+            let from_yaml = DpmlTemplate::parse(&yaml);
+            prop_assert!(from_yaml.is_ok(), "YAML parse failed: {:?}\n{}", from_yaml.err(), yaml);
+            let from_yaml = from_yaml.expect("checked ok");
+
+            let from_toml = DpmlTemplate::parse_toml(&toml);
+            prop_assert!(from_toml.is_ok(), "TOML parse failed: {:?}\n{}", from_toml.err(), toml);
+            let from_toml = from_toml.expect("checked ok");
+
+            // Each parse matches the source template.
+            prop_assert_eq!(&from_yaml.name, &t.name);
+            prop_assert_eq!(from_yaml.roles.len(), t.roles.len());
+            prop_assert_eq!(from_yaml.relationships.len(), t.relationships.len());
+
+            // And the two formats agree with each other.
+            prop_assert_eq!(&from_yaml.name, &from_toml.name);
+            prop_assert_eq!(from_yaml.roles.len(), from_toml.roles.len());
+            prop_assert_eq!(from_yaml.relationships.len(), from_toml.relationships.len());
+        }
     }
 }

@@ -232,7 +232,7 @@ impl DfgExtractor {
                     for (def_var, def_site) in reaching {
                         if def_var == var_name {
                             // Create def-use edge
-                            cpg.connect(
+                            cpg.connect_unique(
                                 *def_site,
                                 use_site,
                                 CpgEdgeKind::DataFlow(DfgEdgeKind::DefUse),
@@ -293,13 +293,15 @@ impl DfgExtractor {
         // precede it in the function's AST child order.
         let mut env: ReachingEnv = FxHashMap::default();
         let mut pairs: Vec<(NodeId, NodeId)> = Vec::new();
+        let mut on_path: FxHashSet<NodeId> = FxHashSet::default();
+        on_path.insert(function);
         for child in cpg.ast_children(function) {
-            visit_reaching(cpg, child, &mut env, false, &mut pairs);
+            visit_reaching(cpg, child, &mut env, false, &mut pairs, &mut on_path);
         }
 
         for (def, use_site) in pairs {
             if def != use_site && existing.insert((def.0, use_site.0)) {
-                cpg.connect(def, use_site, CpgEdgeKind::DataFlow(DfgEdgeKind::DefUse));
+                cpg.connect_unique(def, use_site, CpgEdgeKind::DataFlow(DfgEdgeKind::DefUse));
             }
         }
     }
@@ -331,7 +333,7 @@ impl DfgExtractor {
             // Match arguments to parameters
             for (i, &param) in params.iter().enumerate() {
                 if let Some(&arg) = call_args.get(i) {
-                    cpg.connect(
+                    cpg.connect_unique(
                         arg,
                         param,
                         CpgEdgeKind::DataFlow(DfgEdgeKind::Parameter),
@@ -361,7 +363,7 @@ impl DfgExtractor {
                 if let Some(uses) = collector.uses.get(&name) {
                     for &use_site in uses {
                         if param != use_site && existing_def_use.insert((param.0, use_site.0)) {
-                            cpg.connect(
+                            cpg.connect_unique(
                                 param,
                                 use_site,
                                 CpgEdgeKind::DataFlow(DfgEdgeKind::DefUse),
@@ -399,7 +401,7 @@ impl DfgExtractor {
             let ret_children = cpg.ast_children(ret);
             if let Some(&ret_expr) = ret_children.first() {
                 for &caller in &callers {
-                    cpg.connect(
+                    cpg.connect_unique(
                         ret_expr,
                         caller,
                         CpgEdgeKind::DataFlow(DfgEdgeKind::ReturnValue),
@@ -422,7 +424,7 @@ impl DfgExtractor {
             // First child is typically the object being accessed
             if let Some(&obj) = children.first() {
                 // Create field read edge from object to member access
-                cpg.connect(
+                cpg.connect_unique(
                     obj,
                     node_id,
                     CpgEdgeKind::DataFlow(DfgEdgeKind::FieldRead),
@@ -439,12 +441,12 @@ impl DfgExtractor {
                 let index = children[1];
 
                 // Create index read edges
-                cpg.connect(
+                cpg.connect_unique(
                     array,
                     node_id,
                     CpgEdgeKind::DataFlow(DfgEdgeKind::IndexRead),
                 );
-                cpg.connect(
+                cpg.connect_unique(
                     index,
                     node_id,
                     CpgEdgeKind::DataFlow(DfgEdgeKind::DataDependency),
@@ -543,6 +545,7 @@ fn visit_reaching(
     env: &mut ReachingEnv,
     conditional: bool,
     pairs: &mut Vec<(NodeId, NodeId)>,
+    on_path: &mut FxHashSet<NodeId>,
 ) {
     // Clone the kind so the immutable borrow of `cpg.node(node)` ends before we
     // recurse (each arm re-borrows `cpg` immutably via `ast_children`).
@@ -550,6 +553,16 @@ fn visit_reaching(
         Some(n) => n.kind.clone(),
         None => return,
     };
+
+    // The walk descends `ast_children`, which is a tree for any graph a builder
+    // produces. A malformed graph can close an `AstChild` cycle, which would
+    // make this descent unbounded and overflow the stack. `on_path` holds the
+    // nodes on the *current* path only — so the deliberate two-pass sweep of a
+    // loop body below (which re-enters siblings, never an ancestor) is
+    // unaffected, while a genuine cycle is cut.
+    if !on_path.insert(node) {
+        return;
+    }
 
     match &kind {
         // `let` / local declaration: evaluate the initializer (whose uses see the
@@ -560,7 +573,7 @@ fn visit_reaching(
                 if Some(child) == binder {
                     continue;
                 }
-                visit_reaching(cpg, child, env, conditional, pairs);
+                visit_reaching(cpg, child, env, conditional, pairs, on_path);
             }
             bind_definition(env, name.clone(), node, conditional);
         }
@@ -574,7 +587,7 @@ fn visit_reaching(
                 if Some(child) == binder {
                     continue;
                 }
-                visit_reaching(cpg, child, env, conditional, pairs);
+                visit_reaching(cpg, child, env, conditional, pairs, on_path);
             }
             bind_definition(env, name.clone(), node, conditional);
         }
@@ -597,7 +610,7 @@ fn visit_reaching(
                 if Some(child) == target && target_is_ident && !compound {
                     continue; // simple `x = …`: the target is written, not read
                 }
-                visit_reaching(cpg, child, env, conditional, pairs);
+                visit_reaching(cpg, child, env, conditional, pairs, on_path);
             }
 
             if target_is_ident {
@@ -626,11 +639,13 @@ fn visit_reaching(
             let passes = if is_loop_region(&kind) { 2 } else { 1 };
             for _ in 0..passes {
                 for child in cpg.ast_children(node) {
-                    visit_reaching(cpg, child, env, child_conditional, pairs);
+                    visit_reaching(cpg, child, env, child_conditional, pairs, on_path);
                 }
             }
         }
     }
+
+    on_path.remove(&node);
 }
 
 /// Collects definitions and uses from a function.
@@ -926,7 +941,7 @@ mod tests {
             SourceRange::default(),
         ));
 
-        cpg.connect(func, body, CpgEdgeKind::AstChild);
+        cpg.connect_unique(func, body, CpgEdgeKind::AstChild);
         cpg.node_mut(body).unwrap().parent = Some(func);
 
         func
@@ -949,7 +964,7 @@ mod tests {
             },
             SourceRange::default(),
         ).with_parent(body));
-        cpg.connect(body, var, CpgEdgeKind::AstChild);
+        cpg.connect_unique(body, var, CpgEdgeKind::AstChild);
 
         // Add identifier reference (use)
         let ident = cpg.add_node(CpgNode::new(
@@ -960,7 +975,7 @@ mod tests {
             },
             SourceRange::default(),
         ).with_parent(body));
-        cpg.connect(body, ident, CpgEdgeKind::AstChild);
+        cpg.connect_unique(body, ident, CpgEdgeKind::AstChild);
 
         let extractor = DfgExtractor::new();
         extractor.extract(&mut cpg);
@@ -986,7 +1001,7 @@ mod tests {
             },
             SourceRange::default(),
         ).with_parent(body));
-        cpg.connect(body, var, CpgEdgeKind::AstChild);
+        cpg.connect_unique(body, var, CpgEdgeKind::AstChild);
 
         // Add identifier reference
         let ident = cpg.add_node(CpgNode::new(
@@ -997,7 +1012,7 @@ mod tests {
             },
             SourceRange::default(),
         ).with_parent(body));
-        cpg.connect(body, ident, CpgEdgeKind::AstChild);
+        cpg.connect_unique(body, ident, CpgEdgeKind::AstChild);
 
         let mut collector = DefUseCollector::new(func);
         collector.collect(&cpg);
@@ -1217,5 +1232,440 @@ mod tests {
         let before = cpg.stats().dfg_edges;
         DfgExtractor::new().extract(&mut cpg);
         assert_eq!(before, cpg.stats().dfg_edges, "extract must be idempotent");
+    }
+
+    // ================================================================
+    // Public-surface coverage: config, DefUseChain, Definition/Use,
+    // build_def_use_chains, and aux-builder idempotency.
+    // ================================================================
+
+    fn dfg_child(cpg: &mut CodePropertyGraph, parent: NodeId, kind: CpgNodeKind) -> NodeId {
+        let id = cpg.add_node(CpgNode::new(NodeId::new(0), kind, SourceRange::default()));
+        cpg.connect(parent, id, CpgEdgeKind::AstChild);
+        if let Some(n) = cpg.node_mut(id) {
+            n.parent = Some(parent);
+        }
+        if let Some(p) = cpg.node_mut(parent) {
+            p.children.push(id);
+        }
+        id
+    }
+
+    fn mk_function(cpg: &mut CodePropertyGraph, name: &str) -> NodeId {
+        cpg.add_node(CpgNode::new(
+            NodeId::new(0),
+            CpgNodeKind::Function {
+                signature: MethodSignature {
+                    name: name.into(),
+                    params: Default::default(),
+                    return_type: None,
+                    is_static: false,
+                    is_async: false,
+                    visibility: Visibility::Public,
+                },
+            },
+            SourceRange::default(),
+        ))
+    }
+
+    fn dfg_ident(name: &str) -> CpgNodeKind {
+        CpgNodeKind::Identifier { name: name.into(), definition: None }
+    }
+
+    /// `DfgExtractorConfig` field defaults and `DfgExtractor::with_config`.
+    #[test]
+    fn dfg_extractor_config_fields_and_with_config() {
+        let d = DfgExtractorConfig::default();
+        assert!(d.include_field_access);
+        assert!(d.include_parameters);
+        assert!(d.include_return_values);
+        assert!(!d.track_aliases);
+        assert_eq!(d.max_iterations, 100);
+
+        let custom = DfgExtractorConfig {
+            include_field_access: false,
+            include_parameters: false,
+            include_return_values: false,
+            track_aliases: true,
+            max_iterations: 7,
+        };
+        let extractor = DfgExtractor::with_config(custom);
+        let mut cpg = CodePropertyGraph::new(Language::Rust);
+        let func = create_test_function(&mut cpg);
+        // Runs without panic even with every auxiliary pass disabled.
+        extractor.extract(&mut cpg);
+        let _ = func;
+    }
+
+    /// `DefUseChain`: `add_definition`/`add_use` deduplicate, `link` wires both
+    /// maps, and `uses_of`/`definitions_of` return an empty slice for unknowns.
+    #[test]
+    fn def_use_chain_dedup_and_empty_lookups() {
+        let mut chain = DefUseChain::new(Arc::from("v"));
+        chain.add_definition(NodeId::new(1));
+        chain.add_definition(NodeId::new(1)); // duplicate: ignored
+        chain.add_definition(NodeId::new(2));
+        assert_eq!(chain.definitions.len(), 2);
+
+        chain.add_use(NodeId::new(3));
+        chain.add_use(NodeId::new(3)); // duplicate: ignored
+        assert_eq!(chain.uses.len(), 1);
+
+        chain.link(NodeId::new(1), NodeId::new(3));
+        assert_eq!(chain.uses_of(NodeId::new(1)), &[NodeId::new(3)]);
+        assert_eq!(chain.definitions_of(NodeId::new(3)), &[NodeId::new(1)]);
+
+        // Unknown def/use keys resolve to the empty slice, not a panic.
+        assert!(chain.uses_of(NodeId::new(99)).is_empty());
+        assert!(chain.definitions_of(NodeId::new(99)).is_empty());
+        assert_eq!(&*chain.variable, "v");
+    }
+
+    /// `Definition` / `Use` construction across every `DefinitionKind`/`UseKind`
+    /// variant, plus `Clone`/`PartialEq`.
+    #[test]
+    fn definition_and_use_construction() {
+        let d = Definition {
+            variable: Arc::from("x"),
+            node: NodeId::new(1),
+            kind: DefinitionKind::Declaration,
+        };
+        assert_eq!(&*d.variable, "x");
+        assert_eq!(d.node, NodeId::new(1));
+        assert_eq!(d.kind, DefinitionKind::Declaration);
+        assert_eq!(d.clone(), d);
+
+        for k in [
+            DefinitionKind::Declaration,
+            DefinitionKind::Assignment,
+            DefinitionKind::Parameter,
+            DefinitionKind::FieldWrite,
+            DefinitionKind::IndexWrite,
+        ] {
+            let def = Definition { variable: Arc::from("v"), node: NodeId::new(0), kind: k };
+            assert_eq!(def.kind, k);
+        }
+
+        let u = Use { variable: Arc::from("y"), node: NodeId::new(2), kind: UseKind::Read };
+        assert_eq!(u.kind, UseKind::Read);
+        assert_eq!(u.clone(), u);
+        for k in [UseKind::Read, UseKind::FieldRead, UseKind::IndexRead, UseKind::Argument] {
+            let us = Use { variable: Arc::from("v"), node: NodeId::new(0), kind: k };
+            assert_eq!(us.kind, k);
+        }
+    }
+
+    /// `build_def_use_chains` collects the DFG's DefUse edges of a function into
+    /// a per-variable chain linking the definition to its use.
+    #[test]
+    fn build_def_use_chains_links_def_to_use() {
+        let mut cpg = CodePropertyGraph::new(Language::Rust);
+        let func = mk_function(&mut cpg, "f");
+        let body = dfg_child(&mut cpg, func, CpgNodeKind::Block { scope: ScopeId::GLOBAL });
+        let var = dfg_child(
+            &mut cpg,
+            body,
+            CpgNodeKind::Variable {
+                name: "x".into(),
+                var_type: None,
+                scope: ScopeId::GLOBAL,
+                is_mutable: true,
+            },
+        );
+        let use_x = dfg_child(&mut cpg, body, dfg_ident("x"));
+
+        DfgExtractor::new().extract(&mut cpg);
+        let chains = build_def_use_chains(&cpg, func);
+        let chain = chains.get("x").expect("a def-use chain for `x`");
+        assert!(chain.definitions.contains(&var));
+        assert!(chain.uses.contains(&use_x));
+        assert_eq!(chain.uses_of(var), &[use_x]);
+        assert_eq!(chain.definitions_of(use_x), &[var]);
+    }
+
+    /// The FIXED aux-builder idempotency: on a graph exercising parameter,
+    /// return-value, and def-use edges (via a caller call-site), a second
+    /// `extract` adds no new DFG edges.
+    #[test]
+    fn dfg_extract_idempotent_with_calls_params_returns() {
+        let mut cpg = CodePropertyGraph::new(Language::Rust);
+        let func = mk_function(&mut cpg, "f");
+        // Parameter precedes the body in AST child order (like the real builder).
+        let param = dfg_child(
+            &mut cpg,
+            func,
+            CpgNodeKind::Parameter { name: "x".into(), param_type: None, is_variadic: false },
+        );
+        let body = dfg_child(&mut cpg, func, CpgNodeKind::Block { scope: ScopeId::GLOBAL });
+        // g(x)
+        let call = dfg_child(&mut cpg, body, CpgNodeKind::Call { target: None, is_method: false });
+        let _callee = dfg_child(&mut cpg, call, dfg_ident("g"));
+        let _call_arg = dfg_child(&mut cpg, call, dfg_ident("x"));
+        // return x
+        let ret = dfg_child(&mut cpg, body, CpgNodeKind::Return);
+        let _ret_val = dfg_child(&mut cpg, ret, dfg_ident("x"));
+        // A caller call-site so `callers(func)` is non-empty (drives the
+        // parameter and return-value auxiliary edge builders).
+        let caller =
+            cpg.add_node(CpgNode::new(
+                NodeId::new(0),
+                CpgNodeKind::Call { target: None, is_method: false },
+                SourceRange::default(),
+            ));
+        let _caller_arg = dfg_child(&mut cpg, caller, dfg_ident("arg0"));
+        cpg.connect(caller, func, CpgEdgeKind::CallSite);
+
+        DfgExtractor::new().extract(&mut cpg);
+        let after_first = cpg.stats().dfg_edges;
+        assert!(
+            after_first > 0,
+            "params/calls/returns must yield DFG edges; got {after_first}"
+        );
+        DfgExtractor::new().extract(&mut cpg);
+        assert_eq!(
+            after_first,
+            cpg.stats().dfg_edges,
+            "auxiliary DFG edge builders must be idempotent"
+        );
+        let _ = param;
+    }
+
+    /// Reaching-defs latest-write (straight-line, flow-sensitive): with two
+    /// `let a` bindings, the use of `a` resolves to the LATEST definition and not
+    /// the earlier, killed one.
+    #[test]
+    #[cfg(feature = "lang-rust")]
+    fn reaching_defs_latest_write_wins() {
+        let cpg = build_rust("fn f() { let a = 1; let a = 2; g(a); }");
+
+        // Both `let a` bindings, sorted by id ⇒ source order (earliest first).
+        let a_defs = nodes_where(&cpg, |k| {
+            matches!(k, CpgNodeKind::Variable { name, .. } if &**name == "a")
+        });
+        assert_eq!(a_defs.len(), 2, "two `let a` bindings");
+        let earliest = a_defs[0]; // let a = 1
+        let latest = a_defs[1]; // let a = 2
+
+        // The `a` inside `g(a)` (the only reaching-def use of `a`).
+        let a_use = ident_use(&cpg, "a");
+        let reaching = cpg.reaching_definitions(a_use);
+        assert!(reaching.contains(&latest), "use must see the latest `let a = 2`");
+        assert!(!reaching.contains(&earliest), "use must NOT see the killed `let a = 1`");
+        assert_eq!(reaching.len(), 1, "straight-line code ⇒ exactly one reaching def");
+    }
+}
+
+/// The auxiliary edge builders are individually switchable.
+///
+/// `DfgExtractorConfig` gates three *additional* edge families on top of the
+/// reaching-definition core: parameter passing, return values, and field
+/// access. Each flag must suppress exactly its own family and nothing else.
+#[cfg(test)]
+mod config_flags {
+    use super::*;
+    use crate::testutil::wf_child;
+    use crate::{CpgNode, Language, MethodSignature, ScopeId, SourceRange, Visibility};
+
+    /// `fn f(p) { g(p); return p; self.fld }` — a shape that triggers all three
+    /// auxiliary families at once.
+    fn rich_function() -> (CodePropertyGraph, NodeId) {
+        let mut cpg = CodePropertyGraph::new(Language::Rust);
+        let func = cpg.add_node(CpgNode::new(
+            NodeId::new(0),
+            CpgNodeKind::Function {
+                signature: MethodSignature {
+                    name: "f".into(),
+                    params: Default::default(),
+                    return_type: None,
+                    is_static: false,
+                    is_async: false,
+                    visibility: Visibility::Public,
+                },
+            },
+            SourceRange::default(),
+        ));
+        wf_child(
+            &mut cpg,
+            func,
+            CpgNodeKind::Parameter { name: "p".into(), param_type: None, is_variadic: false },
+        );
+        let body = wf_child(&mut cpg, func, CpgNodeKind::Block { scope: ScopeId::GLOBAL });
+        let call = wf_child(
+            &mut cpg,
+            body,
+            CpgNodeKind::Call { target: None, is_method: false },
+        );
+        wf_child(&mut cpg, call, CpgNodeKind::Identifier { name: "g".into(), definition: None });
+        wf_child(&mut cpg, call, CpgNodeKind::Identifier { name: "p".into(), definition: None });
+        let field = wf_child(&mut cpg, body, CpgNodeKind::MemberAccess { member: "fld".into() });
+        wf_child(&mut cpg, field, CpgNodeKind::Identifier { name: "p".into(), definition: None });
+        let ret = wf_child(&mut cpg, body, CpgNodeKind::Return);
+        wf_child(&mut cpg, ret, CpgNodeKind::Identifier { name: "p".into(), definition: None });
+        (cpg, func)
+    }
+
+    fn extract_with(config: DfgExtractorConfig) -> CodePropertyGraph {
+        let (mut cpg, func) = rich_function();
+        DfgExtractor::with_config(config).extract_function_dfg(&mut cpg, func);
+        cpg
+    }
+
+    fn count_of(cpg: &CodePropertyGraph, kind: DfgEdgeKind) -> usize {
+        cpg.edges()
+            .filter(|e| matches!(&e.kind, CpgEdgeKind::DataFlow(k) if *k == kind))
+            .count()
+    }
+
+    /// Turning a flag off removes that family and leaves the others intact.
+    #[test]
+    fn each_auxiliary_family_is_switchable() {
+        let all = extract_with(DfgExtractorConfig::default());
+
+        // Disabling parameters removes only `Parameter` edges.
+        let no_params = extract_with(DfgExtractorConfig {
+            include_parameters: false,
+            ..DfgExtractorConfig::default()
+        });
+        assert_eq!(count_of(&no_params, DfgEdgeKind::Parameter), 0);
+        assert_eq!(
+            count_of(&no_params, DfgEdgeKind::ReturnValue),
+            count_of(&all, DfgEdgeKind::ReturnValue),
+            "return edges are unaffected"
+        );
+
+        // Disabling return values removes only `ReturnValue` edges.
+        let no_returns = extract_with(DfgExtractorConfig {
+            include_return_values: false,
+            ..DfgExtractorConfig::default()
+        });
+        assert_eq!(count_of(&no_returns, DfgEdgeKind::ReturnValue), 0);
+        assert_eq!(
+            count_of(&no_returns, DfgEdgeKind::Parameter),
+            count_of(&all, DfgEdgeKind::Parameter),
+            "parameter edges are unaffected"
+        );
+
+        // Disabling field access removes only the field edges.
+        let no_fields = extract_with(DfgExtractorConfig {
+            include_field_access: false,
+            ..DfgExtractorConfig::default()
+        });
+        assert_eq!(count_of(&no_fields, DfgEdgeKind::FieldRead), 0);
+        assert_eq!(count_of(&no_fields, DfgEdgeKind::FieldWrite), 0);
+
+        // With everything off, only the reaching-definition core remains.
+        let core_only = extract_with(DfgExtractorConfig {
+            include_parameters: false,
+            include_return_values: false,
+            include_field_access: false,
+            ..DfgExtractorConfig::default()
+        });
+        assert_eq!(count_of(&core_only, DfgEdgeKind::Parameter), 0);
+        assert_eq!(count_of(&core_only, DfgEdgeKind::ReturnValue), 0);
+        assert_eq!(count_of(&core_only, DfgEdgeKind::FieldRead), 0);
+        assert!(
+            core_only.edge_count() < all.edge_count(),
+            "the auxiliary families really did contribute edges"
+        );
+        // The def-use core is still there.
+        assert!(count_of(&core_only, DfgEdgeKind::DefUse) > 0);
+    }
+
+    /// The config's defaults enable every family.
+    #[test]
+    fn defaults_enable_every_family() {
+        let d = DfgExtractorConfig::default();
+        assert!(d.include_parameters);
+        assert!(d.include_return_values);
+        assert!(d.include_field_access);
+        assert!(d.max_iterations > 0, "the fixpoint has an iteration bound");
+    }
+}
+
+/// REGRESSION (malformed input): `visit_reaching` descends `ast_children`
+/// recursively. A cyclic `AstChild` edge used to make that descent unbounded
+/// and overflow the stack; the path guard cuts the cycle. Found by the
+/// `tests/robustness.rs` corruption suite.
+#[cfg(test)]
+mod cyclic_ast_regression {
+    use super::*;
+    use crate::{CpgNode, Language, MethodSignature, ScopeId, SourceRange, Visibility};
+
+    #[test]
+    fn reaching_definitions_terminate_on_a_cyclic_ast() {
+        let mut cpg = CodePropertyGraph::new(Language::Rust);
+        let func = cpg.add_node(CpgNode::new(
+            NodeId::new(0),
+            CpgNodeKind::Function {
+                signature: MethodSignature {
+                    name: "f".into(),
+                    params: Default::default(),
+                    return_type: None,
+                    is_static: false,
+                    is_async: false,
+                    visibility: Visibility::Public,
+                },
+            },
+            SourceRange::default(),
+        ));
+        let body = crate::testutil::wf_child(
+            &mut cpg,
+            func,
+            CpgNodeKind::Block { scope: ScopeId::GLOBAL },
+        );
+        let var = crate::testutil::wf_child(
+            &mut cpg,
+            body,
+            CpgNodeKind::Variable {
+                name: "x".into(),
+                var_type: None,
+                scope: ScopeId::GLOBAL,
+                is_mutable: true,
+            },
+        );
+        crate::testutil::wf_child(
+            &mut cpg,
+            body,
+            CpgNodeKind::Identifier { name: "x".into(), definition: None },
+        );
+        // Close a cycle: the variable claims the body as its own child.
+        cpg.connect(var, body, CpgEdgeKind::AstChild);
+        if let Some(n) = cpg.node_mut(var) {
+            n.children.push(body);
+        }
+
+        // Termination is the property under test.
+        DfgExtractor::new().extract_function_dfg(&mut cpg, func);
+        let chains = build_def_use_chains(&cpg, func);
+        for chain in chains.values() {
+            for def in chain.definitions.iter() {
+                assert!(cpg.node(*def).is_some(), "definitions are real nodes");
+            }
+        }
+    }
+}
+
+#[cfg(test)]
+mod proptests {
+    use super::*;
+    use crate::testutil::*;
+    use crate::CfgExtractor;
+    use proptest::prelude::*;
+
+    proptest! {
+        #![proptest_config(ProptestConfig::with_cases(128))]
+
+        /// On a well-formed CPG (with calls/returns/branches), a second
+        /// `DfgExtractor::extract` leaves the DFG edge count unchanged — the
+        /// fixed aux-builder idempotency.
+        #[test]
+        fn prop_dfg_extract_idempotent(cpg in arb_well_formed_cpg()) {
+            let mut cpg = cpg;
+            CfgExtractor::new().extract(&mut cpg);
+            DfgExtractor::new().extract(&mut cpg);
+            let after_first = cpg.stats().dfg_edges;
+            DfgExtractor::new().extract(&mut cpg);
+            prop_assert_eq!(after_first, cpg.stats().dfg_edges);
+        }
     }
 }

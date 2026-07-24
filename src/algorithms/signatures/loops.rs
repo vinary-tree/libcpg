@@ -78,7 +78,7 @@ pub enum LoopKind {
 }
 
 /// Loop bounds information.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub enum LoopBounds {
     /// Constant bounds (known at compile time).
@@ -90,11 +90,120 @@ pub enum LoopBounds {
     /// Depends on multiple variables.
     Multiple,
     /// Unknown bounds.
+    #[default]
     Unknown,
 }
 
-impl Default for LoopBounds {
-    fn default() -> Self {
-        Self::Unknown
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::NodeId;
+
+    fn sample_loop(depth: usize) -> LoopType {
+        LoopType {
+            header: NodeId::new(depth as u32),
+            kind: LoopKind::CountedFor,
+            depth,
+            bounds: LoopBounds::LinearN,
+            has_early_exit: false,
+        }
+    }
+
+    #[test]
+    fn test_loop_structure_default_is_empty() {
+        let ls = LoopStructure::new();
+        assert_eq!(ls.max_depth, 0);
+        assert_eq!(ls.loop_count, 0);
+        assert!(ls.loop_types.is_empty());
+        assert!(!ls.loops_independent);
+        // Default derive agrees with new().
+        let d = LoopStructure::default();
+        assert_eq!(d.max_depth, ls.max_depth);
+        assert_eq!(d.loop_count, ls.loop_count);
+    }
+
+    #[test]
+    fn test_loop_structure_with_max_depth() {
+        let ls = LoopStructure::new().with_max_depth(3);
+        assert_eq!(ls.max_depth, 3);
+    }
+
+    #[test]
+    fn test_loop_structure_with_loop_increments_count() {
+        let ls = LoopStructure::new()
+            .with_loop(sample_loop(0))
+            .with_loop(sample_loop(1));
+        assert_eq!(ls.loop_count, 2);
+        assert_eq!(ls.loop_types.len(), 2);
+        assert_eq!(ls.loop_types[0].depth, 0);
+        assert_eq!(ls.loop_types[1].depth, 1);
+    }
+
+    #[test]
+    fn test_loop_structure_with_independence() {
+        let ls = LoopStructure::new().with_independence(true);
+        assert!(ls.loops_independent);
+        let ls = LoopStructure::new().with_independence(false);
+        assert!(!ls.loops_independent);
+    }
+
+    #[test]
+    fn test_loop_structure_builder_chains() {
+        let ls = LoopStructure::new()
+            .with_max_depth(2)
+            .with_loop(sample_loop(0))
+            .with_loop(sample_loop(1))
+            .with_independence(true);
+        assert_eq!(ls.max_depth, 2);
+        assert_eq!(ls.loop_count, 2);
+        assert!(ls.loops_independent);
+    }
+
+    #[test]
+    fn test_loop_type_fields() {
+        let lt = LoopType {
+            header: NodeId::new(7),
+            kind: LoopKind::While,
+            depth: 2,
+            bounds: LoopBounds::Constant(16),
+            has_early_exit: true,
+        };
+        assert_eq!(lt.header, NodeId::new(7));
+        assert_eq!(lt.kind, LoopKind::While);
+        assert_eq!(lt.depth, 2);
+        assert!(lt.has_early_exit);
+        assert!(matches!(lt.bounds, LoopBounds::Constant(16)));
+    }
+
+    #[test]
+    fn test_loop_kind_variants_distinct() {
+        // Copy + PartialEq behaviour across all variants.
+        let kinds = [
+            LoopKind::CountedFor,
+            LoopKind::ForEach,
+            LoopKind::While,
+            LoopKind::DoWhile,
+            LoopKind::Infinite,
+        ];
+        for (i, a) in kinds.iter().enumerate() {
+            for (j, b) in kinds.iter().enumerate() {
+                assert_eq!(i == j, a == b);
+            }
+        }
+    }
+
+    #[test]
+    fn test_loop_bounds_default_is_unknown() {
+        assert!(matches!(LoopBounds::default(), LoopBounds::Unknown));
+    }
+
+    #[test]
+    fn test_loop_bounds_variants_construct() {
+        // Exercise every LoopBounds variant (no PartialEq derive → match).
+        assert!(matches!(LoopBounds::Constant(4), LoopBounds::Constant(4)));
+        assert!(matches!(LoopBounds::LinearN, LoopBounds::LinearN));
+        assert!(matches!(LoopBounds::LogarithmicN, LoopBounds::LogarithmicN));
+        assert!(matches!(LoopBounds::Multiple, LoopBounds::Multiple));
+        assert!(matches!(LoopBounds::Unknown, LoopBounds::Unknown));
     }
 }

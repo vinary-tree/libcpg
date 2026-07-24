@@ -18,8 +18,17 @@ gnn = ["ndarray", "rand"]
 # GPU acceleration via wgpu
 gpu = ["wgpu", "pollster"]
 
-# Design pattern detection
-design-patterns = ["serde_yaml", "toml_edit"]
+# Design pattern detection.
+#
+# DPML (`dpml.rs`) parses pattern templates from YAML via `serde_yaml::from_str`,
+# which requires `DpmlTemplate: serde::Deserialize` and hence the `serde` crate
+# in scope. We pull the crate in directly with `dep:serde` (rather than the
+# whole `serde` *feature*) so DPML's own `#[derive(Serialize, Deserialize)]` —
+# gated `any(feature = "serde", feature = "design-patterns")` in `dpml.rs` —
+# compiles, WITHOUT flipping `cfg(feature = "serde")` crate-wide (which would
+# also pull `petgraph/serde-1` and activate every graph-level serde round-trip
+# path). `serde`'s `derive` feature is already enabled on the dependency below.
+design-patterns = ["serde_yaml", "toml_edit", "dep:serde"]
 
 # Algorithm detection and complexity analysis
 algorithm-detection = []
@@ -158,6 +167,11 @@ serde = { version = "1.0", features = ["derive"], optional = true }
 [dev-dependencies]
 criterion = "0.5"
 proptest = "1.5"
+# JSON format for serde round-trip tests (the `serde` feature only supplies the
+# derives; a format crate is needed to actually (de)serialize). `float_roundtrip`
+# uses the precise (not fast-but-lossy) float parser so every finite f64 that
+# libcpg forwards verbatim round-trips exactly.
+serde_json = { version = "1.0", features = ["float_roundtrip"] }
 
 # Rholang / MeTTa tree-sitter grammars — TEST-ONLY (path dev-dependencies).
 #

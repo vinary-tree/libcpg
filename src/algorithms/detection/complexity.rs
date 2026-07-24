@@ -479,4 +479,176 @@ mod tests {
         let _ = format!("{:?}", analyzer);
         let _ = format!("{:?}", default_analyzer);
     }
+
+    // --- space complexity ---
+
+    /// Adds `parent -> child(kind)` via an `AstChild` edge and sets the child's
+    /// parent pointer (so ancestor walks used by recursion analysis work).
+    fn child(cpg: &mut CodePropertyGraph, parent: NodeId, kind: CpgNodeKind) -> NodeId {
+        let mut node = CpgNode::new(NodeId::new(0), kind, SourceRange::default());
+        node.parent = Some(parent);
+        let id = cpg.add_node(node);
+        cpg.connect(parent, id, CpgEdgeKind::AstChild);
+        id
+    }
+
+    #[test]
+    fn test_space_constant_no_recursion_no_allocations() {
+        let mut cpg = CodePropertyGraph::new(Language::Rust);
+        let func = create_function(&mut cpg, "leaf");
+        let _block = child(&mut cpg, func, CpgNodeKind::Block { scope: ScopeId::GLOBAL });
+
+        let est = ComplexityAnalyzer::new().estimate_space_complexity(&cpg, func);
+        assert_eq!(est.class, ComplexityClass::Constant);
+        assert!(est.confidence > 0.0);
+        assert!(est.confidence <= 1.0);
+    }
+
+    #[test]
+    fn test_space_linear_direct_recursion() {
+        // func "f" { f(); }  — a non-tail self call → Direct recursion → O(n) stack.
+        let mut cpg = CodePropertyGraph::new(Language::Rust);
+        let func = create_function(&mut cpg, "f");
+        let block = child(&mut cpg, func, CpgNodeKind::Block { scope: ScopeId::GLOBAL });
+        let call = child(&mut cpg, block, CpgNodeKind::Call { target: None, is_method: false });
+        child(&mut cpg, call, CpgNodeKind::Identifier { name: "f".into(), definition: None });
+
+        let est = ComplexityAnalyzer::new().estimate_space_complexity(&cpg, func);
+        assert_eq!(est.class, ComplexityClass::Linear);
+    }
+
+    #[test]
+    fn test_space_constant_tail_recursion() {
+        // func "f" { return f(); } — tail call → O(1) stack after TCO.
+        let mut cpg = CodePropertyGraph::new(Language::Rust);
+        let func = create_function(&mut cpg, "f");
+        let ret = child(&mut cpg, func, CpgNodeKind::Return);
+        let call = child(&mut cpg, ret, CpgNodeKind::Call { target: None, is_method: false });
+        child(&mut cpg, call, CpgNodeKind::Identifier { name: "f".into(), definition: None });
+
+        let est = ComplexityAnalyzer::new().estimate_space_complexity(&cpg, func);
+        assert_eq!(est.class, ComplexityClass::Constant);
+    }
+
+    #[test]
+    fn test_space_linear_from_array_literal_allocation() {
+        // No recursion, but an array literal → allocation → O(n) space.
+        let mut cpg = CodePropertyGraph::new(Language::Rust);
+        let func = create_function(&mut cpg, "alloc_fn");
+        let block = child(&mut cpg, func, CpgNodeKind::Block { scope: ScopeId::GLOBAL });
+        child(
+            &mut cpg,
+            block,
+            CpgNodeKind::Literal { kind: crate::LiteralKind::Array },
+        );
+
+        let est = ComplexityAnalyzer::new().estimate_space_complexity(&cpg, func);
+        assert_eq!(est.class, ComplexityClass::Linear);
+    }
+
+    #[test]
+    fn test_space_linear_from_alloc_call() {
+        // A call whose callee identifier looks allocation-y (contains "vec").
+        let mut cpg = CodePropertyGraph::new(Language::Rust);
+        let func = create_function(&mut cpg, "builder");
+        let block = child(&mut cpg, func, CpgNodeKind::Block { scope: ScopeId::GLOBAL });
+        let call = child(&mut cpg, block, CpgNodeKind::Call { target: None, is_method: false });
+        child(
+            &mut cpg,
+            call,
+            CpgNodeKind::Identifier { name: "make_vec".into(), definition: None },
+        );
+
+        let est = ComplexityAnalyzer::new().estimate_space_complexity(&cpg, func);
+        assert_eq!(est.class, ComplexityClass::Linear);
+    }
+}
+
+#[cfg(test)]
+mod proptests {
+    use super::*;
+    use crate::testutil::*;
+    use crate::{CpgNode, Language, MethodSignature, SourceRange, ScopeId, Visibility};
+    use proptest::prelude::*;
+
+    /// Builds a function `f` whose body is `depth` perfectly-nested `For` loops
+    /// (each inside a `Block`), with parent pointers set. No recursion, no
+    /// divide-and-conquer tokens — so its estimated time complexity is a pure
+    /// function of loop-nesting depth.
+    fn nested_loop_cpg(depth: usize) -> (CodePropertyGraph, NodeId) {
+        let mut cpg = CodePropertyGraph::new(Language::Rust);
+        let func = cpg.add_node(CpgNode::new(
+            NodeId::new(0),
+            CpgNodeKind::Function {
+                signature: MethodSignature {
+                    name: "f".into(),
+                    params: Default::default(),
+                    return_type: None,
+                    is_static: false,
+                    is_async: false,
+                    visibility: Visibility::Public,
+                },
+            },
+            SourceRange::default(),
+        ));
+        let mut parent = wf_child(&mut cpg, func, CpgNodeKind::Block { scope: ScopeId::GLOBAL });
+        for _ in 0..depth {
+            let for_node = wf_child(&mut cpg, parent, CpgNodeKind::For);
+            parent = wf_child(&mut cpg, for_node, CpgNodeKind::Block { scope: ScopeId::GLOBAL });
+        }
+        (cpg, func)
+    }
+
+    fn function_root(g: &CodePropertyGraph) -> NodeId {
+        node_ids(g)
+            .into_iter()
+            .find(|&id| matches!(g.node(id).map(|n| &n.kind), Some(CpgNodeKind::Function { .. })))
+            .expect("well-formed cpg has a Function root")
+    }
+
+    proptest! {
+        #![proptest_config(ProptestConfig::with_cases(64))]
+
+        /// Deeper max loop-nesting never yields a strictly *better* (asymptotically
+        /// smaller) time-complexity class: the estimate is monotone non-decreasing
+        /// in nesting depth. Also, zero nesting is `Constant`.
+        #[test]
+        fn prop_complexity_monotone_in_nesting(a in 0usize..=4, b in 0usize..=4) {
+            let (ca, fa) = nested_loop_cpg(a);
+            let (cb, fb) = nested_loop_cpg(b);
+            let analyzer = ComplexityAnalyzer::new();
+            let est_a = analyzer.estimate_time_complexity(&ca, fa);
+            let est_b = analyzer.estimate_time_complexity(&cb, fb);
+
+            // The deeper of the two is never strictly better than the shallower.
+            if a <= b {
+                prop_assert!(!est_b.class.is_better_than(&est_a.class));
+            }
+            if b <= a {
+                prop_assert!(!est_a.class.is_better_than(&est_b.class));
+            }
+            // 0 loops (+ 0 recursion by construction) ⇒ Constant.
+            if a == 0 {
+                prop_assert_eq!(est_a.class, ComplexityClass::Constant);
+            }
+            if b == 0 {
+                prop_assert_eq!(est_b.class, ComplexityClass::Constant);
+            }
+        }
+
+        /// On any well-formed generated function, having neither loops nor
+        /// recursion forces a `Constant` time estimate.
+        #[test]
+        fn prop_constant_when_no_loops_no_recursion(g in arb_well_formed_cpg()) {
+            let root = function_root(&g);
+            let cf = ControlFlowAnalyzer::new();
+            let loops = cf.detect_loops(&g, root);
+            let recursion = cf.detect_recursion(&g, root);
+            let est = ComplexityAnalyzer::new().estimate_time_complexity(&g, root);
+
+            if loops.is_empty() && recursion.is_none() {
+                prop_assert_eq!(est.class, ComplexityClass::Constant);
+            }
+        }
+    }
 }

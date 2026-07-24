@@ -676,4 +676,428 @@ mod tests {
         let mode = ClassificationMode::default();
         assert_eq!(mode, ClassificationMode::RuleBased);
     }
+
+    fn add_field(
+        cpg: &mut CodePropertyGraph,
+        class_id: NodeId,
+        name: &str,
+        ty: Option<&str>,
+    ) -> NodeId {
+        use crate::TypeInfo;
+        let mut node = CpgNode::new(
+            NodeId::new(0),
+            CpgNodeKind::Field {
+                name: Arc::from(name),
+                field_type: ty.map(TypeInfo::new),
+                visibility: Visibility::Private,
+            },
+            SourceRange::default(),
+        );
+        node.parent = Some(class_id);
+        let id = cpg.add_node(node);
+        cpg.connect(class_id, id, CpgEdgeKind::AstChild);
+        id
+    }
+
+    fn add_trait(cpg: &mut CodePropertyGraph, name: &str) -> NodeId {
+        cpg.add_node(CpgNode::new(
+            NodeId::new(0),
+            CpgNodeKind::Trait { name: Arc::from(name) },
+            SourceRange::default(),
+        ))
+    }
+
+    /// End-to-end Singleton detection: static `getInstance` + self-typed
+    /// `instance` field.
+    #[test]
+    fn test_singleton_detection() {
+        let mut cpg = CodePropertyGraph::new(Language::Rust);
+        let logger = create_class(&mut cpg, "Logger");
+        add_method(&mut cpg, logger, "getInstance", true, Visibility::Public);
+        add_field(&mut cpg, logger, "instance", Some("Logger"));
+
+        let classifier = PatternClassifier::new().with_min_confidence(0.6);
+        let matches = classifier.classify(&cpg);
+
+        let singleton = matches
+            .iter()
+            .find(|m| m.pattern_name == "Singleton")
+            .expect("Expected Singleton to be detected");
+        assert!(singleton.confidence >= 0.6);
+        assert!(singleton.confidence <= 1.0);
+    }
+
+    /// End-to-end Decorator detection: implements a trait AND holds a field of
+    /// that trait's type.
+    #[test]
+    fn test_decorator_detection() {
+        let mut cpg = CodePropertyGraph::new(Language::Rust);
+        let decorator = create_class(&mut cpg, "LoggingDecorator");
+        let component = add_trait(&mut cpg, "Component");
+        cpg.connect(decorator, component, CpgEdgeKind::Implements);
+        add_field(&mut cpg, decorator, "inner", Some("Component"));
+
+        let classifier = PatternClassifier::new().with_min_confidence(0.7);
+        let matches = classifier.classify(&cpg);
+
+        assert!(
+            matches.iter().any(|m| m.pattern_name == "Decorator"),
+            "Expected Decorator pattern to be detected"
+        );
+        for m in &matches {
+            assert!(m.confidence <= 1.0);
+        }
+    }
+
+    /// The Strategy detector's scoring logic, exercised directly (both the
+    /// firing and the non-firing branch).
+    #[test]
+    fn test_detect_strategy_scoring() {
+        let cpg = CodePropertyGraph::new(Language::Rust);
+        let classifier = PatternClassifier::new();
+        let class_id = NodeId::new(0);
+
+        // Fires: holds interface references but implements none (a context).
+        let fires = FeatureVector {
+            interface_field_count: 2,
+            interface_count: 0,
+            ..FeatureVector::default()
+        };
+        let pm = classifier
+            .detect_strategy(&cpg, class_id, &fires, "Context")
+            .expect("Strategy should fire");
+        assert_eq!(pm.pattern_name, "Strategy");
+        assert!(pm.confidence >= 0.6);
+        assert!(pm.confidence <= 1.0);
+
+        // Does not fire when the class also implements an interface.
+        let quiet = FeatureVector {
+            interface_field_count: 1,
+            interface_count: 1,
+            ..FeatureVector::default()
+        };
+        assert!(classifier.detect_strategy(&cpg, class_id, &quiet, "Context").is_none());
+    }
+
+    /// Hybrid mode agrees with rule-based and never lowers the confidence below
+    /// the rule score, staying within `[0, 1]`.
+    #[test]
+    fn test_hybrid_mode_boost() {
+        let mut cpg = CodePropertyGraph::new(Language::Rust);
+        let factory = create_class(&mut cpg, "WidgetFactory");
+        add_method(&mut cpg, factory, "create_a", false, Visibility::Public);
+        add_method(&mut cpg, factory, "create_b", false, Visibility::Public);
+
+        let classifier = PatternClassifier::new()
+            .with_mode(ClassificationMode::Hybrid)
+            .with_min_confidence(0.5);
+        let matches = classifier.classify(&cpg);
+
+        let factory_match = matches
+            .iter()
+            .find(|m| m.pattern_name == "Factory")
+            .expect("Expected Factory under hybrid mode");
+        // Rule score was 0.7; hybrid boost = (0.7+0.7)/2 * 1.1 = 0.77.
+        assert!(factory_match.confidence >= 0.7 - 1e-9);
+        assert!(factory_match.confidence <= 1.0);
+    }
+
+    /// `with_min_confidence` filters out matches below the threshold.
+    #[test]
+    fn test_min_confidence_filtering() {
+        let mut cpg = CodePropertyGraph::new(Language::Rust);
+        let factory = create_class(&mut cpg, "SimpleFactory");
+        // A single create method -> Factory score 0.6.
+        add_method(&mut cpg, factory, "create_widget", false, Visibility::Public);
+
+        let strict = PatternClassifier::new().with_min_confidence(0.7);
+        assert!(
+            strict.classify(&cpg).is_empty(),
+            "0.6-confidence match should be filtered at threshold 0.7"
+        );
+
+        let lax = PatternClassifier::new().with_min_confidence(0.5);
+        let matches = lax.classify(&cpg);
+        assert!(
+            matches
+                .iter()
+                .any(|m| m.pattern_name == "Factory" && (m.confidence - 0.6).abs() < 1e-9),
+            "0.6-confidence match should pass at threshold 0.5"
+        );
+    }
+
+    /// Results are sorted by descending confidence across multiple classes.
+    #[test]
+    fn test_classify_sorted_descending() {
+        let mut cpg = CodePropertyGraph::new(Language::Rust);
+        let strong = create_class(&mut cpg, "StrongFactory");
+        for name in ["create_a", "create_b", "create_c"] {
+            add_method(&mut cpg, strong, name, false, Visibility::Public);
+        }
+        let weak = create_class(&mut cpg, "WeakFactory");
+        add_method(&mut cpg, weak, "create_x", false, Visibility::Public);
+
+        let classifier = PatternClassifier::new().with_min_confidence(0.5);
+        let matches = classifier.classify(&cpg);
+
+        assert!(matches.len() >= 2, "expected matches from both factories");
+        for pair in matches.windows(2) {
+            assert!(
+                pair[0].confidence >= pair[1].confidence,
+                "matches must be sorted by descending confidence"
+            );
+        }
+    }
+}
+
+/// Feature-extraction and scoring vocabularies.
+///
+/// The rule-based classifier recognizes roles by *method and field naming
+/// conventions*: a factory method is one whose name starts with `create`,
+/// `make`, `build`, `new_`, or is exactly `new`. Every alternative is a
+/// separate rule, and a dropped one silently stops recognizing every class
+/// that spells the role that way — so each is pinned individually.
+#[cfg(test)]
+mod vocabulary {
+    use super::*;
+    use crate::{CpgNode, Language, MethodSignature, SourceRange, TypeInfo, Visibility};
+    use std::sync::Arc;
+    use smallvec::smallvec;
+
+    fn class(cpg: &mut CodePropertyGraph, name: &str) -> NodeId {
+        cpg.add_node(CpgNode::new(
+            NodeId::new(0),
+            CpgNodeKind::Class { name: Arc::from(name), is_abstract: false },
+            SourceRange::default(),
+        ))
+    }
+
+    fn method(
+        cpg: &mut CodePropertyGraph,
+        class_id: NodeId,
+        name: &str,
+        is_static: bool,
+        visibility: Visibility,
+    ) -> NodeId {
+        let mut node = CpgNode::new(
+            NodeId::new(0),
+            CpgNodeKind::Function {
+                signature: MethodSignature {
+                    name: Arc::from(name),
+                    params: smallvec![],
+                    return_type: None,
+                    is_static,
+                    is_async: false,
+                    visibility,
+                },
+            },
+            SourceRange::default(),
+        );
+        node.parent = Some(class_id);
+        let id = cpg.add_node(node);
+        cpg.connect(class_id, id, CpgEdgeKind::AstChild);
+        if let Some(c) = cpg.node_mut(class_id) {
+            c.children.push(id);
+        }
+        id
+    }
+
+    fn field(
+        cpg: &mut CodePropertyGraph,
+        class_id: NodeId,
+        name: &str,
+        field_type: Option<&str>,
+    ) -> NodeId {
+        let mut node = CpgNode::new(
+            NodeId::new(0),
+            CpgNodeKind::Field {
+                name: Arc::from(name),
+                field_type: field_type.map(TypeInfo::new),
+                visibility: Visibility::Private,
+            },
+            SourceRange::default(),
+        );
+        node.parent = Some(class_id);
+        let id = cpg.add_node(node);
+        cpg.connect(class_id, id, CpgEdgeKind::AstChild);
+        if let Some(c) = cpg.node_mut(class_id) {
+            c.children.push(id);
+        }
+        id
+    }
+
+    /// A class with exactly the named methods, and the extracted features.
+    fn features_of(method_names: &[(&str, bool, Visibility)]) -> FeatureVector {
+        let mut cpg = CodePropertyGraph::new(Language::Rust);
+        let c = class(&mut cpg, "C");
+        for (name, is_static, vis) in method_names {
+            method(&mut cpg, c, name, *is_static, *vis);
+        }
+        PatternClassifier::new().extract_features(&cpg, c)
+    }
+
+    /// Every factory-method spelling increments the factory count.
+    #[test]
+    fn every_factory_method_name_is_recognized() {
+        for name in ["create", "create_widget", "make", "make_it", "build", "builder", "new_with", "new"] {
+            let f = features_of(&[(name, false, Visibility::Public)]);
+            assert_eq!(f.factory_method_count, 1, "`{name}` is a factory method");
+        }
+        // A name outside the vocabulary is not one. `renew` is deliberate: it
+        // *contains* "new" but does not start with it and is not exactly "new".
+        for name in ["run", "renew", "newton"] {
+            let f = features_of(&[(name, false, Visibility::Public)]);
+            assert_eq!(f.factory_method_count, 0, "`{name}` is not a factory method");
+        }
+    }
+
+    /// Every observer-method spelling increments the observer count.
+    #[test]
+    fn every_observer_method_name_is_recognized() {
+        for name in [
+            "register", "register_all", "subscribe", "subscribe_to", "notify", "notify_all",
+            "update", "update_state", "add_observer", "remove_observer",
+        ] {
+            let f = features_of(&[(name, false, Visibility::Public)]);
+            assert_eq!(f.observer_method_count, 1, "`{name}` is an observer method");
+        }
+        for name in ["run", "observe"] {
+            let f = features_of(&[(name, false, Visibility::Public)]);
+            assert_eq!(f.observer_method_count, 0, "`{name}` is not an observer method");
+        }
+    }
+
+    /// A private constructor is a private `new`, or a private name containing
+    /// `init`; a *public* one of either spelling is not.
+    #[test]
+    fn a_private_constructor_needs_both_the_name_and_the_visibility() {
+        for name in ["new", "init", "do_init", "initialize"] {
+            let private = features_of(&[(name, false, Visibility::Private)]);
+            assert!(private.has_private_constructor, "private `{name}`");
+            let public = features_of(&[(name, false, Visibility::Public)]);
+            assert!(!public.has_private_constructor, "public `{name}`");
+        }
+        let other = features_of(&[("run", false, Visibility::Private)]);
+        assert!(!other.has_private_constructor, "private `run` is not a constructor");
+    }
+
+    /// Every singleton accessor spelling scores, as does every instance-field
+    /// spelling *whose type is the class itself*.
+    #[test]
+    fn singleton_evidence_requires_the_right_name_and_type() {
+        let detect = |accessor: &str, field_name: &str, field_type: Option<&str>| {
+            let mut cpg = CodePropertyGraph::new(Language::Rust);
+            let c = class(&mut cpg, "Registry");
+            method(&mut cpg, c, accessor, true, Visibility::Public);
+            method(&mut cpg, c, "new", false, Visibility::Private);
+            field(&mut cpg, c, field_name, field_type);
+            let features = PatternClassifier::new().extract_features(&cpg, c);
+            let name = "Registry".to_string();
+            PatternClassifier::new().detect_singleton(&cpg, c, &features, &name)
+        };
+
+        // Accessor spellings.
+        for accessor in ["instance", "get_instance", "singleton", "the_singleton", "get"] {
+            assert!(
+                detect(accessor, "instance", Some("Registry")).is_some(),
+                "`{accessor}` is a singleton accessor"
+            );
+        }
+        // Field spellings.
+        for field_name in ["instance", "the_instance", "singleton", "self"] {
+            assert!(
+                detect("get_instance", field_name, Some("Registry")).is_some(),
+                "`{field_name}` is an instance field"
+            );
+        }
+        // A field of the right name but the wrong type is not evidence, and an
+        // untyped field cannot be checked at all.
+        let wrong_type = detect("frobnicate", "instance", Some("SomethingElse"));
+        let untyped = detect("frobnicate", "instance", None);
+        assert!(
+            wrong_type.is_none() && untyped.is_none(),
+            "an instance field must be typed as the class itself"
+        );
+    }
+
+    /// The factory detector has two arms: several factory methods, or exactly
+    /// one in a small class.
+    #[test]
+    fn factory_detection_has_a_bulk_and_a_single_method_arm() {
+        let detect = |names: &[&str]| {
+            let mut cpg = CodePropertyGraph::new(Language::Rust);
+            let c = class(&mut cpg, "F");
+            for n in names {
+                method(&mut cpg, c, n, false, Visibility::Public);
+            }
+            let features = PatternClassifier::new().extract_features(&cpg, c);
+            PatternClassifier::new().detect_factory(&cpg, c, &features, "F")
+        };
+
+        // Two or more factory methods: score grows with the count.
+        let two = detect(&["create_a", "create_b"]).expect("two factory methods");
+        let three = detect(&["create_a", "create_b", "make_c"]).expect("three factory methods");
+        assert!(three.confidence > two.confidence, "more evidence ⇒ more confidence");
+        assert!(two.confidence >= 0.5);
+        assert!(three.confidence <= 1.0);
+
+        // Exactly one, in a small class.
+        let single = detect(&["create_a", "run"]).expect("a single-method factory");
+        assert!((single.confidence - 0.6).abs() < 1e-9);
+
+        // Exactly one, in a large class: not a factory.
+        assert!(
+            detect(&["create_a", "a", "b", "c"]).is_none(),
+            "one factory method among many is not a factory"
+        );
+        // None at all.
+        assert!(detect(&["a", "b"]).is_none());
+    }
+}
+
+#[cfg(test)]
+mod proptests {
+    use super::*;
+    use crate::testutil::*;
+    use proptest::prelude::*;
+
+    proptest! {
+        #![proptest_config(ProptestConfig::with_cases(128))]
+
+        /// Under both rule-based and hybrid modes, every classified match has
+        /// `min_confidence <= confidence <= 1.0`, and results are sorted by
+        /// descending confidence.
+        #[test]
+        fn prop_classify_bounded_and_sorted(
+            cpg in arb_cpg_raw(),
+            threshold in (0u32..=100).prop_map(|x| x as f64 / 100.0),
+            hybrid in any::<bool>(),
+        ) {
+            let mode = if hybrid {
+                ClassificationMode::Hybrid
+            } else {
+                ClassificationMode::RuleBased
+            };
+            let classifier = PatternClassifier::new()
+                .with_mode(mode)
+                .with_min_confidence(threshold);
+            let matches = classifier.classify(&cpg);
+
+            for m in &matches {
+                prop_assert!(
+                    m.confidence >= threshold,
+                    "confidence {} < min_confidence {}",
+                    m.confidence,
+                    threshold
+                );
+                prop_assert!(m.confidence <= 1.0, "confidence {} > 1.0", m.confidence);
+            }
+            for pair in matches.windows(2) {
+                prop_assert!(
+                    pair[0].confidence >= pair[1].confidence,
+                    "not sorted descending"
+                );
+            }
+        }
+    }
 }

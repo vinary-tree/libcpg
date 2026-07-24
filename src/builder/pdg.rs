@@ -577,3 +577,105 @@ mod tests {
         assert_eq!(control_dependence_count(&cpg), 0);
     }
 }
+
+#[cfg(test)]
+mod proptests {
+    use super::*;
+    use crate::testutil::*;
+    use crate::{CfgExtractor, DfgExtractor};
+    use proptest::prelude::*;
+
+    /// Naive oracle: every node reachable from `criterion` over *incoming*
+    /// `ControlDependence`/`DataDependence` edges (criterion included). The
+    /// bounded `backward_slice` must always be a subset of this set.
+    fn reachable_incoming_pdg(cpg: &CodePropertyGraph, criterion: NodeId) -> FxHashSet<NodeId> {
+        let mut seen = FxHashSet::default();
+        seen.insert(criterion);
+        let mut stack = vec![criterion];
+        while let Some(n) = stack.pop() {
+            for e in cpg.incoming_edges(n) {
+                if e.kind.is_pdg() && seen.insert(e.source) {
+                    stack.push(e.source);
+                }
+            }
+        }
+        seen
+    }
+
+    proptest! {
+        #![proptest_config(ProptestConfig::with_cases(256))]
+
+        /// Slice bounds + model-based oracle: `|slice| ≤ max_nodes`;
+        /// `max_nodes == 0 ⇒ empty`; `max_nodes ≥ 1 ⇒ criterion ∈ slice`; and
+        /// `backward_slice ⊆` the brute-force incoming-PDG reachable set.
+        #[test]
+        fn prop_slice_bounds_and_oracle(
+            cpg in arb_pdg_graph(),
+            idx in any::<usize>(),
+            max_nodes in 0usize..=12,
+        ) {
+            let ids = node_ids(&cpg);
+            prop_assume!(!ids.is_empty());
+            let criterion = ids[idx % ids.len()];
+
+            let bwd = backward_slice(&cpg, criterion, max_nodes);
+            prop_assert!(bwd.len() <= max_nodes);
+            if max_nodes == 0 {
+                prop_assert!(bwd.is_empty());
+            } else {
+                prop_assert!(bwd.contains(&criterion));
+            }
+            let oracle = reachable_incoming_pdg(&cpg, criterion);
+            prop_assert!(bwd.is_subset(&oracle));
+
+            // Forward slice shares the bound / empty / membership properties.
+            let fwd = forward_slice(&cpg, criterion, max_nodes);
+            prop_assert!(fwd.len() <= max_nodes);
+            if max_nodes == 0 {
+                prop_assert!(fwd.is_empty());
+            } else {
+                prop_assert!(fwd.contains(&criterion));
+            }
+        }
+
+        /// The slice is monotone in `max_nodes`: a smaller bound yields a subset
+        /// of a larger bound's slice (both truncate the same BFS discovery order).
+        #[test]
+        fn prop_slice_monotone_in_max_nodes(
+            cpg in arb_pdg_graph(),
+            idx in any::<usize>(),
+            a in 0usize..=12,
+            b in 0usize..=12,
+        ) {
+            let ids = node_ids(&cpg);
+            prop_assume!(!ids.is_empty());
+            let criterion = ids[idx % ids.len()];
+            let (lo, hi) = if a <= b { (a, b) } else { (b, a) };
+            let s_lo = backward_slice(&cpg, criterion, lo);
+            let s_hi = backward_slice(&cpg, criterion, hi);
+            prop_assert!(s_lo.is_subset(&s_hi));
+        }
+    }
+
+    proptest! {
+        #![proptest_config(ProptestConfig::with_cases(128))]
+
+        /// `PdgBuilder::build` is idempotent: after CFG + DFG extraction, a second
+        /// build on the function leaves `edge_count` unchanged (existing PDG edges
+        /// are not duplicated).
+        #[test]
+        fn prop_pdg_build_idempotent(cpg in arb_well_formed_cpg()) {
+            let mut cpg = cpg;
+            CfgExtractor::new().extract(&mut cpg);
+            DfgExtractor::new().extract(&mut cpg);
+            let func = cpg.functions().map(|n| n.id).next();
+            prop_assume!(func.is_some());
+            let func = func.expect("function id");
+
+            PdgBuilder::new().build(&mut cpg, func);
+            let after_first = cpg.edge_count();
+            PdgBuilder::new().build(&mut cpg, func);
+            prop_assert_eq!(after_first, cpg.edge_count());
+        }
+    }
+}

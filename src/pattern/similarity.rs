@@ -104,7 +104,15 @@ impl GraphSimilarity {
         if mag1 == 0.0 || mag2 == 0.0 {
             0.0
         } else {
-            dot / (mag1 * mag2)
+            // In exact arithmetic `dot / (‖v₁‖‖v₂‖) ∈ [-1, 1]`, and `= 1`
+            // exactly when the vectors are parallel — which is the case
+            // whenever a graph is compared with itself. In floating point the
+            // two square roots and the division each round, so the quotient can
+            // land just outside the interval (observed: `1.0000000000000002`
+            // for a self-comparison). Feature counts are non-negative, so the
+            // true value is in `[0, 1]`; clamping restores the documented range
+            // without changing any value that was already inside it.
+            (dot / (mag1 * mag2)).clamp(0.0, 1.0)
         }
     }
 
@@ -133,7 +141,10 @@ impl GraphSimilarity {
         if mag1 == 0.0 || mag2 == 0.0 {
             0.0
         } else {
-            dot / (mag1.sqrt() * mag2.sqrt())
+            // Same normalized-dot-product form as `cosine_similarity`, and so
+            // the same floating-point overshoot at the `= 1` endpoint; clamped
+            // for the same reason.
+            (dot / (mag1.sqrt() * mag2.sqrt())).clamp(0.0, 1.0)
         }
     }
 
@@ -359,5 +370,230 @@ mod tests {
         assert!(jaccard > 0.9, "Jaccard: {}", jaccard);
         assert!(cosine > 0.9, "Cosine: {}", cosine);
         assert!(wl > 0.9, "WL: {}", wl);
+    }
+
+    // ==================== added coverage: example-based ====================
+
+    /// The `GraphEdit` metric (the 4th metric) scores identical graphs as 1.0.
+    #[test]
+    fn test_graph_edit_identical_is_one() {
+        let mut g = CodePropertyGraph::new(Language::Rust);
+        let a = g.add_node(CpgNode::new(NodeId::new(0), CpgNodeKind::Root, SourceRange::default()));
+        let b = g.add_node(CpgNode::new(NodeId::new(0), CpgNodeKind::If, SourceRange::default()));
+        g.connect(a, b, CpgEdgeKind::AstChild);
+
+        let ge = GraphSimilarity::new().with_metric(SimilarityMetric::GraphEdit);
+        let s = ge.similarity(&g, &g.clone());
+        assert!((s - 1.0).abs() < 1e-9, "GraphEdit of identical graphs should be 1.0, got {s}");
+    }
+
+    /// `with_structural_weight` / `with_label_weight` genuinely reshape the
+    /// `GraphEdit` score: the label term is exactly the Jaccard component, the
+    /// structural term is the node/edge-count blend, and the two disagree.
+    #[test]
+    fn test_graph_edit_weights_affect_score() {
+        // g1: 2 nodes, 1 edge.
+        let mut g1 = CodePropertyGraph::new(Language::Rust);
+        let a = g1.add_node(CpgNode::new(NodeId::new(0), CpgNodeKind::Root, SourceRange::default()));
+        let b = g1.add_node(CpgNode::new(NodeId::new(0), CpgNodeKind::If, SourceRange::default()));
+        g1.connect(a, b, CpgEdgeKind::AstChild);
+
+        // g2: 3 nodes, 2 edges.
+        let mut g2 = CodePropertyGraph::new(Language::Rust);
+        let c = g2.add_node(CpgNode::new(NodeId::new(0), CpgNodeKind::Root, SourceRange::default()));
+        let d = g2.add_node(CpgNode::new(NodeId::new(0), CpgNodeKind::If, SourceRange::default()));
+        let e = g2.add_node(CpgNode::new(NodeId::new(0), CpgNodeKind::While, SourceRange::default()));
+        g2.connect(c, d, CpgEdgeKind::AstChild);
+        g2.connect(c, e, CpgEdgeKind::AstChild);
+
+        let jaccard = GraphSimilarity::new()
+            .with_metric(SimilarityMetric::Jaccard)
+            .similarity(&g1, &g2);
+
+        // Label-only GraphEdit collapses to the Jaccard term.
+        let label_only = GraphSimilarity::new()
+            .with_metric(SimilarityMetric::GraphEdit)
+            .with_structural_weight(0.0)
+            .with_label_weight(1.0)
+            .similarity(&g1, &g2);
+        assert!(
+            (label_only - jaccard).abs() < 1e-9,
+            "label-only GraphEdit ({label_only}) should equal Jaccard ({jaccard})"
+        );
+
+        // Structural-only GraphEdit = 0.6*node_sim + 0.4*edge_sim.
+        // node_sim = 1 - |2-3|/3 = 2/3 ; edge_sim = 1 - |1-2|/2 = 1/2.
+        let struct_only = GraphSimilarity::new()
+            .with_metric(SimilarityMetric::GraphEdit)
+            .with_structural_weight(1.0)
+            .with_label_weight(0.0)
+            .similarity(&g1, &g2);
+        let expected_struct = 0.6 * (2.0 / 3.0) + 0.4 * 0.5;
+        assert!(
+            (struct_only - expected_struct).abs() < 1e-9,
+            "structural-only GraphEdit ({struct_only}) != expected ({expected_struct})"
+        );
+
+        // The two weightings disagree, so the weights genuinely matter.
+        assert!((struct_only - label_only).abs() > 1e-9);
+    }
+
+    /// All four metrics are reflexive (1.0) on a non-empty graph and stay within
+    /// [0, 1] against a different graph.
+    #[test]
+    fn test_all_metrics_reflexive_and_bounded() {
+        let mut g = CodePropertyGraph::new(Language::Rust);
+        let a = g.add_node(CpgNode::new(NodeId::new(0), CpgNodeKind::Root, SourceRange::default()));
+        let b = g.add_node(CpgNode::new(NodeId::new(0), CpgNodeKind::If, SourceRange::default()));
+        let c = g.add_node(CpgNode::new(
+            NodeId::new(0),
+            CpgNodeKind::Block { scope: crate::ScopeId::GLOBAL },
+            SourceRange::default(),
+        ));
+        g.connect(a, b, CpgEdgeKind::AstChild);
+        g.connect(b, c, CpgEdgeKind::ControlFlow(crate::CfgEdgeKind::Sequential));
+
+        let metrics = [
+            SimilarityMetric::Jaccard,
+            SimilarityMetric::Cosine,
+            SimilarityMetric::WeisfeilerLehman,
+            SimilarityMetric::GraphEdit,
+        ];
+        for metric in metrics {
+            let sim = GraphSimilarity::new().with_metric(metric);
+            let self_score = sim.similarity(&g, &g);
+            assert!(
+                (self_score - 1.0).abs() < 1e-9,
+                "{metric:?} self-similarity should be 1.0 (non-empty), got {self_score}"
+            );
+
+            let mut h = CodePropertyGraph::new(Language::Rust);
+            h.add_node(CpgNode::new(NodeId::new(0), CpgNodeKind::While, SourceRange::default()));
+            let s = sim.similarity(&g, &h);
+            assert!((-1e-9..=1.0 + 1e-9).contains(&s), "{metric:?} out of range: {s}");
+        }
+    }
+
+    /// The empty-graph carve-out: `Jaccard`/`GraphEdit` treat two empty graphs
+    /// as identical (1.0), while `WeisfeilerLehman` degenerates to 0.0 (no
+    /// labels exist to compare).
+    #[test]
+    fn test_empty_graph_carve_out() {
+        let empty = CodePropertyGraph::new(Language::Rust);
+
+        for metric in [SimilarityMetric::Jaccard, SimilarityMetric::GraphEdit] {
+            let s = GraphSimilarity::new().with_metric(metric).similarity(&empty, &empty);
+            assert!((s - 1.0).abs() < 1e-9, "{metric:?} empty-vs-empty should be 1.0, got {s}");
+        }
+
+        let wl = GraphSimilarity::new()
+            .with_metric(SimilarityMetric::WeisfeilerLehman)
+            .similarity(&empty, &empty);
+        assert_eq!(wl, 0.0, "WL of empty graphs degenerates to 0.0");
+    }
+}
+
+/// REGRESSION: the normalized-dot-product metrics (`Cosine`, `WeisfeilerLehman`)
+/// are `= 1` in exact arithmetic when a graph is compared with itself, but
+/// floating-point rounding in the two square roots and the division can push
+/// the quotient just past 1 (observed: `1.0000000000000002`), breaking the
+/// documented `[0, 1]` range. Found by the `tests/robustness.rs` suite.
+#[cfg(test)]
+mod range_regression {
+    use super::*;
+    use crate::testutil::arb_cpg_raw;
+    use proptest::prelude::*;
+
+    const METRICS: [SimilarityMetric; 4] = [
+        SimilarityMetric::Jaccard,
+        SimilarityMetric::Cosine,
+        SimilarityMetric::GraphEdit,
+        SimilarityMetric::WeisfeilerLehman,
+    ];
+
+    /// The exact graph shape that overshot: a function whose body holds a loop
+    /// with a condition, a variable, a call, an identifier, and a return.
+    #[test]
+    fn self_similarity_never_exceeds_one() {
+        use crate::testutil::{build_well_formed, StmtSpec};
+        let cpg = build_well_formed(vec![
+            StmtSpec::While(vec![
+                StmtSpec::Let("x".into()),
+                StmtSpec::CallStmt("g".into()),
+                StmtSpec::Use("x".into()),
+            ]),
+            StmtSpec::Return,
+        ]);
+
+        for metric in METRICS {
+            let s = GraphSimilarity::new().with_metric(metric).similarity(&cpg, &cpg);
+            assert!(s <= 1.0, "{metric:?} self-similarity overshot 1.0: {s}");
+            assert!(s >= 0.0, "{metric:?} self-similarity went negative: {s}");
+        }
+    }
+
+    proptest! {
+        #![proptest_config(ProptestConfig::with_cases(128))]
+
+        /// No metric ever leaves `[0, 1]`, on any pair of graphs.
+        #[test]
+        fn prop_similarity_stays_in_the_unit_interval(
+            a in arb_cpg_raw(),
+            b in arb_cpg_raw(),
+        ) {
+            for metric in METRICS {
+                let sim = GraphSimilarity::new().with_metric(metric);
+                for (x, y) in [(&a, &b), (&b, &a), (&a, &a), (&b, &b)] {
+                    let s = sim.similarity(x, y);
+                    prop_assert!(s.is_finite(), "{:?} produced {}", metric, s);
+                    prop_assert!((0.0..=1.0).contains(&s), "{:?} produced {}", metric, s);
+                }
+            }
+        }
+    }
+}
+
+#[cfg(test)]
+mod proptests {
+    use super::*;
+    use crate::testutil::*;
+    use proptest::prelude::*;
+
+    const METRICS: [SimilarityMetric; 4] = [
+        SimilarityMetric::Jaccard,
+        SimilarityMetric::Cosine,
+        SimilarityMetric::WeisfeilerLehman,
+        SimilarityMetric::GraphEdit,
+    ];
+
+    proptest! {
+        #![proptest_config(ProptestConfig::with_cases(128))]
+
+        /// For every metric, similarity is bounded in [0, 1] and symmetric.
+        #[test]
+        fn prop_similarity_bounded_and_symmetric(a in arb_cpg_raw(), b in arb_cpg_raw()) {
+            for metric in METRICS {
+                let sim = GraphSimilarity::new().with_metric(metric);
+                let ab = sim.similarity(&a, &b);
+                let ba = sim.similarity(&b, &a);
+                prop_assert!(ab >= -1e-9, "{:?} out of range: {}", metric, ab);
+                prop_assert!(ab <= 1.0 + 1e-9, "{:?} out of range: {}", metric, ab);
+                prop_assert!((ab - ba).abs() < 1e-9, "{:?} asymmetric: {} vs {}", metric, ab, ba);
+            }
+        }
+
+        /// Reflexivity. `arb_cpg_raw` is always non-empty, so every metric
+        /// (including Cosine/WL, which carve out the empty graph) scores 1.0 on
+        /// the diagonal; a distinct-but-identical clone gives Jaccard exactly 1.0.
+        #[test]
+        fn prop_similarity_reflexive(a in arb_cpg_raw()) {
+            for metric in METRICS {
+                let sim = GraphSimilarity::new().with_metric(metric);
+                let s = sim.similarity(&a, &a);
+                prop_assert!((s - 1.0).abs() < 1e-9, "{:?} not reflexive: {}", metric, s);
+            }
+            let jac = GraphSimilarity::new().with_metric(SimilarityMetric::Jaccard);
+            prop_assert_eq!(jac.similarity(&a, &a.clone()), 1.0);
+        }
     }
 }
