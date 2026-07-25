@@ -1,4 +1,5 @@
-# Version-agnostic, DEV-ONLY shim of the MeTTa tree-sitter grammar.
+# Version-agnostic shim of the MeTTa tree-sitter grammar, SHARED across the
+# workspace (libcpg dev-tests, pgmcp, libgrammstein, libgeiststein).
 #
 # WHY THIS EXISTS (conditional patch — droppable once upstream is fixed):
 # The canonical grammar crate at
@@ -6,27 +7,37 @@
 # binds `tree_sitter_metta()` directly to `tree_sitter::Language` and pins
 # `tree-sitter = "0.25"` as a *normal* dependency. Because `tree-sitter` carries
 # `links = "tree-sitter"`, only ONE version may appear in a dependency graph, so
-# that 0.25 pin is irreconcilable with libcpg's target of `tree-sitter = "0.26"`
-# (Cargo aborts resolution before any compilation). Bumping the canonical crate
-# in place is NOT an option: MeTTaTron (`mettatron`) itself pins `tree-sitter =
-# "0.25"` and consumes `tree_sitter_metta::language() -> tree_sitter::Language@0.25`,
-# so changing it would break MeTTa-Compiler.
+# that 0.25 pin is irreconcilable with a `tree-sitter = "0.26"` consumer (Cargo
+# aborts resolution before any compilation). Bumping the canonical crate in place
+# is NOT an option: MeTTaTron (`mettatron`) itself pins `tree-sitter = "0.25"`
+# and consumes `tree_sitter_metta::language() -> tree_sitter::Language@0.25`, and
+# 12 workspace manifests depend on that crate (MeTTa-Compiler plus its
+# worktree/PR clones, rholang-language-server + test_utils, libgeiststein,
+# libgrammstein, libcpg, pgmcp), so changing it would break MeTTa-Compiler and
+# fan out across all of them.
 #
 # This shim recompiles the SAME canonical C sources (parser.c + scanner.c, by
 # absolute path — no vendoring/duplication) but exposes them through
 # `tree-sitter-language`'s `LanguageFn` instead of `tree_sitter::Language`,
 # exactly as `rholang-tree-sitter` already does. `LanguageFn` is decoupled from
 # the `tree-sitter` version, so `LANGUAGE.into()` yields whatever
-# `tree_sitter::Language` the consumer (libcpg) links — 0.26 here.
+# `tree_sitter::Language` the consumer links — 0.26 today.
+#
+# WHY ONE SHARED SHIM AND NOT ONE PER REPO: `tree_sitter_metta` is a C symbol.
+# Two shim crates would each contribute a static archive defining it, and the
+# linker would silently satisfy every reference from whichever archive it pulls
+# first. Both would compile identical C here, so the outcome would be benign, but
+# a single crate removes the class of hazard entirely. pgmcp, libgrammstein and
+# libgeiststein therefore all point at THIS directory.
 #
 # TO DROP THIS SHIM: once MeTTa-Compiler/tree-sitter-metta adopts
-# `tree-sitter-language` (or tree-sitter 0.26), repoint libcpg's
-# `[dev-dependencies] tree-sitter-metta` back at that crate and delete this dir.
+# `tree-sitter-language` (or tree-sitter 0.26), repoint every consumer back at
+# that crate and delete this dir.
 [package]
 name = "tree-sitter-metta"
 version = "0.1.0"
 edition = "2021"
-description = "Dev-only, version-agnostic shim of the MeTTa tree-sitter grammar for libcpg tests"
+description = "Version-agnostic shim of the MeTTa tree-sitter grammar (LanguageFn over the canonical C sources)"
 license = "MIT"
 publish = false
 
@@ -36,6 +47,13 @@ path = "lib.rs"
 
 [dependencies]
 tree-sitter-language = "0.1"
+
+# Test-only: the shim's own tests load the grammar through a real parser to pin
+# the `node_types` constants against the canonical grammar. Dev-dependencies of a
+# path dependency are not resolved by consumers, so this pin never constrains
+# them (`rholang-tree-sitter` relies on the same property).
+[dev-dependencies]
+tree-sitter = "0.26"
 
 [build-dependencies]
 cc = "1"

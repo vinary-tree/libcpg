@@ -6,3 +6,7 @@
 
 # Cargo.lock is intentionally committed: libcpg pins its full dependency graph
 # for reproducible builds (and as a downstream `path` dependency of pgmcp).
+
+# Nested build artifacts for the vendored grammar shim (its tests are run
+# standalone from that directory, which creates its own target dir).
+vendor/*/target
