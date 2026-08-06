@@ -217,8 +217,20 @@ impl TreeSitterCpgBuilder {
         // Map the tree-sitter node kind to CPG node kind
         let cpg_kind = mapper.map_kind(ts_kind, ts_node, source);
 
-        // Create source range from tree-sitter positions
-        let range = SourceRange::from_bytes(ts_node.start_byte() as u32, ts_node.end_byte() as u32);
+        // Preserve both byte offsets and tree-sitter's zero-based source
+        // points. Downstream graph consumers use the byte range for source
+        // slicing and the line/column range for durable symbol anchoring; a
+        // byte-only range silently located every parsed node at line 1.
+        let start = ts_node.start_position();
+        let end = ts_node.end_position();
+        let range = SourceRange::new(
+            ts_node.start_byte() as u32,
+            ts_node.end_byte() as u32,
+            start.row as u32,
+            start.column as u32,
+            end.row as u32,
+            end.column as u32,
+        );
 
         // Create the CPG node
         let cpg_node = CpgNode::new(NodeId::new(0), cpg_kind.clone(), range);
@@ -275,6 +287,25 @@ mod tests {
         // Should have multiple nodes (root, function, block, etc.)
         assert!(cpg.node_count() > 1);
         assert_eq!(cpg.language(), Language::Rust);
+    }
+
+    #[test]
+    #[cfg(feature = "lang-rust")]
+    fn parsed_nodes_preserve_line_and_column_ranges() {
+        let source = "\n  fn located() {\n      let value = 1;\n  }\n";
+        let cpg = TreeSitterCpgBuilder::new()
+            .build(source, Language::Rust)
+            .expect("build should succeed");
+        let function = cpg
+            .functions()
+            .find(|node| node.name() == Some("located"))
+            .expect("located function");
+
+        assert_eq!(function.range.start, 3);
+        assert_eq!(function.range.start_line, 1);
+        assert_eq!(function.range.start_col, 2);
+        assert_eq!(function.range.end_line, 3);
+        assert_eq!(function.range.end_col, 3);
     }
 
     #[test]
