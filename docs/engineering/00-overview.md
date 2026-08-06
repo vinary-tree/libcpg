@@ -11,8 +11,8 @@ Graphs](../GLOSSARY.md#code-property-graph-cpg) (CPGs) — a single graph that
 overlays a program's [AST](../GLOSSARY.md#abstract-syntax-tree-ast),
 [CFG](../GLOSSARY.md#control-flow-graph-cfg),
 [DFG](../GLOSSARY.md#data-flow-graph-dfg), and, on demand, its
-[PDG](../GLOSSARY.md#program-dependence-graph-pdg) — plus pattern detection,
-algorithm/complexity heuristics, and graph-neural embeddings on top of that
+[PDG](../GLOSSARY.md#program-dependence-graph-pdg) — plus exact SCC decomposition,
+pattern detection, algorithm/complexity heuristics, and graph-neural embeddings on top of that
 substrate. The conceptual "why" lives in [`theory/`](../theory/00-overview.md);
 the "what/where" of the code lives in
 [`architecture/`](../architecture/overview.md); this pillar is the "how to work
@@ -41,7 +41,8 @@ with no [feature flags](../GLOSSARY.md#feature-flag-cargo) enabled,
 because no [tree-sitter](../GLOSSARY.md#tree-sitter) grammar is compiled in. Only
 the feature-free surface — hand-built CPGs, the
 [Mode B](../GLOSSARY.md#mode-b--build_from_tree) `build_from_tree` entry point,
-[VF2](../GLOSSARY.md#vf2) matching, and PDG slicing — works out of the box. The
+exact CFG/call-graph [SCC](../GLOSSARY.md#strongly-connected-component-scc)
+decomposition, [VF2](../GLOSSARY.md#vf2) matching, and PDG slicing — works out of the box. The
 [build and features](01-build-and-features.md) page explains how to turn on what
 you need.
 

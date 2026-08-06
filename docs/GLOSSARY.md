@@ -220,6 +220,10 @@ An IR form in which every variable is assigned exactly once, with $`\phi`$-funct
 
 When a reaching-definitions sweep processes a definition of $`x`$ in **straight-line** context it performs a **strong update** — it [kills](#kill--gen-data-flow) prior definitions of $`x`$ and gens the new one. Inside a **conditional region** (where the definition may or may not execute) it performs a **weak update** — it adds the new definition without killing the old, since both may reach later uses. See [`theory/03-data-flow-and-reaching-definitions.md`](theory/03-data-flow-and-reaching-definitions.md).
 
+### Strongly-connected component (SCC)
+
+A maximal set of vertices in a directed graph where every vertex can reach every other vertex. `libcpg` computes exact SCC partitions for per-function CFGs and the resolved function call graph; cyclic CFG components identify loop regions, while cyclic call-graph components identify direct or mutual recursion. Contracting each SCC produces a directed acyclic condensation graph (CLRS [[13]](#references)). See [`components/graph/scc-analysis.md`](components/graph/scc-analysis.md).
+
 ### Subgraph
 
 A graph formed from a subset of another graph's nodes and the edges among them. `libcpg` extracts subgraphs (`subgraph`, `function_cfg`, `function_dfg`) and matches pattern subgraphs against the CPG. See [Subgraph isomorphism](#isomorphism--subgraph-isomorphism).

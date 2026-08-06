@@ -4,6 +4,7 @@ title libcpg crate module architecture — always-on core vs. feature-gated anal
 
 package "always compiled  (default = [])" as core #F8F9FA {
   component "graph\ngraph::CodePropertyGraph\nDiGraph<CpgNode, CpgEdge>" <<always-on>> as G #F1F3F5
+  component "analysis\nCFG + call-graph SCCs\ncondensation DAG" <<always-on>> as SCC #C3FAE8
   component "builder\nTreeSitterCpgBuilder\nCfg / Dfg / Pdg extractors" <<always-on>> as B #DBE4FF
   component "pattern\nVf2Matcher + GraphSimilarity" <<always-on>> as P #FFE3E3
 }
@@ -15,6 +16,7 @@ package "feature-gated  (opt-in)" as gated #FFF9DB {
 }
 
 B  --> G  : builds
+SCC --> G  : decomposes
 P  --> G  : matches over
 PS --> P  : template + relaxed VF2
 PS --> G  : detects in
@@ -24,12 +26,13 @@ GN --> G  : owns / propagates
 note bottom of gated
   Feature-gated modules are absent from the build unless
   their Cargo feature is enabled ( <latex>default = [\,]</latex> ).
-  The core trio always compiles.
+  The four core modules always compile.
 end note
 
 legend right
   |= colour |= module (role) |
   |<#F1F3F5>| graph — CPG store |
+  |<#C3FAE8>| analysis — SCC decomposition |
   |<#DBE4FF>| builder — AST / CFG / DFG construction |
   |<#FFE3E3>| pattern · patterns — VF2 / GoF matching |
   |<#FFF3BF>| algorithms — complexity |

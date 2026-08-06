@@ -70,7 +70,8 @@ working build and [`usage/01-building-cpgs.md`](../usage/01-building-cpgs.md) fo
 
 The [`patterns`], [`algorithms`], and [`gnn`] modules are compiled *only* when their
 feature is on (`#[cfg(feature = "…")]` on the `pub mod` in `lib.rs`); the `graph`,
-`builder`, and [`pattern`](../GLOSSARY.md#vf2) modules are always compiled. Note the
+`analysis`, `builder`, and [`pattern`](../GLOSSARY.md#vf2) modules are always compiled. The
+feature-free `analysis` module supplies exact CFG and call-graph SCC decomposition. Note the
 deliberate distinction between the always-on `pattern` module (VF2 / similarity) and
 the feature-gated `patterns` module (Gang-of-Four detection) — they are different
 modules, not a typo.

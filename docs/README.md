@@ -22,7 +22,8 @@ flow, and data flow at once:
 
 Combining these views enables, for example: **taint / vulnerability queries**
 (untrusted data reaching a sensitive sink), **design-pattern recognition**
-(subgraph matching), **algorithm detection** (from control-flow structure),
+(subgraph matching), **exact SCC decomposition** (loops and recursion),
+**algorithm detection** (from control-flow structure),
 **code-clone detection** (graph similarity), and **complexity analysis**.
 
 ## Quick start
@@ -86,12 +87,12 @@ let slice = backward_slice(&cpg, func, 256);         // bounded backward slice
 [Overview](design/00-overview.md) · [0001 Unified overlay graph](design/0001-unified-overlay-graph.md) · [0002 Mode B: build_from_tree](design/0002-mode-b-build-from-tree.md) · [0003 AST-ordered reaching definitions](design/0003-ast-ordered-reaching-defs.md) · [0004 Relaxed VF2 detection](design/0004-relaxed-vf2-detection.md) · [0005 Feature-flag taxonomy](design/0005-feature-flag-taxonomy.md)
 
 ### API reference
-[Graph reference](api/graph-reference.md) · [Builder reference](api/builder-reference.md) · [Pattern / algorithm / GNN reference](api/pattern-reference.md)
+[Graph / SCC reference](api/graph-reference.md) · [Builder reference](api/builder-reference.md) · [Pattern / algorithm / GNN reference](api/pattern-reference.md)
 
 ### Components
 
 #### Graph core
-[Overview](components/graph/overview.md) · [Nodes](components/graph/nodes.md) · [Edges](components/graph/edges.md) · [Traversal](components/graph/traversal.md)
+[Overview](components/graph/overview.md) · [Nodes](components/graph/nodes.md) · [Edges](components/graph/edges.md) · [Traversal](components/graph/traversal.md) · [Strongly-connected components](components/graph/scc-analysis.md)
 
 #### Builder
 [Overview](components/builder/overview.md) · [CFG extraction](components/builder/cfg.md) · [DFG extraction](components/builder/dfg.md) · [PDG & slicing](components/builder/pdg-and-slicing.md) · [Node mapper](components/builder/node-mapper.md)

@@ -7,6 +7,7 @@
 //! ## Features
 //!
 //! - **Graph Construction**: Build CPGs from source code via tree-sitter ASTs
+//! - **SCC Analysis**: Decompose per-function CFGs and resolved call graphs
 //! - **Pattern Detection**: Detect design patterns using subgraph isomorphism (VF2/VF3)
 //! - **Algorithm Analysis**: Extract algorithm signatures and estimate complexity
 //! - **GNN Support**: Graph neural network message passing for semantic embeddings
@@ -37,8 +38,9 @@
 #![warn(clippy::all)]
 #![allow(clippy::module_inception)]
 
-pub mod graph;
+pub mod analysis;
 pub mod builder;
+pub mod graph;
 
 #[cfg(feature = "gnn")]
 pub mod gnn;
@@ -57,55 +59,26 @@ pub(crate) mod testutil;
 
 // Re-export commonly used types
 pub use graph::{
-    CodePropertyGraph,
-    CpgStats,
-    CpgNode,
-    CpgNodeKind,
-    CpgEdge,
-    CpgEdgeKind,
-    CfgEdgeKind,
-    DfgEdgeKind,
-    NodeId,
-    EdgeId,
-    SourceRange,
-    Language,
-    Paradigm,
-    TypeInfo,
-    MethodSignature,
-    Visibility,
-    ScopeId,
-    PropertyKey,
-    PropertyValue,
-    LiteralKind,
+    CfgEdgeKind, CodePropertyGraph, CpgEdge, CpgEdgeKind, CpgNode, CpgNodeKind, CpgStats,
+    DfgEdgeKind, EdgeId, Language, LiteralKind, MethodSignature, NodeId, Paradigm, PropertyKey,
+    PropertyValue, ScopeId, SourceRange, TypeInfo, Visibility,
+};
+
+pub use analysis::{
+    call_graph_sccs, control_flow_sccs, SccAnalysisError, SccComponent, SccCondensationEdge,
+    SccDecomposition, SccProjection,
 };
 
 pub use builder::{
-    CpgBuilder,
-    CpgBuilderConfig,
-    TreeSitterCpgBuilder,
-    CfgExtractor,
-    CfgExtractorConfig,
-    BasicBlockIdentifier,
-    DfgExtractor,
-    DfgExtractorConfig,
-    DefUseChain,
-    Definition,
-    DefinitionKind,
-    Use,
-    UseKind,
-    build_def_use_chains,
-    PdgBuilder,
-    backward_slice,
-    forward_slice,
+    backward_slice, build_def_use_chains, forward_slice, BasicBlockIdentifier, CfgExtractor,
+    CfgExtractorConfig, CpgBuilder, CpgBuilderConfig, DefUseChain, Definition, DefinitionKind,
+    DfgExtractor, DfgExtractorConfig, PdgBuilder, TreeSitterCpgBuilder, Use, UseKind,
 };
 
 #[cfg(feature = "gnn")]
 pub use gnn::GraphNeuralNetwork;
 
-pub use pattern::{
-    PatternMatch,
-    SubgraphMatcher,
-};
+pub use pattern::{PatternMatch, SubgraphMatcher};
 
 /// Result type alias for libcpg operations.
 pub type Result<T> = std::result::Result<T, Error>;

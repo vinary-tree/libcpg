@@ -103,11 +103,13 @@ security guarantees:
   similarity is a soft signal.
 
 Use these to *prioritise* human attention, not to *gate* a security decision on
-their own. The one analysis that is exact — [program slicing](../GLOSSARY.md#program-slicing)
-over the PDG — still reflects only the dependencies `libcpg` modelled (its
-[AST-ordered](../GLOSSARY.md#ast-ordered-reaching-definitions) data flow is
-deliberately not a full fixpoint), so a slice is sound with respect to the modelled
-edges, not a guarantee of runtime behaviour.
+their own. Exact structural analyses are exact with respect to their input
+projection: SCC decomposition exactly partitions the projected CFG or resolved
+call graph, and [program slicing](../GLOSSARY.md#program-slicing) exactly traverses
+the modelled PDG. Neither claim fills in facts absent from the CPG: unresolved
+calls are omitted, and the PDG reflects the dependencies produced by libcpg's
+[AST-ordered](../GLOSSARY.md#ast-ordered-reaching-definitions) data flow rather
+than a full fixpoint. These results are not guarantees of runtime behaviour.
 
 ## Scope
 

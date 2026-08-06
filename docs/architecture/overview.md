@@ -52,9 +52,9 @@ source ──parse──▶ AST  ──(build_cfg)──▶ +CFG  ──(build_d
 
 `CpgBuilderConfig` is the real knob set — `retain_source`, `build_cfg` (default `true`), `build_dfg` (default `true`), `include_comments`, `max_file_size` (default 10 MiB), `resolve_imports`. There is no `enable_cfg`/`enable_dfg`/`enable_cache` field; there is no cache. The [`data-flow.md`](data-flow.md) page walks the full pipeline.
 
-### 4. Feature-gated analyses, empty by default
+### 4. Empty default feature set
 
-`default = []`: with no Cargo features, `build(source, language)` fails for **every** language (the [parser registry](../GLOSSARY.md#tree-sitter) is empty), and only the feature-free surface works — hand-built CPGs, `build_from_tree`, the CFG/DFG/PDG extractors, VF2 matching, and slicing. Optional analyses live behind features: `gnn`, `design-patterns`, `algorithm-detection`, `serde`, `ml-linfa`/`ml-rules`, and the Mode-B toggles `rholang`/`metta`. The umbrella `full = [gnn, design-patterns, algorithm-detection, serde, ml-rules, lang-all]` (it excludes `rholang`, `metta`, `gpu`, and `ml-linfa`). The rationale — compile time, dependency surface, and duplicate-symbol avoidance — is captured in [`../design/0005-feature-flag-taxonomy.md`](../design/0005-feature-flag-taxonomy.md).
+`default = []`: with no Cargo features, `build(source, language)` fails for **every** language (the [parser registry](../GLOSSARY.md#tree-sitter) is empty), and only the feature-free surface works — hand-built CPGs, `build_from_tree`, the CFG/DFG/PDG extractors, exact CFG/call-graph SCC decomposition, VF2 matching, and slicing. Optional analyses live behind features: `gnn`, `design-patterns`, `algorithm-detection`, `serde`, `ml-linfa`/`ml-rules`, and the Mode-B toggles `rholang`/`metta`. The umbrella `full = [gnn, design-patterns, algorithm-detection, serde, ml-rules, lang-all]` (it excludes `rholang`, `metta`, `gpu`, and `ml-linfa`). The rationale — compile time, dependency surface, and duplicate-symbol avoidance — is captured in [`../design/0005-feature-flag-taxonomy.md`](../design/0005-feature-flag-taxonomy.md).
 
 ### 5. Thread-safety, honestly
 
@@ -66,15 +66,16 @@ The public types are built for concurrency but do **not** silently parallelize:
 
 ## Module map
 
-libcpg is a small set of modules; two are always compiled, the rest are feature-gated.
+libcpg is a small set of modules; four are always compiled, the rest are feature-gated.
 
 ![Component diagram of libcpg crate modules and their feature gates](../diagrams/module-architecture.svg)
 
-*Figure — the crate's modules and the Cargo features that gate them; `graph`, `builder`, and `pattern` are always compiled. Source: [`diagrams/module-architecture.puml`](../diagrams/module-architecture.puml).*
+*Figure — the crate's modules and the Cargo features that gate them; `graph`, `analysis`, `builder`, and `pattern` are always compiled. Source: [`diagrams/module-architecture.puml`](../diagrams/module-architecture.puml).*
 
 | Module | Gate | Responsibility |
 |--------|------|----------------|
 | `graph` | always | `CodePropertyGraph` and the graph vocabulary: `CpgNode`/`CpgNodeKind`, `CpgEdge`/`CpgEdgeKind`/`CfgEdgeKind`/`DfgEdgeKind`, `NodeId`/`EdgeId`, `SourceRange`, `Language`/`Paradigm`, `CpgStats`. |
+| `analysis` | always | Exact graph analyses: per-function CFG and whole-CPG call-graph SCC decomposition, cycle classification, membership lookup, and condensation DAGs. |
 | `builder` | always | Construction: the `CpgBuilder` trait, `TreeSitterCpgBuilder`, `CfgExtractor`, `DfgExtractor`, `PdgBuilder`, `backward_slice`/`forward_slice`, def-use chains, plus `NodeMapper` and `ParserRegistry`. |
 | `pattern` | always | Generic subgraph matching and similarity: `Vf2Matcher`/`Vf2State` ([VF2](../GLOSSARY.md#vf2)), `GraphSimilarity`/`SimilarityMetric`, `PatternMatch`, the `SubgraphMatcher` trait, and pattern templates. |
 | `patterns` | `design-patterns` | [Gang-of-Four](../GLOSSARY.md#gang-of-four-gof) detection: `GofPatternDetector`, the 23 `GofPattern` templates, [DPML](../GLOSSARY.md#dpml-design-pattern-markup-language), classification, and `PatternMetrics`. |

@@ -200,6 +200,23 @@ where $`E`$ is the number of CFG edges and $`N`$ the number of CFG
 nodes (`cfg_nodes().count()`); when there are no CFG nodes it returns $`1`$.
 The implementation uses a saturating subtraction, so it never underflows.
 
+### Strongly-connected components
+
+These feature-free functions compute exact SCC partitions over two graph
+projections:
+
+| Function | Signature | Projection |
+|---|---|---|
+| `control_flow_sccs` | `fn control_flow_sccs(&CodePropertyGraph, NodeId) -> Result<SccDecomposition, SccAnalysisError>` | One function's intraprocedural CFG; nested functions and interprocedural call edges are excluded. |
+| `call_graph_sccs` | `fn call_graph_sccs(&CodePropertyGraph) -> SccDecomposition` | All functions and resolved caller-to-callee relations in the CPG. |
+
+`SccDecomposition` exposes deterministic `components`, a
+`component_by_node` membership map, cycle-only iteration, and the condensation
+DAG's `condensation_edges`. Multi-node SCCs identify loop or recursion
+clusters; singleton SCCs are marked cyclic only when they have a self-loop.
+See the [SCC component guide](../components/graph/scc-analysis.md) for projection
+boundaries, accepted call encodings, complexity, and examples.
+
 ### Subgraph extraction
 
 | Method | Signature | Notes |
@@ -721,7 +738,8 @@ and `add_edge_with_id` rather than `add_node`/`add_edge`.
   [data flow](../architecture/data-flow.md) — the design behind the model.
 - Component guides: [graph overview](../components/graph/overview.md),
   [nodes](../components/graph/nodes.md), [edges](../components/graph/edges.md),
-  [traversal](../components/graph/traversal.md).
+  [traversal](../components/graph/traversal.md), and
+  [SCC analysis](../components/graph/scc-analysis.md).
 
 ---
 

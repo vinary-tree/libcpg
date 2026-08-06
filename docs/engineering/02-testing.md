@@ -22,17 +22,17 @@ think to write down.
 
 | Kind | Count | Where |
 | --- | ---: | --- |
-| Example-based `#[test]` functions | 399 | inline `#[cfg(test)] mod …` next to the code |
-| Property-based properties (in 26 `proptest!` blocks) | 63 | inline `mod proptests` / `mod …_regression` |
-| Public-API integration tests | 7 | `tests/integration.rs` |
+| Example-based `#[test]` functions | 407 | inline `#[cfg(test)] mod …` next to the code |
+| Property-based properties (in 27 `proptest!` blocks) | 64 | inline `mod proptests` / `mod …_regression` |
+| Public-API integration tests | 8 | `tests/integration.rs` |
 | Malformed-input robustness tests | 5 | `tests/robustness.rs` |
-| **Total** | **474** | |
+| **Total** | **484** | |
 
 That is up from **99** inline tests and **zero** property tests before this work.
 
 Each property runs many generated cases (`ProptestConfig::with_cases(N)`, with
 `N` tuned to the cost of the property: 256 for cheap structural laws, 128 for
-mid-weight ones, 64 for parser-backed ones, 32 for the heaviest), so the 63
+mid-weight ones, 64 for parser-backed ones, 32 for the heaviest), so the 64
 properties execute on the order of ten thousand distinct inputs per run.
 
 ### Not every test compiles under every build
@@ -42,11 +42,12 @@ on the features enabled:
 
 | Command | Lib tests | Notes |
 | --- | ---: | --- |
-| `cargo test` | 174 | `default = []`: the feature-free surface only |
-| `cargo test --features "full rholang metta"` | 450 | the maximal matrix, including the Mode-B mappers |
+| `cargo test` | 182 | `default = []`: the feature-free surface only |
+| `cargo test --features "full rholang metta"` | 459 | the maximal matrix, including the Mode-B mappers |
 
-The feature-free 174 exercise the graph model, the CFG/DFG/PDG extractors, VF2,
-and similarity by building CPGs **by hand** — no grammar required. This is what
+The feature-free 182 exercise the graph model, exact CFG/call-graph SCC
+decomposition, the CFG/DFG/PDG extractors, VF2, and similarity by building CPGs
+**by hand** — no grammar required. This is what
 the [`arb_well_formed_cpg`](#the-generators) generator exists for.
 
 ## Running the tests
@@ -103,12 +104,13 @@ return.
 
 ## What the properties assert
 
-The ~50 invariants fall into six families.
+The invariants fall into seven families.
 
 | Family | Representative laws |
 | --- | --- |
 | **Round-trip / identity** | $`\mathit{deserialize} \circ \mathit{serialize} = \mathrm{id}`$ over the whole serializable surface; `NodeId`/`EdgeId`/`SourceRange` conversions; `Language` extension round-trip; $`\mathit{from\_kind} \circ \mathit{to\_cpg\_node\_kind} = \mathrm{id}`$ |
 | **Structural** | `add_node` yields sequential ids; `connect` is defined iff both endpoints exist; `ast_children` preserves insertion order; $`M = E - N + 2`$ (`cyclomatic_complexity`); `ast_depth` is bounded by the node count |
+| **SCC decomposition** | Every projected node occurs in exactly one component; the partition matches `petgraph::algo::tarjan_scc`; singleton cycles require a self-loop; the condensation graph is acyclic; a 50,000-node path does not overflow the native stack |
 | **Idempotency** | a second `CfgExtractor::extract` / `DfgExtractor::extract` / `PdgBuilder::build` adds no edges |
 | **Slicing** | $`\lvert S\rvert \le \mathit{max\_nodes}`$; the criterion is in its own backward slice; $`\mathit{max\_nodes} = 0 \Rightarrow S = \varnothing`$; $`S`$ is monotone in $`\mathit{max\_nodes}`$; every sliced id is a real node |
 | **Matching & similarity** | VF2 embeddings are injective, kind-consistent, and edge-preserving; relaxed matching $`\supseteq`$ strict; all four metrics land in $`[0,1]`$, are symmetric, and are maximal on self-comparison |

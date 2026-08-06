@@ -1,10 +1,13 @@
 @startuml
 !include _libcpg-theme.iuml
-title CPG analysis pipeline — four analyses fan out over one CodePropertyGraph
+title CPG analysis pipeline — five analyses fan out over one CodePropertyGraph
 start
 :CodePropertyGraph
 (AST + CFG + DFG over one shared node set);
 fork
+  :control_flow_sccs / call_graph_sccs
+  → components + condensation DAG;<<#C3FAE8>>
+fork again
   :PdgBuilder.build
   → backward_slice / forward_slice;<<#E5DBFF>>
 fork again
@@ -21,6 +24,7 @@ end fork
 stop
 legend right
   |= colour |= analysis (module) |
+  |<#C3FAE8>| SCC — loops / recursion |
   |<#E5DBFF>| PDG — program slicing |
   |<#FFE3E3>| VF2 — subgraph iso / GoF |
   |<#FFF3BF>| algorithm + complexity |

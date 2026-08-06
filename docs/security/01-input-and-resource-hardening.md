@@ -22,7 +22,7 @@ Source: [`diagrams/resource-bounds.puml`](../diagrams/resource-bounds.puml).*
 | `Vf2Matcher` strict toggles | `strict_kinds`/`strict_edges` off | `pattern::Vf2Matcher` | tighter feasibility test prunes branches earlier |
 | `DfgExtractorConfig::max_iterations` | `100` | `DfgExtractor` | reaching-definitions sweep stops iterating (guaranteed termination) |
 | `backward_slice` / `forward_slice` `max_nodes` | *(caller-supplied argument)* | crate-root slice fns | BFS returns as soon as the slice reaches `max_nodes` |
-| AST traversal guards | *(always on)* | `ast_descendants` / `ast_ancestors` / `ast_depth`, `CfgExtractor`, DFG reaching-defs | a cyclic `AstChild` graph terminates instead of looping or overflowing the stack |
+| AST traversal guards | *(always on)* | `ast_descendants` / `ast_ancestors` / `ast_depth`, SCC scope discovery, `CfgExtractor`, DFG reaching-defs | a cyclic `AstChild` graph terminates instead of looping or overflowing the stack |
 
 All of these are on the **feature-free surface** — you can configure and use them
 with `default = []`.
@@ -200,6 +200,7 @@ correctness**: an analysis may return a meaningless answer, but it must
 | --- | --- |
 | `ast_descendants`, `ast_ancestors`, `ast_depth` | a **visited set** — each node is expanded at most once, so the walk is bounded by the node count |
 | `ast_ancestors` | additionally stops at a parent pointer that names a node not in the graph, rather than returning an id `node()` cannot resolve |
+| `control_flow_sccs` / `call_graph_sccs` | visited sets plus explicit work stacks for both AST scope discovery and Kosaraju passes; work stays $`O(V + E)`$ and does not consume native stack per path element |
 | `CfgExtractor::process_node` (and every `process_*` handler) | a **path set** on `CfgContext` — a node already on the current recursion path becomes its own exit instead of being re-entered |
 | DFG reaching definitions (`visit_reaching`) | a **path set** — same rule |
 

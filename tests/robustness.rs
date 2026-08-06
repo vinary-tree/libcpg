@@ -109,21 +109,37 @@ fn corrupt_graph(how: Corruption) -> (CodePropertyGraph, NodeId) {
     let mut cpg = CodePropertyGraph::new(Language::Rust);
     let func = add(
         &mut cpg,
-        CpgNodeKind::Function { signature: signature("f") },
+        CpgNodeKind::Function {
+            signature: signature("f"),
+        },
     );
 
     if how == Corruption::BodylessFunction {
         return (cpg, func);
     }
 
-    let body = child(&mut cpg, func, CpgNodeKind::Block { scope: ScopeId::GLOBAL });
+    let body = child(
+        &mut cpg,
+        func,
+        CpgNodeKind::Block {
+            scope: ScopeId::GLOBAL,
+        },
+    );
     let loop_node = child(&mut cpg, body, CpgNodeKind::While);
     child(
         &mut cpg,
         loop_node,
-        CpgNodeKind::BinaryOp { operator: "<".into() },
+        CpgNodeKind::BinaryOp {
+            operator: "<".into(),
+        },
     );
-    let loop_body = child(&mut cpg, loop_node, CpgNodeKind::Block { scope: ScopeId::GLOBAL });
+    let loop_body = child(
+        &mut cpg,
+        loop_node,
+        CpgNodeKind::Block {
+            scope: ScopeId::GLOBAL,
+        },
+    );
     let var = child(
         &mut cpg,
         loop_body,
@@ -137,12 +153,18 @@ fn corrupt_graph(how: Corruption) -> (CodePropertyGraph, NodeId) {
     let call = child(
         &mut cpg,
         loop_body,
-        CpgNodeKind::Call { target: None, is_method: false },
+        CpgNodeKind::Call {
+            target: None,
+            is_method: false,
+        },
     );
     let ident = child(
         &mut cpg,
         call,
-        CpgNodeKind::Identifier { name: "x".into(), definition: None },
+        CpgNodeKind::Identifier {
+            name: "x".into(),
+            definition: None,
+        },
     );
     child(&mut cpg, body, CpgNodeKind::Return);
 
@@ -151,11 +173,16 @@ fn corrupt_graph(how: Corruption) -> (CodePropertyGraph, NodeId) {
             cpg.node_mut(var).expect("var").parent = Some(dangling());
         }
         Corruption::DanglingChild => {
-            cpg.node_mut(loop_body).expect("loop body").children.push(dangling());
+            cpg.node_mut(loop_body)
+                .expect("loop body")
+                .children
+                .push(dangling());
         }
         Corruption::DanglingCallTarget => {
-            cpg.node_mut(call).expect("call").kind =
-                CpgNodeKind::Call { target: Some(dangling()), is_method: false };
+            cpg.node_mut(call).expect("call").kind = CpgNodeKind::Call {
+                target: Some(dangling()),
+                is_method: false,
+            };
         }
         Corruption::DanglingDefinition => {
             cpg.node_mut(ident).expect("ident").kind = CpgNodeKind::Identifier {
@@ -175,7 +202,10 @@ fn corrupt_graph(how: Corruption) -> (CodePropertyGraph, NodeId) {
         Corruption::AstChildCycle => {
             // The innermost block claims the function as its child.
             cpg.connect(loop_body, func, CpgEdgeKind::AstChild);
-            cpg.node_mut(loop_body).expect("loop body").children.push(func);
+            cpg.node_mut(loop_body)
+                .expect("loop body")
+                .children
+                .push(func);
         }
         Corruption::ChildWithoutEdge => {
             let orphan = add(&mut cpg, CpgNodeKind::Return);
@@ -220,6 +250,38 @@ fn exercise_every_analysis(cpg: &CodePropertyGraph, func: NodeId) {
     }
     let _ = cpg.subgraph(&descendants);
 
+    // --- exact SCC decomposition ---
+    let cfg_sccs = libcpg::control_flow_sccs(cpg, func).expect("func remains a function");
+    assert!(cfg_sccs.node_count() <= cpg.node_count());
+    let call_sccs = libcpg::call_graph_sccs(cpg);
+    assert_eq!(call_sccs.node_count(), cpg.functions().count());
+    for decomposition in [&cfg_sccs, &call_sccs] {
+        assert_eq!(
+            decomposition
+                .components
+                .iter()
+                .map(|component| component.nodes.len())
+                .sum::<usize>(),
+            decomposition.node_count(),
+            "every projected node belongs to exactly one SCC"
+        );
+        assert!(
+            decomposition
+                .components
+                .iter()
+                .flat_map(|component| &component.nodes)
+                .all(|node| cpg.node(*node).is_some()),
+            "SCCs contain only real nodes"
+        );
+        assert!(
+            decomposition
+                .condensation_edges
+                .iter()
+                .all(|edge| edge.source != edge.target),
+            "condensation edges never contain self-loops"
+        );
+    }
+
     // --- extractors ---
     let mut work = cpg.clone();
     libcpg::CfgExtractor::new().extract(&mut work);
@@ -241,7 +303,10 @@ fn exercise_every_analysis(cpg: &CodePropertyGraph, func: NodeId) {
     for max in [0usize, 1, 8, 64] {
         let back = libcpg::backward_slice(&work, func, max);
         let fwd = libcpg::forward_slice(&work, func, max);
-        assert!(back.len() <= max && fwd.len() <= max, "slices honor their budget");
+        assert!(
+            back.len() <= max && fwd.len() <= max,
+            "slices honor their budget"
+        );
         for id in back.iter().chain(fwd.iter()) {
             assert!(work.node(*id).is_some(), "slices contain only real nodes");
         }
@@ -259,9 +324,14 @@ fn exercise_every_analysis(cpg: &CodePropertyGraph, func: NodeId) {
             SimilarityMetric::GraphEdit,
             SimilarityMetric::WeisfeilerLehman,
         ] {
-            let s = GraphSimilarity::new().with_metric(metric).similarity(cpg, cpg);
+            let s = GraphSimilarity::new()
+                .with_metric(metric)
+                .similarity(cpg, cpg);
             assert!(s.is_finite(), "{metric:?} similarity is finite");
-            assert!((0.0..=1.0).contains(&s), "{metric:?} similarity in [0,1], got {s}");
+            assert!(
+                (0.0..=1.0).contains(&s),
+                "{metric:?} similarity in [0,1], got {s}"
+            );
         }
     }
 
@@ -269,7 +339,8 @@ fn exercise_every_analysis(cpg: &CodePropertyGraph, func: NodeId) {
     #[cfg(feature = "algorithm-detection")]
     {
         use libcpg::algorithms::AlgorithmDetector;
-        let found = libcpg::algorithms::detection::DefaultAlgorithmDetector::new().detect(cpg, func);
+        let found =
+            libcpg::algorithms::detection::DefaultAlgorithmDetector::new().detect(cpg, func);
         for d in &found {
             assert!(d.confidence.is_finite() && (0.0..=1.0).contains(&d.confidence));
         }
@@ -284,7 +355,9 @@ fn exercise_every_analysis(cpg: &CodePropertyGraph, func: NodeId) {
     #[cfg(feature = "gnn")]
     {
         use libcpg::gnn::{CpgGnn, GraphNeuralNetwork};
-        let mut gnn = CpgGnn::new(cpg.clone()).with_embedding_dim(4).with_num_layers(1);
+        let mut gnn = CpgGnn::new(cpg.clone())
+            .with_embedding_dim(4)
+            .with_num_layers(1);
         gnn.propagate(2);
         for id in cpg.node_ids() {
             if let Some(e) = gnn.node_embedding(id) {
@@ -331,6 +404,10 @@ fn an_absent_node_id_is_inert_everywhere() {
     assert!(cpg.ast_ancestors(dangling()).is_empty());
     assert!(cpg.cfg_successors(dangling()).is_empty());
     assert!(cpg.cfg_predecessors(dangling()).is_empty());
+    assert_eq!(
+        libcpg::control_flow_sccs(&cpg, dangling()),
+        Err(libcpg::SccAnalysisError::UnknownNode(dangling()))
+    );
 
     let mut work = cpg.clone();
     libcpg::CfgExtractor::new().extract_function_cfg(&mut work, dangling());
@@ -349,6 +426,9 @@ fn the_empty_graph_is_analyzable() {
     let stats = cpg.stats();
     assert_eq!(stats.node_count, 0);
     assert_eq!(stats.edge_count, 0);
+    let sccs = libcpg::call_graph_sccs(&cpg);
+    assert_eq!(sccs.node_count(), 0);
+    assert!(sccs.is_acyclic());
 
     let mut work = cpg.clone();
     libcpg::CfgExtractor::new().extract(&mut work);

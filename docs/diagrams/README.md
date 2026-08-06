@@ -39,9 +39,9 @@ Grouped by subject. Each row: the source (its `.svg` sibling is embedded by the 
 |---|---|---|---|
 | `cpg-overlay.dot` | graph | AST⊕CFG⊕DFG overlays on one shared node set (hero figure) | README, docs/README, theory/00–01, architecture/graph-data-model, api/graph-reference, components/graph/overview, design/0001 |
 | `cpg-vs-traditional.dot` | graph | Three separate views vs one unified CPG | theory/00, architecture/overview |
-| `module-architecture.puml` | component | Crate modules and feature gates | architecture/overview, design/00 |
+| `module-architecture.puml` | component | Crate modules, always-on SCC analysis, and feature gates | architecture/overview, design/00 |
 | `construction-pipeline.puml` | activity | parse → AST → CFG → DFG build | architecture/data-flow, components/builder/overview, api/builder-reference, usage/01 |
-| `analysis-pipeline.puml` | activity | CPG → PDG/slice, VF2/GoF, algorithm, GNN | architecture/data-flow |
+| `analysis-pipeline.puml` | activity | CPG → SCC, PDG/slice, VF2/GoF, algorithm, GNN | architecture/data-flow |
 | `feature-flag-map.puml` | mindmap | Cargo feature taxonomy (`default = []`) | design/0005, engineering/01, usage/00 |
 
 ### Graph data model

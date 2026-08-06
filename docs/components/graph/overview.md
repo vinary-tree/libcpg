@@ -3,8 +3,8 @@
 The `graph` module holds the data structures at the heart of `libcpg`: the
 [Code Property Graph](../../GLOSSARY.md#code-property-graph-cpg) (CPG) and the
 node, edge, and identifier types it is built from. Everything else in the crate
-— the builders, the pattern matchers, the slicer, the GNN — reads from or writes
-to this one structure. This page explains what a CPG is, why `libcpg` merges
+— the builders, SCC analysis, the pattern matchers, the slicer, the GNN — reads
+from or writes to this one structure. This page explains what a CPG is, why `libcpg` merges
 several program views into a single graph, how that graph is stored, and how you
 create and inspect one.
 

@@ -63,6 +63,7 @@ dimension, $`k`$ = Weisfeiler-Lehman iterations (3).
 | CFG extraction (per function) | $`O(n)`$ | A per-construct walk over the function's AST children. |
 | DFG reaching-defs (per function) | $`O(I \cdot n)`$ | An [AST-ordered sweep](../GLOSSARY.md#ast-ordered-reaching-definitions); $`I`$ is bounded by `max_iterations` (default 100), with loop bodies swept twice. |
 | PDG construction (per function) | near-linear in $`V + E`$ of the CFG | `petgraph::dominators::simple_fast` on the reversed CFG plus a Cytron reverse-dominance-frontier walk. |
+| CFG/call-graph SCC decomposition | $`O(V + E)`$ | Iterative Kosaraju passes plus construction of the condensation DAG; explicit stacks avoid native-stack growth with path depth. |
 | [`backward_slice`](../GLOSSARY.md#backward-slice--forward-slice) / `forward_slice` | $`O(V + E)`$, capped at `max_nodes` | Breadth-first over PDG edges; returns as soon as the slice reaches `max_nodes`. |
 | [VF2](../GLOSSARY.md#vf2) `find_matches` | worst case $`O(N!\,N)`$; pruned in practice | Feasibility rules and `max_matches` cut the state space dramatically; see [`theory/05-subgraph-isomorphism-vf2.md`](../theory/05-subgraph-isomorphism-vf2.md). |
 | [Jaccard](../GLOSSARY.md#jaccard-similarity) similarity | $`O(V_1 + V_2)`$ | Over the two graphs' node-kind multisets. |

@@ -48,7 +48,7 @@ alternatives is folklore, and a decision without its costs is marketing.
 | [0002 — Mode B: `build_from_tree`](0002-mode-b-build-from-tree.md) | Accept a caller-parsed tree-sitter tree; keep the `rholang` / `metta` features empty `cfg` toggles; match grammar pins to pgmcp to avoid duplicate C symbols. | Accepted |
 | [0003 — AST-ordered reaching definitions](0003-ast-ordered-reaching-defs.md) | Build the DFG from a single AST-ordered, flow-sensitive reaching-definitions sweep rather than SSA or a CFG fixed point. | Accepted |
 | [0004 — Relaxed VF2 detection](0004-relaxed-vf2-detection.md) | Detect Gang-of-Four patterns with a *relaxed* (category-level) VF2 matcher plus a completeness-scaled confidence, not strict isomorphism or pure ML. | Accepted |
-| [0005 — Feature-flag taxonomy](0005-feature-flag-taxonomy.md) | `default = []`: every grammar and every analysis is opt-in via Cargo features, grouped into `lang-*` sets and an umbrella `full`. | Accepted |
+| [0005 — Feature-flag taxonomy](0005-feature-flag-taxonomy.md) | `default = []`: every grammar and optional analysis family is opt-in via Cargo features, grouped into `lang-*` sets and an umbrella `full`; core graph analyses remain feature-free. | Accepted |
 
 These five are not independent. ADR-0001 fixes the substrate that all analyses
 write onto; ADR-0002 and ADR-0005 together explain how a language reaches that
@@ -58,7 +58,7 @@ chose a pragmatic algorithm over a textbook-maximal one. Read 0001 first.
 
 ![Module architecture of libcpg, showing the graph core and the analysis modules layered over it](../diagrams/module-architecture.svg)
 
-*Figure — the module map these decisions inhabit: the `graph` core (ADR-0001) with the `builder`, `pattern`/`patterns`, `algorithms`, and `gnn` modules layered on top. Source: [`diagrams/module-architecture.puml`](../diagrams/module-architecture.puml).*
+*Figure — the module map these decisions inhabit: the `graph` core (ADR-0001) with the `analysis`, `builder`, `pattern`/`patterns`, `algorithms`, and `gnn` modules layered on top. Source: [`diagrams/module-architecture.puml`](../diagrams/module-architecture.puml).*
 
 ## Conventions
 

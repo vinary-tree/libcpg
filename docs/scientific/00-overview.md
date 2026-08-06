@@ -61,7 +61,7 @@ Because `default = []`, many tests are **feature-gated**. The end-to-end reachin
 
 Scientific honesty requires separating the two:
 
-- **Proven (guarded by the tests above).** The CPG's structural invariants, the reaching-definition semantics on the audited corpus, and VF2's completeness on the discriminating diamond. These are deterministic and regression-locked.
+- **Proven (guarded by the tests above).** The CPG's structural invariants, exact SCC partitioning and condensation acyclicity (differentially checked against `petgraph`'s Tarjan implementation), the reaching-definition semantics on the audited corpus, and VF2's completeness on the discriminating diamond. These are deterministic and regression-locked.
 - **Advisory (heuristic by design).** [Design-pattern detection](../GLOSSARY.md#design-pattern), [algorithm-family](../GLOSSARY.md#algorithm-family) recognition, and [GNN](../GLOSSARY.md#graph-neural-network-gnn) embeddings are *heuristics*: they score likelihood, they do not prove identity. Their tests check that the machinery runs and returns well-formed, plausibly-ranked results — not that a classification is correct in the sense a theorem is correct. Treat their output as evidence to be reviewed, never as ground truth.
 - **Unproven (a gap, not a defect).** Performance. No timing is asserted anywhere in the crate today; any speed claim must be earned by the protocol in [04](04-measurement-methodology.md).
 

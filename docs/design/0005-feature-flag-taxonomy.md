@@ -35,7 +35,8 @@ Three pressures shape the choice of what to enable by default:
 ## Decision
 
 **Default to *nothing* — `default = []` — and make every grammar and every
-analysis an explicit opt-in, organised into a small taxonomy of features.**
+dependency-bearing analysis family an explicit opt-in, organised into a small
+taxonomy of features. Core graph algorithms remain feature-free.**
 
 ### The layers
 
@@ -74,8 +75,8 @@ full = ["gnn", "design-patterns", "algorithm-detection", "serde",
         "ml-rules", "lang-all"]
 ```
 
-The taxonomy has four tiers: **capability** features (one per analysis module,
-each also gating its dependencies), the two dependency-free **Mode-B** toggles,
+The taxonomy has four tiers: **capability** features (one per optional analysis
+family, each also gating its dependencies), the two dependency-free **Mode-B** toggles,
 **sixteen per-grammar** `lang-*` features, and **group** features that are simply
 unions of `lang-*` for common bundles. `full` is a convenience umbrella over the
 usual analysis set plus every language.
@@ -110,8 +111,8 @@ documents the intent and is future-proof.)
 ### Positive
 
 - **Minimal downstream cost.** A consumer compiles exactly the grammars and
-  analyses it names; the graph core, the always-on `pattern` matcher, and the
-  PDG/slicing layer are feature-free and always available.
+  analyses it names; the graph core, exact SCC decomposition, the always-on
+  `pattern` matcher, and the PDG/slicing layer are feature-free and always available.
 - **The duplicate-symbol hazard is avoided by construction.** No grammar is
   linked by default, so a consumer that also links grammars (pgmcp) does not
   inherit a second copy from `libcpg` (reinforced by the pgmcp-matched pins in

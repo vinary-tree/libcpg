@@ -27,6 +27,9 @@ PDG). A query can therefore mix syntax, control flow, and data flow freely.
   that already parsed a file can reuse its own grammar and avoid a second parse).
 - **CFG extraction** — structural control-flow edges (14 `CfgEdgeKind` variants)
   for block/if/while/for/loop/match/return/break/continue/try/throw/call.
+- **Strongly-connected components** — exact, deterministic decomposition of
+  per-function CFGs and the resolved whole-CPG call graph, including
+  loop/recursion classification and the condensation DAG.
 - **DFG extraction** — intraprocedural, AST-ordered reaching definitions
   (Kildall 1973) and def-use chains (13 `DfgEdgeKind` variants).
 - **PDG + program slicing** — control-dependence edges via the reverse dominance
@@ -99,8 +102,8 @@ Comprehensive documentation lives under [`docs/`](docs/README.md):
 - **[Theory](docs/theory/00-overview.md)** — the CPG model, control/data flow, program dependence & slicing, subgraph isomorphism, similarity, pattern detection, complexity, and GNNs, with proofs, math, and citations.
 - **[Architecture](docs/architecture/overview.md)** — module map, the graph data model, construction & analysis pipelines, and language frontends.
 - **[Design decisions](docs/design/00-overview.md)** — ADR-style records (unified overlay, Mode B, AST-ordered reaching defs, relaxed VF2, feature taxonomy).
-- **[API reference](docs/api/graph-reference.md)** — graph, builder, and pattern/algorithm/GNN reference.
-- **[Components](docs/README.md#components)** — graph, builder, patterns, algorithms, and GNN internals.
+- **[API reference](docs/api/graph-reference.md)** — graph/SCC, builder, and pattern/algorithm/GNN reference.
+- **[Components](docs/README.md#components)** — graph and SCC analysis, builder, patterns, algorithms, and GNN internals.
 - **[Usage guides](docs/usage/00-getting-started.md)** — task-oriented how-tos.
 - **[Engineering](docs/engineering/00-overview.md)** · **[Scientific validation](docs/scientific/00-overview.md)** · **[Security](docs/security/00-threat-model.md)**.
 - **[Glossary](docs/GLOSSARY.md)** and the **[diagram catalog](docs/diagrams/README.md)**.

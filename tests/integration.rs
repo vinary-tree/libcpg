@@ -6,9 +6,71 @@
 
 #![allow(clippy::items_after_test_module)]
 
+mod scc_analysis {
+    use libcpg::{
+        call_graph_sccs, control_flow_sccs, CfgEdgeKind, CodePropertyGraph, CpgEdgeKind, CpgNode,
+        CpgNodeKind, Language, MethodSignature, NodeId, SourceRange, Visibility,
+    };
+
+    fn node(kind: CpgNodeKind) -> CpgNode {
+        CpgNode::new(NodeId::new(0), kind, SourceRange::default())
+    }
+
+    fn function(name: &str) -> CpgNodeKind {
+        CpgNodeKind::Function {
+            signature: MethodSignature {
+                name: name.into(),
+                params: Default::default(),
+                return_type: None,
+                is_static: false,
+                is_async: false,
+                visibility: Visibility::Private,
+            },
+        }
+    }
+
+    #[test]
+    fn root_api_reports_cfg_cycles_and_recursive_call_clusters() {
+        let mut cpg = CodePropertyGraph::new(Language::Rust);
+        let first = cpg.add_node(node(function("first")));
+        let second = cpg.add_node(node(function("second")));
+        let first_call = cpg.add_node(node(CpgNodeKind::Call {
+            target: Some(second),
+            is_method: false,
+        }));
+        let second_call = cpg.add_node(node(CpgNodeKind::Call {
+            target: Some(first),
+            is_method: false,
+        }));
+        cpg.connect(first, first_call, CpgEdgeKind::AstChild);
+        cpg.connect(second, second_call, CpgEdgeKind::AstChild);
+        cpg.connect(
+            first,
+            first_call,
+            CpgEdgeKind::ControlFlow(CfgEdgeKind::Sequential),
+        );
+        cpg.connect(
+            first_call,
+            first_call,
+            CpgEdgeKind::ControlFlow(CfgEdgeKind::LoopBack),
+        );
+
+        let cfg = control_flow_sccs(&cpg, first).expect("valid function");
+        assert!(cfg.component_of(first_call).expect("call component").cyclic);
+
+        let calls = call_graph_sccs(&cpg);
+        assert_eq!(
+            calls.component_of(first).expect("recursive cluster").nodes,
+            vec![first, second]
+        );
+    }
+}
+
 #[cfg(feature = "lang-rust")]
 mod rust_pipeline {
-    use libcpg::{backward_slice, forward_slice, CpgBuilder, Language, PdgBuilder, TreeSitterCpgBuilder};
+    use libcpg::{
+        backward_slice, forward_slice, CpgBuilder, Language, PdgBuilder, TreeSitterCpgBuilder,
+    };
 
     const SRC: &str = "fn f(x: i32) -> i32 { let y = x + 1; if y > 0 { y } else { 0 } }";
 
