@@ -3,9 +3,9 @@
 //! Uses loop nesting depth and recursion patterns to estimate
 //! time and space complexity of functions.
 
-use crate::{CodePropertyGraph, CpgNodeKind, NodeId};
-use super::super::signatures::{ComplexityEstimate, ComplexityClass};
+use super::super::signatures::{ComplexityClass, ComplexityEstimate};
 use super::control_flow::{ControlFlowAnalyzer, RecursionKind};
+use crate::{CodePropertyGraph, CpgNodeKind, NodeId};
 
 /// Analyzes code complexity.
 #[derive(Debug, Default)]
@@ -105,10 +105,7 @@ impl ComplexityAnalyzer {
             return ComplexityEstimate {
                 class: space_class,
                 confidence: 0.6,
-                justification: format!(
-                    "{:?} recursion detected, stack depth estimated",
-                    rec.kind
-                ),
+                justification: format!("{:?} recursion detected, stack depth estimated", rec.kind),
             };
         }
 
@@ -208,7 +205,8 @@ impl ComplexityAnalyzer {
         let has_base_cases = !recursion.base_cases.is_empty();
 
         // Check for divide-and-conquer pattern
-        let is_divide_conquer = self.is_divide_and_conquer(cpg, function, &recursion.recursive_calls);
+        let is_divide_conquer =
+            self.is_divide_and_conquer(cpg, function, &recursion.recursive_calls);
 
         let (class, confidence, justification) = match recursion.kind {
             RecursionKind::Tail => (
@@ -222,17 +220,22 @@ impl ComplexityAnalyzer {
                         1 => (
                             ComplexityClass::Logarithmic,
                             0.8,
-                            "Binary search pattern detected (single recursive call with halving)".to_string(),
+                            "Binary search pattern detected (single recursive call with halving)"
+                                .to_string(),
                         ),
                         2 => (
                             ComplexityClass::Linearithmic,
                             0.7,
-                            "Merge sort/divide-and-conquer pattern detected (2 calls with halving)".to_string(),
+                            "Merge sort/divide-and-conquer pattern detected (2 calls with halving)"
+                                .to_string(),
                         ),
                         _ => (
                             ComplexityClass::Polynomial(num_recursive_calls as u32),
                             0.5,
-                            format!("Divide-and-conquer with {} recursive calls", num_recursive_calls),
+                            format!(
+                                "Divide-and-conquer with {} recursive calls",
+                                num_recursive_calls
+                            ),
                         ),
                     }
                 } else {
@@ -261,7 +264,10 @@ impl ComplexityAnalyzer {
                         _ => (
                             ComplexityClass::Exponential,
                             0.6,
-                            format!("Multiple recursive calls ({}) detected", num_recursive_calls),
+                            format!(
+                                "Multiple recursive calls ({}) detected",
+                                num_recursive_calls
+                            ),
                         ),
                     }
                 }
@@ -346,7 +352,7 @@ impl ComplexityAnalyzer {
                         for child_id in children {
                             if let Some(child) = cpg.node(child_id) {
                                 if let CpgNodeKind::Identifier { name, .. }
-                                    | CpgNodeKind::MemberAccess { member: name } = &child.kind
+                                | CpgNodeKind::MemberAccess { member: name } = &child.kind
                                 {
                                     let name_lower = name.to_lowercase();
                                     if name_lower.contains("vec")
@@ -374,7 +380,9 @@ impl ComplexityAnalyzer {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{CpgNode, Language, SourceRange, MethodSignature, Visibility, CpgEdgeKind, ScopeId};
+    use crate::{
+        CpgEdgeKind, CpgNode, Language, MethodSignature, ScopeId, SourceRange, Visibility,
+    };
 
     fn create_function(cpg: &mut CodePropertyGraph, name: &str) -> NodeId {
         cpg.add_node(CpgNode::new(
@@ -412,18 +420,16 @@ mod tests {
 
         let mut block = CpgNode::new(
             NodeId::new(0),
-            CpgNodeKind::Block { scope: ScopeId::GLOBAL },
+            CpgNodeKind::Block {
+                scope: ScopeId::GLOBAL,
+            },
             SourceRange::default(),
         );
         block.parent = Some(func);
         let block_id = cpg.add_node(block);
         cpg.connect(func, block_id, CpgEdgeKind::AstChild);
 
-        let mut for_loop = CpgNode::new(
-            NodeId::new(0),
-            CpgNodeKind::For,
-            SourceRange::default(),
-        );
+        let mut for_loop = CpgNode::new(NodeId::new(0), CpgNodeKind::For, SourceRange::default());
         for_loop.parent = Some(block_id);
         let loop_id = cpg.add_node(for_loop);
         cpg.connect(block_id, loop_id, CpgEdgeKind::AstChild);
@@ -441,27 +447,21 @@ mod tests {
 
         let mut block = CpgNode::new(
             NodeId::new(0),
-            CpgNodeKind::Block { scope: ScopeId::GLOBAL },
+            CpgNodeKind::Block {
+                scope: ScopeId::GLOBAL,
+            },
             SourceRange::default(),
         );
         block.parent = Some(func);
         let block_id = cpg.add_node(block);
         cpg.connect(func, block_id, CpgEdgeKind::AstChild);
 
-        let mut outer = CpgNode::new(
-            NodeId::new(0),
-            CpgNodeKind::For,
-            SourceRange::default(),
-        );
+        let mut outer = CpgNode::new(NodeId::new(0), CpgNodeKind::For, SourceRange::default());
         outer.parent = Some(block_id);
         let outer_id = cpg.add_node(outer);
         cpg.connect(block_id, outer_id, CpgEdgeKind::AstChild);
 
-        let mut inner = CpgNode::new(
-            NodeId::new(0),
-            CpgNodeKind::For,
-            SourceRange::default(),
-        );
+        let mut inner = CpgNode::new(NodeId::new(0), CpgNodeKind::For, SourceRange::default());
         inner.parent = Some(outer_id);
         let inner_id = cpg.add_node(inner);
         cpg.connect(outer_id, inner_id, CpgEdgeKind::AstChild);
@@ -496,7 +496,13 @@ mod tests {
     fn test_space_constant_no_recursion_no_allocations() {
         let mut cpg = CodePropertyGraph::new(Language::Rust);
         let func = create_function(&mut cpg, "leaf");
-        let _block = child(&mut cpg, func, CpgNodeKind::Block { scope: ScopeId::GLOBAL });
+        let _block = child(
+            &mut cpg,
+            func,
+            CpgNodeKind::Block {
+                scope: ScopeId::GLOBAL,
+            },
+        );
 
         let est = ComplexityAnalyzer::new().estimate_space_complexity(&cpg, func);
         assert_eq!(est.class, ComplexityClass::Constant);
@@ -509,9 +515,29 @@ mod tests {
         // func "f" { f(); }  — a non-tail self call → Direct recursion → O(n) stack.
         let mut cpg = CodePropertyGraph::new(Language::Rust);
         let func = create_function(&mut cpg, "f");
-        let block = child(&mut cpg, func, CpgNodeKind::Block { scope: ScopeId::GLOBAL });
-        let call = child(&mut cpg, block, CpgNodeKind::Call { target: None, is_method: false });
-        child(&mut cpg, call, CpgNodeKind::Identifier { name: "f".into(), definition: None });
+        let block = child(
+            &mut cpg,
+            func,
+            CpgNodeKind::Block {
+                scope: ScopeId::GLOBAL,
+            },
+        );
+        let call = child(
+            &mut cpg,
+            block,
+            CpgNodeKind::Call {
+                target: None,
+                is_method: false,
+            },
+        );
+        child(
+            &mut cpg,
+            call,
+            CpgNodeKind::Identifier {
+                name: "f".into(),
+                definition: None,
+            },
+        );
 
         let est = ComplexityAnalyzer::new().estimate_space_complexity(&cpg, func);
         assert_eq!(est.class, ComplexityClass::Linear);
@@ -523,8 +549,22 @@ mod tests {
         let mut cpg = CodePropertyGraph::new(Language::Rust);
         let func = create_function(&mut cpg, "f");
         let ret = child(&mut cpg, func, CpgNodeKind::Return);
-        let call = child(&mut cpg, ret, CpgNodeKind::Call { target: None, is_method: false });
-        child(&mut cpg, call, CpgNodeKind::Identifier { name: "f".into(), definition: None });
+        let call = child(
+            &mut cpg,
+            ret,
+            CpgNodeKind::Call {
+                target: None,
+                is_method: false,
+            },
+        );
+        child(
+            &mut cpg,
+            call,
+            CpgNodeKind::Identifier {
+                name: "f".into(),
+                definition: None,
+            },
+        );
 
         let est = ComplexityAnalyzer::new().estimate_space_complexity(&cpg, func);
         assert_eq!(est.class, ComplexityClass::Constant);
@@ -535,11 +575,19 @@ mod tests {
         // No recursion, but an array literal → allocation → O(n) space.
         let mut cpg = CodePropertyGraph::new(Language::Rust);
         let func = create_function(&mut cpg, "alloc_fn");
-        let block = child(&mut cpg, func, CpgNodeKind::Block { scope: ScopeId::GLOBAL });
+        let block = child(
+            &mut cpg,
+            func,
+            CpgNodeKind::Block {
+                scope: ScopeId::GLOBAL,
+            },
+        );
         child(
             &mut cpg,
             block,
-            CpgNodeKind::Literal { kind: crate::LiteralKind::Array },
+            CpgNodeKind::Literal {
+                kind: crate::LiteralKind::Array,
+            },
         );
 
         let est = ComplexityAnalyzer::new().estimate_space_complexity(&cpg, func);
@@ -551,12 +599,28 @@ mod tests {
         // A call whose callee identifier looks allocation-y (contains "vec").
         let mut cpg = CodePropertyGraph::new(Language::Rust);
         let func = create_function(&mut cpg, "builder");
-        let block = child(&mut cpg, func, CpgNodeKind::Block { scope: ScopeId::GLOBAL });
-        let call = child(&mut cpg, block, CpgNodeKind::Call { target: None, is_method: false });
+        let block = child(
+            &mut cpg,
+            func,
+            CpgNodeKind::Block {
+                scope: ScopeId::GLOBAL,
+            },
+        );
+        let call = child(
+            &mut cpg,
+            block,
+            CpgNodeKind::Call {
+                target: None,
+                is_method: false,
+            },
+        );
         child(
             &mut cpg,
             call,
-            CpgNodeKind::Identifier { name: "make_vec".into(), definition: None },
+            CpgNodeKind::Identifier {
+                name: "make_vec".into(),
+                definition: None,
+            },
         );
 
         let est = ComplexityAnalyzer::new().estimate_space_complexity(&cpg, func);
@@ -568,7 +632,7 @@ mod tests {
 mod proptests {
     use super::*;
     use crate::testutil::*;
-    use crate::{CpgNode, Language, MethodSignature, SourceRange, ScopeId, Visibility};
+    use crate::{CpgNode, Language, MethodSignature, ScopeId, SourceRange, Visibility};
     use proptest::prelude::*;
 
     /// Builds a function `f` whose body is `depth` perfectly-nested `For` loops
@@ -591,10 +655,22 @@ mod proptests {
             },
             SourceRange::default(),
         ));
-        let mut parent = wf_child(&mut cpg, func, CpgNodeKind::Block { scope: ScopeId::GLOBAL });
+        let mut parent = wf_child(
+            &mut cpg,
+            func,
+            CpgNodeKind::Block {
+                scope: ScopeId::GLOBAL,
+            },
+        );
         for _ in 0..depth {
             let for_node = wf_child(&mut cpg, parent, CpgNodeKind::For);
-            parent = wf_child(&mut cpg, for_node, CpgNodeKind::Block { scope: ScopeId::GLOBAL });
+            parent = wf_child(
+                &mut cpg,
+                for_node,
+                CpgNodeKind::Block {
+                    scope: ScopeId::GLOBAL,
+                },
+            );
         }
         (cpg, func)
     }
@@ -602,7 +678,12 @@ mod proptests {
     fn function_root(g: &CodePropertyGraph) -> NodeId {
         node_ids(g)
             .into_iter()
-            .find(|&id| matches!(g.node(id).map(|n| &n.kind), Some(CpgNodeKind::Function { .. })))
+            .find(|&id| {
+                matches!(
+                    g.node(id).map(|n| &n.kind),
+                    Some(CpgNodeKind::Function { .. })
+                )
+            })
             .expect("well-formed cpg has a Function root")
     }
 

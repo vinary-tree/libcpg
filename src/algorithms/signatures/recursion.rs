@@ -186,10 +186,22 @@ mod tests {
     #[test]
     fn test_reduction_pattern_variants_construct() {
         // No PartialEq derive → match on each variant.
-        assert!(matches!(ReductionPattern::Constant(3), ReductionPattern::Constant(3)));
+        assert!(matches!(
+            ReductionPattern::Constant(3),
+            ReductionPattern::Constant(3)
+        ));
         assert!(matches!(ReductionPattern::Linear, ReductionPattern::Linear));
-        assert!(matches!(ReductionPattern::Division(2), ReductionPattern::Division(2)));
-        assert!(matches!(ReductionPattern::Logarithmic, ReductionPattern::Logarithmic));
-        assert!(matches!(ReductionPattern::Unknown, ReductionPattern::Unknown));
+        assert!(matches!(
+            ReductionPattern::Division(2),
+            ReductionPattern::Division(2)
+        ));
+        assert!(matches!(
+            ReductionPattern::Logarithmic,
+            ReductionPattern::Logarithmic
+        ));
+        assert!(matches!(
+            ReductionPattern::Unknown,
+            ReductionPattern::Unknown
+        ));
     }
 }

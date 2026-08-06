@@ -33,12 +33,17 @@
 #[cfg(any(feature = "serde", feature = "design-patterns"))]
 use serde::{Deserialize, Serialize};
 
-use crate::pattern::{PatternTemplate, NodeConstraint, EdgeConstraint, NodeKindMatcher, NodeKindTag, EdgeKindMatcher};
+use crate::pattern::{
+    EdgeConstraint, EdgeKindMatcher, NodeConstraint, NodeKindMatcher, NodeKindTag, PatternTemplate,
+};
 use rustc_hash::FxHashMap;
 
 /// DPML template for pattern matching.
 #[derive(Debug, Clone)]
-#[cfg_attr(any(feature = "serde", feature = "design-patterns"), derive(Serialize, Deserialize))]
+#[cfg_attr(
+    any(feature = "serde", feature = "design-patterns"),
+    derive(Serialize, Deserialize)
+)]
 pub struct DpmlTemplate {
     /// Template name.
     pub name: String,
@@ -52,7 +57,10 @@ pub struct DpmlTemplate {
     #[cfg_attr(any(feature = "serde", feature = "design-patterns"), serde(default))]
     pub roles: Vec<DpmlRole>,
     /// Constraints/relationships between roles.
-    #[cfg_attr(any(feature = "serde", feature = "design-patterns"), serde(default, alias = "constraints"))]
+    #[cfg_attr(
+        any(feature = "serde", feature = "design-patterns"),
+        serde(default, alias = "constraints")
+    )]
     pub relationships: Vec<DpmlConstraint>,
 }
 
@@ -123,29 +131,32 @@ impl DpmlTemplate {
     /// Parses YAML content into a DPML template.
     #[cfg(feature = "design-patterns")]
     pub fn parse_yaml(content: &str) -> Result<Self, DpmlError> {
-        serde_yaml::from_str(content)
-            .map_err(|e| DpmlError::YamlError(e.to_string()))
+        serde_yaml::from_str(content).map_err(|e| DpmlError::YamlError(e.to_string()))
     }
 
     /// Parses TOML content into a DPML template.
     #[cfg(feature = "design-patterns")]
     pub fn parse_toml(content: &str) -> Result<Self, DpmlError> {
         // Parse TOML document
-        let doc: toml_edit::DocumentMut = content.parse()
+        let doc: toml_edit::DocumentMut = content
+            .parse()
             .map_err(|e: toml_edit::TomlError| DpmlError::TomlError(e.to_string()))?;
 
         // Extract fields from the document
-        let name = doc.get("name")
+        let name = doc
+            .get("name")
             .and_then(|v| v.as_str())
             .ok_or_else(|| DpmlError::MissingField("name".to_string()))?
             .to_string();
 
-        let description = doc.get("description")
+        let description = doc
+            .get("description")
             .and_then(|v| v.as_str())
             .unwrap_or("")
             .to_string();
 
-        let category = doc.get("category")
+        let category = doc
+            .get("category")
             .and_then(|v| v.as_str())
             .unwrap_or("")
             .to_string();
@@ -154,42 +165,60 @@ impl DpmlTemplate {
         let mut roles = Vec::new();
         if let Some(roles_arr) = doc.get("roles").and_then(|v| v.as_array_of_tables()) {
             for role_table in roles_arr {
-                let id = role_table.get("id")
+                let id = role_table
+                    .get("id")
                     .and_then(|v| v.as_str())
                     .unwrap_or("")
                     .to_string();
-                let role_type = role_table.get("type")
+                let role_type = role_table
+                    .get("type")
                     .and_then(|v| v.as_str())
                     .unwrap_or("unknown")
                     .to_string();
-                let cardinality = role_table.get("cardinality")
+                let cardinality = role_table
+                    .get("cardinality")
                     .and_then(|v| v.as_str())
                     .unwrap_or("1")
                     .to_string();
 
-                roles.push(DpmlRole { id, role_type, cardinality });
+                roles.push(DpmlRole {
+                    id,
+                    role_type,
+                    cardinality,
+                });
             }
         }
 
         // Parse relationships
         let mut relationships = Vec::new();
-        let rel_key = if doc.contains_key("relationships") { "relationships" } else { "constraints" };
+        let rel_key = if doc.contains_key("relationships") {
+            "relationships"
+        } else {
+            "constraints"
+        };
         if let Some(rels_arr) = doc.get(rel_key).and_then(|v| v.as_array_of_tables()) {
             for rel_table in rels_arr {
-                let source = rel_table.get("source")
+                let source = rel_table
+                    .get("source")
                     .and_then(|v| v.as_str())
                     .unwrap_or("")
                     .to_string();
-                let target = rel_table.get("target")
+                let target = rel_table
+                    .get("target")
                     .and_then(|v| v.as_str())
                     .unwrap_or("")
                     .to_string();
-                let constraint_type = rel_table.get("type")
+                let constraint_type = rel_table
+                    .get("type")
                     .and_then(|v| v.as_str())
                     .unwrap_or("contains")
                     .to_string();
 
-                relationships.push(DpmlConstraint { source, target, constraint_type });
+                relationships.push(DpmlConstraint {
+                    source,
+                    target,
+                    constraint_type,
+                });
             }
         }
 
@@ -271,8 +300,7 @@ impl DpmlTemplate {
             let source_idx = role_to_index[rel.source.as_str()];
             let target_idx = role_to_index[rel.target.as_str()];
             let edge_matcher = constraint_type_to_edge_matcher(&rel.constraint_type);
-            let constraint = EdgeConstraint::new(source_idx, target_idx)
-                .with_kind(edge_matcher);
+            let constraint = EdgeConstraint::new(source_idx, target_idx).with_kind(edge_matcher);
             template = template.with_edge(constraint);
         }
 
@@ -319,15 +347,24 @@ fn constraint_type_to_edge_matcher(constraint_type: &str) -> EdgeKindMatcher {
 
 /// A role in a DPML template.
 #[derive(Debug, Clone)]
-#[cfg_attr(any(feature = "serde", feature = "design-patterns"), derive(Serialize, Deserialize))]
+#[cfg_attr(
+    any(feature = "serde", feature = "design-patterns"),
+    derive(Serialize, Deserialize)
+)]
 pub struct DpmlRole {
     /// Role identifier.
     pub id: String,
     /// Role type (class, interface, method, etc.).
-    #[cfg_attr(any(feature = "serde", feature = "design-patterns"), serde(rename = "type"))]
+    #[cfg_attr(
+        any(feature = "serde", feature = "design-patterns"),
+        serde(rename = "type")
+    )]
     pub role_type: String,
     /// Cardinality (e.g., "1", "1..*").
-    #[cfg_attr(any(feature = "serde", feature = "design-patterns"), serde(default = "default_cardinality"))]
+    #[cfg_attr(
+        any(feature = "serde", feature = "design-patterns"),
+        serde(default = "default_cardinality")
+    )]
     pub cardinality: String,
 }
 
@@ -354,14 +391,20 @@ impl DpmlRole {
 
 /// A constraint between roles.
 #[derive(Debug, Clone)]
-#[cfg_attr(any(feature = "serde", feature = "design-patterns"), derive(Serialize, Deserialize))]
+#[cfg_attr(
+    any(feature = "serde", feature = "design-patterns"),
+    derive(Serialize, Deserialize)
+)]
 pub struct DpmlConstraint {
     /// Source role ID.
     pub source: String,
     /// Target role ID.
     pub target: String,
     /// Constraint type.
-    #[cfg_attr(any(feature = "serde", feature = "design-patterns"), serde(rename = "type", default = "default_constraint_type"))]
+    #[cfg_attr(
+        any(feature = "serde", feature = "design-patterns"),
+        serde(rename = "type", default = "default_constraint_type")
+    )]
     pub constraint_type: String,
 }
 
@@ -371,7 +414,11 @@ fn default_constraint_type() -> String {
 
 impl DpmlConstraint {
     /// Creates a new constraint.
-    pub fn new(source: impl Into<String>, target: impl Into<String>, constraint_type: impl Into<String>) -> Self {
+    pub fn new(
+        source: impl Into<String>,
+        target: impl Into<String>,
+        constraint_type: impl Into<String>,
+    ) -> Self {
         Self {
             source: source.into(),
             target: target.into(),
@@ -429,7 +476,11 @@ mod tests {
             .with_category("Creational")
             .with_role(DpmlRole::new("singleton_class", "class"))
             .with_role(DpmlRole::new("instance_field", "field"))
-            .with_relationship(DpmlConstraint::new("singleton_class", "instance_field", "contains"));
+            .with_relationship(DpmlConstraint::new(
+                "singleton_class",
+                "instance_field",
+                "contains",
+            ));
 
         assert_eq!(template.name, "Singleton");
         assert_eq!(template.roles.len(), 2);
@@ -439,7 +490,10 @@ mod tests {
     #[test]
     fn test_validate_empty_name() {
         let template = DpmlTemplate::new("");
-        assert!(matches!(template.validate(), Err(DpmlError::MissingField(_))));
+        assert!(matches!(
+            template.validate(),
+            Err(DpmlError::MissingField(_))
+        ));
     }
 
     #[test]
@@ -447,7 +501,10 @@ mod tests {
         let template = DpmlTemplate::new("Test")
             .with_role(DpmlRole::new("role1", "class"))
             .with_role(DpmlRole::new("role1", "method"));
-        assert!(matches!(template.validate(), Err(DpmlError::DuplicateRole(_))));
+        assert!(matches!(
+            template.validate(),
+            Err(DpmlError::DuplicateRole(_))
+        ));
     }
 
     #[test]
@@ -455,7 +512,10 @@ mod tests {
         let template = DpmlTemplate::new("Test")
             .with_role(DpmlRole::new("role1", "class"))
             .with_relationship(DpmlConstraint::new("role1", "nonexistent", "contains"));
-        assert!(matches!(template.validate(), Err(DpmlError::InvalidRelationship(_))));
+        assert!(matches!(
+            template.validate(),
+            Err(DpmlError::InvalidRelationship(_))
+        ));
     }
 
     #[test]
@@ -468,7 +528,9 @@ mod tests {
             .with_relationship(DpmlConstraint::new("subject", "notify_method", "contains"))
             .with_relationship(DpmlConstraint::new("subject", "observer", "uses"));
 
-        let pattern = dpml.to_pattern_template().expect("Should convert successfully");
+        let pattern = dpml
+            .to_pattern_template()
+            .expect("Should convert successfully");
 
         assert_eq!(pattern.name, "Observer");
         assert_eq!(pattern.node_constraints.len(), 3);

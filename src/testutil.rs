@@ -81,8 +81,10 @@ pub(crate) fn arb_node_kind() -> impl Strategy<Value = CpgNodeKind> {
     prop_oneof![
         Just(CpgNodeKind::Root),
         arb_name().prop_map(|n| CpgNodeKind::Module { name: n.into() }),
-        (arb_name(), any::<bool>())
-            .prop_map(|(n, a)| CpgNodeKind::Class { name: n.into(), is_abstract: a }),
+        (arb_name(), any::<bool>()).prop_map(|(n, a)| CpgNodeKind::Class {
+            name: n.into(),
+            is_abstract: a
+        }),
         arb_name().prop_map(|n| CpgNodeKind::Struct { name: n.into() }),
         arb_name().prop_map(|n| CpgNodeKind::Enum { name: n.into() }),
         arb_name().prop_map(|n| CpgNodeKind::Trait { name: n.into() }),
@@ -93,7 +95,9 @@ pub(crate) fn arb_node_kind() -> impl Strategy<Value = CpgNodeKind> {
             scope: ScopeId::GLOBAL,
             is_mutable: m,
         }),
-        Just(CpgNodeKind::Block { scope: ScopeId::GLOBAL }),
+        Just(CpgNodeKind::Block {
+            scope: ScopeId::GLOBAL
+        }),
         Just(CpgNodeKind::If),
         Just(CpgNodeKind::Else),
         Just(CpgNodeKind::While),
@@ -105,8 +109,14 @@ pub(crate) fn arb_node_kind() -> impl Strategy<Value = CpgNodeKind> {
         Just(CpgNodeKind::Continue),
         arb_name().prop_map(|o| CpgNodeKind::BinaryOp { operator: o.into() }),
         arb_name().prop_map(|o| CpgNodeKind::Assignment { operator: o.into() }),
-        any::<bool>().prop_map(|m| CpgNodeKind::Call { target: None, is_method: m }),
-        arb_name().prop_map(|n| CpgNodeKind::Identifier { name: n.into(), definition: None }),
+        any::<bool>().prop_map(|m| CpgNodeKind::Call {
+            target: None,
+            is_method: m
+        }),
+        arb_name().prop_map(|n| CpgNodeKind::Identifier {
+            name: n.into(),
+            definition: None
+        }),
         arb_literal_kind().prop_map(|kind| CpgNodeKind::Literal { kind }),
         Just(CpgNodeKind::IndexAccess),
         (arb_name(), any::<bool>()).prop_map(|(n, doc)| {
@@ -228,7 +238,9 @@ pub(crate) fn arb_pdg_graph() -> impl Strategy<Value = CodePropertyGraph> {
                 .map(|_| {
                     cpg.add_node(CpgNode::new(
                         NodeId::new(0),
-                        CpgNodeKind::Block { scope: ScopeId::GLOBAL },
+                        CpgNodeKind::Block {
+                            scope: ScopeId::GLOBAL,
+                        },
                         SourceRange::default(),
                     ))
                 })
@@ -310,26 +322,48 @@ fn build_stmt(cpg: &mut CodePropertyGraph, parent: NodeId, spec: &StmtSpec) {
             );
         }
         StmtSpec::Assign(name) => {
-            let a = wf_child(cpg, parent, CpgNodeKind::Assignment { operator: "=".into() });
+            let a = wf_child(
+                cpg,
+                parent,
+                CpgNodeKind::Assignment {
+                    operator: "=".into(),
+                },
+            );
             wf_child(
                 cpg,
                 a,
-                CpgNodeKind::Identifier { name: name.clone().into(), definition: None },
+                CpgNodeKind::Identifier {
+                    name: name.clone().into(),
+                    definition: None,
+                },
             );
         }
         StmtSpec::Use(name) => {
             wf_child(
                 cpg,
                 parent,
-                CpgNodeKind::Identifier { name: name.clone().into(), definition: None },
+                CpgNodeKind::Identifier {
+                    name: name.clone().into(),
+                    definition: None,
+                },
             );
         }
         StmtSpec::CallStmt(name) => {
-            let c = wf_child(cpg, parent, CpgNodeKind::Call { target: None, is_method: false });
+            let c = wf_child(
+                cpg,
+                parent,
+                CpgNodeKind::Call {
+                    target: None,
+                    is_method: false,
+                },
+            );
             wf_child(
                 cpg,
                 c,
-                CpgNodeKind::Identifier { name: name.clone().into(), definition: None },
+                CpgNodeKind::Identifier {
+                    name: name.clone().into(),
+                    definition: None,
+                },
             );
         }
         StmtSpec::Return => {
@@ -354,9 +388,18 @@ fn build_control(
     wf_child(
         cpg,
         head,
-        CpgNodeKind::Identifier { name: "cond".into(), definition: None },
+        CpgNodeKind::Identifier {
+            name: "cond".into(),
+            definition: None,
+        },
     );
-    let block = wf_child(cpg, head, CpgNodeKind::Block { scope: ScopeId::GLOBAL });
+    let block = wf_child(
+        cpg,
+        head,
+        CpgNodeKind::Block {
+            scope: ScopeId::GLOBAL,
+        },
+    );
     for s in body {
         build_stmt(cpg, block, s);
     }
@@ -378,7 +421,13 @@ pub(crate) fn build_well_formed(stmts: Vec<StmtSpec>) -> CodePropertyGraph {
         },
         SourceRange::default(),
     ));
-    let body = wf_child(&mut cpg, func, CpgNodeKind::Block { scope: ScopeId::GLOBAL });
+    let body = wf_child(
+        &mut cpg,
+        func,
+        CpgNodeKind::Block {
+            scope: ScopeId::GLOBAL,
+        },
+    );
     for s in &stmts {
         build_stmt(&mut cpg, body, s);
     }

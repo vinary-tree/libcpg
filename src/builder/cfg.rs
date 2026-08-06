@@ -7,9 +7,7 @@
 use rustc_hash::{FxHashMap, FxHashSet};
 use smallvec::SmallVec;
 
-use crate::{
-    CodePropertyGraph, CpgEdgeKind, CpgNodeKind, CfgEdgeKind, NodeId,
-};
+use crate::{CfgEdgeKind, CodePropertyGraph, CpgEdgeKind, CpgNodeKind, NodeId};
 
 /// Configuration for CFG extraction.
 #[derive(Debug, Clone)]
@@ -54,10 +52,7 @@ impl CfgExtractor {
     /// Extracts CFG edges for all functions in the CPG.
     pub fn extract(&self, cpg: &mut CodePropertyGraph) {
         // Find all function nodes
-        let functions: Vec<NodeId> = cpg
-            .functions()
-            .map(|n| n.id)
-            .collect();
+        let functions: Vec<NodeId> = cpg.functions().map(|n| n.id).collect();
 
         for func_id in functions {
             self.extract_function_cfg(cpg, func_id);
@@ -76,7 +71,11 @@ impl CfgExtractor {
         let children = cpg.ast_children(function);
         if let Some(&body) = children.last() {
             // Connect function to body entry
-            cpg.connect_unique(function, body, CpgEdgeKind::ControlFlow(CfgEdgeKind::Sequential));
+            cpg.connect_unique(
+                function,
+                body,
+                CpgEdgeKind::ControlFlow(CfgEdgeKind::Sequential),
+            );
 
             // Process the function body
             let exits = self.process_node(cpg, body, &mut ctx);
@@ -155,7 +154,11 @@ impl CfgExtractor {
 
         // Connect block entry to first child
         if let Some(&first) = children.first() {
-            cpg.connect_unique(block_id, first, CpgEdgeKind::ControlFlow(CfgEdgeKind::Sequential));
+            cpg.connect_unique(
+                block_id,
+                first,
+                CpgEdgeKind::ControlFlow(CfgEdgeKind::Sequential),
+            );
         }
 
         // Process each child and chain them together
@@ -166,7 +169,11 @@ impl CfgExtractor {
         for (i, &child_id) in children.iter().enumerate() {
             // Connect previous exits to this child
             for &exit in &current_exits {
-                cpg.connect_unique(exit, child_id, CpgEdgeKind::ControlFlow(CfgEdgeKind::Sequential));
+                cpg.connect_unique(
+                    exit,
+                    child_id,
+                    CpgEdgeKind::ControlFlow(CfgEdgeKind::Sequential),
+                );
             }
 
             // Process this child
@@ -227,7 +234,11 @@ impl CfgExtractor {
             }
             1 => {
                 // Just condition, no branches - unusual but handle it
-                cpg.connect_unique(if_id, children[0], CpgEdgeKind::ControlFlow(CfgEdgeKind::Sequential));
+                cpg.connect_unique(
+                    if_id,
+                    children[0],
+                    CpgEdgeKind::ControlFlow(CfgEdgeKind::Sequential),
+                );
                 exits.push(children[0]);
             }
             2 => {
@@ -236,10 +247,18 @@ impl CfgExtractor {
                 let then_branch = children[1];
 
                 // if -> condition
-                cpg.connect_unique(if_id, condition, CpgEdgeKind::ControlFlow(CfgEdgeKind::Sequential));
+                cpg.connect_unique(
+                    if_id,
+                    condition,
+                    CpgEdgeKind::ControlFlow(CfgEdgeKind::Sequential),
+                );
 
                 // condition -> then (true)
-                cpg.connect_unique(condition, then_branch, CpgEdgeKind::ControlFlow(CfgEdgeKind::ConditionalTrue));
+                cpg.connect_unique(
+                    condition,
+                    then_branch,
+                    CpgEdgeKind::ControlFlow(CfgEdgeKind::ConditionalTrue),
+                );
 
                 // Process then branch
                 let then_exits = self.process_node(cpg, then_branch, ctx);
@@ -254,10 +273,18 @@ impl CfgExtractor {
                 let then_branch = children[1];
 
                 // if -> condition
-                cpg.connect_unique(if_id, condition, CpgEdgeKind::ControlFlow(CfgEdgeKind::Sequential));
+                cpg.connect_unique(
+                    if_id,
+                    condition,
+                    CpgEdgeKind::ControlFlow(CfgEdgeKind::Sequential),
+                );
 
                 // condition -> then (true)
-                cpg.connect_unique(condition, then_branch, CpgEdgeKind::ControlFlow(CfgEdgeKind::ConditionalTrue));
+                cpg.connect_unique(
+                    condition,
+                    then_branch,
+                    CpgEdgeKind::ControlFlow(CfgEdgeKind::ConditionalTrue),
+                );
 
                 // Process then branch
                 let then_exits = self.process_node(cpg, then_branch, ctx);
@@ -270,13 +297,20 @@ impl CfgExtractor {
                 // Determine actual else content
                 let actual_else = if matches!(else_kind.as_ref(), Some(CpgNodeKind::Else)) {
                     // Get the block inside the Else node
-                    cpg.ast_children(else_branch).first().copied().unwrap_or(else_branch)
+                    cpg.ast_children(else_branch)
+                        .first()
+                        .copied()
+                        .unwrap_or(else_branch)
                 } else {
                     else_branch
                 };
 
                 // condition -> else (false)
-                cpg.connect_unique(condition, actual_else, CpgEdgeKind::ControlFlow(CfgEdgeKind::ConditionalFalse));
+                cpg.connect_unique(
+                    condition,
+                    actual_else,
+                    CpgEdgeKind::ControlFlow(CfgEdgeKind::ConditionalFalse),
+                );
 
                 // Process else branch
                 let else_exits = self.process_node(cpg, actual_else, ctx);
@@ -311,17 +345,29 @@ impl CfgExtractor {
         ctx.push_loop(while_id, condition);
 
         // while -> condition
-        cpg.connect_unique(while_id, condition, CpgEdgeKind::ControlFlow(CfgEdgeKind::Sequential));
+        cpg.connect_unique(
+            while_id,
+            condition,
+            CpgEdgeKind::ControlFlow(CfgEdgeKind::Sequential),
+        );
 
         // condition -> body (true)
-        cpg.connect_unique(condition, body, CpgEdgeKind::ControlFlow(CfgEdgeKind::ConditionalTrue));
+        cpg.connect_unique(
+            condition,
+            body,
+            CpgEdgeKind::ControlFlow(CfgEdgeKind::ConditionalTrue),
+        );
 
         // Process body
         let body_exits = self.process_node(cpg, body, ctx);
 
         // body exits -> condition (loop back)
         for &exit in &body_exits {
-            cpg.connect_unique(exit, condition, CpgEdgeKind::ControlFlow(CfgEdgeKind::LoopBack));
+            cpg.connect_unique(
+                exit,
+                condition,
+                CpgEdgeKind::ControlFlow(CfgEdgeKind::LoopBack),
+            );
         }
 
         // Pop loop context and collect break targets
@@ -359,14 +405,22 @@ impl CfgExtractor {
         ctx.push_loop(for_id, header);
 
         // for -> body (enter loop)
-        cpg.connect_unique(for_id, body, CpgEdgeKind::ControlFlow(CfgEdgeKind::ConditionalTrue));
+        cpg.connect_unique(
+            for_id,
+            body,
+            CpgEdgeKind::ControlFlow(CfgEdgeKind::ConditionalTrue),
+        );
 
         // Process body
         let body_exits = self.process_node(cpg, body, ctx);
 
         // body exits -> header (loop back)
         for &exit in &body_exits {
-            cpg.connect_unique(exit, header, CpgEdgeKind::ControlFlow(CfgEdgeKind::LoopBack));
+            cpg.connect_unique(
+                exit,
+                header,
+                CpgEdgeKind::ControlFlow(CfgEdgeKind::LoopBack),
+            );
         }
 
         let loop_ctx = ctx.pop_loop();
@@ -396,14 +450,22 @@ impl CfgExtractor {
         ctx.push_loop(loop_id, loop_id);
 
         // loop -> body
-        cpg.connect_unique(loop_id, body, CpgEdgeKind::ControlFlow(CfgEdgeKind::Sequential));
+        cpg.connect_unique(
+            loop_id,
+            body,
+            CpgEdgeKind::ControlFlow(CfgEdgeKind::Sequential),
+        );
 
         // Process body
         let body_exits = self.process_node(cpg, body, ctx);
 
         // body exits -> loop (loop back)
         for &exit in &body_exits {
-            cpg.connect_unique(exit, loop_id, CpgEdgeKind::ControlFlow(CfgEdgeKind::LoopBack));
+            cpg.connect_unique(
+                exit,
+                loop_id,
+                CpgEdgeKind::ControlFlow(CfgEdgeKind::LoopBack),
+            );
         }
 
         let loop_ctx = ctx.pop_loop();
@@ -434,7 +496,11 @@ impl CfgExtractor {
             if matches!(first_kind.as_ref(), Some(CpgNodeKind::MatchArm)) {
                 (None, 0)
             } else {
-                cpg.connect_unique(match_id, first, CpgEdgeKind::ControlFlow(CfgEdgeKind::Sequential));
+                cpg.connect_unique(
+                    match_id,
+                    first,
+                    CpgEdgeKind::ControlFlow(CfgEdgeKind::Sequential),
+                );
                 (Some(first), 1)
             }
         } else {
@@ -454,7 +520,11 @@ impl CfgExtractor {
                 // Process arm body
                 let arm_children = cpg.ast_children(arm);
                 if let Some(&arm_body) = arm_children.last() {
-                    cpg.connect_unique(arm, arm_body, CpgEdgeKind::ControlFlow(CfgEdgeKind::Sequential));
+                    cpg.connect_unique(
+                        arm,
+                        arm_body,
+                        CpgEdgeKind::ControlFlow(CfgEdgeKind::Sequential),
+                    );
                     let arm_exits = self.process_node(cpg, arm_body, ctx);
                     exits.extend(arm_exits);
                 } else {
@@ -481,7 +551,11 @@ impl CfgExtractor {
 
         // Process return value expression if present
         if let Some(&expr) = children.first() {
-            cpg.connect_unique(return_id, expr, CpgEdgeKind::ControlFlow(CfgEdgeKind::Sequential));
+            cpg.connect_unique(
+                return_id,
+                expr,
+                CpgEdgeKind::ControlFlow(CfgEdgeKind::Sequential),
+            );
             let _ = self.process_node(cpg, expr, ctx);
         }
 
@@ -502,7 +576,11 @@ impl CfgExtractor {
             loop_ctx.break_targets.push(break_id);
 
             // Create break edge to loop header
-            cpg.connect_unique(break_id, loop_ctx.loop_id, CpgEdgeKind::ControlFlow(CfgEdgeKind::Break));
+            cpg.connect_unique(
+                break_id,
+                loop_ctx.loop_id,
+                CpgEdgeKind::ControlFlow(CfgEdgeKind::Break),
+            );
         }
 
         // Break has no normal exits
@@ -566,7 +644,11 @@ impl CfgExtractor {
 
         // Process try body
         if let Some(body) = try_body {
-            cpg.connect_unique(try_id, body, CpgEdgeKind::ControlFlow(CfgEdgeKind::Sequential));
+            cpg.connect_unique(
+                try_id,
+                body,
+                CpgEdgeKind::ControlFlow(CfgEdgeKind::Sequential),
+            );
 
             // Push try context for exception handling
             ctx.push_try(try_id, catch_blocks.clone());
@@ -578,7 +660,11 @@ impl CfgExtractor {
             // Connect body exits to finally (if present) or add to exits
             if let Some(finally) = finally_block {
                 for &exit in &body_exits {
-                    cpg.connect_unique(exit, finally, CpgEdgeKind::ControlFlow(CfgEdgeKind::Sequential));
+                    cpg.connect_unique(
+                        exit,
+                        finally,
+                        CpgEdgeKind::ControlFlow(CfgEdgeKind::Sequential),
+                    );
                 }
             } else {
                 exits.extend(body_exits);
@@ -589,12 +675,20 @@ impl CfgExtractor {
         for &catch in &catch_blocks {
             let catch_children = cpg.ast_children(catch);
             if let Some(&catch_body) = catch_children.last() {
-                cpg.connect_unique(catch, catch_body, CpgEdgeKind::ControlFlow(CfgEdgeKind::Sequential));
+                cpg.connect_unique(
+                    catch,
+                    catch_body,
+                    CpgEdgeKind::ControlFlow(CfgEdgeKind::Sequential),
+                );
                 let catch_exits = self.process_node(cpg, catch_body, ctx);
 
                 if let Some(finally) = finally_block {
                     for &exit in &catch_exits {
-                        cpg.connect_unique(exit, finally, CpgEdgeKind::ControlFlow(CfgEdgeKind::Sequential));
+                        cpg.connect_unique(
+                            exit,
+                            finally,
+                            CpgEdgeKind::ControlFlow(CfgEdgeKind::Sequential),
+                        );
                     }
                 } else {
                     exits.extend(catch_exits);
@@ -630,14 +724,22 @@ impl CfgExtractor {
 
         // Process thrown expression
         if let Some(&expr) = children.first() {
-            cpg.connect_unique(throw_id, expr, CpgEdgeKind::ControlFlow(CfgEdgeKind::Sequential));
+            cpg.connect_unique(
+                throw_id,
+                expr,
+                CpgEdgeKind::ControlFlow(CfgEdgeKind::Sequential),
+            );
             let _ = self.process_node(cpg, expr, ctx);
         }
 
         // Connect to catch handlers in the try stack
         if let Some(try_ctx) = ctx.try_stack.last() {
             for &catch in &try_ctx.catch_handlers {
-                cpg.connect_unique(throw_id, catch, CpgEdgeKind::ControlFlow(CfgEdgeKind::Throw));
+                cpg.connect_unique(
+                    throw_id,
+                    catch,
+                    CpgEdgeKind::ControlFlow(CfgEdgeKind::Throw),
+                );
             }
         }
 
@@ -656,13 +758,21 @@ impl CfgExtractor {
 
         // Process arguments
         for &arg in &children {
-            cpg.connect_unique(call_id, arg, CpgEdgeKind::ControlFlow(CfgEdgeKind::Sequential));
+            cpg.connect_unique(
+                call_id,
+                arg,
+                CpgEdgeKind::ControlFlow(CfgEdgeKind::Sequential),
+            );
             let _ = self.process_node(cpg, arg, ctx);
         }
 
         // Check if we have a target function
         if let Some(node) = cpg.node(call_id) {
-            if let CpgNodeKind::Call { target: Some(target), .. } = &node.kind {
+            if let CpgNodeKind::Call {
+                target: Some(target),
+                ..
+            } = &node.kind
+            {
                 let target = *target;
                 // Create call edge
                 cpg.connect_unique(call_id, target, CpgEdgeKind::ControlFlow(CfgEdgeKind::Call));
@@ -687,7 +797,11 @@ impl CfgExtractor {
 
         // Connect to first child
         if let Some(&first) = children.first() {
-            cpg.connect_unique(node_id, first, CpgEdgeKind::ControlFlow(CfgEdgeKind::Sequential));
+            cpg.connect_unique(
+                node_id,
+                first,
+                CpgEdgeKind::ControlFlow(CfgEdgeKind::Sequential),
+            );
         }
 
         // Process all children
@@ -789,7 +903,11 @@ impl BasicBlockIdentifier {
     /// Identifies basic blocks within a function CFG.
     ///
     /// Returns a map from block leader node IDs to lists of nodes in the block.
-    pub fn identify(&self, cpg: &CodePropertyGraph, function: NodeId) -> FxHashMap<NodeId, Vec<NodeId>> {
+    pub fn identify(
+        &self,
+        cpg: &CodePropertyGraph,
+        function: NodeId,
+    ) -> FxHashMap<NodeId, Vec<NodeId>> {
         let descendants = cpg.ast_descendants(function);
         let mut leaders: FxHashSet<NodeId> = FxHashSet::default();
         let mut blocks: FxHashMap<NodeId, Vec<NodeId>> = FxHashMap::default();
@@ -869,7 +987,7 @@ impl Default for BasicBlockIdentifier {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{CpgNode, SourceRange, Language, ScopeId, MethodSignature, Visibility};
+    use crate::{CpgNode, Language, MethodSignature, ScopeId, SourceRange, Visibility};
 
     fn create_test_function(cpg: &mut CodePropertyGraph) -> NodeId {
         let func = cpg.add_node(CpgNode::new(
@@ -889,7 +1007,9 @@ mod tests {
 
         let body = cpg.add_node(CpgNode::new(
             NodeId::new(0),
-            CpgNodeKind::Block { scope: ScopeId::GLOBAL },
+            CpgNodeKind::Block {
+                scope: ScopeId::GLOBAL,
+            },
             SourceRange::default(),
         ));
 
@@ -918,11 +1038,9 @@ mod tests {
         let body = cpg.ast_children(func)[0];
 
         // Add if statement as child of body
-        let if_node = cpg.add_node(CpgNode::new(
-            NodeId::new(0),
-            CpgNodeKind::If,
-            SourceRange::default(),
-        ).with_parent(body));
+        let if_node = cpg.add_node(
+            CpgNode::new(NodeId::new(0), CpgNodeKind::If, SourceRange::default()).with_parent(body),
+        );
         cpg.connect_unique(body, if_node, CpgEdgeKind::AstChild);
 
         // Update body's children list
@@ -931,11 +1049,17 @@ mod tests {
         }
 
         // Add condition as child of if
-        let cond = cpg.add_node(CpgNode::new(
-            NodeId::new(0),
-            CpgNodeKind::Identifier { name: "x".into(), definition: None },
-            SourceRange::default(),
-        ).with_parent(if_node));
+        let cond = cpg.add_node(
+            CpgNode::new(
+                NodeId::new(0),
+                CpgNodeKind::Identifier {
+                    name: "x".into(),
+                    definition: None,
+                },
+                SourceRange::default(),
+            )
+            .with_parent(if_node),
+        );
         cpg.connect_unique(if_node, cond, CpgEdgeKind::AstChild);
 
         // Update if's children list
@@ -944,11 +1068,16 @@ mod tests {
         }
 
         // Add then branch as child of if
-        let then_branch = cpg.add_node(CpgNode::new(
-            NodeId::new(0),
-            CpgNodeKind::Block { scope: ScopeId::GLOBAL },
-            SourceRange::default(),
-        ).with_parent(if_node));
+        let then_branch = cpg.add_node(
+            CpgNode::new(
+                NodeId::new(0),
+                CpgNodeKind::Block {
+                    scope: ScopeId::GLOBAL,
+                },
+                SourceRange::default(),
+            )
+            .with_parent(if_node),
+        );
         cpg.connect_unique(if_node, then_branch, CpgEdgeKind::AstChild);
 
         // Update if's children list
@@ -962,7 +1091,10 @@ mod tests {
         // Check CFG edges were created - if should have control flow edges
         // The if node should connect to condition, and condition to branches
         let if_successors = cpg.cfg_successors(if_node);
-        assert!(!if_successors.is_empty(), "if node should have CFG successors");
+        assert!(
+            !if_successors.is_empty(),
+            "if node should have CFG successors"
+        );
     }
 
     #[test]
@@ -992,11 +1124,16 @@ mod tests {
     }
 
     fn ident(name: &str) -> CpgNodeKind {
-        CpgNodeKind::Identifier { name: name.into(), definition: None }
+        CpgNodeKind::Identifier {
+            name: name.into(),
+            definition: None,
+        }
     }
 
     fn block() -> CpgNodeKind {
-        CpgNodeKind::Block { scope: ScopeId::GLOBAL }
+        CpgNodeKind::Block {
+            scope: ScopeId::GLOBAL,
+        }
     }
 
     /// `CfgExtractorConfig` field defaults and `CfgExtractor::with_config`
@@ -1041,7 +1178,10 @@ mod tests {
         CfgExtractor::new().extract(&mut cpg);
         let blocks = BasicBlockIdentifier::new().identify(&cpg, func);
 
-        assert!(blocks.contains_key(&func), "the function is always a leader");
+        assert!(
+            blocks.contains_key(&func),
+            "the function is always a leader"
+        );
         for (leader, nodes) in &blocks {
             assert!(!nodes.is_empty(), "each basic block is non-empty");
             assert_eq!(nodes[0], *leader, "each block is headed by its leader");
@@ -1294,7 +1434,10 @@ mod tests {
             !has_cfg(&cpg, ret, after, CfgEdgeKind::Sequential),
             "control does not fall through a `return`"
         );
-        assert!(cpg.cfg_exits().contains(&ret), "`return` exits the function");
+        assert!(
+            cpg.cfg_exits().contains(&ret),
+            "`return` exits the function"
+        );
     }
 
     /// `try { … } catch { … } finally { … }`: the try body and every catch body
@@ -1423,7 +1566,10 @@ mod tests {
         let call = ast_child(
             &mut cpg,
             body,
-            CpgNodeKind::Call { target: Some(callee), is_method: false },
+            CpgNodeKind::Call {
+                target: Some(callee),
+                is_method: false,
+            },
         );
         let arg = ast_child(&mut cpg, call, ident("a"));
 
@@ -1445,7 +1591,10 @@ mod tests {
         let call2 = ast_child(
             &mut plain,
             body2,
-            CpgNodeKind::Call { target: Some(callee2), is_method: false },
+            CpgNodeKind::Call {
+                target: Some(callee2),
+                is_method: false,
+            },
         );
         let config = CfgExtractorConfig {
             include_call_edges: false,
@@ -1530,8 +1679,14 @@ mod tests {
             has_cfg(&cpg, cond_only_if, lone_cond, CfgEdgeKind::Sequential),
             "a condition-only `if` still evaluates its condition"
         );
-        assert!(!branches(cond_only_if), "with no branches there is nothing to branch to");
-        assert!(!branches(bare_while), "a `while` without a body never branches or loops");
+        assert!(
+            !branches(cond_only_if),
+            "with no branches there is nothing to branch to"
+        );
+        assert!(
+            !branches(bare_while),
+            "a `while` without a body never branches or loops"
+        );
         assert!(!branches(bare_for), "a childless `for` has no back-edge");
         assert!(!branches(bare_loop), "a childless `loop` has no back-edge");
         assert!(

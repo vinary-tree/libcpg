@@ -6,8 +6,8 @@
 
 use rustc_hash::{FxHashMap, FxHashSet};
 
-use crate::{CodePropertyGraph, NodeId, CpgNodeKind, CpgEdgeKind};
-use super::{PatternMatch, SubgraphMatcher, NodeKindTag};
+use super::{NodeKindTag, PatternMatch, SubgraphMatcher};
+use crate::{CodePropertyGraph, CpgEdgeKind, CpgNodeKind, NodeId};
 
 /// VF2 subgraph isomorphism matcher.
 ///
@@ -363,7 +363,11 @@ impl<'a> Vf2State<'a> {
         // If there are nodes in terminal sets, prefer those
         if !self.pattern_terminal.is_empty() && !self.target_terminal.is_empty() {
             // Pick the first terminal pattern node
-            let p_node = *self.pattern_terminal.iter().next().expect("terminal not empty");
+            let p_node = *self
+                .pattern_terminal
+                .iter()
+                .next()
+                .expect("terminal not empty");
 
             // Pair with all terminal target nodes
             for &t_node in &self.target_terminal {
@@ -371,7 +375,11 @@ impl<'a> Vf2State<'a> {
             }
         } else if !self.unmapped_pattern.is_empty() {
             // Fall back to any unmapped pattern node
-            let p_node = *self.unmapped_pattern.iter().next().expect("unmapped not empty");
+            let p_node = *self
+                .unmapped_pattern
+                .iter()
+                .next()
+                .expect("unmapped not empty");
 
             // Pair with all unused target nodes
             for &t_node in &self.unused_target {
@@ -417,15 +425,13 @@ impl<'a> Vf2State<'a> {
 
         let mut target_terminal_added = Vec::new();
         for edge in self.target.outgoing_edges(target_node) {
-            if self.unused_target.contains(&edge.target)
-                && self.target_terminal.insert(edge.target)
+            if self.unused_target.contains(&edge.target) && self.target_terminal.insert(edge.target)
             {
                 target_terminal_added.push(edge.target);
             }
         }
         for edge in self.target.incoming_edges(target_node) {
-            if self.unused_target.contains(&edge.source)
-                && self.target_terminal.insert(edge.source)
+            if self.unused_target.contains(&edge.source) && self.target_terminal.insert(edge.source)
             {
                 target_terminal_added.push(edge.source);
             }
@@ -496,7 +502,7 @@ impl<'a> Vf2State<'a> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{CpgNode, CpgNodeKind, SourceRange, Language};
+    use crate::{CpgNode, CpgNodeKind, Language, SourceRange};
 
     #[test]
     fn test_vf2_matcher_creation() {
@@ -648,14 +654,17 @@ mod tests {
     /// strict matching (exact kind) on a same-category target.
     #[test]
     fn test_relaxed_finds_at_least_strict() {
-        use std::sync::Arc;
         use crate::{MethodSignature, Visibility};
+        use std::sync::Arc;
 
         // pattern: a single `Class` node.
         let mut pattern = CodePropertyGraph::new(Language::Rust);
         pattern.add_node(CpgNode::new(
             NodeId::new(0),
-            CpgNodeKind::Class { name: Arc::from("C"), is_abstract: false },
+            CpgNodeKind::Class {
+                name: Arc::from("C"),
+                is_abstract: false,
+            },
             SourceRange::default(),
         ));
 
@@ -663,12 +672,17 @@ mod tests {
         let mut target = CodePropertyGraph::new(Language::Rust);
         target.add_node(CpgNode::new(
             NodeId::new(0),
-            CpgNodeKind::Class { name: Arc::from("A"), is_abstract: false },
+            CpgNodeKind::Class {
+                name: Arc::from("A"),
+                is_abstract: false,
+            },
             SourceRange::default(),
         ));
         target.add_node(CpgNode::new(
             NodeId::new(0),
-            CpgNodeKind::Struct { name: Arc::from("B") },
+            CpgNodeKind::Struct {
+                name: Arc::from("B"),
+            },
             SourceRange::default(),
         ));
         target.add_node(CpgNode::new(
@@ -701,21 +715,35 @@ mod tests {
     fn test_max_matches_caps_results() {
         // pattern: single `If` node.
         let mut pattern = CodePropertyGraph::new(Language::Rust);
-        pattern.add_node(CpgNode::new(NodeId::new(0), CpgNodeKind::If, SourceRange::default()));
+        pattern.add_node(CpgNode::new(
+            NodeId::new(0),
+            CpgNodeKind::If,
+            SourceRange::default(),
+        ));
 
         // target: four `If` nodes -> four unconstrained matches.
         let mut target = CodePropertyGraph::new(Language::Rust);
         for _ in 0..4 {
-            target.add_node(CpgNode::new(NodeId::new(0), CpgNodeKind::If, SourceRange::default()));
+            target.add_node(CpgNode::new(
+                NodeId::new(0),
+                CpgNodeKind::If,
+                SourceRange::default(),
+            ));
         }
 
         assert_eq!(Vf2Matcher::new().find_matches(&pattern, &target).len(), 4);
         assert_eq!(
-            Vf2Matcher::new().with_max_matches(2).find_matches(&pattern, &target).len(),
+            Vf2Matcher::new()
+                .with_max_matches(2)
+                .find_matches(&pattern, &target)
+                .len(),
             2
         );
         assert_eq!(
-            Vf2Matcher::new().with_max_matches(1).find_matches(&pattern, &target).len(),
+            Vf2Matcher::new()
+                .with_max_matches(1)
+                .find_matches(&pattern, &target)
+                .len(),
             1
         );
     }
@@ -724,14 +752,28 @@ mod tests {
     fn test_returned_mapping_is_injective() {
         // pattern: two `If` nodes joined by an AST edge.
         let mut pattern = CodePropertyGraph::new(Language::Rust);
-        let p0 = pattern.add_node(CpgNode::new(NodeId::new(0), CpgNodeKind::If, SourceRange::default()));
-        let p1 = pattern.add_node(CpgNode::new(NodeId::new(0), CpgNodeKind::If, SourceRange::default()));
+        let p0 = pattern.add_node(CpgNode::new(
+            NodeId::new(0),
+            CpgNodeKind::If,
+            SourceRange::default(),
+        ));
+        let p1 = pattern.add_node(CpgNode::new(
+            NodeId::new(0),
+            CpgNodeKind::If,
+            SourceRange::default(),
+        ));
         pattern.connect(p0, p1, CpgEdgeKind::AstChild);
 
         // target: a 3-node AST path of `If` nodes.
         let mut target = CodePropertyGraph::new(Language::Rust);
         let t: Vec<NodeId> = (0..3)
-            .map(|_| target.add_node(CpgNode::new(NodeId::new(0), CpgNodeKind::If, SourceRange::default())))
+            .map(|_| {
+                target.add_node(CpgNode::new(
+                    NodeId::new(0),
+                    CpgNodeKind::If,
+                    SourceRange::default(),
+                ))
+            })
             .collect();
         target.connect(t[0], t[1], CpgEdgeKind::AstChild);
         target.connect(t[1], t[2], CpgEdgeKind::AstChild);
@@ -740,7 +782,12 @@ mod tests {
         assert!(!matches.is_empty());
         for m in &matches {
             let images: FxHashSet<NodeId> = m.node_mapping.values().copied().collect();
-            assert_eq!(images.len(), m.node_mapping.len(), "mapping is not injective: {:?}", m.node_mapping);
+            assert_eq!(
+                images.len(),
+                m.node_mapping.len(),
+                "mapping is not injective: {:?}",
+                m.node_mapping
+            );
             assert_eq!(m.node_mapping.len(), 2, "match is complete");
             assert!(m.node_mapping.contains_key(&p0));
             assert!(m.node_mapping.contains_key(&p1));
@@ -754,20 +801,34 @@ mod tests {
     fn test_self_loop_must_be_mirrored() {
         // pattern: single node with a self-loop.
         let mut pattern = CodePropertyGraph::new(Language::Rust);
-        let p = pattern.add_node(CpgNode::new(NodeId::new(0), CpgNodeKind::If, SourceRange::default()));
+        let p = pattern.add_node(CpgNode::new(
+            NodeId::new(0),
+            CpgNodeKind::If,
+            SourceRange::default(),
+        ));
         pattern.connect(p, p, CpgEdgeKind::AstChild);
 
         // target A: a matching-kind node WITHOUT a self-loop -> no match.
         let mut no_loop = CodePropertyGraph::new(Language::Rust);
-        no_loop.add_node(CpgNode::new(NodeId::new(0), CpgNodeKind::If, SourceRange::default()));
+        no_loop.add_node(CpgNode::new(
+            NodeId::new(0),
+            CpgNodeKind::If,
+            SourceRange::default(),
+        ));
         assert!(
-            Vf2Matcher::new().find_matches(&pattern, &no_loop).is_empty(),
+            Vf2Matcher::new()
+                .find_matches(&pattern, &no_loop)
+                .is_empty(),
             "self-loop pattern must not match a target node lacking a self-loop"
         );
 
         // target B: a node WITH a self-loop -> exactly one match onto it.
         let mut with_loop = CodePropertyGraph::new(Language::Rust);
-        let t = with_loop.add_node(CpgNode::new(NodeId::new(0), CpgNodeKind::If, SourceRange::default()));
+        let t = with_loop.add_node(CpgNode::new(
+            NodeId::new(0),
+            CpgNodeKind::If,
+            SourceRange::default(),
+        ));
         with_loop.connect(t, t, CpgEdgeKind::AstChild);
         let matches = Vf2Matcher::new().find_matches(&pattern, &with_loop);
         assert_eq!(matches.len(), 1);
@@ -786,12 +847,16 @@ mod tests {
             let mut g = CodePropertyGraph::new(Language::Rust);
             let a = g.add_node(CpgNode::new(
                 NodeId::new(0),
-                CpgNodeKind::Block { scope: crate::ScopeId::GLOBAL },
+                CpgNodeKind::Block {
+                    scope: crate::ScopeId::GLOBAL,
+                },
                 SourceRange::default(),
             ));
             let b = g.add_node(CpgNode::new(
                 NodeId::new(0),
-                CpgNodeKind::Block { scope: crate::ScopeId::GLOBAL },
+                CpgNodeKind::Block {
+                    scope: crate::ScopeId::GLOBAL,
+                },
                 SourceRange::default(),
             ));
             g.connect(a, b, kind);
@@ -801,8 +866,12 @@ mod tests {
         let pattern = two_block_pdg(CpgEdgeKind::ControlDependence);
         let target = two_block_pdg(CpgEdgeKind::ControlDependence);
 
-        let strict = Vf2Matcher::new().with_strict_kinds(true).with_strict_edges(true);
-        let relaxed = Vf2Matcher::new().with_strict_kinds(false).with_strict_edges(false);
+        let strict = Vf2Matcher::new()
+            .with_strict_kinds(true)
+            .with_strict_edges(true);
+        let relaxed = Vf2Matcher::new()
+            .with_strict_kinds(false)
+            .with_strict_edges(false);
 
         let strict_n = strict.find_matches(&pattern, &target).len();
         let relaxed_n = relaxed.find_matches(&pattern, &target).len();
@@ -835,8 +904,11 @@ mod proptests {
         matches
             .iter()
             .map(|m| {
-                let mut v: Vec<(u32, u32)> =
-                    m.node_mapping.iter().map(|(p, t)| (p.as_u32(), t.as_u32())).collect();
+                let mut v: Vec<(u32, u32)> = m
+                    .node_mapping
+                    .iter()
+                    .map(|(p, t)| (p.as_u32(), t.as_u32()))
+                    .collect();
                 v.sort_unstable();
                 v
             })
@@ -876,7 +948,11 @@ mod proptests {
                 .edges_between(ts, tt)
                 .iter()
                 .any(|te| matcher.edges_compatible(&e.kind, &te.kind));
-            prop_assert!(preserved, "pattern edge {:?} not preserved by any target edge", e.kind);
+            prop_assert!(
+                preserved,
+                "pattern edge {:?} not preserved by any target edge",
+                e.kind
+            );
         }
         Ok(())
     }

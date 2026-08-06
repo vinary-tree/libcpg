@@ -5,9 +5,9 @@
 //! computational complexity from code structure.
 
 pub mod detection;
-pub mod signatures;
 pub mod families;
+pub mod signatures;
 
 pub use detection::{AlgorithmDetector, DetectedAlgorithm};
-pub use signatures::{AlgorithmSignature, ComplexityEstimate, ComplexityClass};
 pub use families::AlgorithmFamily;
+pub use signatures::{AlgorithmSignature, ComplexityClass, ComplexityEstimate};

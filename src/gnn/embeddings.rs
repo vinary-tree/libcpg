@@ -30,7 +30,11 @@ impl NodeEmbedding {
     #[cfg(feature = "gnn")]
     pub fn new(node_id: NodeId, vector: Array1<f32>) -> Self {
         let dim = vector.len();
-        Self { node_id, vector, dim }
+        Self {
+            node_id,
+            vector,
+            dim,
+        }
     }
 
     /// Returns the L2 norm of the embedding.
@@ -46,7 +50,9 @@ impl NodeEmbedding {
             return 0.0;
         }
 
-        let dot: f32 = self.vector.iter()
+        let dot: f32 = self
+            .vector
+            .iter()
             .zip(other.vector.iter())
             .map(|(a, b)| a * b)
             .sum();
@@ -83,7 +89,12 @@ impl SubgraphEmbedding {
     #[cfg(feature = "gnn")]
     pub fn new(node_ids: Vec<NodeId>, vector: Array1<f32>, aggregation: AggregationMethod) -> Self {
         let dim = vector.len();
-        Self { node_ids, vector, dim, aggregation }
+        Self {
+            node_ids,
+            vector,
+            dim,
+            aggregation,
+        }
     }
 
     /// Returns the L2 norm of the embedding.
@@ -99,7 +110,9 @@ impl SubgraphEmbedding {
             return 0.0;
         }
 
-        let dot: f32 = self.vector.iter()
+        let dot: f32 = self
+            .vector
+            .iter()
             .zip(other.vector.iter())
             .map(|(a, b)| a * b)
             .sum();
@@ -248,7 +261,10 @@ mod tests {
         }
         // Distinct variants are unequal.
         assert_ne!(AggregationMethod::Mean, AggregationMethod::Sum);
-        assert_ne!(AggregationMethod::Attention, AggregationMethod::Hierarchical);
+        assert_ne!(
+            AggregationMethod::Attention,
+            AggregationMethod::Hierarchical
+        );
         // `Copy` semantics: a bitwise copy compares equal to its source.
         let m = AggregationMethod::Max;
         let copied = m;

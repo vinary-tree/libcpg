@@ -36,11 +36,14 @@ mod parser_registry;
 mod pdg;
 mod tree_sitter;
 
-pub use cfg::{CfgExtractor, CfgExtractorConfig, BasicBlockIdentifier};
-pub use dfg::{DfgExtractor, DfgExtractorConfig, DefUseChain, Definition, DefinitionKind, Use, UseKind, build_def_use_chains};
+pub use cfg::{BasicBlockIdentifier, CfgExtractor, CfgExtractorConfig};
+pub use dfg::{
+    build_def_use_chains, DefUseChain, Definition, DefinitionKind, DfgExtractor,
+    DfgExtractorConfig, Use, UseKind,
+};
 pub use node_mapper::NodeMapper;
 pub use parser_registry::ParserRegistry;
-pub use pdg::{PdgBuilder, backward_slice, forward_slice};
+pub use pdg::{backward_slice, forward_slice, PdgBuilder};
 pub use tree_sitter::TreeSitterCpgBuilder;
 
 use crate::{CodePropertyGraph, Language, Result};
@@ -197,7 +200,10 @@ mod tests {
         assert!(!cfg.build_dfg);
         assert!(cfg.include_comments);
         assert_eq!(cfg.max_file_size, 4096);
-        assert!(cfg.resolve_imports, "with_import_resolution must set resolve_imports");
+        assert!(
+            cfg.resolve_imports,
+            "with_import_resolution must set resolve_imports"
+        );
     }
 
     /// The default `CpgBuilder::supports_language` reflects `supported_languages`:
@@ -265,7 +271,9 @@ mod tests {
         std::fs::write(&path, "fn main() { let x = 1; }\n").expect("write temp .rs");
 
         let builder = TreeSitterCpgBuilder::new();
-        let cpg = builder.build_file(&path).expect("build_file should succeed");
+        let cpg = builder
+            .build_file(&path)
+            .expect("build_file should succeed");
 
         // `.rs` maps to Rust via `Language::from_extension`.
         assert_eq!(cpg.language(), Language::Rust);

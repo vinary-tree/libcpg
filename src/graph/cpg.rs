@@ -2,11 +2,11 @@
 //!
 //! The main graph data structure that combines AST, CFG, and DFG into a unified representation.
 
-use std::sync::Arc;
 use petgraph::graph::{DiGraph, NodeIndex};
 use petgraph::Direction;
 use rustc_hash::FxHashMap;
 use smallvec::SmallVec;
+use std::sync::Arc;
 
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
@@ -15,8 +15,8 @@ use serde::{Deserialize, Serialize};
 use super::serde_util::option_arc_str;
 
 use super::{
-    CpgEdge, CpgEdgeKind, CpgNode, CpgNodeKind, CfgEdgeKind, DfgEdgeKind,
-    EdgeId, Language, NodeId, SourceRange,
+    CfgEdgeKind, CpgEdge, CpgEdgeKind, CpgNode, CpgNodeKind, DfgEdgeKind, EdgeId, Language, NodeId,
+    SourceRange,
 };
 
 /// A Code Property Graph combining AST, CFG, and DFG.
@@ -404,7 +404,9 @@ impl CodePropertyGraph {
     pub fn reaching_definitions(&self, use_site: NodeId) -> Vec<NodeId> {
         self.incoming_edges(use_site)
             .filter_map(|e| {
-                if let CpgEdgeKind::DataFlow(DfgEdgeKind::DefUse | DfgEdgeKind::ReachingDef) = &e.kind {
+                if let CpgEdgeKind::DataFlow(DfgEdgeKind::DefUse | DfgEdgeKind::ReachingDef) =
+                    &e.kind
+                {
                     Some(e.source)
                 } else {
                     None
@@ -470,7 +472,10 @@ impl CodePropertyGraph {
     pub fn callees(&self, call_site: NodeId) -> Vec<NodeId> {
         self.outgoing_edges(call_site)
             .filter_map(|e| {
-                if matches!(e.kind, CpgEdgeKind::CallSite | CpgEdgeKind::StaticCall | CpgEdgeKind::DynamicCall) {
+                if matches!(
+                    e.kind,
+                    CpgEdgeKind::CallSite | CpgEdgeKind::StaticCall | CpgEdgeKind::DynamicCall
+                ) {
                     Some(e.target)
                 } else {
                     None
@@ -483,7 +488,10 @@ impl CodePropertyGraph {
     pub fn callers(&self, function: NodeId) -> Vec<NodeId> {
         self.incoming_edges(function)
             .filter_map(|e| {
-                if matches!(e.kind, CpgEdgeKind::CallSite | CpgEdgeKind::StaticCall | CpgEdgeKind::DynamicCall) {
+                if matches!(
+                    e.kind,
+                    CpgEdgeKind::CallSite | CpgEdgeKind::StaticCall | CpgEdgeKind::DynamicCall
+                ) {
                     Some(e.source)
                 } else {
                     None
@@ -496,22 +504,26 @@ impl CodePropertyGraph {
 
     /// Returns all function nodes.
     pub fn functions(&self) -> impl Iterator<Item = &CpgNode> {
-        self.nodes().filter(|n| matches!(n.kind, CpgNodeKind::Function { .. }))
+        self.nodes()
+            .filter(|n| matches!(n.kind, CpgNodeKind::Function { .. }))
     }
 
     /// Returns all class nodes.
     pub fn classes(&self) -> impl Iterator<Item = &CpgNode> {
-        self.nodes().filter(|n| matches!(n.kind, CpgNodeKind::Class { .. }))
+        self.nodes()
+            .filter(|n| matches!(n.kind, CpgNodeKind::Class { .. }))
     }
 
     /// Returns all variable declaration nodes.
     pub fn variables(&self) -> impl Iterator<Item = &CpgNode> {
-        self.nodes().filter(|n| matches!(n.kind, CpgNodeKind::Variable { .. }))
+        self.nodes()
+            .filter(|n| matches!(n.kind, CpgNodeKind::Variable { .. }))
     }
 
     /// Returns all call expression nodes.
     pub fn calls(&self) -> impl Iterator<Item = &CpgNode> {
-        self.nodes().filter(|n| matches!(n.kind, CpgNodeKind::Call { .. }))
+        self.nodes()
+            .filter(|n| matches!(n.kind, CpgNodeKind::Call { .. }))
     }
 
     /// Returns all nodes of a specific kind.
@@ -534,9 +546,7 @@ impl CodePropertyGraph {
     /// Returns nodes overlapping a range.
     pub fn nodes_in_range(&self, range: SourceRange) -> Vec<&CpgNode> {
         self.nodes()
-            .filter(|n| {
-                n.range.start < range.end && n.range.end > range.start
-            })
+            .filter(|n| n.range.start < range.end && n.range.end > range.start)
             .collect()
     }
 
@@ -544,8 +554,12 @@ impl CodePropertyGraph {
     pub fn scope_at_offset(&self, offset: u32) -> Option<&CpgNode> {
         self.nodes()
             .filter(|n| {
-                n.range.start <= offset && offset < n.range.end
-                    && matches!(n.kind, CpgNodeKind::Block { .. } | CpgNodeKind::Function { .. })
+                n.range.start <= offset
+                    && offset < n.range.end
+                    && matches!(
+                        n.kind,
+                        CpgNodeKind::Block { .. } | CpgNodeKind::Function { .. }
+                    )
             })
             .min_by_key(|n| n.range.len())
     }
@@ -813,8 +827,16 @@ mod tests {
     fn test_add_edges() {
         let mut cpg = CodePropertyGraph::new(Language::Rust);
 
-        let n1 = cpg.add_node(CpgNode::new(NodeId::new(0), CpgNodeKind::Root, SourceRange::default()));
-        let n2 = cpg.add_node(CpgNode::new(NodeId::new(0), CpgNodeKind::Root, SourceRange::default()));
+        let n1 = cpg.add_node(CpgNode::new(
+            NodeId::new(0),
+            CpgNodeKind::Root,
+            SourceRange::default(),
+        ));
+        let n2 = cpg.add_node(CpgNode::new(
+            NodeId::new(0),
+            CpgNodeKind::Root,
+            SourceRange::default(),
+        ));
 
         let edge_id = cpg.connect(n1, n2, CpgEdgeKind::AstChild);
         assert!(edge_id.is_some());
@@ -825,12 +847,36 @@ mod tests {
     fn test_cfg_traversal() {
         let mut cpg = CodePropertyGraph::new(Language::Rust);
 
-        let entry = cpg.add_node(CpgNode::new(NodeId::new(0), CpgNodeKind::If, SourceRange::default()));
-        let then_branch = cpg.add_node(CpgNode::new(NodeId::new(0), CpgNodeKind::Block { scope: super::super::ScopeId::GLOBAL }, SourceRange::default()));
-        let else_branch = cpg.add_node(CpgNode::new(NodeId::new(0), CpgNodeKind::Block { scope: super::super::ScopeId::GLOBAL }, SourceRange::default()));
+        let entry = cpg.add_node(CpgNode::new(
+            NodeId::new(0),
+            CpgNodeKind::If,
+            SourceRange::default(),
+        ));
+        let then_branch = cpg.add_node(CpgNode::new(
+            NodeId::new(0),
+            CpgNodeKind::Block {
+                scope: super::super::ScopeId::GLOBAL,
+            },
+            SourceRange::default(),
+        ));
+        let else_branch = cpg.add_node(CpgNode::new(
+            NodeId::new(0),
+            CpgNodeKind::Block {
+                scope: super::super::ScopeId::GLOBAL,
+            },
+            SourceRange::default(),
+        ));
 
-        cpg.connect(entry, then_branch, CpgEdgeKind::ControlFlow(CfgEdgeKind::ConditionalTrue));
-        cpg.connect(entry, else_branch, CpgEdgeKind::ControlFlow(CfgEdgeKind::ConditionalFalse));
+        cpg.connect(
+            entry,
+            then_branch,
+            CpgEdgeKind::ControlFlow(CfgEdgeKind::ConditionalTrue),
+        );
+        cpg.connect(
+            entry,
+            else_branch,
+            CpgEdgeKind::ControlFlow(CfgEdgeKind::ConditionalFalse),
+        );
 
         let successors = cpg.cfg_successors(entry);
         assert_eq!(successors.len(), 2);
@@ -865,7 +911,9 @@ mod ext_tests {
     }
 
     fn block() -> CpgNodeKind {
-        CpgNodeKind::Block { scope: ScopeId::GLOBAL }
+        CpgNodeKind::Block {
+            scope: ScopeId::GLOBAL,
+        }
     }
 
     /// Wires an AST child edge (edges alone suffice for `ast_children`).
@@ -892,10 +940,26 @@ mod ext_tests {
         let then_b = g.add_node(mk(block()));
         let else_b = g.add_node(mk(block()));
         let merge = g.add_node(mk(block()));
-        g.connect(entry, then_b, CpgEdgeKind::ControlFlow(CfgEdgeKind::ConditionalTrue));
-        g.connect(entry, else_b, CpgEdgeKind::ControlFlow(CfgEdgeKind::ConditionalFalse));
-        g.connect(then_b, merge, CpgEdgeKind::ControlFlow(CfgEdgeKind::Sequential));
-        g.connect(else_b, merge, CpgEdgeKind::ControlFlow(CfgEdgeKind::Sequential));
+        g.connect(
+            entry,
+            then_b,
+            CpgEdgeKind::ControlFlow(CfgEdgeKind::ConditionalTrue),
+        );
+        g.connect(
+            entry,
+            else_b,
+            CpgEdgeKind::ControlFlow(CfgEdgeKind::ConditionalFalse),
+        );
+        g.connect(
+            then_b,
+            merge,
+            CpgEdgeKind::ControlFlow(CfgEdgeKind::Sequential),
+        );
+        g.connect(
+            else_b,
+            merge,
+            CpgEdgeKind::ControlFlow(CfgEdgeKind::Sequential),
+        );
         // 4 CFG edges, 4 CFG nodes -> 4 - 4 + 2 = 2.
         assert_eq!(g.cyclomatic_complexity(), 2);
     }
@@ -911,7 +975,11 @@ mod ext_tests {
         g.connect(b, c, CpgEdgeKind::ControlFlow(CfgEdgeKind::Sequential));
         g.connect(c, a, CpgEdgeKind::ControlFlow(CfgEdgeKind::LoopBack));
         g.connect(a, c, CpgEdgeKind::ControlFlow(CfgEdgeKind::ConditionalTrue));
-        g.connect(b, a, CpgEdgeKind::ControlFlow(CfgEdgeKind::ConditionalFalse));
+        g.connect(
+            b,
+            a,
+            CpgEdgeKind::ControlFlow(CfgEdgeKind::ConditionalFalse),
+        );
         assert_eq!(g.cyclomatic_complexity(), 4);
     }
 
@@ -920,15 +988,24 @@ mod ext_tests {
         let mut g = CodePropertyGraph::new(Language::Rust);
         let f = g.add_node(mk(func("f"))); // Function (also the root)
         let blk = g.add_node(mk(block()));
-        let cls = g.add_node(mk(CpgNodeKind::Class { name: "C".into(), is_abstract: false }));
-        let call = g.add_node(mk(CpgNodeKind::Call { target: None, is_method: false }));
+        let cls = g.add_node(mk(CpgNodeKind::Class {
+            name: "C".into(),
+            is_abstract: false,
+        }));
+        let call = g.add_node(mk(CpgNodeKind::Call {
+            target: None,
+            is_method: false,
+        }));
         let var = g.add_node(mk(CpgNodeKind::Variable {
             name: "v".into(),
             var_type: None,
             scope: ScopeId::GLOBAL,
             is_mutable: false,
         }));
-        let idn = g.add_node(mk(CpgNodeKind::Identifier { name: "x".into(), definition: None }));
+        let idn = g.add_node(mk(CpgNodeKind::Identifier {
+            name: "x".into(),
+            definition: None,
+        }));
 
         // 4 AST edges.
         g.connect(f, blk, CpgEdgeKind::AstChild);
@@ -1000,14 +1077,20 @@ mod ext_tests {
         let f = g.add_node(mk(func("f")));
         let blk = g.add_node(mk(block()));
         let iff = g.add_node(mk(CpgNodeKind::If));
-        let idn = g.add_node(mk(CpgNodeKind::Identifier { name: "x".into(), definition: None }));
+        let idn = g.add_node(mk(CpgNodeKind::Identifier {
+            name: "x".into(),
+            definition: None,
+        }));
         let var = g.add_node(mk(CpgNodeKind::Variable {
             name: "v".into(),
             var_type: None,
             scope: ScopeId::GLOBAL,
             is_mutable: false,
         }));
-        let call = g.add_node(mk(CpgNodeKind::Call { target: None, is_method: false }));
+        let call = g.add_node(mk(CpgNodeKind::Call {
+            target: None,
+            is_method: false,
+        }));
         ast_edge(&mut g, f, blk);
         ast_edge(&mut g, blk, iff);
         ast_edge(&mut g, iff, idn);
@@ -1039,7 +1122,10 @@ mod ext_tests {
             scope: ScopeId::GLOBAL,
             is_mutable: false,
         }));
-        let use_site = g.add_node(mk(CpgNodeKind::Identifier { name: "v".into(), definition: None }));
+        let use_site = g.add_node(mk(CpgNodeKind::Identifier {
+            name: "v".into(),
+            definition: None,
+        }));
         let other = g.add_node(mk(CpgNodeKind::Return));
         ast_edge(&mut g, f, blk);
         ast_edge(&mut g, blk, def);
@@ -1080,7 +1166,7 @@ mod ext_tests {
         ast_edge(&mut g, a, b);
         ast_edge(&mut g, b, a); // cycle a -> b -> a
         ast_edge(&mut g, a, a); // self-loop
-        // The visited-set guard makes this terminate; the value stays bounded.
+                                // The visited-set guard makes this terminate; the value stays bounded.
         let d = g.ast_depth();
         assert!(d >= 1);
         assert!(d <= g.node_count());
@@ -1128,8 +1214,14 @@ mod ext_tests {
         let mut g = CodePropertyGraph::new(Language::Rust);
         let f = g.add_node(mk_r(func("f"), 0, 100));
         let blk = g.add_node(mk_r(block(), 10, 50));
-        let _idn =
-            g.add_node(mk_r(CpgNodeKind::Identifier { name: "x".into(), definition: None }, 20, 30));
+        let _idn = g.add_node(mk_r(
+            CpgNodeKind::Identifier {
+                name: "x".into(),
+                definition: None,
+            },
+            20,
+            30,
+        ));
         // At 25 the innermost *scope* is the block (the identifier is not a scope).
         assert_eq!(g.scope_at_offset(25).map(|n| n.id), Some(blk));
         // At 5 only the function encloses.
@@ -1156,7 +1248,10 @@ mod ext_tests {
         let mut g = CodePropertyGraph::new(Language::Rust);
         let f = g.add_node(mk(func("f")));
         let blk = g.add_node(mk(block()));
-        let call = g.add_node(mk(CpgNodeKind::Call { target: None, is_method: false }));
+        let call = g.add_node(mk(CpgNodeKind::Call {
+            target: None,
+            is_method: false,
+        }));
         let g2 = g.add_node(mk(func("g")));
         ast_edge(&mut g, f, blk);
         ast_edge(&mut g, blk, call);
@@ -1171,22 +1266,39 @@ mod ext_tests {
     #[test]
     fn query_by_kind() {
         let mut g = CodePropertyGraph::new(Language::Rust);
-        g.add_node(mk(CpgNodeKind::Class { name: "C".into(), is_abstract: false }));
-        g.add_node(mk(CpgNodeKind::Class { name: "D".into(), is_abstract: true }));
+        g.add_node(mk(CpgNodeKind::Class {
+            name: "C".into(),
+            is_abstract: false,
+        }));
+        g.add_node(mk(CpgNodeKind::Class {
+            name: "D".into(),
+            is_abstract: true,
+        }));
         g.add_node(mk(CpgNodeKind::Variable {
             name: "v".into(),
             var_type: None,
             scope: ScopeId::GLOBAL,
             is_mutable: false,
         }));
-        g.add_node(mk(CpgNodeKind::Call { target: None, is_method: false }));
+        g.add_node(mk(CpgNodeKind::Call {
+            target: None,
+            is_method: false,
+        }));
         g.add_node(mk(func("f")));
         assert_eq!(g.classes().count(), 2);
         assert_eq!(g.variables().count(), 1);
         assert_eq!(g.calls().count(), 1);
         assert_eq!(g.functions().count(), 1);
-        assert_eq!(g.nodes_by_kind(|k| matches!(k, CpgNodeKind::Class { .. })).count(), 2);
-        assert_eq!(g.nodes_by_kind(|k| matches!(k, CpgNodeKind::Return)).count(), 0);
+        assert_eq!(
+            g.nodes_by_kind(|k| matches!(k, CpgNodeKind::Class { .. }))
+                .count(),
+            2
+        );
+        assert_eq!(
+            g.nodes_by_kind(|k| matches!(k, CpgNodeKind::Return))
+                .count(),
+            0
+        );
     }
 
     #[test]
@@ -1200,7 +1312,7 @@ mod ext_tests {
         assert_eq!(id5, NodeId::new(5));
         assert!(g.contains_node(NodeId::new(5)));
         assert_eq!(g.root(), Some(NodeId::new(5))); // first node becomes the root
-        // The auto-assigned id must be strictly greater than the reserved id.
+                                                    // The auto-assigned id must be strictly greater than the reserved id.
         let auto = g.add_node(mk(CpgNodeKind::Return));
         assert_eq!(auto, NodeId::new(6));
     }
@@ -1216,8 +1328,12 @@ mod ext_tests {
         let auto = g.connect(a, b, CpgEdgeKind::AstNextSibling);
         assert_eq!(auto, Some(EdgeId::new(11)));
         // An edge referencing a missing endpoint is rejected.
-        let bad =
-            g.add_edge_with_id(CpgEdge::new(EdgeId::new(20), a, NodeId::new(999), CpgEdgeKind::AstChild));
+        let bad = g.add_edge_with_id(CpgEdge::new(
+            EdgeId::new(20),
+            a,
+            NodeId::new(999),
+            CpgEdgeKind::AstChild,
+        ));
         assert_eq!(bad, None);
     }
 
@@ -1244,11 +1360,14 @@ mod ext_tests {
         let e2 = g.connect_unique(a, b, CpgEdgeKind::AstChild);
         assert_eq!(e1, e2); // the same edge id is returned
         assert_eq!(g.edge_count(), 1); // and no duplicate is created
-        // A different kind between the same endpoints IS added.
+                                       // A different kind between the same endpoints IS added.
         g.connect_unique(a, b, CpgEdgeKind::ControlFlow(CfgEdgeKind::Sequential));
         assert_eq!(g.edge_count(), 2);
         // A missing endpoint returns None and changes nothing.
-        assert_eq!(g.connect_unique(a, NodeId::new(999), CpgEdgeKind::AstChild), None);
+        assert_eq!(
+            g.connect_unique(a, NodeId::new(999), CpgEdgeKind::AstChild),
+            None
+        );
         assert_eq!(g.edge_count(), 2);
     }
 
@@ -1322,7 +1441,9 @@ mod dangling_parent_regression {
         let mut cpg = CodePropertyGraph::new(Language::Rust);
         let root = cpg.add_node(CpgNode::new(
             NodeId::new(0),
-            CpgNodeKind::Block { scope: ScopeId::GLOBAL },
+            CpgNodeKind::Block {
+                scope: ScopeId::GLOBAL,
+            },
             SourceRange::default(),
         ));
         let child = cpg.add_node(CpgNode::new(
@@ -1338,7 +1459,11 @@ mod dangling_parent_regression {
         assert!(cpg.node(absent).is_none(), "the id really is absent");
 
         let ancestors = cpg.ast_ancestors(child);
-        assert_eq!(ancestors, vec![root], "the chain stops before the absent id");
+        assert_eq!(
+            ancestors,
+            vec![root],
+            "the chain stops before the absent id"
+        );
         for id in &ancestors {
             assert!(cpg.node(*id).is_some(), "every ancestor resolves");
         }
@@ -1510,8 +1635,16 @@ mod serde_tests {
     #[test]
     fn serde_whole_graph_example() {
         let mut g = CodePropertyGraph::new(Language::Rust);
-        let a = g.add_node(CpgNode::new(NodeId::new(0), CpgNodeKind::Root, SourceRange::from_bytes(0, 10)));
-        let b = g.add_node(CpgNode::new(NodeId::new(0), CpgNodeKind::Return, SourceRange::from_bytes(2, 4)));
+        let a = g.add_node(CpgNode::new(
+            NodeId::new(0),
+            CpgNodeKind::Root,
+            SourceRange::from_bytes(0, 10),
+        ));
+        let b = g.add_node(CpgNode::new(
+            NodeId::new(0),
+            CpgNodeKind::Return,
+            SourceRange::from_bytes(2, 4),
+        ));
         g.connect(a, b, CpgEdgeKind::AstChild);
         g.connect(a, b, CpgEdgeKind::ControlFlow(CfgEdgeKind::Sequential));
 

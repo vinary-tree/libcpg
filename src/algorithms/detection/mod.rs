@@ -3,19 +3,20 @@
 //! Analyzes control flow patterns and data access patterns
 //! to identify common algorithm families.
 
-mod control_flow;
 mod complexity;
+mod control_flow;
 
-pub use control_flow::{ControlFlowAnalyzer, LoopPattern, LoopKind, RecursionPattern, RecursionKind};
 pub use complexity::ComplexityAnalyzer;
-
-use crate::{CodePropertyGraph, CpgNodeKind, NodeId};
-use super::signatures::{
-    AlgorithmSignature, ComplexityClass, ComplexityEstimate,
-    LoopStructure, LoopType, LoopBounds, SigLoopKind,
-    RecursionPattern as SigRecursionPattern, ReductionPattern, SigRecursionKind,
+pub use control_flow::{
+    ControlFlowAnalyzer, LoopKind, LoopPattern, RecursionKind, RecursionPattern,
 };
+
 use super::families::AlgorithmFamily;
+use super::signatures::{
+    AlgorithmSignature, ComplexityClass, ComplexityEstimate, LoopBounds, LoopStructure, LoopType,
+    RecursionPattern as SigRecursionPattern, ReductionPattern, SigLoopKind, SigRecursionKind,
+};
+use crate::{CodePropertyGraph, CpgNodeKind, NodeId};
 
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
@@ -107,7 +108,13 @@ impl DefaultAlgorithmDetector {
     }
 
     /// Detects sorting algorithm patterns.
-    fn detect_sorting(&self, cpg: &CodePropertyGraph, function: NodeId, loops: &[LoopPattern], time_complexity: &ComplexityEstimate) -> Option<DetectedAlgorithm> {
+    fn detect_sorting(
+        &self,
+        cpg: &CodePropertyGraph,
+        function: NodeId,
+        loops: &[LoopPattern],
+        time_complexity: &ComplexityEstimate,
+    ) -> Option<DetectedAlgorithm> {
         // Sorting algorithms typically have:
         // - Nested loops (O(n²)) OR recursion with divide (O(n log n))
         // - Comparison operations
@@ -167,7 +174,14 @@ impl DefaultAlgorithmDetector {
     }
 
     /// Detects searching algorithm patterns.
-    fn detect_searching(&self, cpg: &CodePropertyGraph, function: NodeId, loops: &[LoopPattern], recursion: Option<&RecursionPattern>, time_complexity: &ComplexityEstimate) -> Option<DetectedAlgorithm> {
+    fn detect_searching(
+        &self,
+        cpg: &CodePropertyGraph,
+        function: NodeId,
+        loops: &[LoopPattern],
+        recursion: Option<&RecursionPattern>,
+        time_complexity: &ComplexityEstimate,
+    ) -> Option<DetectedAlgorithm> {
         // Searching algorithms typically have:
         // - A single loop OR divide-and-conquer recursion
         // - Comparison operations
@@ -213,7 +227,12 @@ impl DefaultAlgorithmDetector {
     }
 
     /// Detects graph algorithm patterns.
-    fn detect_graph(&self, cpg: &CodePropertyGraph, function: NodeId, loops: &[LoopPattern]) -> Option<DetectedAlgorithm> {
+    fn detect_graph(
+        &self,
+        cpg: &CodePropertyGraph,
+        function: NodeId,
+        loops: &[LoopPattern],
+    ) -> Option<DetectedAlgorithm> {
         // Graph algorithms typically have:
         // - Queue or stack operations (BFS/DFS)
         // - Visited set/array
@@ -239,7 +258,8 @@ impl DefaultAlgorithmDetector {
             return None;
         }
 
-        let mut algo = DetectedAlgorithm::new(AlgorithmFamily::GraphTraversal, function, confidence);
+        let mut algo =
+            DetectedAlgorithm::new(AlgorithmFamily::GraphTraversal, function, confidence);
         if let Some(n) = name {
             algo = algo.with_name(n);
         }
@@ -248,7 +268,12 @@ impl DefaultAlgorithmDetector {
     }
 
     /// Detects dynamic programming patterns.
-    fn detect_dp(&self, cpg: &CodePropertyGraph, function: NodeId, loops: &[LoopPattern]) -> Option<DetectedAlgorithm> {
+    fn detect_dp(
+        &self,
+        cpg: &CodePropertyGraph,
+        function: NodeId,
+        loops: &[LoopPattern],
+    ) -> Option<DetectedAlgorithm> {
         // DP algorithms typically have:
         // - Memoization table (array/hashmap)
         // - Nested loops OR recursion with memoization
@@ -261,21 +286,27 @@ impl DefaultAlgorithmDetector {
             return None;
         }
 
-        let confidence = if has_nested_loops {
-            0.7
-        } else {
-            0.5
-        };
+        let confidence = if has_nested_loops { 0.7 } else { 0.5 };
 
         if confidence < self.min_confidence {
             return None;
         }
 
-        Some(DetectedAlgorithm::new(AlgorithmFamily::DynamicProgramming, function, confidence))
+        Some(DetectedAlgorithm::new(
+            AlgorithmFamily::DynamicProgramming,
+            function,
+            confidence,
+        ))
     }
 
     /// Detects divide-and-conquer patterns.
-    fn detect_divide_conquer(&self, _cpg: &CodePropertyGraph, function: NodeId, recursion: Option<&RecursionPattern>, time_complexity: &ComplexityEstimate) -> Option<DetectedAlgorithm> {
+    fn detect_divide_conquer(
+        &self,
+        _cpg: &CodePropertyGraph,
+        function: NodeId,
+        recursion: Option<&RecursionPattern>,
+        time_complexity: &ComplexityEstimate,
+    ) -> Option<DetectedAlgorithm> {
         let rec = recursion?;
 
         // D&C typically has:
@@ -283,8 +314,10 @@ impl DefaultAlgorithmDetector {
         // - Multiple recursive calls (2 for merge sort, 1-2 for quicksort)
         // - O(n log n) or O(log n) complexity
 
-        let is_dc_complexity = matches!(time_complexity.class,
-            ComplexityClass::Logarithmic | ComplexityClass::Linearithmic);
+        let is_dc_complexity = matches!(
+            time_complexity.class,
+            ComplexityClass::Logarithmic | ComplexityClass::Linearithmic
+        );
 
         if !is_dc_complexity {
             return None;
@@ -302,32 +335,47 @@ impl DefaultAlgorithmDetector {
             return None;
         }
 
-        Some(DetectedAlgorithm::new(AlgorithmFamily::DivideAndConquer, function, confidence))
+        Some(DetectedAlgorithm::new(
+            AlgorithmFamily::DivideAndConquer,
+            function,
+            confidence,
+        ))
     }
 
     /// Builds an algorithm signature from detected patterns.
-    fn build_signature(&self, loops: &[LoopPattern], recursion: Option<&RecursionPattern>, time_complexity: ComplexityEstimate) -> AlgorithmSignature {
-        let mut sig = AlgorithmSignature::new()
-            .with_time_complexity(time_complexity);
+    fn build_signature(
+        &self,
+        loops: &[LoopPattern],
+        recursion: Option<&RecursionPattern>,
+        time_complexity: ComplexityEstimate,
+    ) -> AlgorithmSignature {
+        let mut sig = AlgorithmSignature::new().with_time_complexity(time_complexity);
 
         if !loops.is_empty() {
             let max_depth = loops.iter().map(|l| l.depth).max().unwrap_or(0);
-            let loop_types: Vec<LoopType> = loops.iter().map(|l| {
-                let sig_kind = match l.kind {
-                    LoopKind::For => SigLoopKind::CountedFor,
-                    LoopKind::While => SigLoopKind::While,
-                    LoopKind::DoWhile => SigLoopKind::DoWhile,
-                    LoopKind::Infinite => SigLoopKind::Infinite,
-                    LoopKind::Iterator => SigLoopKind::ForEach,
-                };
-                LoopType {
-                    header: l.header,
-                    kind: sig_kind,
-                    depth: l.depth,
-                    bounds: if l.is_counted { LoopBounds::LinearN } else { LoopBounds::Unknown },
-                    has_early_exit: false,
-                }
-            }).collect();
+            let loop_types: Vec<LoopType> = loops
+                .iter()
+                .map(|l| {
+                    let sig_kind = match l.kind {
+                        LoopKind::For => SigLoopKind::CountedFor,
+                        LoopKind::While => SigLoopKind::While,
+                        LoopKind::DoWhile => SigLoopKind::DoWhile,
+                        LoopKind::Infinite => SigLoopKind::Infinite,
+                        LoopKind::Iterator => SigLoopKind::ForEach,
+                    };
+                    LoopType {
+                        header: l.header,
+                        kind: sig_kind,
+                        depth: l.depth,
+                        bounds: if l.is_counted {
+                            LoopBounds::LinearN
+                        } else {
+                            LoopBounds::Unknown
+                        },
+                        has_early_exit: false,
+                    }
+                })
+                .collect();
 
             let loop_structure = LoopStructure {
                 max_depth,
@@ -365,8 +413,10 @@ impl DefaultAlgorithmDetector {
         let descendants = cpg.ast_descendants(function);
         descendants.iter().any(|&id| {
             cpg.node(id)
-                .map(|n| matches!(&n.kind, CpgNodeKind::BinaryOp { operator }
-                    if matches!(operator.as_ref(), "<" | ">" | "<=" | ">=" | "==" | "!=")))
+                .map(|n| {
+                    matches!(&n.kind, CpgNodeKind::BinaryOp { operator }
+                    if matches!(operator.as_ref(), "<" | ">" | "<=" | ">=" | "==" | "!="))
+                })
                 .unwrap_or(false)
         })
     }
@@ -376,21 +426,28 @@ impl DefaultAlgorithmDetector {
         let descendants = cpg.ast_descendants(function);
 
         // Look for multiple assignments that suggest swapping
-        let assignment_count = descendants.iter().filter(|&&id| {
-            cpg.node(id)
-                .map(|n| matches!(n.kind, CpgNodeKind::Assignment { .. }))
-                .unwrap_or(false)
-        }).count();
+        let assignment_count = descendants
+            .iter()
+            .filter(|&&id| {
+                cpg.node(id)
+                    .map(|n| matches!(n.kind, CpgNodeKind::Assignment { .. }))
+                    .unwrap_or(false)
+            })
+            .count();
 
         // Also check for std::mem::swap or similar calls
         let has_swap_call = descendants.iter().any(|&id| {
-            cpg.node(id).map(|n| {
-                if let CpgNodeKind::Identifier { name, .. } | CpgNodeKind::MemberAccess { member: name } = &n.kind {
-                    name.to_lowercase().contains("swap")
-                } else {
-                    false
-                }
-            }).unwrap_or(false)
+            cpg.node(id)
+                .map(|n| {
+                    if let CpgNodeKind::Identifier { name, .. }
+                    | CpgNodeKind::MemberAccess { member: name } = &n.kind
+                    {
+                        name.to_lowercase().contains("swap")
+                    } else {
+                        false
+                    }
+                })
+                .unwrap_or(false)
         });
 
         assignment_count >= 3 || has_swap_call
@@ -402,24 +459,33 @@ impl DefaultAlgorithmDetector {
         let descendants = cpg.ast_descendants(function);
 
         descendants.iter().any(|&id| {
-            cpg.node(id).map(|n| {
-                if let CpgNodeKind::BinaryOp { operator } = &n.kind {
-                    // Look for i+1 pattern
-                    let op = operator.as_ref();
-                    if op == "+" {
-                        let children = cpg.ast_children(id);
-                        children.iter().any(|&child_id| {
-                            cpg.node(child_id)
-                                .map(|c| matches!(&c.kind, CpgNodeKind::Literal { kind: crate::LiteralKind::Integer(1) }))
-                                .unwrap_or(false)
-                        })
+            cpg.node(id)
+                .map(|n| {
+                    if let CpgNodeKind::BinaryOp { operator } = &n.kind {
+                        // Look for i+1 pattern
+                        let op = operator.as_ref();
+                        if op == "+" {
+                            let children = cpg.ast_children(id);
+                            children.iter().any(|&child_id| {
+                                cpg.node(child_id)
+                                    .map(|c| {
+                                        matches!(
+                                            &c.kind,
+                                            CpgNodeKind::Literal {
+                                                kind: crate::LiteralKind::Integer(1)
+                                            }
+                                        )
+                                    })
+                                    .unwrap_or(false)
+                            })
+                        } else {
+                            false
+                        }
                     } else {
                         false
                     }
-                } else {
-                    false
-                }
-            }).unwrap_or(false)
+                })
+                .unwrap_or(false)
         })
     }
 
@@ -439,12 +505,21 @@ impl DefaultAlgorithmDetector {
 
         // Look for return inside a loop or conditional
         descendants.iter().any(|&id| {
-            if cpg.node(id).map(|n| matches!(n.kind, CpgNodeKind::Return)).unwrap_or(false) {
+            if cpg
+                .node(id)
+                .map(|n| matches!(n.kind, CpgNodeKind::Return))
+                .unwrap_or(false)
+            {
                 // Check if inside a loop
                 let ancestors = cpg.ast_ancestors(id);
                 ancestors.iter().any(|&anc| {
                     cpg.node(anc)
-                        .map(|n| matches!(n.kind, CpgNodeKind::For | CpgNodeKind::While | CpgNodeKind::Loop))
+                        .map(|n| {
+                            matches!(
+                                n.kind,
+                                CpgNodeKind::For | CpgNodeKind::While | CpgNodeKind::Loop
+                            )
+                        })
                         .unwrap_or(false)
                 })
             } else {
@@ -459,27 +534,40 @@ impl DefaultAlgorithmDetector {
 
         // Look for division by 2 or right shift by 1
         descendants.iter().any(|&id| {
-            cpg.node(id).map(|n| {
-                if let CpgNodeKind::BinaryOp { operator } = &n.kind {
-                    let op = operator.as_ref();
-                    if op == "/" || op == ">>" {
-                        let children = cpg.ast_children(id);
-                        children.iter().any(|&child_id| {
-                            cpg.node(child_id).map(|c| {
-                                matches!(&c.kind, CpgNodeKind::Literal { kind: crate::LiteralKind::Integer(2) })
-                                    || matches!(&c.kind, CpgNodeKind::Literal { kind: crate::LiteralKind::Integer(1) })
-                            }).unwrap_or(false)
-                        })
+            cpg.node(id)
+                .map(|n| {
+                    if let CpgNodeKind::BinaryOp { operator } = &n.kind {
+                        let op = operator.as_ref();
+                        if op == "/" || op == ">>" {
+                            let children = cpg.ast_children(id);
+                            children.iter().any(|&child_id| {
+                                cpg.node(child_id)
+                                    .map(|c| {
+                                        matches!(
+                                            &c.kind,
+                                            CpgNodeKind::Literal {
+                                                kind: crate::LiteralKind::Integer(2)
+                                            }
+                                        ) || matches!(
+                                            &c.kind,
+                                            CpgNodeKind::Literal {
+                                                kind: crate::LiteralKind::Integer(1)
+                                            }
+                                        )
+                                    })
+                                    .unwrap_or(false)
+                            })
+                        } else {
+                            false
+                        }
+                    } else if let CpgNodeKind::Identifier { name, .. } = &n.kind {
+                        let name_lower = name.to_lowercase();
+                        name_lower == "mid" || name_lower == "middle"
                     } else {
                         false
                     }
-                } else if let CpgNodeKind::Identifier { name, .. } = &n.kind {
-                    let name_lower = name.to_lowercase();
-                    name_lower == "mid" || name_lower == "middle"
-                } else {
-                    false
-                }
-            }).unwrap_or(false)
+                })
+                .unwrap_or(false)
         })
     }
 
@@ -488,19 +576,23 @@ impl DefaultAlgorithmDetector {
         let descendants = cpg.ast_descendants(function);
 
         descendants.iter().any(|&id| {
-            cpg.node(id).map(|n| {
-                if let CpgNodeKind::Identifier { name, .. } | CpgNodeKind::MemberAccess { member: name } = &n.kind {
-                    let name_lower = name.to_lowercase();
-                    name_lower.contains("queue")
-                        || name_lower.contains("push_back")
-                        || name_lower.contains("pop_front")
-                        || name_lower.contains("deque")
-                        || name_lower.contains("enqueue")
-                        || name_lower.contains("dequeue")
-                } else {
-                    false
-                }
-            }).unwrap_or(false)
+            cpg.node(id)
+                .map(|n| {
+                    if let CpgNodeKind::Identifier { name, .. }
+                    | CpgNodeKind::MemberAccess { member: name } = &n.kind
+                    {
+                        let name_lower = name.to_lowercase();
+                        name_lower.contains("queue")
+                            || name_lower.contains("push_back")
+                            || name_lower.contains("pop_front")
+                            || name_lower.contains("deque")
+                            || name_lower.contains("enqueue")
+                            || name_lower.contains("dequeue")
+                    } else {
+                        false
+                    }
+                })
+                .unwrap_or(false)
         })
     }
 
@@ -509,15 +601,19 @@ impl DefaultAlgorithmDetector {
         let descendants = cpg.ast_descendants(function);
 
         descendants.iter().any(|&id| {
-            cpg.node(id).map(|n| {
-                if let CpgNodeKind::Identifier { name, .. } | CpgNodeKind::MemberAccess { member: name } = &n.kind {
-                    let name_lower = name.to_lowercase();
-                    name_lower.contains("stack")
-                        || (name_lower == "push" || name_lower == "pop")
-                } else {
-                    false
-                }
-            }).unwrap_or(false)
+            cpg.node(id)
+                .map(|n| {
+                    if let CpgNodeKind::Identifier { name, .. }
+                    | CpgNodeKind::MemberAccess { member: name } = &n.kind
+                    {
+                        let name_lower = name.to_lowercase();
+                        name_lower.contains("stack")
+                            || (name_lower == "push" || name_lower == "pop")
+                    } else {
+                        false
+                    }
+                })
+                .unwrap_or(false)
         })
     }
 
@@ -526,16 +622,18 @@ impl DefaultAlgorithmDetector {
         let descendants = cpg.ast_descendants(function);
 
         descendants.iter().any(|&id| {
-            cpg.node(id).map(|n| {
-                if let CpgNodeKind::Identifier { name, .. } = &n.kind {
-                    let name_lower = name.to_lowercase();
-                    name_lower.contains("visited")
-                        || name_lower.contains("seen")
-                        || name_lower.contains("marked")
-                } else {
-                    false
-                }
-            }).unwrap_or(false)
+            cpg.node(id)
+                .map(|n| {
+                    if let CpgNodeKind::Identifier { name, .. } = &n.kind {
+                        let name_lower = name.to_lowercase();
+                        name_lower.contains("visited")
+                            || name_lower.contains("seen")
+                            || name_lower.contains("marked")
+                    } else {
+                        false
+                    }
+                })
+                .unwrap_or(false)
         })
     }
 
@@ -544,19 +642,21 @@ impl DefaultAlgorithmDetector {
         let descendants = cpg.ast_descendants(function);
 
         descendants.iter().any(|&id| {
-            cpg.node(id).map(|n| {
-                if let CpgNodeKind::Identifier { name, .. } = &n.kind {
-                    let name_lower = name.to_lowercase();
-                    name_lower.contains("memo")
-                        || name_lower.contains("dp")
-                        || name_lower.contains("cache")
-                        || name_lower.contains("table")
-                        || name_lower == "f"
-                        || name_lower == "dp_table"
-                } else {
-                    false
-                }
-            }).unwrap_or(false)
+            cpg.node(id)
+                .map(|n| {
+                    if let CpgNodeKind::Identifier { name, .. } = &n.kind {
+                        let name_lower = name.to_lowercase();
+                        name_lower.contains("memo")
+                            || name_lower.contains("dp")
+                            || name_lower.contains("cache")
+                            || name_lower.contains("table")
+                            || name_lower == "f"
+                            || name_lower == "dp_table"
+                    } else {
+                        false
+                    }
+                })
+                .unwrap_or(false)
         })
     }
 }
@@ -581,7 +681,9 @@ impl AlgorithmDetector for DefaultAlgorithmDetector {
         }
 
         // Searching detection
-        if let Some(algo) = self.detect_searching(cpg, function, &loops, recursion.as_ref(), &time_complexity) {
+        if let Some(algo) =
+            self.detect_searching(cpg, function, &loops, recursion.as_ref(), &time_complexity)
+        {
             detections.push(algo);
         }
 
@@ -596,12 +698,18 @@ impl AlgorithmDetector for DefaultAlgorithmDetector {
         }
 
         // Divide and conquer detection
-        if let Some(algo) = self.detect_divide_conquer(cpg, function, recursion.as_ref(), &time_complexity) {
+        if let Some(algo) =
+            self.detect_divide_conquer(cpg, function, recursion.as_ref(), &time_complexity)
+        {
             detections.push(algo);
         }
 
         // Sort by confidence (highest first)
-        detections.sort_by(|a, b| b.confidence.partial_cmp(&a.confidence).unwrap_or(std::cmp::Ordering::Equal));
+        detections.sort_by(|a, b| {
+            b.confidence
+                .partial_cmp(&a.confidence)
+                .unwrap_or(std::cmp::Ordering::Equal)
+        });
 
         detections
     }
@@ -621,13 +729,12 @@ impl AlgorithmDetector for DefaultAlgorithmDetector {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{CpgNode, Language, SourceRange, MethodSignature, Visibility, ScopeId};
     use crate::testutil::wf_child;
+    use crate::{CpgNode, Language, MethodSignature, ScopeId, SourceRange, Visibility};
 
     #[test]
     fn test_detector_creation() {
-        let detector = DefaultAlgorithmDetector::new()
-            .with_min_confidence(0.7);
+        let detector = DefaultAlgorithmDetector::new().with_min_confidence(0.7);
 
         assert_eq!(detector.min_confidence, 0.7);
         assert!(!detector.supported_families().is_empty());
@@ -673,11 +780,16 @@ mod tests {
     }
 
     fn ident(name: &str) -> CpgNodeKind {
-        CpgNodeKind::Identifier { name: name.into(), definition: None }
+        CpgNodeKind::Identifier {
+            name: name.into(),
+            definition: None,
+        }
     }
 
     fn block() -> CpgNodeKind {
-        CpgNodeKind::Block { scope: ScopeId::GLOBAL }
+        CpgNodeKind::Block {
+            scope: ScopeId::GLOBAL,
+        }
     }
 
     /// `fn bubble() { for { for { arr[j] > arr[j+1]; t=..; a=..; b=..; } } }`.
@@ -692,12 +804,48 @@ mod tests {
         let inner = wf_child(&mut cpg, outer_body, CpgNodeKind::For);
         let inner_body = wf_child(&mut cpg, inner, block());
 
-        wf_child(&mut cpg, inner_body, CpgNodeKind::BinaryOp { operator: ">".into() });
-        wf_child(&mut cpg, inner_body, CpgNodeKind::Assignment { operator: "=".into() });
-        wf_child(&mut cpg, inner_body, CpgNodeKind::Assignment { operator: "=".into() });
-        wf_child(&mut cpg, inner_body, CpgNodeKind::Assignment { operator: "=".into() });
-        let plus = wf_child(&mut cpg, inner_body, CpgNodeKind::BinaryOp { operator: "+".into() });
-        wf_child(&mut cpg, plus, CpgNodeKind::Literal { kind: crate::LiteralKind::Integer(1) });
+        wf_child(
+            &mut cpg,
+            inner_body,
+            CpgNodeKind::BinaryOp {
+                operator: ">".into(),
+            },
+        );
+        wf_child(
+            &mut cpg,
+            inner_body,
+            CpgNodeKind::Assignment {
+                operator: "=".into(),
+            },
+        );
+        wf_child(
+            &mut cpg,
+            inner_body,
+            CpgNodeKind::Assignment {
+                operator: "=".into(),
+            },
+        );
+        wf_child(
+            &mut cpg,
+            inner_body,
+            CpgNodeKind::Assignment {
+                operator: "=".into(),
+            },
+        );
+        let plus = wf_child(
+            &mut cpg,
+            inner_body,
+            CpgNodeKind::BinaryOp {
+                operator: "+".into(),
+            },
+        );
+        wf_child(
+            &mut cpg,
+            plus,
+            CpgNodeKind::Literal {
+                kind: crate::LiteralKind::Integer(1),
+            },
+        );
         wf_child(&mut cpg, inner_body, CpgNodeKind::IndexAccess);
         (cpg, func)
     }
@@ -720,7 +868,13 @@ mod tests {
             sig.time_complexity.as_ref().expect("time complexity").class,
             ComplexityClass::Quadratic
         );
-        assert_eq!(sig.loop_structure.as_ref().expect("loop structure").max_depth, 2);
+        assert_eq!(
+            sig.loop_structure
+                .as_ref()
+                .expect("loop structure")
+                .max_depth,
+            2
+        );
     }
 
     #[test]
@@ -730,8 +884,21 @@ mod tests {
         let func = make_function(&mut cpg, "binary_search");
         let body = wf_child(&mut cpg, func, block());
         wf_child(&mut cpg, body, ident("mid")); // midpoint token ⇒ divide & conquer
-        wf_child(&mut cpg, body, CpgNodeKind::BinaryOp { operator: "<".into() });
-        let call = wf_child(&mut cpg, body, CpgNodeKind::Call { target: None, is_method: false });
+        wf_child(
+            &mut cpg,
+            body,
+            CpgNodeKind::BinaryOp {
+                operator: "<".into(),
+            },
+        );
+        let call = wf_child(
+            &mut cpg,
+            body,
+            CpgNodeKind::Call {
+                target: None,
+                is_method: false,
+            },
+        );
         wf_child(&mut cpg, call, ident("binary_search")); // direct self-call
 
         let results = DefaultAlgorithmDetector::new().detect(&cpg, func);
@@ -741,7 +908,9 @@ mod tests {
             .expect("searching family should be detected");
         assert_eq!(search.name.as_deref(), Some("Binary Search"));
         // Divide-and-conquer is also recognised (at lower confidence).
-        assert!(results.iter().any(|r| r.family == AlgorithmFamily::DivideAndConquer));
+        assert!(results
+            .iter()
+            .any(|r| r.family == AlgorithmFamily::DivideAndConquer));
         // Results are sorted by descending confidence.
         for w in results.windows(2) {
             assert!(w[0].confidence >= w[1].confidence);
@@ -832,7 +1001,12 @@ mod proptests {
     fn function_root(g: &CodePropertyGraph) -> NodeId {
         node_ids(g)
             .into_iter()
-            .find(|&id| matches!(g.node(id).map(|n| &n.kind), Some(CpgNodeKind::Function { .. })))
+            .find(|&id| {
+                matches!(
+                    g.node(id).map(|n| &n.kind),
+                    Some(CpgNodeKind::Function { .. })
+                )
+            })
             .expect("well-formed cpg has a Function root")
     }
 
@@ -875,7 +1049,9 @@ mod proptests {
 mod scenarios {
     use super::*;
     use crate::testutil::wf_child;
-    use crate::{CpgNode, Language, LiteralKind, MethodSignature, ScopeId, SourceRange, Visibility};
+    use crate::{
+        CpgNode, Language, LiteralKind, MethodSignature, ScopeId, SourceRange, Visibility,
+    };
 
     /// A function scaffold: `Function <name> → Block`.
     struct Scaffold {
@@ -906,25 +1082,41 @@ mod scenarios {
 
     // ---- node-kind shorthands ----
     fn block() -> CpgNodeKind {
-        CpgNodeKind::Block { scope: ScopeId::GLOBAL }
+        CpgNodeKind::Block {
+            scope: ScopeId::GLOBAL,
+        }
     }
     fn ident(name: &str) -> CpgNodeKind {
-        CpgNodeKind::Identifier { name: name.into(), definition: None }
+        CpgNodeKind::Identifier {
+            name: name.into(),
+            definition: None,
+        }
     }
     fn member(name: &str) -> CpgNodeKind {
-        CpgNodeKind::MemberAccess { member: name.into() }
+        CpgNodeKind::MemberAccess {
+            member: name.into(),
+        }
     }
     fn binop(op: &str) -> CpgNodeKind {
-        CpgNodeKind::BinaryOp { operator: op.into() }
+        CpgNodeKind::BinaryOp {
+            operator: op.into(),
+        }
     }
     fn assign(op: &str) -> CpgNodeKind {
-        CpgNodeKind::Assignment { operator: op.into() }
+        CpgNodeKind::Assignment {
+            operator: op.into(),
+        }
     }
     fn int(v: i64) -> CpgNodeKind {
-        CpgNodeKind::Literal { kind: LiteralKind::Integer(v) }
+        CpgNodeKind::Literal {
+            kind: LiteralKind::Integer(v),
+        }
     }
     fn call() -> CpgNodeKind {
-        CpgNodeKind::Call { target: None, is_method: false }
+        CpgNodeKind::Call {
+            target: None,
+            is_method: false,
+        }
     }
 
     /// `for … { <body built by `f`> }` under `parent`, returning the loop node.
@@ -1132,7 +1324,10 @@ mod scenarios {
         assert!((search.confidence - 0.8).abs() < 1e-9);
 
         let dc = find(&found, AlgorithmFamily::DivideAndConquer).expect("a D&C detection");
-        assert!((dc.confidence - 0.6).abs() < 1e-9, "one recursive call ⇒ 0.6");
+        assert!(
+            (dc.confidence - 0.6).abs() < 1e-9,
+            "one recursive call ⇒ 0.6"
+        );
 
         // Results are ordered by descending confidence.
         for w in found.windows(2) {
@@ -1157,11 +1352,17 @@ mod scenarios {
         }
 
         let est = ComplexityAnalyzer::new().estimate_time_complexity(&s.cpg, s.func);
-        assert!(matches!(est.class, ComplexityClass::Linearithmic), "got {est:?}");
+        assert!(
+            matches!(est.class, ComplexityClass::Linearithmic),
+            "got {est:?}"
+        );
 
         let found = DefaultAlgorithmDetector::new().detect(&s.cpg, s.func);
         let dc = find(&found, AlgorithmFamily::DivideAndConquer).expect("a D&C detection");
-        assert!((dc.confidence - 0.7).abs() < 1e-9, "two recursive calls ⇒ 0.7");
+        assert!(
+            (dc.confidence - 0.7).abs() < 1e-9,
+            "two recursive calls ⇒ 0.7"
+        );
     }
 
     /// Three or more halving self-calls fall back to a polynomial estimate,
@@ -1177,7 +1378,10 @@ mod scenarios {
         }
 
         let est = ComplexityAnalyzer::new().estimate_time_complexity(&s.cpg, s.func);
-        assert!(matches!(est.class, ComplexityClass::Polynomial(3)), "got {est:?}");
+        assert!(
+            matches!(est.class, ComplexityClass::Polynomial(3)),
+            "got {est:?}"
+        );
     }
 
     /// Binary recursion *without* halving is the naive-Fibonacci shape: O(2ⁿ).
@@ -1191,7 +1395,10 @@ mod scenarios {
         }
 
         let est = ComplexityAnalyzer::new().estimate_time_complexity(&s.cpg, s.func);
-        assert!(matches!(est.class, ComplexityClass::Exponential), "got {est:?}");
+        assert!(
+            matches!(est.class, ComplexityClass::Exponential),
+            "got {est:?}"
+        );
         assert!((est.confidence - 0.7).abs() < 1e-9);
     }
 
@@ -1664,7 +1871,15 @@ mod scenarios {
     /// an array literal does so on its own.
     #[test]
     fn every_allocation_witness_is_recognized() {
-        for word in ["vec", "new", "alloc", "create", "clone", "collect", "vector_new"] {
+        for word in [
+            "vec",
+            "new",
+            "alloc",
+            "create",
+            "clone",
+            "collect",
+            "vector_new",
+        ] {
             let mut s = scaffold("build");
             let cpg = &mut s.cpg;
             let c = wf_child(cpg, s.body, call());
@@ -1679,7 +1894,13 @@ mod scenarios {
         // An array literal is an allocation by itself.
         let mut s = scaffold("build");
         let cpg = &mut s.cpg;
-        wf_child(cpg, s.body, CpgNodeKind::Literal { kind: LiteralKind::Array });
+        wf_child(
+            cpg,
+            s.body,
+            CpgNodeKind::Literal {
+                kind: LiteralKind::Array,
+            },
+        );
         let est = ComplexityAnalyzer::new().estimate_space_complexity(&s.cpg, s.func);
         assert!(matches!(est.class, ComplexityClass::Linear));
 
@@ -1688,12 +1909,15 @@ mod scenarios {
         // the recognized substrings, so the heuristic (correctly, per its own
         // definition) does not fire.
         for word in ["log", "with_capacity"] {
-        let mut s = scaffold("noop");
-        let cpg = &mut s.cpg;
-        let c = wf_child(cpg, s.body, call());
-        wf_child(cpg, c, ident(word));
-        let est = ComplexityAnalyzer::new().estimate_space_complexity(&s.cpg, s.func);
-        assert!(matches!(est.class, ComplexityClass::Constant), "`{word}`: got {est:?}");
+            let mut s = scaffold("noop");
+            let cpg = &mut s.cpg;
+            let c = wf_child(cpg, s.body, call());
+            wf_child(cpg, c, ident(word));
+            let est = ComplexityAnalyzer::new().estimate_space_complexity(&s.cpg, s.func);
+            assert!(
+                matches!(est.class, ComplexityClass::Constant),
+                "`{word}`: got {est:?}"
+            );
         }
     }
 
@@ -1748,7 +1972,10 @@ mod scenarios {
             ComplexityAnalyzer::new().estimate_time_complexity(&s.cpg, s.func)
         };
         assert!(matches!(unbounded_single.class, ComplexityClass::Linear));
-        assert!((unbounded_single.confidence - 0.6).abs() < 1e-9, "unbounded ⇒ 0.6");
+        assert!(
+            (unbounded_single.confidence - 0.6).abs() < 1e-9,
+            "unbounded ⇒ 0.6"
+        );
 
         let counted_single = {
             let mut s = scaffold("f");
@@ -1757,7 +1984,10 @@ mod scenarios {
             ComplexityAnalyzer::new().estimate_time_complexity(&s.cpg, s.func)
         };
         assert!(matches!(counted_single.class, ComplexityClass::Linear));
-        assert!((counted_single.confidence - 0.8).abs() < 1e-9, "counted ⇒ 0.8");
+        assert!(
+            (counted_single.confidence - 0.8).abs() < 1e-9,
+            "counted ⇒ 0.8"
+        );
 
         // Same at depth 2.
         let unbounded_nested = {
@@ -1796,7 +2026,10 @@ mod scenarios {
             });
             ComplexityAnalyzer::new().estimate_time_complexity(&s.cpg, s.func)
         };
-        assert!(matches!(cubic.class, ComplexityClass::Cubic), "got {cubic:?}");
+        assert!(
+            matches!(cubic.class, ComplexityClass::Cubic),
+            "got {cubic:?}"
+        );
 
         let quartic = {
             let mut s = scaffold("f");
@@ -1810,7 +2043,10 @@ mod scenarios {
             });
             ComplexityAnalyzer::new().estimate_time_complexity(&s.cpg, s.func)
         };
-        assert!(matches!(quartic.class, ComplexityClass::Polynomial(4)), "got {quartic:?}");
+        assert!(
+            matches!(quartic.class, ComplexityClass::Polynomial(4)),
+            "got {quartic:?}"
+        );
     }
 
     /// When a function both loops *and* recurses, the **worse** of the two
@@ -1870,7 +2106,13 @@ mod scenarios {
             wf_child(cpg, w, block());
         });
         wf_child(cpg, s.body, CpgNodeKind::Loop);
-        wf_child(cpg, s.body, CpgNodeKind::Unknown { kind: "do_statement".into() });
+        wf_child(
+            cpg,
+            s.body,
+            CpgNodeKind::Unknown {
+                kind: "do_statement".into(),
+            },
+        );
 
         let found = DefaultAlgorithmDetector::new().detect(&s.cpg, s.func);
         let sorting = find(&found, AlgorithmFamily::Sorting).expect("a sorting detection");
@@ -1887,21 +2129,41 @@ mod scenarios {
         // `SigLoopKind`/`LoopBounds` are not `PartialEq`, so match structurally.
         let kinds = &loops.loop_types;
         for (label, hit) in [
-            ("CountedFor", kinds.iter().any(|l| matches!(l.kind, SigLoopKind::CountedFor))),
-            ("While", kinds.iter().any(|l| matches!(l.kind, SigLoopKind::While))),
-            ("Infinite", kinds.iter().any(|l| matches!(l.kind, SigLoopKind::Infinite))),
-            ("DoWhile", kinds.iter().any(|l| matches!(l.kind, SigLoopKind::DoWhile))),
+            (
+                "CountedFor",
+                kinds
+                    .iter()
+                    .any(|l| matches!(l.kind, SigLoopKind::CountedFor)),
+            ),
+            (
+                "While",
+                kinds.iter().any(|l| matches!(l.kind, SigLoopKind::While)),
+            ),
+            (
+                "Infinite",
+                kinds
+                    .iter()
+                    .any(|l| matches!(l.kind, SigLoopKind::Infinite)),
+            ),
+            (
+                "DoWhile",
+                kinds.iter().any(|l| matches!(l.kind, SigLoopKind::DoWhile)),
+            ),
         ] {
             assert!(hit, "a {label} loop must appear in the signature");
         }
 
         // Boundedness is carried across as the loop bounds.
         assert!(
-            kinds.iter().any(|l| matches!(l.bounds, LoopBounds::LinearN)),
+            kinds
+                .iter()
+                .any(|l| matches!(l.bounds, LoopBounds::LinearN)),
             "the counted `for` is bounded"
         );
         assert!(
-            kinds.iter().any(|l| matches!(l.bounds, LoopBounds::Unknown)),
+            kinds
+                .iter()
+                .any(|l| matches!(l.bounds, LoopBounds::Unknown)),
             "the bare `loop` is not"
         );
 
@@ -1941,10 +2203,16 @@ mod scenarios {
             CpgNodeKind::Return,
             SourceRange::default(),
         ));
-        assert!(DefaultAlgorithmDetector::new().detect(&s.cpg, stray).is_empty());
-        assert!(ControlFlowAnalyzer::new().detect_recursion(&s.cpg, stray).is_none());
+        assert!(DefaultAlgorithmDetector::new()
+            .detect(&s.cpg, stray)
+            .is_empty());
+        assert!(ControlFlowAnalyzer::new()
+            .detect_recursion(&s.cpg, stray)
+            .is_none());
         // A node id that is not in the graph at all is equally inert.
         let absent = NodeId::new(9_999);
-        assert!(ControlFlowAnalyzer::new().detect_recursion(&s.cpg, absent).is_none());
+        assert!(ControlFlowAnalyzer::new()
+            .detect_recursion(&s.cpg, absent)
+            .is_none());
     }
 }

@@ -7,4 +7,4 @@
 
 mod classifier;
 
-pub use classifier::{PatternClassifier, ClassificationMode, FeatureVector};
+pub use classifier::{ClassificationMode, FeatureVector, PatternClassifier};

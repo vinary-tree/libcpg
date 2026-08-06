@@ -6,8 +6,8 @@
 pub mod loops;
 pub mod recursion;
 
-pub use loops::{LoopStructure, LoopType, LoopKind as SigLoopKind, LoopBounds};
-pub use recursion::{RecursionPattern, RecursionKind as SigRecursionKind, ReductionPattern};
+pub use loops::{LoopBounds, LoopKind as SigLoopKind, LoopStructure, LoopType};
+pub use recursion::{RecursionKind as SigRecursionKind, RecursionPattern, ReductionPattern};
 
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
@@ -229,7 +229,10 @@ mod tests {
     #[test]
     fn test_is_better_than_irreflexive_spot() {
         for c in all_named_classes() {
-            assert!(!c.is_better_than(&c), "{c:?} must not be better than itself");
+            assert!(
+                !c.is_better_than(&c),
+                "{c:?} must not be better than itself"
+            );
         }
     }
 
@@ -243,8 +246,14 @@ mod tests {
             (ComplexityClass::Polynomial(3), ComplexityClass::Cubic),
         ];
         for (poly, named) in pairs {
-            assert!(!poly.is_better_than(&named), "{poly:?} vs {named:?} must tie");
-            assert!(!named.is_better_than(&poly), "{named:?} vs {poly:?} must tie");
+            assert!(
+                !poly.is_better_than(&named),
+                "{poly:?} vs {named:?} must tie"
+            );
+            assert!(
+                !named.is_better_than(&poly),
+                "{named:?} vs {poly:?} must tie"
+            );
         }
     }
 
@@ -287,7 +296,10 @@ mod tests {
             .with_space_complexity(space);
 
         assert_eq!(
-            sig.loop_structure.as_ref().expect("loop structure set").max_depth,
+            sig.loop_structure
+                .as_ref()
+                .expect("loop structure set")
+                .max_depth,
             2
         );
         assert_eq!(

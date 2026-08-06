@@ -7,9 +7,7 @@ use rustc_hash::{FxHashMap, FxHashSet};
 use smallvec::SmallVec;
 use std::sync::Arc;
 
-use crate::{
-    CodePropertyGraph, CpgEdgeKind, CpgNodeKind, DfgEdgeKind, NodeId,
-};
+use crate::{CodePropertyGraph, CpgEdgeKind, CpgNodeKind, DfgEdgeKind, NodeId};
 
 /// Configuration for DFG extraction.
 #[derive(Debug, Clone)]
@@ -60,10 +58,7 @@ impl DfgExtractor {
     /// Extracts DFG edges for all functions in the CPG.
     pub fn extract(&self, cpg: &mut CodePropertyGraph) {
         // Find all function nodes
-        let functions: Vec<NodeId> = cpg
-            .functions()
-            .map(|n| n.id)
-            .collect();
+        let functions: Vec<NodeId> = cpg.functions().map(|n| n.id).collect();
 
         for func_id in functions {
             self.extract_function_dfg(cpg, func_id);
@@ -130,9 +125,7 @@ impl DfgExtractor {
         let descendants = cpg.ast_descendants(function);
         let cfg_nodes: Vec<NodeId> = descendants
             .into_iter()
-            .filter(|&id| {
-                cpg.cfg_predecessors(id).len() > 0 || cpg.cfg_successors(id).len() > 0
-            })
+            .filter(|&id| cpg.cfg_predecessors(id).len() > 0 || cpg.cfg_successors(id).len() > 0)
             .collect();
 
         // Initialize reaching definitions sets
@@ -333,11 +326,7 @@ impl DfgExtractor {
             // Match arguments to parameters
             for (i, &param) in params.iter().enumerate() {
                 if let Some(&arg) = call_args.get(i) {
-                    cpg.connect_unique(
-                        arg,
-                        param,
-                        CpgEdgeKind::DataFlow(DfgEdgeKind::Parameter),
-                    );
+                    cpg.connect_unique(arg, param, CpgEdgeKind::DataFlow(DfgEdgeKind::Parameter));
                 }
             }
         }
@@ -412,11 +401,7 @@ impl DfgExtractor {
     }
 
     /// Builds field access edges.
-    fn build_field_access_edges(
-        &self,
-        cpg: &mut CodePropertyGraph,
-        collector: &DefUseCollector,
-    ) {
+    fn build_field_access_edges(&self, cpg: &mut CodePropertyGraph, collector: &DefUseCollector) {
         // Process member access nodes
         for &node_id in &collector.field_accesses {
             let children = cpg.ast_children(node_id);
@@ -424,11 +409,7 @@ impl DfgExtractor {
             // First child is typically the object being accessed
             if let Some(&obj) = children.first() {
                 // Create field read edge from object to member access
-                cpg.connect_unique(
-                    obj,
-                    node_id,
-                    CpgEdgeKind::DataFlow(DfgEdgeKind::FieldRead),
-                );
+                cpg.connect_unique(obj, node_id, CpgEdgeKind::DataFlow(DfgEdgeKind::FieldRead));
             }
         }
 
@@ -489,7 +470,10 @@ fn is_conditional_region(kind: &CpgNodeKind) -> bool {
 /// Returns true for loop kinds, whose bodies are swept twice so a use near the
 /// top of the body can observe a definition made lower in the same body.
 fn is_loop_region(kind: &CpgNodeKind) -> bool {
-    matches!(kind, CpgNodeKind::While | CpgNodeKind::For | CpgNodeKind::Loop)
+    matches!(
+        kind,
+        CpgNodeKind::While | CpgNodeKind::For | CpgNodeKind::Loop
+    )
 }
 
 /// The identifier child of a binding node (`let`/parameter) that *is* the bound
@@ -727,10 +711,7 @@ impl DefUseCollector {
                             .unwrap_or(false);
 
                         if !is_assignment_target {
-                            self.uses
-                                .entry(name.clone())
-                                .or_default()
-                                .push(node_id);
+                            self.uses.entry(name.clone()).or_default().push(node_id);
                         }
                     }
                     // Member access
@@ -843,29 +824,32 @@ impl DefUseChain {
 
     /// Links a definition to a use.
     pub fn link(&mut self, def: NodeId, use_site: NodeId) {
-        self.def_to_uses
-            .entry(def)
-            .or_default()
-            .push(use_site);
-        self.use_to_defs
-            .entry(use_site)
-            .or_default()
-            .push(def);
+        self.def_to_uses.entry(def).or_default().push(use_site);
+        self.use_to_defs.entry(use_site).or_default().push(def);
     }
 
     /// Returns all uses that are reached by the given definition.
     pub fn uses_of(&self, def: NodeId) -> &[NodeId] {
-        self.def_to_uses.get(&def).map(|v| v.as_slice()).unwrap_or(&[])
+        self.def_to_uses
+            .get(&def)
+            .map(|v| v.as_slice())
+            .unwrap_or(&[])
     }
 
     /// Returns all definitions that reach the given use.
     pub fn definitions_of(&self, use_site: NodeId) -> &[NodeId] {
-        self.use_to_defs.get(&use_site).map(|v| v.as_slice()).unwrap_or(&[])
+        self.use_to_defs
+            .get(&use_site)
+            .map(|v| v.as_slice())
+            .unwrap_or(&[])
     }
 }
 
 /// Builds def-use chains for all variables in a function.
-pub fn build_def_use_chains(cpg: &CodePropertyGraph, function: NodeId) -> FxHashMap<Arc<str>, DefUseChain> {
+pub fn build_def_use_chains(
+    cpg: &CodePropertyGraph,
+    function: NodeId,
+) -> FxHashMap<Arc<str>, DefUseChain> {
     let mut chains: FxHashMap<Arc<str>, DefUseChain> = FxHashMap::default();
 
     // Collect all def-use edges
@@ -903,7 +887,9 @@ pub fn build_def_use_chains(cpg: &CodePropertyGraph, function: NodeId) -> FxHash
             });
 
             if let Some(name) = var_name {
-                let chain = chains.entry(name.clone()).or_insert_with(|| DefUseChain::new(name));
+                let chain = chains
+                    .entry(name.clone())
+                    .or_insert_with(|| DefUseChain::new(name));
                 chain.add_definition(def_id);
                 chain.add_use(use_id);
                 chain.link(def_id, use_id);
@@ -917,7 +903,7 @@ pub fn build_def_use_chains(cpg: &CodePropertyGraph, function: NodeId) -> FxHash
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{CpgNode, SourceRange, Language, ScopeId, MethodSignature, Visibility};
+    use crate::{CpgNode, Language, MethodSignature, ScopeId, SourceRange, Visibility};
 
     fn create_test_function(cpg: &mut CodePropertyGraph) -> NodeId {
         let func = cpg.add_node(CpgNode::new(
@@ -937,7 +923,9 @@ mod tests {
 
         let body = cpg.add_node(CpgNode::new(
             NodeId::new(0),
-            CpgNodeKind::Block { scope: ScopeId::GLOBAL },
+            CpgNodeKind::Block {
+                scope: ScopeId::GLOBAL,
+            },
             SourceRange::default(),
         ));
 
@@ -954,27 +942,33 @@ mod tests {
         let body = cpg.ast_children(func)[0];
 
         // Add variable declaration
-        let var = cpg.add_node(CpgNode::new(
-            NodeId::new(0),
-            CpgNodeKind::Variable {
-                name: "x".into(),
-                var_type: None,
-                scope: ScopeId::GLOBAL,
-                is_mutable: true,
-            },
-            SourceRange::default(),
-        ).with_parent(body));
+        let var = cpg.add_node(
+            CpgNode::new(
+                NodeId::new(0),
+                CpgNodeKind::Variable {
+                    name: "x".into(),
+                    var_type: None,
+                    scope: ScopeId::GLOBAL,
+                    is_mutable: true,
+                },
+                SourceRange::default(),
+            )
+            .with_parent(body),
+        );
         cpg.connect_unique(body, var, CpgEdgeKind::AstChild);
 
         // Add identifier reference (use)
-        let ident = cpg.add_node(CpgNode::new(
-            NodeId::new(0),
-            CpgNodeKind::Identifier {
-                name: "x".into(),
-                definition: Some(var),
-            },
-            SourceRange::default(),
-        ).with_parent(body));
+        let ident = cpg.add_node(
+            CpgNode::new(
+                NodeId::new(0),
+                CpgNodeKind::Identifier {
+                    name: "x".into(),
+                    definition: Some(var),
+                },
+                SourceRange::default(),
+            )
+            .with_parent(body),
+        );
         cpg.connect_unique(body, ident, CpgEdgeKind::AstChild);
 
         let extractor = DfgExtractor::new();
@@ -991,27 +985,33 @@ mod tests {
         let body = cpg.ast_children(func)[0];
 
         // Add variable declaration
-        let var = cpg.add_node(CpgNode::new(
-            NodeId::new(0),
-            CpgNodeKind::Variable {
-                name: "x".into(),
-                var_type: None,
-                scope: ScopeId::GLOBAL,
-                is_mutable: true,
-            },
-            SourceRange::default(),
-        ).with_parent(body));
+        let var = cpg.add_node(
+            CpgNode::new(
+                NodeId::new(0),
+                CpgNodeKind::Variable {
+                    name: "x".into(),
+                    var_type: None,
+                    scope: ScopeId::GLOBAL,
+                    is_mutable: true,
+                },
+                SourceRange::default(),
+            )
+            .with_parent(body),
+        );
         cpg.connect_unique(body, var, CpgEdgeKind::AstChild);
 
         // Add identifier reference
-        let ident = cpg.add_node(CpgNode::new(
-            NodeId::new(0),
-            CpgNodeKind::Identifier {
-                name: "x".into(),
-                definition: Some(var),
-            },
-            SourceRange::default(),
-        ).with_parent(body));
+        let ident = cpg.add_node(
+            CpgNode::new(
+                NodeId::new(0),
+                CpgNodeKind::Identifier {
+                    name: "x".into(),
+                    definition: Some(var),
+                },
+                SourceRange::default(),
+            )
+            .with_parent(body),
+        );
         cpg.connect_unique(body, ident, CpgEdgeKind::AstChild);
 
         let mut collector = DefUseCollector::new(func);
@@ -1056,10 +1056,7 @@ mod tests {
 
     /// All node ids whose kind satisfies `pred`, sorted by id for determinism.
     #[cfg(feature = "lang-rust")]
-    fn nodes_where(
-        cpg: &CodePropertyGraph,
-        pred: impl Fn(&CpgNodeKind) -> bool,
-    ) -> Vec<NodeId> {
+    fn nodes_where(cpg: &CodePropertyGraph, pred: impl Fn(&CpgNodeKind) -> bool) -> Vec<NodeId> {
         let mut ids: Vec<NodeId> = cpg
             .node_ids()
             .filter(|&id| cpg.node(id).map(|n| pred(&n.kind)).unwrap_or(false))
@@ -1071,9 +1068,10 @@ mod tests {
     /// The (unique) `Variable` definition node named `name`.
     #[cfg(feature = "lang-rust")]
     fn var_named(cpg: &CodePropertyGraph, name: &str) -> NodeId {
-        let v = nodes_where(cpg, |k| {
-            matches!(k, CpgNodeKind::Variable { name: n, .. } if &**n == name)
-        });
+        let v = nodes_where(
+            cpg,
+            |k| matches!(k, CpgNodeKind::Variable { name: n, .. } if &**n == name),
+        );
         assert_eq!(v.len(), 1, "expected exactly one `let {name}`");
         v[0]
     }
@@ -1082,9 +1080,10 @@ mod tests {
     /// received a reaching definition (i.e. it is not the binder of `name`).
     #[cfg(feature = "lang-rust")]
     fn ident_use(cpg: &CodePropertyGraph, name: &str) -> NodeId {
-        nodes_where(cpg, |k| {
-            matches!(k, CpgNodeKind::Identifier { name: n, .. } if &**n == name)
-        })
+        nodes_where(
+            cpg,
+            |k| matches!(k, CpgNodeKind::Identifier { name: n, .. } if &**n == name),
+        )
         .into_iter()
         .find(|&id| !cpg.reaching_definitions(id).is_empty())
         .unwrap_or_else(|| panic!("no reaching-def use of `{name}` (bug: DFG empty?)"))
@@ -1097,9 +1096,8 @@ mod tests {
     #[test]
     #[cfg(feature = "lang-rust")]
     fn parsed_nested_use_resolves_and_chains() {
-        let cpg = build_rust(
-            "fn foo(fd: i32) { let buf = read(fd); let out = decode(buf); sink(out); }",
-        );
+        let cpg =
+            build_rust("fn foo(fd: i32) { let buf = read(fd); let out = decode(buf); sink(out); }");
 
         // The whole point: a normally-parsed function now has DFG edges.
         // (fd -> use in read, buf -> use in decode, out -> use in sink.)
@@ -1121,7 +1119,9 @@ mod tests {
         );
         // dfg_successors(let buf) reaches the `buf` use.
         assert!(
-            cpg.dfg_successors(buf_def).iter().any(|(t, _)| *t == buf_use),
+            cpg.dfg_successors(buf_def)
+                .iter()
+                .any(|(t, _)| *t == buf_use),
             "dfg_successors(let buf) must reach the `buf` use"
         );
 
@@ -1136,7 +1136,9 @@ mod tests {
             "reaching defs of the sink argument `out` must include `let out`"
         );
         assert!(
-            cpg.dfg_successors(out_def).iter().any(|(t, _)| *t == out_use),
+            cpg.dfg_successors(out_def)
+                .iter()
+                .any(|(t, _)| *t == out_use),
             "dfg_successors(let out) must reach the `out` use"
         );
     }
@@ -1211,18 +1213,20 @@ mod tests {
 
         // The `n` in `n + 1` is the shadowing initializer use: it must resolve
         // to the parameter (the pre-binding definition), not to the `let n`.
-        let init_use = nodes_where(&cpg, |k| {
-            matches!(k, CpgNodeKind::Identifier { name, .. } if &**name == "n")
-        })
+        let init_use = nodes_where(
+            &cpg,
+            |k| matches!(k, CpgNodeKind::Identifier { name, .. } if &**name == "n"),
+        )
         .into_iter()
         .find(|&id| cpg.reaching_definitions(id).contains(&param_n))
         .expect("initializer use of `n` bound to the parameter");
         assert!(!cpg.reaching_definitions(init_use).contains(&let_n));
 
         // `consume(n)` sees the shadowing `let n`.
-        let consume_use = nodes_where(&cpg, |k| {
-            matches!(k, CpgNodeKind::Identifier { name, .. } if &**name == "n")
-        })
+        let consume_use = nodes_where(
+            &cpg,
+            |k| matches!(k, CpgNodeKind::Identifier { name, .. } if &**name == "n"),
+        )
         .into_iter()
         .find(|&id| cpg.reaching_definitions(id).contains(&let_n))
         .expect("consume use of `n` bound to the shadowing let");
@@ -1269,7 +1273,10 @@ mod tests {
     }
 
     fn dfg_ident(name: &str) -> CpgNodeKind {
-        CpgNodeKind::Identifier { name: name.into(), definition: None }
+        CpgNodeKind::Identifier {
+            name: name.into(),
+            definition: None,
+        }
     }
 
     /// `DfgExtractorConfig` field defaults and `DfgExtractor::with_config`.
@@ -1342,15 +1349,32 @@ mod tests {
             DefinitionKind::FieldWrite,
             DefinitionKind::IndexWrite,
         ] {
-            let def = Definition { variable: Arc::from("v"), node: NodeId::new(0), kind: k };
+            let def = Definition {
+                variable: Arc::from("v"),
+                node: NodeId::new(0),
+                kind: k,
+            };
             assert_eq!(def.kind, k);
         }
 
-        let u = Use { variable: Arc::from("y"), node: NodeId::new(2), kind: UseKind::Read };
+        let u = Use {
+            variable: Arc::from("y"),
+            node: NodeId::new(2),
+            kind: UseKind::Read,
+        };
         assert_eq!(u.kind, UseKind::Read);
         assert_eq!(u.clone(), u);
-        for k in [UseKind::Read, UseKind::FieldRead, UseKind::IndexRead, UseKind::Argument] {
-            let us = Use { variable: Arc::from("v"), node: NodeId::new(0), kind: k };
+        for k in [
+            UseKind::Read,
+            UseKind::FieldRead,
+            UseKind::IndexRead,
+            UseKind::Argument,
+        ] {
+            let us = Use {
+                variable: Arc::from("v"),
+                node: NodeId::new(0),
+                kind: k,
+            };
             assert_eq!(us.kind, k);
         }
     }
@@ -1361,7 +1385,13 @@ mod tests {
     fn build_def_use_chains_links_def_to_use() {
         let mut cpg = CodePropertyGraph::new(Language::Rust);
         let func = mk_function(&mut cpg, "f");
-        let body = dfg_child(&mut cpg, func, CpgNodeKind::Block { scope: ScopeId::GLOBAL });
+        let body = dfg_child(
+            &mut cpg,
+            func,
+            CpgNodeKind::Block {
+                scope: ScopeId::GLOBAL,
+            },
+        );
         let var = dfg_child(
             &mut cpg,
             body,
@@ -1394,11 +1424,28 @@ mod tests {
         let param = dfg_child(
             &mut cpg,
             func,
-            CpgNodeKind::Parameter { name: "x".into(), param_type: None, is_variadic: false },
+            CpgNodeKind::Parameter {
+                name: "x".into(),
+                param_type: None,
+                is_variadic: false,
+            },
         );
-        let body = dfg_child(&mut cpg, func, CpgNodeKind::Block { scope: ScopeId::GLOBAL });
+        let body = dfg_child(
+            &mut cpg,
+            func,
+            CpgNodeKind::Block {
+                scope: ScopeId::GLOBAL,
+            },
+        );
         // g(x)
-        let call = dfg_child(&mut cpg, body, CpgNodeKind::Call { target: None, is_method: false });
+        let call = dfg_child(
+            &mut cpg,
+            body,
+            CpgNodeKind::Call {
+                target: None,
+                is_method: false,
+            },
+        );
         let _callee = dfg_child(&mut cpg, call, dfg_ident("g"));
         let _call_arg = dfg_child(&mut cpg, call, dfg_ident("x"));
         // return x
@@ -1406,12 +1453,14 @@ mod tests {
         let _ret_val = dfg_child(&mut cpg, ret, dfg_ident("x"));
         // A caller call-site so `callers(func)` is non-empty (drives the
         // parameter and return-value auxiliary edge builders).
-        let caller =
-            cpg.add_node(CpgNode::new(
-                NodeId::new(0),
-                CpgNodeKind::Call { target: None, is_method: false },
-                SourceRange::default(),
-            ));
+        let caller = cpg.add_node(CpgNode::new(
+            NodeId::new(0),
+            CpgNodeKind::Call {
+                target: None,
+                is_method: false,
+            },
+            SourceRange::default(),
+        ));
         let _caller_arg = dfg_child(&mut cpg, caller, dfg_ident("arg0"));
         cpg.connect(caller, func, CpgEdgeKind::CallSite);
 
@@ -1439,9 +1488,10 @@ mod tests {
         let cpg = build_rust("fn f() { let a = 1; let a = 2; g(a); }");
 
         // Both `let a` bindings, sorted by id ⇒ source order (earliest first).
-        let a_defs = nodes_where(&cpg, |k| {
-            matches!(k, CpgNodeKind::Variable { name, .. } if &**name == "a")
-        });
+        let a_defs = nodes_where(
+            &cpg,
+            |k| matches!(k, CpgNodeKind::Variable { name, .. } if &**name == "a"),
+        );
         assert_eq!(a_defs.len(), 2, "two `let a` bindings");
         let earliest = a_defs[0]; // let a = 1
         let latest = a_defs[1]; // let a = 2
@@ -1449,9 +1499,19 @@ mod tests {
         // The `a` inside `g(a)` (the only reaching-def use of `a`).
         let a_use = ident_use(&cpg, "a");
         let reaching = cpg.reaching_definitions(a_use);
-        assert!(reaching.contains(&latest), "use must see the latest `let a = 2`");
-        assert!(!reaching.contains(&earliest), "use must NOT see the killed `let a = 1`");
-        assert_eq!(reaching.len(), 1, "straight-line code ⇒ exactly one reaching def");
+        assert!(
+            reaching.contains(&latest),
+            "use must see the latest `let a = 2`"
+        );
+        assert!(
+            !reaching.contains(&earliest),
+            "use must NOT see the killed `let a = 1`"
+        );
+        assert_eq!(
+            reaching.len(),
+            1,
+            "straight-line code ⇒ exactly one reaching def"
+        );
     }
 }
 
@@ -1487,20 +1547,67 @@ mod config_flags {
         wf_child(
             &mut cpg,
             func,
-            CpgNodeKind::Parameter { name: "p".into(), param_type: None, is_variadic: false },
+            CpgNodeKind::Parameter {
+                name: "p".into(),
+                param_type: None,
+                is_variadic: false,
+            },
         );
-        let body = wf_child(&mut cpg, func, CpgNodeKind::Block { scope: ScopeId::GLOBAL });
+        let body = wf_child(
+            &mut cpg,
+            func,
+            CpgNodeKind::Block {
+                scope: ScopeId::GLOBAL,
+            },
+        );
         let call = wf_child(
             &mut cpg,
             body,
-            CpgNodeKind::Call { target: None, is_method: false },
+            CpgNodeKind::Call {
+                target: None,
+                is_method: false,
+            },
         );
-        wf_child(&mut cpg, call, CpgNodeKind::Identifier { name: "g".into(), definition: None });
-        wf_child(&mut cpg, call, CpgNodeKind::Identifier { name: "p".into(), definition: None });
-        let field = wf_child(&mut cpg, body, CpgNodeKind::MemberAccess { member: "fld".into() });
-        wf_child(&mut cpg, field, CpgNodeKind::Identifier { name: "p".into(), definition: None });
+        wf_child(
+            &mut cpg,
+            call,
+            CpgNodeKind::Identifier {
+                name: "g".into(),
+                definition: None,
+            },
+        );
+        wf_child(
+            &mut cpg,
+            call,
+            CpgNodeKind::Identifier {
+                name: "p".into(),
+                definition: None,
+            },
+        );
+        let field = wf_child(
+            &mut cpg,
+            body,
+            CpgNodeKind::MemberAccess {
+                member: "fld".into(),
+            },
+        );
+        wf_child(
+            &mut cpg,
+            field,
+            CpgNodeKind::Identifier {
+                name: "p".into(),
+                definition: None,
+            },
+        );
         let ret = wf_child(&mut cpg, body, CpgNodeKind::Return);
-        wf_child(&mut cpg, ret, CpgNodeKind::Identifier { name: "p".into(), definition: None });
+        wf_child(
+            &mut cpg,
+            ret,
+            CpgNodeKind::Identifier {
+                name: "p".into(),
+                definition: None,
+            },
+        );
         (cpg, func)
     }
 
@@ -1611,7 +1718,9 @@ mod cyclic_ast_regression {
         let body = crate::testutil::wf_child(
             &mut cpg,
             func,
-            CpgNodeKind::Block { scope: ScopeId::GLOBAL },
+            CpgNodeKind::Block {
+                scope: ScopeId::GLOBAL,
+            },
         );
         let var = crate::testutil::wf_child(
             &mut cpg,
@@ -1626,7 +1735,10 @@ mod cyclic_ast_regression {
         crate::testutil::wf_child(
             &mut cpg,
             body,
-            CpgNodeKind::Identifier { name: "x".into(), definition: None },
+            CpgNodeKind::Identifier {
+                name: "x".into(),
+                definition: None,
+            },
         );
         // Close a cycle: the variable claims the body as its own child.
         cpg.connect(var, body, CpgEdgeKind::AstChild);

@@ -6,8 +6,8 @@
 //!
 //! The classifier can operate in hybrid mode, combining both approaches.
 
-use crate::{CodePropertyGraph, CpgNodeKind, CpgEdgeKind, NodeId};
 use crate::pattern::PatternMatch;
+use crate::{CodePropertyGraph, CpgEdgeKind, CpgNodeKind, NodeId};
 use rustc_hash::{FxHashMap, FxHashSet};
 
 /// Classification mode.
@@ -62,11 +62,19 @@ impl FeatureVector {
             self.inheritance_depth as f64,
             self.interface_count as f64,
             self.static_method_count as f64,
-            if self.has_private_constructor { 1.0 } else { 0.0 },
+            if self.has_private_constructor {
+                1.0
+            } else {
+                0.0
+            },
             self.factory_method_count as f64,
             self.observer_method_count as f64,
             self.interface_field_count as f64,
-            if self.is_decorator_candidate { 1.0 } else { 0.0 },
+            if self.is_decorator_candidate {
+                1.0
+            } else {
+                0.0
+            },
             // Computed features
             (self.static_method_count as f64 / self.method_count.max(1) as f64),
         ]
@@ -119,7 +127,12 @@ impl PatternClassifier {
         // Find all class/struct nodes
         let class_nodes: Vec<NodeId> = cpg
             .nodes()
-            .filter(|n| matches!(n.kind, CpgNodeKind::Class { .. } | CpgNodeKind::Struct { .. }))
+            .filter(|n| {
+                matches!(
+                    n.kind,
+                    CpgNodeKind::Class { .. } | CpgNodeKind::Struct { .. }
+                )
+            })
             .map(|n| n.id)
             .collect();
 
@@ -239,7 +252,11 @@ impl PatternClassifier {
         // Check fields for interface references (for decorator detection)
         for &field_id in &fields {
             if let Some(node) = cpg.node(field_id) {
-                if let CpgNodeKind::Field { field_type: Some(type_info), .. } = &node.kind {
+                if let CpgNodeKind::Field {
+                    field_type: Some(type_info),
+                    ..
+                } = &node.kind
+                {
                     // Check if field type is an implemented interface
                     let type_name = type_info.name.to_string();
                     if implemented_traits.contains(&type_name) {
@@ -337,7 +354,9 @@ impl PatternClassifier {
                             evidence.push(format!("Static method: {}", signature.name));
                         }
                     }
-                    CpgNodeKind::Field { name, field_type, .. } => {
+                    CpgNodeKind::Field {
+                        name, field_type, ..
+                    } => {
                         let name_lower = name.to_lowercase();
                         if name_lower.contains("instance")
                             || name_lower.contains("singleton")
@@ -538,7 +557,7 @@ impl PatternClassifier {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{CpgNode, Language, SourceRange, MethodSignature, Visibility};
+    use crate::{CpgNode, Language, MethodSignature, SourceRange, Visibility};
     use std::sync::Arc;
 
     fn create_class(cpg: &mut CodePropertyGraph, name: &str) -> NodeId {
@@ -640,9 +659,27 @@ mod tests {
         let mut cpg = CodePropertyGraph::new(Language::Rust);
         let class_id = create_class(&mut cpg, "ProductFactory");
 
-        add_method(&mut cpg, class_id, "create_product_a", false, Visibility::Public);
-        add_method(&mut cpg, class_id, "create_product_b", false, Visibility::Public);
-        add_method(&mut cpg, class_id, "make_product_c", false, Visibility::Public);
+        add_method(
+            &mut cpg,
+            class_id,
+            "create_product_a",
+            false,
+            Visibility::Public,
+        );
+        add_method(
+            &mut cpg,
+            class_id,
+            "create_product_b",
+            false,
+            Visibility::Public,
+        );
+        add_method(
+            &mut cpg,
+            class_id,
+            "make_product_c",
+            false,
+            Visibility::Public,
+        );
 
         let classifier = PatternClassifier::new().with_min_confidence(0.5);
         let matches = classifier.classify(&cpg);
@@ -658,9 +695,21 @@ mod tests {
         let mut cpg = CodePropertyGraph::new(Language::Rust);
         let class_id = create_class(&mut cpg, "EventEmitter");
 
-        add_method(&mut cpg, class_id, "register_listener", false, Visibility::Public);
+        add_method(
+            &mut cpg,
+            class_id,
+            "register_listener",
+            false,
+            Visibility::Public,
+        );
         add_method(&mut cpg, class_id, "notify_all", false, Visibility::Public);
-        add_method(&mut cpg, class_id, "update_state", false, Visibility::Public);
+        add_method(
+            &mut cpg,
+            class_id,
+            "update_state",
+            false,
+            Visibility::Public,
+        );
 
         let classifier = PatternClassifier::new().with_min_confidence(0.5);
         let matches = classifier.classify(&cpg);
@@ -702,7 +751,9 @@ mod tests {
     fn add_trait(cpg: &mut CodePropertyGraph, name: &str) -> NodeId {
         cpg.add_node(CpgNode::new(
             NodeId::new(0),
-            CpgNodeKind::Trait { name: Arc::from(name) },
+            CpgNodeKind::Trait {
+                name: Arc::from(name),
+            },
             SourceRange::default(),
         ))
     }
@@ -776,7 +827,9 @@ mod tests {
             interface_count: 1,
             ..FeatureVector::default()
         };
-        assert!(classifier.detect_strategy(&cpg, class_id, &quiet, "Context").is_none());
+        assert!(classifier
+            .detect_strategy(&cpg, class_id, &quiet, "Context")
+            .is_none());
     }
 
     /// Hybrid mode agrees with rule-based and never lowers the confidence below
@@ -808,7 +861,13 @@ mod tests {
         let mut cpg = CodePropertyGraph::new(Language::Rust);
         let factory = create_class(&mut cpg, "SimpleFactory");
         // A single create method -> Factory score 0.6.
-        add_method(&mut cpg, factory, "create_widget", false, Visibility::Public);
+        add_method(
+            &mut cpg,
+            factory,
+            "create_widget",
+            false,
+            Visibility::Public,
+        );
 
         let strict = PatternClassifier::new().with_min_confidence(0.7);
         assert!(
@@ -861,13 +920,16 @@ mod tests {
 mod vocabulary {
     use super::*;
     use crate::{CpgNode, Language, MethodSignature, SourceRange, TypeInfo, Visibility};
-    use std::sync::Arc;
     use smallvec::smallvec;
+    use std::sync::Arc;
 
     fn class(cpg: &mut CodePropertyGraph, name: &str) -> NodeId {
         cpg.add_node(CpgNode::new(
             NodeId::new(0),
-            CpgNodeKind::Class { name: Arc::from(name), is_abstract: false },
+            CpgNodeKind::Class {
+                name: Arc::from(name),
+                is_abstract: false,
+            },
             SourceRange::default(),
         ))
     }
@@ -939,7 +1001,16 @@ mod vocabulary {
     /// Every factory-method spelling increments the factory count.
     #[test]
     fn every_factory_method_name_is_recognized() {
-        for name in ["create", "create_widget", "make", "make_it", "build", "builder", "new_with", "new"] {
+        for name in [
+            "create",
+            "create_widget",
+            "make",
+            "make_it",
+            "build",
+            "builder",
+            "new_with",
+            "new",
+        ] {
             let f = features_of(&[(name, false, Visibility::Public)]);
             assert_eq!(f.factory_method_count, 1, "`{name}` is a factory method");
         }
@@ -947,7 +1018,10 @@ mod vocabulary {
         // *contains* "new" but does not start with it and is not exactly "new".
         for name in ["run", "renew", "newton"] {
             let f = features_of(&[(name, false, Visibility::Public)]);
-            assert_eq!(f.factory_method_count, 0, "`{name}` is not a factory method");
+            assert_eq!(
+                f.factory_method_count, 0,
+                "`{name}` is not a factory method"
+            );
         }
     }
 
@@ -955,15 +1029,26 @@ mod vocabulary {
     #[test]
     fn every_observer_method_name_is_recognized() {
         for name in [
-            "register", "register_all", "subscribe", "subscribe_to", "notify", "notify_all",
-            "update", "update_state", "add_observer", "remove_observer",
+            "register",
+            "register_all",
+            "subscribe",
+            "subscribe_to",
+            "notify",
+            "notify_all",
+            "update",
+            "update_state",
+            "add_observer",
+            "remove_observer",
         ] {
             let f = features_of(&[(name, false, Visibility::Public)]);
             assert_eq!(f.observer_method_count, 1, "`{name}` is an observer method");
         }
         for name in ["run", "observe"] {
             let f = features_of(&[(name, false, Visibility::Public)]);
-            assert_eq!(f.observer_method_count, 0, "`{name}` is not an observer method");
+            assert_eq!(
+                f.observer_method_count, 0,
+                "`{name}` is not an observer method"
+            );
         }
     }
 
@@ -978,7 +1063,10 @@ mod vocabulary {
             assert!(!public.has_private_constructor, "public `{name}`");
         }
         let other = features_of(&[("run", false, Visibility::Private)]);
-        assert!(!other.has_private_constructor, "private `run` is not a constructor");
+        assert!(
+            !other.has_private_constructor,
+            "private `run` is not a constructor"
+        );
     }
 
     /// Every singleton accessor spelling scores, as does every instance-field
@@ -997,7 +1085,13 @@ mod vocabulary {
         };
 
         // Accessor spellings.
-        for accessor in ["instance", "get_instance", "singleton", "the_singleton", "get"] {
+        for accessor in [
+            "instance",
+            "get_instance",
+            "singleton",
+            "the_singleton",
+            "get",
+        ] {
             assert!(
                 detect(accessor, "instance", Some("Registry")).is_some(),
                 "`{accessor}` is a singleton accessor"
@@ -1037,7 +1131,10 @@ mod vocabulary {
         // Two or more factory methods: score grows with the count.
         let two = detect(&["create_a", "create_b"]).expect("two factory methods");
         let three = detect(&["create_a", "create_b", "make_c"]).expect("three factory methods");
-        assert!(three.confidence > two.confidence, "more evidence ⇒ more confidence");
+        assert!(
+            three.confidence > two.confidence,
+            "more evidence ⇒ more confidence"
+        );
         assert!(two.confidence >= 0.5);
         assert!(three.confidence <= 1.0);
 

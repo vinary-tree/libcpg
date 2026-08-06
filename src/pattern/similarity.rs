@@ -5,8 +5,8 @@
 
 use rustc_hash::{FxHashMap, FxHashSet};
 
-use crate::{CodePropertyGraph, NodeId};
 use super::NodeKindTag;
+use crate::{CodePropertyGraph, NodeId};
 
 /// Graph similarity calculator.
 #[derive(Debug, Clone, Default)]
@@ -226,9 +226,21 @@ fn graph_feature_vector(graph: &CodePropertyGraph) -> Vec<f64> {
     vec![
         (node_count / 1000.0).min(1.0),
         (edge_count / 2000.0).min(1.0),
-        if edge_count > 0.0 { ast_edges / edge_count } else { 0.0 },
-        if edge_count > 0.0 { cfg_edges / edge_count } else { 0.0 },
-        if edge_count > 0.0 { dfg_edges / edge_count } else { 0.0 },
+        if edge_count > 0.0 {
+            ast_edges / edge_count
+        } else {
+            0.0
+        },
+        if edge_count > 0.0 {
+            cfg_edges / edge_count
+        } else {
+            0.0
+        },
+        if edge_count > 0.0 {
+            dfg_edges / edge_count
+        } else {
+            0.0
+        },
         (func_count / 100.0).min(1.0),
         (class_count / 50.0).min(1.0),
         (depth / 50.0).min(1.0),
@@ -299,38 +311,78 @@ fn wl_labels(graph: &CodePropertyGraph, iterations: usize) -> FxHashMap<u64, usi
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{CpgNode, CpgNodeKind, SourceRange, Language, CpgEdgeKind};
+    use crate::{CpgEdgeKind, CpgNode, CpgNodeKind, Language, SourceRange};
 
     #[test]
     fn test_identical_graphs() {
         let mut g1 = CodePropertyGraph::new(Language::Rust);
-        g1.add_node(CpgNode::new(NodeId::new(0), CpgNodeKind::Root, SourceRange::default()));
-        g1.add_node(CpgNode::new(NodeId::new(0), CpgNodeKind::If, SourceRange::default()));
+        g1.add_node(CpgNode::new(
+            NodeId::new(0),
+            CpgNodeKind::Root,
+            SourceRange::default(),
+        ));
+        g1.add_node(CpgNode::new(
+            NodeId::new(0),
+            CpgNodeKind::If,
+            SourceRange::default(),
+        ));
 
         let mut g2 = CodePropertyGraph::new(Language::Rust);
-        g2.add_node(CpgNode::new(NodeId::new(0), CpgNodeKind::Root, SourceRange::default()));
-        g2.add_node(CpgNode::new(NodeId::new(0), CpgNodeKind::If, SourceRange::default()));
+        g2.add_node(CpgNode::new(
+            NodeId::new(0),
+            CpgNodeKind::Root,
+            SourceRange::default(),
+        ));
+        g2.add_node(CpgNode::new(
+            NodeId::new(0),
+            CpgNodeKind::If,
+            SourceRange::default(),
+        ));
 
         let similarity = GraphSimilarity::new();
         let score = similarity.similarity(&g1, &g2);
 
-        assert!(score > 0.9, "Identical graphs should have high similarity: {}", score);
+        assert!(
+            score > 0.9,
+            "Identical graphs should have high similarity: {}",
+            score
+        );
     }
 
     #[test]
     fn test_different_graphs() {
         let mut g1 = CodePropertyGraph::new(Language::Rust);
-        g1.add_node(CpgNode::new(NodeId::new(0), CpgNodeKind::Root, SourceRange::default()));
+        g1.add_node(CpgNode::new(
+            NodeId::new(0),
+            CpgNodeKind::Root,
+            SourceRange::default(),
+        ));
 
         let mut g2 = CodePropertyGraph::new(Language::Rust);
-        g2.add_node(CpgNode::new(NodeId::new(0), CpgNodeKind::If, SourceRange::default()));
-        g2.add_node(CpgNode::new(NodeId::new(0), CpgNodeKind::While, SourceRange::default()));
-        g2.add_node(CpgNode::new(NodeId::new(0), CpgNodeKind::For, SourceRange::default()));
+        g2.add_node(CpgNode::new(
+            NodeId::new(0),
+            CpgNodeKind::If,
+            SourceRange::default(),
+        ));
+        g2.add_node(CpgNode::new(
+            NodeId::new(0),
+            CpgNodeKind::While,
+            SourceRange::default(),
+        ));
+        g2.add_node(CpgNode::new(
+            NodeId::new(0),
+            CpgNodeKind::For,
+            SourceRange::default(),
+        ));
 
         let similarity = GraphSimilarity::new();
         let score = similarity.similarity(&g1, &g2);
 
-        assert!(score < 0.5, "Different graphs should have low similarity: {}", score);
+        assert!(
+            score < 0.5,
+            "Different graphs should have low similarity: {}",
+            score
+        );
     }
 
     #[test]
@@ -348,23 +400,53 @@ mod tests {
     fn test_different_metrics() {
         // Create two similar graphs with same node kinds
         let mut g1 = CodePropertyGraph::new(Language::Rust);
-        let n1 = g1.add_node(CpgNode::new(NodeId::new(0), CpgNodeKind::Root, SourceRange::default()));
-        let n2 = g1.add_node(CpgNode::new(NodeId::new(0), CpgNodeKind::If, SourceRange::default()));
-        let n3 = g1.add_node(CpgNode::new(NodeId::new(0), CpgNodeKind::While, SourceRange::default()));
+        let n1 = g1.add_node(CpgNode::new(
+            NodeId::new(0),
+            CpgNodeKind::Root,
+            SourceRange::default(),
+        ));
+        let n2 = g1.add_node(CpgNode::new(
+            NodeId::new(0),
+            CpgNodeKind::If,
+            SourceRange::default(),
+        ));
+        let n3 = g1.add_node(CpgNode::new(
+            NodeId::new(0),
+            CpgNodeKind::While,
+            SourceRange::default(),
+        ));
         g1.connect(n1, n2, CpgEdgeKind::AstChild);
         g1.connect(n1, n3, CpgEdgeKind::AstChild);
 
         let mut g2 = CodePropertyGraph::new(Language::Rust);
-        let n4 = g2.add_node(CpgNode::new(NodeId::new(0), CpgNodeKind::Root, SourceRange::default()));
-        let n5 = g2.add_node(CpgNode::new(NodeId::new(0), CpgNodeKind::If, SourceRange::default()));
-        let n6 = g2.add_node(CpgNode::new(NodeId::new(0), CpgNodeKind::While, SourceRange::default()));
+        let n4 = g2.add_node(CpgNode::new(
+            NodeId::new(0),
+            CpgNodeKind::Root,
+            SourceRange::default(),
+        ));
+        let n5 = g2.add_node(CpgNode::new(
+            NodeId::new(0),
+            CpgNodeKind::If,
+            SourceRange::default(),
+        ));
+        let n6 = g2.add_node(CpgNode::new(
+            NodeId::new(0),
+            CpgNodeKind::While,
+            SourceRange::default(),
+        ));
         g2.connect(n4, n5, CpgEdgeKind::AstChild);
         g2.connect(n4, n6, CpgEdgeKind::AstChild);
 
         // Test different metrics on similar graphs
-        let jaccard = GraphSimilarity::new().with_metric(SimilarityMetric::Jaccard).similarity(&g1, &g2);
-        let cosine = GraphSimilarity::new().with_metric(SimilarityMetric::Cosine).similarity(&g1, &g2);
-        let wl = GraphSimilarity::new().with_metric(SimilarityMetric::WeisfeilerLehman).similarity(&g1, &g2);
+        let jaccard = GraphSimilarity::new()
+            .with_metric(SimilarityMetric::Jaccard)
+            .similarity(&g1, &g2);
+        let cosine = GraphSimilarity::new()
+            .with_metric(SimilarityMetric::Cosine)
+            .similarity(&g1, &g2);
+        let wl = GraphSimilarity::new()
+            .with_metric(SimilarityMetric::WeisfeilerLehman)
+            .similarity(&g1, &g2);
 
         // Similar graphs should have high similarity across all metrics
         assert!(jaccard > 0.9, "Jaccard: {}", jaccard);
@@ -378,13 +460,24 @@ mod tests {
     #[test]
     fn test_graph_edit_identical_is_one() {
         let mut g = CodePropertyGraph::new(Language::Rust);
-        let a = g.add_node(CpgNode::new(NodeId::new(0), CpgNodeKind::Root, SourceRange::default()));
-        let b = g.add_node(CpgNode::new(NodeId::new(0), CpgNodeKind::If, SourceRange::default()));
+        let a = g.add_node(CpgNode::new(
+            NodeId::new(0),
+            CpgNodeKind::Root,
+            SourceRange::default(),
+        ));
+        let b = g.add_node(CpgNode::new(
+            NodeId::new(0),
+            CpgNodeKind::If,
+            SourceRange::default(),
+        ));
         g.connect(a, b, CpgEdgeKind::AstChild);
 
         let ge = GraphSimilarity::new().with_metric(SimilarityMetric::GraphEdit);
         let s = ge.similarity(&g, &g.clone());
-        assert!((s - 1.0).abs() < 1e-9, "GraphEdit of identical graphs should be 1.0, got {s}");
+        assert!(
+            (s - 1.0).abs() < 1e-9,
+            "GraphEdit of identical graphs should be 1.0, got {s}"
+        );
     }
 
     /// `with_structural_weight` / `with_label_weight` genuinely reshape the
@@ -394,15 +487,35 @@ mod tests {
     fn test_graph_edit_weights_affect_score() {
         // g1: 2 nodes, 1 edge.
         let mut g1 = CodePropertyGraph::new(Language::Rust);
-        let a = g1.add_node(CpgNode::new(NodeId::new(0), CpgNodeKind::Root, SourceRange::default()));
-        let b = g1.add_node(CpgNode::new(NodeId::new(0), CpgNodeKind::If, SourceRange::default()));
+        let a = g1.add_node(CpgNode::new(
+            NodeId::new(0),
+            CpgNodeKind::Root,
+            SourceRange::default(),
+        ));
+        let b = g1.add_node(CpgNode::new(
+            NodeId::new(0),
+            CpgNodeKind::If,
+            SourceRange::default(),
+        ));
         g1.connect(a, b, CpgEdgeKind::AstChild);
 
         // g2: 3 nodes, 2 edges.
         let mut g2 = CodePropertyGraph::new(Language::Rust);
-        let c = g2.add_node(CpgNode::new(NodeId::new(0), CpgNodeKind::Root, SourceRange::default()));
-        let d = g2.add_node(CpgNode::new(NodeId::new(0), CpgNodeKind::If, SourceRange::default()));
-        let e = g2.add_node(CpgNode::new(NodeId::new(0), CpgNodeKind::While, SourceRange::default()));
+        let c = g2.add_node(CpgNode::new(
+            NodeId::new(0),
+            CpgNodeKind::Root,
+            SourceRange::default(),
+        ));
+        let d = g2.add_node(CpgNode::new(
+            NodeId::new(0),
+            CpgNodeKind::If,
+            SourceRange::default(),
+        ));
+        let e = g2.add_node(CpgNode::new(
+            NodeId::new(0),
+            CpgNodeKind::While,
+            SourceRange::default(),
+        ));
         g2.connect(c, d, CpgEdgeKind::AstChild);
         g2.connect(c, e, CpgEdgeKind::AstChild);
 
@@ -443,15 +556,29 @@ mod tests {
     #[test]
     fn test_all_metrics_reflexive_and_bounded() {
         let mut g = CodePropertyGraph::new(Language::Rust);
-        let a = g.add_node(CpgNode::new(NodeId::new(0), CpgNodeKind::Root, SourceRange::default()));
-        let b = g.add_node(CpgNode::new(NodeId::new(0), CpgNodeKind::If, SourceRange::default()));
+        let a = g.add_node(CpgNode::new(
+            NodeId::new(0),
+            CpgNodeKind::Root,
+            SourceRange::default(),
+        ));
+        let b = g.add_node(CpgNode::new(
+            NodeId::new(0),
+            CpgNodeKind::If,
+            SourceRange::default(),
+        ));
         let c = g.add_node(CpgNode::new(
             NodeId::new(0),
-            CpgNodeKind::Block { scope: crate::ScopeId::GLOBAL },
+            CpgNodeKind::Block {
+                scope: crate::ScopeId::GLOBAL,
+            },
             SourceRange::default(),
         ));
         g.connect(a, b, CpgEdgeKind::AstChild);
-        g.connect(b, c, CpgEdgeKind::ControlFlow(crate::CfgEdgeKind::Sequential));
+        g.connect(
+            b,
+            c,
+            CpgEdgeKind::ControlFlow(crate::CfgEdgeKind::Sequential),
+        );
 
         let metrics = [
             SimilarityMetric::Jaccard,
@@ -468,9 +595,16 @@ mod tests {
             );
 
             let mut h = CodePropertyGraph::new(Language::Rust);
-            h.add_node(CpgNode::new(NodeId::new(0), CpgNodeKind::While, SourceRange::default()));
+            h.add_node(CpgNode::new(
+                NodeId::new(0),
+                CpgNodeKind::While,
+                SourceRange::default(),
+            ));
             let s = sim.similarity(&g, &h);
-            assert!((-1e-9..=1.0 + 1e-9).contains(&s), "{metric:?} out of range: {s}");
+            assert!(
+                (-1e-9..=1.0 + 1e-9).contains(&s),
+                "{metric:?} out of range: {s}"
+            );
         }
     }
 
@@ -482,8 +616,13 @@ mod tests {
         let empty = CodePropertyGraph::new(Language::Rust);
 
         for metric in [SimilarityMetric::Jaccard, SimilarityMetric::GraphEdit] {
-            let s = GraphSimilarity::new().with_metric(metric).similarity(&empty, &empty);
-            assert!((s - 1.0).abs() < 1e-9, "{metric:?} empty-vs-empty should be 1.0, got {s}");
+            let s = GraphSimilarity::new()
+                .with_metric(metric)
+                .similarity(&empty, &empty);
+            assert!(
+                (s - 1.0).abs() < 1e-9,
+                "{metric:?} empty-vs-empty should be 1.0, got {s}"
+            );
         }
 
         let wl = GraphSimilarity::new()
@@ -526,7 +665,9 @@ mod range_regression {
         ]);
 
         for metric in METRICS {
-            let s = GraphSimilarity::new().with_metric(metric).similarity(&cpg, &cpg);
+            let s = GraphSimilarity::new()
+                .with_metric(metric)
+                .similarity(&cpg, &cpg);
             assert!(s <= 1.0, "{metric:?} self-similarity overshot 1.0: {s}");
             assert!(s >= 0.0, "{metric:?} self-similarity went negative: {s}");
         }

@@ -2,10 +2,10 @@
 //!
 //! Defines categories of common algorithms and their characteristics.
 
-pub mod sorting;
-pub mod searching;
-pub mod graph;
 pub mod dp;
+pub mod graph;
+pub mod searching;
+pub mod sorting;
 
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
@@ -122,9 +122,18 @@ mod tests {
         assert_eq!(AlgorithmFamily::Searching.name(), "Searching");
         assert_eq!(AlgorithmFamily::GraphTraversal.name(), "Graph Traversal");
         assert_eq!(AlgorithmFamily::ShortestPath.name(), "Shortest Path");
-        assert_eq!(AlgorithmFamily::MinimumSpanningTree.name(), "Minimum Spanning Tree");
-        assert_eq!(AlgorithmFamily::DynamicProgramming.name(), "Dynamic Programming");
-        assert_eq!(AlgorithmFamily::DivideAndConquer.name(), "Divide and Conquer");
+        assert_eq!(
+            AlgorithmFamily::MinimumSpanningTree.name(),
+            "Minimum Spanning Tree"
+        );
+        assert_eq!(
+            AlgorithmFamily::DynamicProgramming.name(),
+            "Dynamic Programming"
+        );
+        assert_eq!(
+            AlgorithmFamily::DivideAndConquer.name(),
+            "Divide and Conquer"
+        );
         assert_eq!(AlgorithmFamily::Greedy.name(), "Greedy");
         assert_eq!(AlgorithmFamily::Backtracking.name(), "Backtracking");
         assert_eq!(AlgorithmFamily::StringMatching.name(), "String Matching");
@@ -137,17 +146,44 @@ mod tests {
     #[test]
     fn test_typical_complexity_every_variant() {
         assert_eq!(AlgorithmFamily::Sorting.typical_complexity(), "O(n log n)");
-        assert_eq!(AlgorithmFamily::Searching.typical_complexity(), "O(log n) to O(n)");
-        assert_eq!(AlgorithmFamily::GraphTraversal.typical_complexity(), "O(V + E)");
-        assert_eq!(AlgorithmFamily::ShortestPath.typical_complexity(), "O(E log V) to O(V³)");
-        assert_eq!(AlgorithmFamily::MinimumSpanningTree.typical_complexity(), "O(E log V)");
-        assert_eq!(AlgorithmFamily::DynamicProgramming.typical_complexity(), "Varies");
-        assert_eq!(AlgorithmFamily::DivideAndConquer.typical_complexity(), "O(n log n)");
+        assert_eq!(
+            AlgorithmFamily::Searching.typical_complexity(),
+            "O(log n) to O(n)"
+        );
+        assert_eq!(
+            AlgorithmFamily::GraphTraversal.typical_complexity(),
+            "O(V + E)"
+        );
+        assert_eq!(
+            AlgorithmFamily::ShortestPath.typical_complexity(),
+            "O(E log V) to O(V³)"
+        );
+        assert_eq!(
+            AlgorithmFamily::MinimumSpanningTree.typical_complexity(),
+            "O(E log V)"
+        );
+        assert_eq!(
+            AlgorithmFamily::DynamicProgramming.typical_complexity(),
+            "Varies"
+        );
+        assert_eq!(
+            AlgorithmFamily::DivideAndConquer.typical_complexity(),
+            "O(n log n)"
+        );
         assert_eq!(AlgorithmFamily::Greedy.typical_complexity(), "O(n log n)");
-        assert_eq!(AlgorithmFamily::Backtracking.typical_complexity(), "O(k^n) worst case");
-        assert_eq!(AlgorithmFamily::StringMatching.typical_complexity(), "O(n + m)");
+        assert_eq!(
+            AlgorithmFamily::Backtracking.typical_complexity(),
+            "O(k^n) worst case"
+        );
+        assert_eq!(
+            AlgorithmFamily::StringMatching.typical_complexity(),
+            "O(n + m)"
+        );
         assert_eq!(AlgorithmFamily::TreeAlgorithm.typical_complexity(), "O(n)");
-        assert_eq!(AlgorithmFamily::Hashing.typical_complexity(), "O(1) average");
+        assert_eq!(
+            AlgorithmFamily::Hashing.typical_complexity(),
+            "O(1) average"
+        );
         assert_eq!(AlgorithmFamily::Mathematical.typical_complexity(), "Varies");
         assert_eq!(AlgorithmFamily::Other.typical_complexity(), "Unknown");
     }

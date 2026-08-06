@@ -3,9 +3,9 @@
 //! This module provides custom serialization/deserialization for types
 //! that don't have native serde support.
 
-use std::sync::Arc;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use smallvec::SmallVec;
+use std::sync::Arc;
 
 /// Serialize Arc<str> as a string.
 pub fn serialize_arc_str<S>(value: &Arc<str>, serializer: S) -> Result<S::Ok, S::Error>
@@ -70,10 +70,7 @@ pub mod option_arc_str {
 pub mod smallvec_arc_str_2 {
     use super::*;
 
-    pub fn serialize<S>(
-        value: &SmallVec<[Arc<str>; 2]>,
-        serializer: S,
-    ) -> Result<S::Ok, S::Error>
+    pub fn serialize<S>(value: &SmallVec<[Arc<str>; 2]>, serializer: S) -> Result<S::Ok, S::Error>
     where
         S: Serializer,
     {
@@ -85,9 +82,7 @@ pub mod smallvec_arc_str_2 {
         seq.end()
     }
 
-    pub fn deserialize<'de, D>(
-        deserializer: D,
-    ) -> Result<SmallVec<[Arc<str>; 2]>, D::Error>
+    pub fn deserialize<'de, D>(deserializer: D) -> Result<SmallVec<[Arc<str>; 2]>, D::Error>
     where
         D: Deserializer<'de>,
     {

@@ -122,7 +122,9 @@ mod tests {
         parser
             .set_language(&super::LANGUAGE.into())
             .expect("load MeTTa grammar");
-        let tree = parser.parse("(= (double $x) (* 2 $x))\n", None).expect("parse");
+        let tree = parser
+            .parse("(= (double $x) (* 2 $x))\n", None)
+            .expect("parse");
         assert!(!tree.root_node().has_error());
     }
 

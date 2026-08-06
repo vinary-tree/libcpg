@@ -3,12 +3,10 @@
 //! This module provides language-specific mappers that convert tree-sitter
 //! node types into unified CpgNodeKind variants.
 
-use std::sync::Arc;
 use smallvec::SmallVec;
+use std::sync::Arc;
 
-use crate::{
-    CpgNodeKind, Language, LiteralKind, MethodSignature, ScopeId, TypeInfo, Visibility,
-};
+use crate::{CpgNodeKind, Language, LiteralKind, MethodSignature, ScopeId, TypeInfo, Visibility};
 
 /// Maps tree-sitter node types to CpgNodeKind.
 ///
@@ -39,7 +37,9 @@ impl NodeMapper {
         match self.language {
             Language::Rust => self.map_rust(ts_kind, node, source),
             Language::Python => self.map_python(ts_kind, node, source),
-            Language::JavaScript | Language::TypeScript => self.map_javascript(ts_kind, node, source),
+            Language::JavaScript | Language::TypeScript => {
+                self.map_javascript(ts_kind, node, source)
+            }
             Language::Go => self.map_go(ts_kind, node, source),
             Language::Java => self.map_java(ts_kind, node, source),
             Language::C | Language::Cpp => self.map_c_cpp(ts_kind, node, source),
@@ -81,7 +81,20 @@ impl NodeMapper {
         // Skip pure punctuation
         if matches!(
             ts_kind,
-            "(" | ")" | "{" | "}" | "[" | "]" | "," | ";" | ":" | "::" | "." | "->" | "=>" | "<" | ">"
+            "(" | ")"
+                | "{"
+                | "}"
+                | "["
+                | "]"
+                | ","
+                | ";"
+                | ":"
+                | "::"
+                | "."
+                | "->"
+                | "=>"
+                | "<"
+                | ">"
         ) {
             return false;
         }
@@ -107,7 +120,10 @@ impl NodeMapper {
             // standalone operator glyph is a meaningful, if inert, leaf.)
             #[cfg(feature = "metta")]
             Language::MeTTa
-                if matches!(ts_kind, "expression" | "atom_expression" | "prefixed_expression") =>
+                if matches!(
+                    ts_kind,
+                    "expression" | "atom_expression" | "prefixed_expression"
+                ) =>
             {
                 false
             }
@@ -224,7 +240,8 @@ impl NodeMapper {
                 name: self.extract_child_text(node, "name", source),
                 var_type: self.extract_type_from_node(node, source),
                 scope: ScopeId::GLOBAL,
-                is_mutable: ts_kind == "static_item" && self.has_child_kind(node, "mutable_specifier"),
+                is_mutable: ts_kind == "static_item"
+                    && self.has_child_kind(node, "mutable_specifier"),
             },
             "field_declaration" => CpgNodeKind::Field {
                 name: self.extract_child_text(node, "name", source),
@@ -384,9 +401,11 @@ impl NodeMapper {
             "raise_statement" => CpgNodeKind::Throw,
 
             // Expressions
-            "binary_operator" | "comparison_operator" | "boolean_operator" => CpgNodeKind::BinaryOp {
-                operator: self.extract_operator(node, source),
-            },
+            "binary_operator" | "comparison_operator" | "boolean_operator" => {
+                CpgNodeKind::BinaryOp {
+                    operator: self.extract_operator(node, source),
+                }
+            }
             "unary_operator" | "not_operator" => CpgNodeKind::UnaryOp {
                 operator: self.extract_operator(node, source),
             },
@@ -435,12 +454,10 @@ impl NodeMapper {
             "decorator" => CpgNodeKind::Attribute {
                 name: self.extract_decorator_name(node, source),
             },
-            "comment" => CpgNodeKind::Comment {
-                is_doc: false,
-            },
-            "expression_statement" if self.is_docstring(node, source) => CpgNodeKind::Comment {
-                is_doc: true,
-            },
+            "comment" => CpgNodeKind::Comment { is_doc: false },
+            "expression_statement" if self.is_docstring(node, source) => {
+                CpgNodeKind::Comment { is_doc: true }
+            }
             "ERROR" => CpgNodeKind::Error {
                 message: Arc::from("Parse error"),
             },
@@ -531,9 +548,11 @@ impl NodeMapper {
             "unary_expression" | "update_expression" => CpgNodeKind::UnaryOp {
                 operator: self.extract_operator(node, source),
             },
-            "assignment_expression" | "augmented_assignment_expression" => CpgNodeKind::Assignment {
-                operator: self.extract_operator(node, source),
-            },
+            "assignment_expression" | "augmented_assignment_expression" => {
+                CpgNodeKind::Assignment {
+                    operator: self.extract_operator(node, source),
+                }
+            }
             "call_expression" | "new_expression" => CpgNodeKind::Call {
                 target: None,
                 is_method: false,
@@ -778,14 +797,17 @@ impl NodeMapper {
                 name: Arc::from(self.node_text(node, source)),
                 definition: None,
             },
-            "decimal_integer_literal" | "hex_integer_literal" | "octal_integer_literal" | "binary_integer_literal" => {
+            "decimal_integer_literal"
+            | "hex_integer_literal"
+            | "octal_integer_literal"
+            | "binary_integer_literal" => CpgNodeKind::Literal {
+                kind: self.parse_integer(node, source),
+            },
+            "decimal_floating_point_literal" | "hex_floating_point_literal" => {
                 CpgNodeKind::Literal {
-                    kind: self.parse_integer(node, source),
+                    kind: self.parse_float(node, source),
                 }
             }
-            "decimal_floating_point_literal" | "hex_floating_point_literal" => CpgNodeKind::Literal {
-                kind: self.parse_float(node, source),
-            },
             "string_literal" => CpgNodeKind::Literal {
                 kind: LiteralKind::String(Arc::from(self.node_text(node, source))),
             },
@@ -986,12 +1008,11 @@ impl NodeMapper {
                 is_method: true,
             },
             "element_reference" => CpgNodeKind::IndexAccess,
-            "identifier" | "constant" | "instance_variable" | "class_variable" | "global_variable" => {
-                CpgNodeKind::Identifier {
-                    name: Arc::from(self.node_text(node, source)),
-                    definition: None,
-                }
-            }
+            "identifier" | "constant" | "instance_variable" | "class_variable"
+            | "global_variable" => CpgNodeKind::Identifier {
+                name: Arc::from(self.node_text(node, source)),
+                definition: None,
+            },
             "integer" => CpgNodeKind::Literal {
                 kind: self.parse_integer(node, source),
             },
@@ -1022,9 +1043,7 @@ impl NodeMapper {
             "regex" => CpgNodeKind::Literal {
                 kind: LiteralKind::Regex(Arc::from(self.node_text(node, source))),
             },
-            "comment" => CpgNodeKind::Comment {
-                is_doc: false,
-            },
+            "comment" => CpgNodeKind::Comment { is_doc: false },
             "ERROR" => CpgNodeKind::Error {
                 message: Arc::from("Parse error"),
             },
@@ -1192,11 +1211,14 @@ impl NodeMapper {
                 field_type: None,
                 visibility: Visibility::Public,
             },
-            "string_scalar" | "single_quote_scalar" | "double_quote_scalar" | "string" | "basic_string" | "literal_string" => {
-                CpgNodeKind::Literal {
-                    kind: LiteralKind::String(Arc::from(self.node_text(node, source))),
-                }
-            }
+            "string_scalar"
+            | "single_quote_scalar"
+            | "double_quote_scalar"
+            | "string"
+            | "basic_string"
+            | "literal_string" => CpgNodeKind::Literal {
+                kind: LiteralKind::String(Arc::from(self.node_text(node, source))),
+            },
             "integer_scalar" | "integer" => CpgNodeKind::Literal {
                 kind: self.parse_integer(node, source),
             },
@@ -1333,7 +1355,10 @@ impl NodeMapper {
                 is_method: true,
             },
             // `names <- src` / `<= src` / `<<- src` receive: consumes on `src`.
-            "linear_bind" | "repeated_bind" | "peek_bind" | "receive_send_source"
+            "linear_bind"
+            | "repeated_bind"
+            | "peek_bind"
+            | "receive_send_source"
             | "send_receive_source" => CpgNodeKind::Call {
                 target: None,
                 is_method: false,
@@ -1677,9 +1702,17 @@ impl NodeMapper {
             // Operator glyphs as *standalone* leaves (a list head is consumed by
             // `map_metta_list` and never reaches here). Kept out of the DFG
             // use-set as `Unknown`.
-            "operator" | "arrow_operator" | "comparison_operator" | "assignment_operator"
-            | "type_annotation_operator" | "rule_definition_operator" | "punctuation_operator"
-            | "arithmetic_operator" | "logic_operator" | "exclaim_prefix" | "question_prefix"
+            "operator"
+            | "arrow_operator"
+            | "comparison_operator"
+            | "assignment_operator"
+            | "type_annotation_operator"
+            | "rule_definition_operator"
+            | "punctuation_operator"
+            | "arithmetic_operator"
+            | "logic_operator"
+            | "exclaim_prefix"
+            | "question_prefix"
             | "quote_prefix" => CpgNodeKind::Unknown {
                 kind: Arc::from(ts_kind),
             },
@@ -1796,7 +1829,10 @@ impl NodeMapper {
         // tree-sitter 0.26 changed `named_child`'s index parameter from `usize`
         // to `u32` (while `named_child_count` still returns `usize`); `count >= 1`
         // is guaranteed by the guard above, so `count - 1` cannot underflow.
-        match list_node.named_child((count - 1) as u32).map(|c| self.metta_unwrap(c)) {
+        match list_node
+            .named_child((count - 1) as u32)
+            .map(|c| self.metta_unwrap(c))
+        {
             Some(module) => Arc::from(self.node_text(&module, source)),
             None => Arc::from(""),
         }
@@ -1823,12 +1859,12 @@ impl NodeMapper {
                 return Some(false);
             }
             let head = self.metta_unwrap(outer.named_child(0)?);
-            let head_is_rule =
-                matches!(head.kind(), "assignment_operator" | "rule_definition_operator");
-            let lhs_is_second = outer
-                .named_child(1)
-                .map(|c| self.metta_unwrap(c).id())
-                == Some(lhs.id());
+            let head_is_rule = matches!(
+                head.kind(),
+                "assignment_operator" | "rule_definition_operator"
+            );
+            let lhs_is_second =
+                outer.named_child(1).map(|c| self.metta_unwrap(c).id()) == Some(lhs.id());
             Some(head_is_rule && lhs_is_second)
         })()
         .unwrap_or(false);
@@ -1975,11 +2011,7 @@ impl NodeMapper {
 
     fn parse_char(&self, node: &tree_sitter::Node, source: &str) -> LiteralKind {
         let text = self.node_text(node, source);
-        let ch = text
-            .trim_matches('\'')
-            .chars()
-            .next()
-            .unwrap_or('\0');
+        let ch = text.trim_matches('\'').chars().next().unwrap_or('\0');
         LiteralKind::Char(ch)
     }
 
@@ -2065,7 +2097,11 @@ impl NodeMapper {
         false
     }
 
-    fn extract_rust_function_signature(&self, node: &tree_sitter::Node, source: &str) -> MethodSignature {
+    fn extract_rust_function_signature(
+        &self,
+        node: &tree_sitter::Node,
+        source: &str,
+    ) -> MethodSignature {
         let name = self.extract_child_text(node, "name", source);
         // `async` is grouped under `function_modifiers` in tree-sitter-rust, so
         // a direct-child check would never see it.
@@ -2075,7 +2111,8 @@ impl NodeMapper {
         MethodSignature {
             name,
             params: SmallVec::new(),
-            return_type: node.child_by_field_name("return_type")
+            return_type: node
+                .child_by_field_name("return_type")
                 .map(|rt| TypeInfo::new(self.node_text(&rt, source))),
             is_static: false,
             is_async,
@@ -2083,7 +2120,11 @@ impl NodeMapper {
         }
     }
 
-    fn extract_python_function_signature(&self, node: &tree_sitter::Node, source: &str) -> MethodSignature {
+    fn extract_python_function_signature(
+        &self,
+        node: &tree_sitter::Node,
+        source: &str,
+    ) -> MethodSignature {
         let name = self.extract_child_text(node, "name", source);
         let is_async = self.has_modifier_token(node, "async");
 
@@ -2097,7 +2138,11 @@ impl NodeMapper {
         }
     }
 
-    fn extract_js_function_signature(&self, node: &tree_sitter::Node, source: &str) -> MethodSignature {
+    fn extract_js_function_signature(
+        &self,
+        node: &tree_sitter::Node,
+        source: &str,
+    ) -> MethodSignature {
         let name = self.extract_child_text(node, "name", source);
         let is_async = self.has_modifier_token(node, "async");
         let is_static = self.has_modifier_token(node, "static");
@@ -2112,7 +2157,11 @@ impl NodeMapper {
         }
     }
 
-    fn extract_go_function_signature(&self, node: &tree_sitter::Node, source: &str) -> MethodSignature {
+    fn extract_go_function_signature(
+        &self,
+        node: &tree_sitter::Node,
+        source: &str,
+    ) -> MethodSignature {
         let name = self.extract_child_text(node, "name", source);
 
         MethodSignature {
@@ -2125,7 +2174,11 @@ impl NodeMapper {
         }
     }
 
-    fn extract_java_function_signature(&self, node: &tree_sitter::Node, source: &str) -> MethodSignature {
+    fn extract_java_function_signature(
+        &self,
+        node: &tree_sitter::Node,
+        source: &str,
+    ) -> MethodSignature {
         let name = self.extract_child_text(node, "name", source);
         let is_static = self.has_modifier(node, "static");
         let visibility = self.extract_java_visibility(node);
@@ -2133,7 +2186,8 @@ impl NodeMapper {
         MethodSignature {
             name,
             params: SmallVec::new(),
-            return_type: node.child_by_field_name("type")
+            return_type: node
+                .child_by_field_name("type")
                 .map(|t| TypeInfo::new(self.node_text(&t, source))),
             is_static,
             is_async: false,
@@ -2141,8 +2195,13 @@ impl NodeMapper {
         }
     }
 
-    fn extract_c_function_signature(&self, node: &tree_sitter::Node, source: &str) -> MethodSignature {
-        let name = node.child_by_field_name("declarator")
+    fn extract_c_function_signature(
+        &self,
+        node: &tree_sitter::Node,
+        source: &str,
+    ) -> MethodSignature {
+        let name = node
+            .child_by_field_name("declarator")
             .and_then(|d| d.child_by_field_name("declarator"))
             .map(|n| Arc::from(self.node_text(&n, source)))
             .unwrap_or_else(|| Arc::from(""));
@@ -2150,7 +2209,8 @@ impl NodeMapper {
         MethodSignature {
             name,
             params: SmallVec::new(),
-            return_type: node.child_by_field_name("type")
+            return_type: node
+                .child_by_field_name("type")
                 .map(|t| TypeInfo::new(self.node_text(&t, source))),
             is_static: self.has_child_kind(node, "storage_class_specifier"),
             is_async: false,
@@ -2158,7 +2218,11 @@ impl NodeMapper {
         }
     }
 
-    fn extract_ruby_function_signature(&self, node: &tree_sitter::Node, source: &str) -> MethodSignature {
+    fn extract_ruby_function_signature(
+        &self,
+        node: &tree_sitter::Node,
+        source: &str,
+    ) -> MethodSignature {
         let name = self.extract_child_text(node, "name", source);
 
         MethodSignature {
@@ -2171,7 +2235,11 @@ impl NodeMapper {
         }
     }
 
-    fn extract_bash_function_signature(&self, node: &tree_sitter::Node, source: &str) -> MethodSignature {
+    fn extract_bash_function_signature(
+        &self,
+        node: &tree_sitter::Node,
+        source: &str,
+    ) -> MethodSignature {
         let name = self.extract_child_text(node, "name", source);
 
         MethodSignature {
@@ -2277,7 +2345,11 @@ mod tests {
         let cpg = build_rholang(src);
 
         let funcs: Vec<_> = cpg.functions().collect();
-        assert_eq!(funcs.len(), 1, "the contract must map to exactly one Function");
+        assert_eq!(
+            funcs.len(),
+            1,
+            "the contract must map to exactly one Function"
+        );
         match &funcs[0].kind {
             CpgNodeKind::Function { signature } => {
                 assert!(
@@ -2294,7 +2366,15 @@ mod tests {
         );
         let send_calls = kinds(&cpg)
             .into_iter()
-            .filter(|k| matches!(k, CpgNodeKind::Call { is_method: false, .. }))
+            .filter(|k| {
+                matches!(
+                    k,
+                    CpgNodeKind::Call {
+                        is_method: false,
+                        ..
+                    }
+                )
+            })
             .count();
         assert!(send_calls >= 1, "the `stdout!(…)` send must be a Call");
     }
@@ -2337,7 +2417,8 @@ mod tests {
             "the received `@msg` must be a Parameter def"
         );
         assert!(
-            cpg.nodes().any(|n| matches!(&n.kind, CpgNodeKind::Call { .. })),
+            cpg.nodes()
+                .any(|n| matches!(&n.kind, CpgNodeKind::Call { .. })),
             "the receive must be a Call"
         );
         assert!(
@@ -2370,11 +2451,20 @@ mod tests {
     fn rholang_should_include_keyword_vs_rule_collision() {
         let mapper = NodeMapper::new(Language::Rholang);
         // String-keyed view: rule names kept, containers/markers dropped.
-        assert!(mapper.should_include("contract", false), "contract RULE kept");
+        assert!(
+            mapper.should_include("contract", false),
+            "contract RULE kept"
+        );
         assert!(mapper.should_include("match", false), "match RULE kept");
         assert!(mapper.should_include("send", false), "send kept");
-        assert!(!mapper.should_include("names", false), "names container dropped");
-        assert!(!mapper.should_include("send_single", false), "arity marker dropped");
+        assert!(
+            !mapper.should_include("names", false),
+            "names container dropped"
+        );
+        assert!(
+            !mapper.should_include("send_single", false),
+            "arity marker dropped"
+        );
 
         // Node-aware view against a real tree: the anonymous `contract` keyword
         // token (kind() == "contract", is_named() == false) is dropped, but the
@@ -2429,7 +2519,11 @@ mod tests {
         let cpg = build_metta("(= (double $x) (* $x 2))\n");
 
         let funcs: Vec<_> = cpg.functions().collect();
-        assert_eq!(funcs.len(), 1, "the `(= …)` rule must map to exactly one Function");
+        assert_eq!(
+            funcs.len(),
+            1,
+            "the `(= …)` rule must map to exactly one Function"
+        );
         match &funcs[0].kind {
             CpgNodeKind::Function { signature } => {
                 assert_eq!(&*signature.name, "double", "rule-head atom is the name");
@@ -2458,7 +2552,8 @@ mod tests {
     fn metta_head_dispatch_type_import_call() {
         let ta = build_metta("(: double (-> Number Number))\n");
         assert!(
-            ta.nodes().any(|n| matches!(&n.kind, CpgNodeKind::TypeAnnotation { .. })),
+            ta.nodes()
+                .any(|n| matches!(&n.kind, CpgNodeKind::TypeAnnotation { .. })),
             "`(: name Type)` must map to a TypeAnnotation"
         );
 
@@ -2467,11 +2562,16 @@ mod tests {
             CpgNodeKind::Import { path } => Some(path.clone()),
             _ => None,
         });
-        assert_eq!(path.as_deref(), Some("math"), "`import!` must map to an Import");
+        assert_eq!(
+            path.as_deref(),
+            Some("math"),
+            "`import!` must map to an Import"
+        );
 
         let call = build_metta("(+ 1 2)\n");
         assert!(
-            call.nodes().any(|n| matches!(&n.kind, CpgNodeKind::Call { .. })),
+            call.nodes()
+                .any(|n| matches!(&n.kind, CpgNodeKind::Call { .. })),
             "a grounded `(+ …)` operation must map to a Call"
         );
         // The grounded-op operands and a bare atom are still in the graph.
@@ -2510,10 +2610,17 @@ mod tests {
         let cpg = build_rholang(src);
         let ks = kinds(&cpg);
 
-        assert!(ks.iter().any(|k| matches!(k, CpgNodeKind::If)), "ifElse ⇒ If");
         assert!(
-            ks.iter()
-                .any(|k| matches!(k, CpgNodeKind::Literal { kind: LiteralKind::Bool(true) })),
+            ks.iter().any(|k| matches!(k, CpgNodeKind::If)),
+            "ifElse ⇒ If"
+        );
+        assert!(
+            ks.iter().any(|k| matches!(
+                k,
+                CpgNodeKind::Literal {
+                    kind: LiteralKind::Bool(true)
+                }
+            )),
             "`true` ⇒ Bool literal"
         );
         assert!(
@@ -2548,8 +2655,12 @@ mod tests {
             "`3 * 4` ⇒ BinaryOp(*)"
         );
         assert!(
-            ks.iter()
-                .any(|k| matches!(k, CpgNodeKind::Literal { kind: LiteralKind::Array })),
+            ks.iter().any(|k| matches!(
+                k,
+                CpgNodeKind::Literal {
+                    kind: LiteralKind::Array
+                }
+            )),
             "`[...]` ⇒ Array literal"
         );
         assert!(
@@ -2567,25 +2678,44 @@ mod tests {
         let cpg = build_metta("(if True 1 2)\n(foo 1.5 \"hi\" _ $x)\n");
         let ks = kinds(&cpg);
 
-        assert!(ks.iter().any(|k| matches!(k, CpgNodeKind::If)), "head `if` ⇒ If");
         assert!(
-            ks.iter()
-                .any(|k| matches!(k, CpgNodeKind::Literal { kind: LiteralKind::Bool(true) })),
+            ks.iter().any(|k| matches!(k, CpgNodeKind::If)),
+            "head `if` ⇒ If"
+        );
+        assert!(
+            ks.iter().any(|k| matches!(
+                k,
+                CpgNodeKind::Literal {
+                    kind: LiteralKind::Bool(true)
+                }
+            )),
             "`True` ⇒ Bool"
         );
         assert!(
-            ks.iter()
-                .any(|k| matches!(k, CpgNodeKind::Literal { kind: LiteralKind::Integer(1) })),
+            ks.iter().any(|k| matches!(
+                k,
+                CpgNodeKind::Literal {
+                    kind: LiteralKind::Integer(1)
+                }
+            )),
             "`1` ⇒ Integer"
         );
         assert!(
-            ks.iter()
-                .any(|k| matches!(k, CpgNodeKind::Literal { kind: LiteralKind::Float(_) })),
+            ks.iter().any(|k| matches!(
+                k,
+                CpgNodeKind::Literal {
+                    kind: LiteralKind::Float(_)
+                }
+            )),
             "`1.5` ⇒ Float"
         );
         assert!(
-            ks.iter()
-                .any(|k| matches!(k, CpgNodeKind::Literal { kind: LiteralKind::String(_) })),
+            ks.iter().any(|k| matches!(
+                k,
+                CpgNodeKind::Literal {
+                    kind: LiteralKind::String(_)
+                }
+            )),
             "`\"hi\"` ⇒ String"
         );
         assert!(
@@ -2810,7 +2940,9 @@ fn g() -> Result<i32, ()> { Ok(1) }
             .iter()
             .filter(|(k, _)| k == "integer_literal")
             .filter_map(|(_, v)| match v {
-                CpgNodeKind::Literal { kind: LiteralKind::Integer(i) } => Some(*i),
+                CpgNodeKind::Literal {
+                    kind: LiteralKind::Integer(i),
+                } => Some(*i),
                 _ => None,
             })
             .collect();
@@ -2831,7 +2963,10 @@ fn g() -> Result<i32, ()> { Ok(1) }
                 _ => None,
             })
             .collect();
-        assert!(comments.contains(&true), "`///` and `/** */` are doc comments");
+        assert!(
+            comments.contains(&true),
+            "`///` and `/** */` are doc comments"
+        );
         assert!(comments.contains(&false), "`/* */` is not a doc comment");
 
         // ---- visibility is read off the `pub` modifier ----
@@ -2843,8 +2978,14 @@ fn g() -> Result<i32, ()> { Ok(1) }
                 _ => None,
             })
             .collect();
-        assert!(visibilities.contains(&Visibility::Public), "`pub fn` is public");
-        assert!(visibilities.contains(&Visibility::Private), "a bare `fn` is private");
+        assert!(
+            visibilities.contains(&Visibility::Public),
+            "`pub fn` is public"
+        );
+        assert!(
+            visibilities.contains(&Visibility::Private),
+            "a bare `fn` is private"
+        );
 
         // ---- `async` is detected; the return type is carried ----
         let asyncs: Vec<bool> = p
@@ -2890,7 +3031,10 @@ fn g() -> Result<i32, ()> { Ok(1) }
             "+", "-", "<", ">", "==", "!=", "<=", ">=", "&&", "||", "!", "<<", ">>", "=", "+=",
             "-=", "*=", "/=", "%=", "&=", "|=", "^=",
         ] {
-            assert!(ops.contains(&op.to_string()), "operator `{op}` was not extracted from {ops:?}");
+            assert!(
+                ops.contains(&op.to_string()),
+                "operator `{op}` was not extracted from {ops:?}"
+            );
         }
 
         // ---- the import path is the `use` tree, not the whole statement ----
@@ -3139,12 +3283,18 @@ class Foo extends Bar {
             .filter(|(k, _)| k == "number")
             .map(|(_, v)| v)
             .collect();
-        assert!(numbers
-            .iter()
-            .any(|k| matches!(k, CpgNodeKind::Literal { kind: LiteralKind::Integer(_) })));
-        assert!(numbers
-            .iter()
-            .any(|k| matches!(k, CpgNodeKind::Literal { kind: LiteralKind::Float(_) })));
+        assert!(numbers.iter().any(|k| matches!(
+            k,
+            CpgNodeKind::Literal {
+                kind: LiteralKind::Integer(_)
+            }
+        )));
+        assert!(numbers.iter().any(|k| matches!(
+            k,
+            CpgNodeKind::Literal {
+                kind: LiteralKind::Float(_)
+            }
+        )));
     }
 
     /// TypeScript reuses the JavaScript mapper, and reaches three arms the JS
@@ -3393,11 +3543,23 @@ enum E { A }
         // A field with no access modifier is package-private.
         let pkg_private = p.iter().any(|(k, v)| {
             k == "field_declaration"
-                && matches!(v, CpgNodeKind::Field { visibility: Visibility::Private, .. })
+                && matches!(
+                    v,
+                    CpgNodeKind::Field {
+                        visibility: Visibility::Private,
+                        ..
+                    }
+                )
         });
         let public_field = p.iter().any(|(k, v)| {
             k == "field_declaration"
-                && matches!(v, CpgNodeKind::Field { visibility: Visibility::Public, .. })
+                && matches!(
+                    v,
+                    CpgNodeKind::Field {
+                        visibility: Visibility::Public,
+                        ..
+                    }
+                )
         });
         assert!(pkg_private, "`private static final int F` is private");
         assert!(public_field, "`public int g` is public");
@@ -3504,12 +3666,18 @@ int g(int a, char c) {
             .filter(|(k, _)| k == "number_literal")
             .map(|(_, v)| v)
             .collect();
-        assert!(nums
-            .iter()
-            .any(|k| matches!(k, CpgNodeKind::Literal { kind: LiteralKind::Integer(_) })));
-        assert!(nums
-            .iter()
-            .any(|k| matches!(k, CpgNodeKind::Literal { kind: LiteralKind::Float(_) })));
+        assert!(nums.iter().any(|k| matches!(
+            k,
+            CpgNodeKind::Literal {
+                kind: LiteralKind::Integer(_)
+            }
+        )));
+        assert!(nums.iter().any(|k| matches!(
+            k,
+            CpgNodeKind::Literal {
+                kind: LiteralKind::Float(_)
+            }
+        )));
     }
 
     /// C shares the C++ mapper; this pins the shared arms against the C grammar.
@@ -3666,12 +3834,18 @@ end
             .filter(|(k, _)| k == "number")
             .map(|(_, v)| v)
             .collect();
-        assert!(nums
-            .iter()
-            .any(|k| matches!(k, CpgNodeKind::Literal { kind: LiteralKind::Integer(_) })));
-        assert!(nums
-            .iter()
-            .any(|k| matches!(k, CpgNodeKind::Literal { kind: LiteralKind::Float(_) })));
+        assert!(nums.iter().any(|k| matches!(
+            k,
+            CpgNodeKind::Literal {
+                kind: LiteralKind::Integer(_)
+            }
+        )));
+        assert!(nums.iter().any(|k| matches!(
+            k,
+            CpgNodeKind::Literal {
+                kind: LiteralKind::Float(_)
+            }
+        )));
     }
 
     #[cfg(feature = "lang-html")]
@@ -3701,7 +3875,8 @@ end
             .collect();
         assert!(!tags.is_empty(), "the snippet has elements");
         assert!(
-            tags.iter().any(|k| matches!(k, CpgNodeKind::Unknown { kind } if kind.starts_with("html:"))),
+            tags.iter()
+                .any(|k| matches!(k, CpgNodeKind::Unknown { kind } if kind.starts_with("html:"))),
             "elements map to `html:<tag>`, got {tags:?}"
         );
     }

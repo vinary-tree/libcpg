@@ -3,17 +3,17 @@
 //! This module defines structural templates for each Gang-of-Four design pattern.
 //! These templates are used by the VF2 matcher to detect pattern occurrences in CPGs.
 
-use std::sync::Arc;
 use smallvec::SmallVec;
+use std::sync::Arc;
 
+use super::GofPattern;
+use crate::pattern::{
+    EdgeConstraint, EdgeKindMatcher, NodeConstraint, NodeKindMatcher, NodeKindTag, PatternTemplate,
+};
 use crate::{
     CodePropertyGraph, CpgEdge, CpgEdgeKind, CpgNode, CpgNodeKind, DfgEdgeKind, EdgeId, Language,
     MethodSignature, NodeId, SourceRange, Visibility,
 };
-use crate::pattern::{
-    EdgeConstraint, EdgeKindMatcher, NodeConstraint, NodeKindMatcher, NodeKindTag, PatternTemplate,
-};
-use super::GofPattern;
 
 /// Builds a pattern template CPG for a given GoF pattern.
 pub fn build_pattern_cpg(pattern: GofPattern) -> CodePropertyGraph {
@@ -136,12 +136,32 @@ fn build_singleton_pattern() -> CodePropertyGraph {
     let return_id = cpg.add_node(CpgNode::new(NodeId::new(4), CpgNodeKind::Return, range));
 
     // AST edges: class contains field, constructor, and getInstance
-    cpg.add_edge(CpgEdge::new(EdgeId::new(0), class_id, field_id, CpgEdgeKind::AstChild));
-    cpg.add_edge(CpgEdge::new(EdgeId::new(1), class_id, constructor_id, CpgEdgeKind::AstChild));
-    cpg.add_edge(CpgEdge::new(EdgeId::new(2), class_id, get_instance_id, CpgEdgeKind::AstChild));
+    cpg.add_edge(CpgEdge::new(
+        EdgeId::new(0),
+        class_id,
+        field_id,
+        CpgEdgeKind::AstChild,
+    ));
+    cpg.add_edge(CpgEdge::new(
+        EdgeId::new(1),
+        class_id,
+        constructor_id,
+        CpgEdgeKind::AstChild,
+    ));
+    cpg.add_edge(CpgEdge::new(
+        EdgeId::new(2),
+        class_id,
+        get_instance_id,
+        CpgEdgeKind::AstChild,
+    ));
 
     // getInstance contains return
-    cpg.add_edge(CpgEdge::new(EdgeId::new(3), get_instance_id, return_id, CpgEdgeKind::AstChild));
+    cpg.add_edge(CpgEdge::new(
+        EdgeId::new(3),
+        get_instance_id,
+        return_id,
+        CpgEdgeKind::AstChild,
+    ));
 
     // DFG: return reads from field
     cpg.add_edge(CpgEdge::new(
@@ -159,17 +179,20 @@ fn singleton_template() -> PatternTemplate {
     // so `node_constraints.len()` equals the pattern CPG's `node_count()` (5).
     // VF2 emits only complete mappings, so a full match then scores
     // `completeness == 1.0` (confidence == base), never > 1.0.
-    PatternTemplate::new("Singleton", "Class with private constructor and single static instance")
-        .with_node(NodeConstraint::new(0).with_kind(NodeKindMatcher::Exact(NodeKindTag::Class)))
-        .with_node(NodeConstraint::new(1).with_kind(NodeKindMatcher::Exact(NodeKindTag::Field)))
-        .with_node(NodeConstraint::new(2).with_kind(NodeKindMatcher::Exact(NodeKindTag::Function)))
-        .with_node(NodeConstraint::new(3).with_kind(NodeKindMatcher::Exact(NodeKindTag::Function)))
-        .with_node(NodeConstraint::new(4).with_kind(NodeKindMatcher::Exact(NodeKindTag::Return)))
-        .with_edge(EdgeConstraint::new(0, 1).with_kind(EdgeKindMatcher::AnyAst))
-        .with_edge(EdgeConstraint::new(0, 2).with_kind(EdgeKindMatcher::AnyAst))
-        .with_edge(EdgeConstraint::new(0, 3).with_kind(EdgeKindMatcher::AnyAst))
-        .with_edge(EdgeConstraint::new(3, 4).with_kind(EdgeKindMatcher::AnyAst))
-        .with_min_confidence(0.8)
+    PatternTemplate::new(
+        "Singleton",
+        "Class with private constructor and single static instance",
+    )
+    .with_node(NodeConstraint::new(0).with_kind(NodeKindMatcher::Exact(NodeKindTag::Class)))
+    .with_node(NodeConstraint::new(1).with_kind(NodeKindMatcher::Exact(NodeKindTag::Field)))
+    .with_node(NodeConstraint::new(2).with_kind(NodeKindMatcher::Exact(NodeKindTag::Function)))
+    .with_node(NodeConstraint::new(3).with_kind(NodeKindMatcher::Exact(NodeKindTag::Function)))
+    .with_node(NodeConstraint::new(4).with_kind(NodeKindMatcher::Exact(NodeKindTag::Return)))
+    .with_edge(EdgeConstraint::new(0, 1).with_kind(EdgeKindMatcher::AnyAst))
+    .with_edge(EdgeConstraint::new(0, 2).with_kind(EdgeKindMatcher::AnyAst))
+    .with_edge(EdgeConstraint::new(0, 3).with_kind(EdgeKindMatcher::AnyAst))
+    .with_edge(EdgeConstraint::new(3, 4).with_kind(EdgeKindMatcher::AnyAst))
+    .with_min_confidence(0.8)
 }
 
 // ===========================================================================
@@ -219,24 +242,42 @@ fn build_factory_method_pattern() -> CodePropertyGraph {
     ));
 
     // AST edges
-    cpg.add_edge(CpgEdge::new(EdgeId::new(0), creator_id, factory_method_id, CpgEdgeKind::AstChild));
-    cpg.add_edge(CpgEdge::new(EdgeId::new(1), concrete_creator_id, override_method_id, CpgEdgeKind::AstChild));
+    cpg.add_edge(CpgEdge::new(
+        EdgeId::new(0),
+        creator_id,
+        factory_method_id,
+        CpgEdgeKind::AstChild,
+    ));
+    cpg.add_edge(CpgEdge::new(
+        EdgeId::new(1),
+        concrete_creator_id,
+        override_method_id,
+        CpgEdgeKind::AstChild,
+    ));
 
     // Inheritance edge
-    cpg.add_edge(CpgEdge::new(EdgeId::new(2), concrete_creator_id, creator_id, CpgEdgeKind::Inherits));
+    cpg.add_edge(CpgEdge::new(
+        EdgeId::new(2),
+        concrete_creator_id,
+        creator_id,
+        CpgEdgeKind::Inherits,
+    ));
 
     cpg
 }
 
 fn factory_method_template() -> PatternTemplate {
-    PatternTemplate::new("Factory Method", "Abstract factory method overridden by concrete creators")
-        .with_node(NodeConstraint::new(0).with_kind(NodeKindMatcher::Exact(NodeKindTag::Class)))
-        .with_node(NodeConstraint::new(1).with_kind(NodeKindMatcher::Exact(NodeKindTag::Function)))
-        .with_node(NodeConstraint::new(2).with_kind(NodeKindMatcher::Exact(NodeKindTag::Class)))
-        .with_node(NodeConstraint::new(3).with_kind(NodeKindMatcher::Exact(NodeKindTag::Function)))
-        .with_edge(EdgeConstraint::new(0, 1).with_kind(EdgeKindMatcher::AnyAst))
-        .with_edge(EdgeConstraint::new(2, 3).with_kind(EdgeKindMatcher::AnyAst))
-        .with_min_confidence(0.7)
+    PatternTemplate::new(
+        "Factory Method",
+        "Abstract factory method overridden by concrete creators",
+    )
+    .with_node(NodeConstraint::new(0).with_kind(NodeKindMatcher::Exact(NodeKindTag::Class)))
+    .with_node(NodeConstraint::new(1).with_kind(NodeKindMatcher::Exact(NodeKindTag::Function)))
+    .with_node(NodeConstraint::new(2).with_kind(NodeKindMatcher::Exact(NodeKindTag::Class)))
+    .with_node(NodeConstraint::new(3).with_kind(NodeKindMatcher::Exact(NodeKindTag::Function)))
+    .with_edge(EdgeConstraint::new(0, 1).with_kind(EdgeKindMatcher::AnyAst))
+    .with_edge(EdgeConstraint::new(2, 3).with_kind(EdgeKindMatcher::AnyAst))
+    .with_min_confidence(0.7)
 }
 
 // ===========================================================================
@@ -285,24 +326,42 @@ fn build_abstract_factory_pattern() -> CodePropertyGraph {
     ));
 
     // AST edges
-    cpg.add_edge(CpgEdge::new(EdgeId::new(0), factory_trait, create_a, CpgEdgeKind::AstChild));
-    cpg.add_edge(CpgEdge::new(EdgeId::new(1), factory_trait, create_b, CpgEdgeKind::AstChild));
+    cpg.add_edge(CpgEdge::new(
+        EdgeId::new(0),
+        factory_trait,
+        create_a,
+        CpgEdgeKind::AstChild,
+    ));
+    cpg.add_edge(CpgEdge::new(
+        EdgeId::new(1),
+        factory_trait,
+        create_b,
+        CpgEdgeKind::AstChild,
+    ));
 
     // Implements edge
-    cpg.add_edge(CpgEdge::new(EdgeId::new(2), concrete_factory, factory_trait, CpgEdgeKind::Implements));
+    cpg.add_edge(CpgEdge::new(
+        EdgeId::new(2),
+        concrete_factory,
+        factory_trait,
+        CpgEdgeKind::Implements,
+    ));
 
     cpg
 }
 
 fn abstract_factory_template() -> PatternTemplate {
-    PatternTemplate::new("Abstract Factory", "Factory interface with multiple creation methods")
-        .with_node(NodeConstraint::new(0).with_kind(NodeKindMatcher::Exact(NodeKindTag::Trait)))
-        .with_node(NodeConstraint::new(1).with_kind(NodeKindMatcher::Exact(NodeKindTag::Function)))
-        .with_node(NodeConstraint::new(2).with_kind(NodeKindMatcher::Exact(NodeKindTag::Function)))
-        .with_node(NodeConstraint::new(3).with_kind(NodeKindMatcher::Exact(NodeKindTag::Class)))
-        .with_edge(EdgeConstraint::new(0, 1).with_kind(EdgeKindMatcher::AnyAst))
-        .with_edge(EdgeConstraint::new(0, 2).with_kind(EdgeKindMatcher::AnyAst))
-        .with_min_confidence(0.7)
+    PatternTemplate::new(
+        "Abstract Factory",
+        "Factory interface with multiple creation methods",
+    )
+    .with_node(NodeConstraint::new(0).with_kind(NodeKindMatcher::Exact(NodeKindTag::Trait)))
+    .with_node(NodeConstraint::new(1).with_kind(NodeKindMatcher::Exact(NodeKindTag::Function)))
+    .with_node(NodeConstraint::new(2).with_kind(NodeKindMatcher::Exact(NodeKindTag::Function)))
+    .with_node(NodeConstraint::new(3).with_kind(NodeKindMatcher::Exact(NodeKindTag::Class)))
+    .with_edge(EdgeConstraint::new(0, 1).with_kind(EdgeKindMatcher::AnyAst))
+    .with_edge(EdgeConstraint::new(0, 2).with_kind(EdgeKindMatcher::AnyAst))
+    .with_min_confidence(0.7)
 }
 
 // ===========================================================================
@@ -351,23 +410,41 @@ fn build_builder_pattern() -> CodePropertyGraph {
     ));
 
     // AST edges
-    cpg.add_edge(CpgEdge::new(EdgeId::new(0), builder, set_a, CpgEdgeKind::AstChild));
-    cpg.add_edge(CpgEdge::new(EdgeId::new(1), builder, set_b, CpgEdgeKind::AstChild));
-    cpg.add_edge(CpgEdge::new(EdgeId::new(2), builder, build, CpgEdgeKind::AstChild));
+    cpg.add_edge(CpgEdge::new(
+        EdgeId::new(0),
+        builder,
+        set_a,
+        CpgEdgeKind::AstChild,
+    ));
+    cpg.add_edge(CpgEdge::new(
+        EdgeId::new(1),
+        builder,
+        set_b,
+        CpgEdgeKind::AstChild,
+    ));
+    cpg.add_edge(CpgEdge::new(
+        EdgeId::new(2),
+        builder,
+        build,
+        CpgEdgeKind::AstChild,
+    ));
 
     cpg
 }
 
 fn builder_template() -> PatternTemplate {
-    PatternTemplate::new("Builder", "Fluent builder with chained setter methods and build()")
-        .with_node(NodeConstraint::new(0).with_kind(NodeKindMatcher::Exact(NodeKindTag::Class)))
-        .with_node(NodeConstraint::new(1).with_kind(NodeKindMatcher::Exact(NodeKindTag::Function)))
-        .with_node(NodeConstraint::new(2).with_kind(NodeKindMatcher::Exact(NodeKindTag::Function)))
-        .with_node(NodeConstraint::new(3).with_kind(NodeKindMatcher::Exact(NodeKindTag::Function)))
-        .with_edge(EdgeConstraint::new(0, 1).with_kind(EdgeKindMatcher::AnyAst))
-        .with_edge(EdgeConstraint::new(0, 2).with_kind(EdgeKindMatcher::AnyAst))
-        .with_edge(EdgeConstraint::new(0, 3).with_kind(EdgeKindMatcher::AnyAst))
-        .with_min_confidence(0.7)
+    PatternTemplate::new(
+        "Builder",
+        "Fluent builder with chained setter methods and build()",
+    )
+    .with_node(NodeConstraint::new(0).with_kind(NodeKindMatcher::Exact(NodeKindTag::Class)))
+    .with_node(NodeConstraint::new(1).with_kind(NodeKindMatcher::Exact(NodeKindTag::Function)))
+    .with_node(NodeConstraint::new(2).with_kind(NodeKindMatcher::Exact(NodeKindTag::Function)))
+    .with_node(NodeConstraint::new(3).with_kind(NodeKindMatcher::Exact(NodeKindTag::Function)))
+    .with_edge(EdgeConstraint::new(0, 1).with_kind(EdgeKindMatcher::AnyAst))
+    .with_edge(EdgeConstraint::new(0, 2).with_kind(EdgeKindMatcher::AnyAst))
+    .with_edge(EdgeConstraint::new(0, 3).with_kind(EdgeKindMatcher::AnyAst))
+    .with_min_confidence(0.7)
 }
 
 // ===========================================================================
@@ -407,25 +484,38 @@ fn build_prototype_pattern() -> CodePropertyGraph {
     ));
 
     // AST edge
-    cpg.add_edge(CpgEdge::new(EdgeId::new(0), prototype, clone, CpgEdgeKind::AstChild));
+    cpg.add_edge(CpgEdge::new(
+        EdgeId::new(0),
+        prototype,
+        clone,
+        CpgEdgeKind::AstChild,
+    ));
 
     // Implements edge
-    cpg.add_edge(CpgEdge::new(EdgeId::new(1), concrete, prototype, CpgEdgeKind::Implements));
+    cpg.add_edge(CpgEdge::new(
+        EdgeId::new(1),
+        concrete,
+        prototype,
+        CpgEdgeKind::Implements,
+    ));
 
     cpg
 }
 
 fn prototype_template() -> PatternTemplate {
-    PatternTemplate::new("Prototype", "Interface with clone() method implemented by concrete types")
-        .with_node(NodeConstraint::new(0).with_kind(NodeKindMatcher::Exact(NodeKindTag::Trait)))
-        .with_node(
-            NodeConstraint::new(1)
-                .with_kind(NodeKindMatcher::Exact(NodeKindTag::Function))
-                .with_name_pattern("clone"),
-        )
-        .with_node(NodeConstraint::new(2).with_kind(NodeKindMatcher::Exact(NodeKindTag::Class)))
-        .with_edge(EdgeConstraint::new(0, 1).with_kind(EdgeKindMatcher::AnyAst))
-        .with_min_confidence(0.8)
+    PatternTemplate::new(
+        "Prototype",
+        "Interface with clone() method implemented by concrete types",
+    )
+    .with_node(NodeConstraint::new(0).with_kind(NodeKindMatcher::Exact(NodeKindTag::Trait)))
+    .with_node(
+        NodeConstraint::new(1)
+            .with_kind(NodeKindMatcher::Exact(NodeKindTag::Function))
+            .with_name_pattern("clone"),
+    )
+    .with_node(NodeConstraint::new(2).with_kind(NodeKindMatcher::Exact(NodeKindTag::Class)))
+    .with_edge(EdgeConstraint::new(0, 1).with_kind(EdgeKindMatcher::AnyAst))
+    .with_min_confidence(0.8)
 }
 
 // ===========================================================================
@@ -476,24 +566,42 @@ fn build_adapter_pattern() -> CodePropertyGraph {
     ));
 
     // Implements edge
-    cpg.add_edge(CpgEdge::new(EdgeId::new(0), adapter, target, CpgEdgeKind::Implements));
+    cpg.add_edge(CpgEdge::new(
+        EdgeId::new(0),
+        adapter,
+        target,
+        CpgEdgeKind::Implements,
+    ));
 
     // AST edges
-    cpg.add_edge(CpgEdge::new(EdgeId::new(1), adapter, adaptee_field, CpgEdgeKind::AstChild));
-    cpg.add_edge(CpgEdge::new(EdgeId::new(2), adapter, request, CpgEdgeKind::AstChild));
+    cpg.add_edge(CpgEdge::new(
+        EdgeId::new(1),
+        adapter,
+        adaptee_field,
+        CpgEdgeKind::AstChild,
+    ));
+    cpg.add_edge(CpgEdge::new(
+        EdgeId::new(2),
+        adapter,
+        request,
+        CpgEdgeKind::AstChild,
+    ));
 
     cpg
 }
 
 fn adapter_template() -> PatternTemplate {
-    PatternTemplate::new("Adapter", "Class implementing target interface and delegating to adaptee")
-        .with_node(NodeConstraint::new(0).with_kind(NodeKindMatcher::Exact(NodeKindTag::Trait)))
-        .with_node(NodeConstraint::new(1).with_kind(NodeKindMatcher::Exact(NodeKindTag::Class)))
-        .with_node(NodeConstraint::new(2).with_kind(NodeKindMatcher::Exact(NodeKindTag::Field)))
-        .with_node(NodeConstraint::new(3).with_kind(NodeKindMatcher::Exact(NodeKindTag::Function)))
-        .with_edge(EdgeConstraint::new(1, 2).with_kind(EdgeKindMatcher::AnyAst))
-        .with_edge(EdgeConstraint::new(1, 3).with_kind(EdgeKindMatcher::AnyAst))
-        .with_min_confidence(0.7)
+    PatternTemplate::new(
+        "Adapter",
+        "Class implementing target interface and delegating to adaptee",
+    )
+    .with_node(NodeConstraint::new(0).with_kind(NodeKindMatcher::Exact(NodeKindTag::Trait)))
+    .with_node(NodeConstraint::new(1).with_kind(NodeKindMatcher::Exact(NodeKindTag::Class)))
+    .with_node(NodeConstraint::new(2).with_kind(NodeKindMatcher::Exact(NodeKindTag::Field)))
+    .with_node(NodeConstraint::new(3).with_kind(NodeKindMatcher::Exact(NodeKindTag::Function)))
+    .with_edge(EdgeConstraint::new(1, 2).with_kind(EdgeKindMatcher::AnyAst))
+    .with_edge(EdgeConstraint::new(1, 3).with_kind(EdgeKindMatcher::AnyAst))
+    .with_min_confidence(0.7)
 }
 
 // ===========================================================================
@@ -544,11 +652,26 @@ fn build_bridge_pattern() -> CodePropertyGraph {
     ));
 
     // AST edges
-    cpg.add_edge(CpgEdge::new(EdgeId::new(0), abstraction, impl_field, CpgEdgeKind::AstChild));
-    cpg.add_edge(CpgEdge::new(EdgeId::new(1), abstraction, operation, CpgEdgeKind::AstChild));
+    cpg.add_edge(CpgEdge::new(
+        EdgeId::new(0),
+        abstraction,
+        impl_field,
+        CpgEdgeKind::AstChild,
+    ));
+    cpg.add_edge(CpgEdge::new(
+        EdgeId::new(1),
+        abstraction,
+        operation,
+        CpgEdgeKind::AstChild,
+    ));
 
     // Type reference from field to implementor type
-    cpg.add_edge(CpgEdge::new(EdgeId::new(2), impl_field, implementor, CpgEdgeKind::TypeOf));
+    cpg.add_edge(CpgEdge::new(
+        EdgeId::new(2),
+        impl_field,
+        implementor,
+        CpgEdgeKind::TypeOf,
+    ));
 
     cpg
 }
@@ -556,14 +679,17 @@ fn build_bridge_pattern() -> CodePropertyGraph {
 fn bridge_template() -> PatternTemplate {
     // Node 3 (the abstraction's `operation` method) mirrors `build_bridge_pattern`
     // so `node_constraints.len()` matches the pattern CPG's `node_count()` (4).
-    PatternTemplate::new("Bridge", "Abstraction with field referencing Implementor interface")
-        .with_node(NodeConstraint::new(0).with_kind(NodeKindMatcher::Exact(NodeKindTag::Class)))
-        .with_node(NodeConstraint::new(1).with_kind(NodeKindMatcher::Exact(NodeKindTag::Trait)))
-        .with_node(NodeConstraint::new(2).with_kind(NodeKindMatcher::Exact(NodeKindTag::Field)))
-        .with_node(NodeConstraint::new(3).with_kind(NodeKindMatcher::Exact(NodeKindTag::Function)))
-        .with_edge(EdgeConstraint::new(0, 2).with_kind(EdgeKindMatcher::AnyAst))
-        .with_edge(EdgeConstraint::new(0, 3).with_kind(EdgeKindMatcher::AnyAst))
-        .with_min_confidence(0.7)
+    PatternTemplate::new(
+        "Bridge",
+        "Abstraction with field referencing Implementor interface",
+    )
+    .with_node(NodeConstraint::new(0).with_kind(NodeKindMatcher::Exact(NodeKindTag::Class)))
+    .with_node(NodeConstraint::new(1).with_kind(NodeKindMatcher::Exact(NodeKindTag::Trait)))
+    .with_node(NodeConstraint::new(2).with_kind(NodeKindMatcher::Exact(NodeKindTag::Field)))
+    .with_node(NodeConstraint::new(3).with_kind(NodeKindMatcher::Exact(NodeKindTag::Function)))
+    .with_edge(EdgeConstraint::new(0, 2).with_kind(EdgeKindMatcher::AnyAst))
+    .with_edge(EdgeConstraint::new(0, 3).with_kind(EdgeKindMatcher::AnyAst))
+    .with_min_confidence(0.7)
 }
 
 // ===========================================================================
@@ -623,12 +749,32 @@ fn build_composite_pattern() -> CodePropertyGraph {
     ));
 
     // AST edges
-    cpg.add_edge(CpgEdge::new(EdgeId::new(0), component, operation, CpgEdgeKind::AstChild));
-    cpg.add_edge(CpgEdge::new(EdgeId::new(1), composite, children, CpgEdgeKind::AstChild));
-    cpg.add_edge(CpgEdge::new(EdgeId::new(2), composite, add, CpgEdgeKind::AstChild));
+    cpg.add_edge(CpgEdge::new(
+        EdgeId::new(0),
+        component,
+        operation,
+        CpgEdgeKind::AstChild,
+    ));
+    cpg.add_edge(CpgEdge::new(
+        EdgeId::new(1),
+        composite,
+        children,
+        CpgEdgeKind::AstChild,
+    ));
+    cpg.add_edge(CpgEdge::new(
+        EdgeId::new(2),
+        composite,
+        add,
+        CpgEdgeKind::AstChild,
+    ));
 
     // Implements edge
-    cpg.add_edge(CpgEdge::new(EdgeId::new(3), composite, component, CpgEdgeKind::Implements));
+    cpg.add_edge(CpgEdge::new(
+        EdgeId::new(3),
+        composite,
+        component,
+        CpgEdgeKind::Implements,
+    ));
 
     cpg
 }
@@ -636,16 +782,19 @@ fn build_composite_pattern() -> CodePropertyGraph {
 fn composite_template() -> PatternTemplate {
     // Node 4 (the composite's `add` method) mirrors `build_composite_pattern`
     // so `node_constraints.len()` matches the pattern CPG's `node_count()` (5).
-    PatternTemplate::new("Composite", "Component interface with Composite holding children collection")
-        .with_node(NodeConstraint::new(0).with_kind(NodeKindMatcher::Exact(NodeKindTag::Trait)))
-        .with_node(NodeConstraint::new(1).with_kind(NodeKindMatcher::Exact(NodeKindTag::Function)))
-        .with_node(NodeConstraint::new(2).with_kind(NodeKindMatcher::Exact(NodeKindTag::Class)))
-        .with_node(NodeConstraint::new(3).with_kind(NodeKindMatcher::Exact(NodeKindTag::Field)))
-        .with_node(NodeConstraint::new(4).with_kind(NodeKindMatcher::Exact(NodeKindTag::Function)))
-        .with_edge(EdgeConstraint::new(0, 1).with_kind(EdgeKindMatcher::AnyAst))
-        .with_edge(EdgeConstraint::new(2, 3).with_kind(EdgeKindMatcher::AnyAst))
-        .with_edge(EdgeConstraint::new(2, 4).with_kind(EdgeKindMatcher::AnyAst))
-        .with_min_confidence(0.7)
+    PatternTemplate::new(
+        "Composite",
+        "Component interface with Composite holding children collection",
+    )
+    .with_node(NodeConstraint::new(0).with_kind(NodeKindMatcher::Exact(NodeKindTag::Trait)))
+    .with_node(NodeConstraint::new(1).with_kind(NodeKindMatcher::Exact(NodeKindTag::Function)))
+    .with_node(NodeConstraint::new(2).with_kind(NodeKindMatcher::Exact(NodeKindTag::Class)))
+    .with_node(NodeConstraint::new(3).with_kind(NodeKindMatcher::Exact(NodeKindTag::Field)))
+    .with_node(NodeConstraint::new(4).with_kind(NodeKindMatcher::Exact(NodeKindTag::Function)))
+    .with_edge(EdgeConstraint::new(0, 1).with_kind(EdgeKindMatcher::AnyAst))
+    .with_edge(EdgeConstraint::new(2, 3).with_kind(EdgeKindMatcher::AnyAst))
+    .with_edge(EdgeConstraint::new(2, 4).with_kind(EdgeKindMatcher::AnyAst))
+    .with_min_confidence(0.7)
 }
 
 // ===========================================================================
@@ -696,27 +845,50 @@ fn build_decorator_pattern() -> CodePropertyGraph {
     ));
 
     // Implements edge
-    cpg.add_edge(CpgEdge::new(EdgeId::new(0), decorator, component, CpgEdgeKind::Implements));
+    cpg.add_edge(CpgEdge::new(
+        EdgeId::new(0),
+        decorator,
+        component,
+        CpgEdgeKind::Implements,
+    ));
 
     // AST edges
-    cpg.add_edge(CpgEdge::new(EdgeId::new(1), decorator, wrapped, CpgEdgeKind::AstChild));
-    cpg.add_edge(CpgEdge::new(EdgeId::new(2), decorator, operation, CpgEdgeKind::AstChild));
+    cpg.add_edge(CpgEdge::new(
+        EdgeId::new(1),
+        decorator,
+        wrapped,
+        CpgEdgeKind::AstChild,
+    ));
+    cpg.add_edge(CpgEdge::new(
+        EdgeId::new(2),
+        decorator,
+        operation,
+        CpgEdgeKind::AstChild,
+    ));
 
     // Type reference: wrapped field is of type Component
-    cpg.add_edge(CpgEdge::new(EdgeId::new(3), wrapped, component, CpgEdgeKind::TypeOf));
+    cpg.add_edge(CpgEdge::new(
+        EdgeId::new(3),
+        wrapped,
+        component,
+        CpgEdgeKind::TypeOf,
+    ));
 
     cpg
 }
 
 fn decorator_template() -> PatternTemplate {
-    PatternTemplate::new("Decorator", "Class implementing Component, wrapping and delegating to Component")
-        .with_node(NodeConstraint::new(0).with_kind(NodeKindMatcher::Exact(NodeKindTag::Trait)))
-        .with_node(NodeConstraint::new(1).with_kind(NodeKindMatcher::Exact(NodeKindTag::Class)))
-        .with_node(NodeConstraint::new(2).with_kind(NodeKindMatcher::Exact(NodeKindTag::Field)))
-        .with_node(NodeConstraint::new(3).with_kind(NodeKindMatcher::Exact(NodeKindTag::Function)))
-        .with_edge(EdgeConstraint::new(1, 2).with_kind(EdgeKindMatcher::AnyAst))
-        .with_edge(EdgeConstraint::new(1, 3).with_kind(EdgeKindMatcher::AnyAst))
-        .with_min_confidence(0.7)
+    PatternTemplate::new(
+        "Decorator",
+        "Class implementing Component, wrapping and delegating to Component",
+    )
+    .with_node(NodeConstraint::new(0).with_kind(NodeKindMatcher::Exact(NodeKindTag::Trait)))
+    .with_node(NodeConstraint::new(1).with_kind(NodeKindMatcher::Exact(NodeKindTag::Class)))
+    .with_node(NodeConstraint::new(2).with_kind(NodeKindMatcher::Exact(NodeKindTag::Field)))
+    .with_node(NodeConstraint::new(3).with_kind(NodeKindMatcher::Exact(NodeKindTag::Function)))
+    .with_edge(EdgeConstraint::new(1, 2).with_kind(EdgeKindMatcher::AnyAst))
+    .with_edge(EdgeConstraint::new(1, 3).with_kind(EdgeKindMatcher::AnyAst))
+    .with_min_confidence(0.7)
 }
 
 // ===========================================================================
@@ -767,23 +939,41 @@ fn build_facade_pattern() -> CodePropertyGraph {
     ));
 
     // AST edges
-    cpg.add_edge(CpgEdge::new(EdgeId::new(0), facade, subsystem1, CpgEdgeKind::AstChild));
-    cpg.add_edge(CpgEdge::new(EdgeId::new(1), facade, subsystem2, CpgEdgeKind::AstChild));
-    cpg.add_edge(CpgEdge::new(EdgeId::new(2), facade, operation, CpgEdgeKind::AstChild));
+    cpg.add_edge(CpgEdge::new(
+        EdgeId::new(0),
+        facade,
+        subsystem1,
+        CpgEdgeKind::AstChild,
+    ));
+    cpg.add_edge(CpgEdge::new(
+        EdgeId::new(1),
+        facade,
+        subsystem2,
+        CpgEdgeKind::AstChild,
+    ));
+    cpg.add_edge(CpgEdge::new(
+        EdgeId::new(2),
+        facade,
+        operation,
+        CpgEdgeKind::AstChild,
+    ));
 
     cpg
 }
 
 fn facade_template() -> PatternTemplate {
-    PatternTemplate::new("Facade", "Class with multiple subsystem fields and simplified methods")
-        .with_node(NodeConstraint::new(0).with_kind(NodeKindMatcher::Exact(NodeKindTag::Class)))
-        .with_node(NodeConstraint::new(1).with_kind(NodeKindMatcher::Exact(NodeKindTag::Field)))
-        .with_node(NodeConstraint::new(2).with_kind(NodeKindMatcher::Exact(NodeKindTag::Field)))
-        .with_node(NodeConstraint::new(3).with_kind(NodeKindMatcher::Exact(NodeKindTag::Function)))
-        .with_edge(EdgeConstraint::new(0, 1).with_kind(EdgeKindMatcher::AnyAst))
-        .with_edge(EdgeConstraint::new(0, 2).with_kind(EdgeKindMatcher::AnyAst))
-        .with_edge(EdgeConstraint::new(0, 3).with_kind(EdgeKindMatcher::AnyAst))
-        .with_min_confidence(0.6)
+    PatternTemplate::new(
+        "Facade",
+        "Class with multiple subsystem fields and simplified methods",
+    )
+    .with_node(NodeConstraint::new(0).with_kind(NodeKindMatcher::Exact(NodeKindTag::Class)))
+    .with_node(NodeConstraint::new(1).with_kind(NodeKindMatcher::Exact(NodeKindTag::Field)))
+    .with_node(NodeConstraint::new(2).with_kind(NodeKindMatcher::Exact(NodeKindTag::Field)))
+    .with_node(NodeConstraint::new(3).with_kind(NodeKindMatcher::Exact(NodeKindTag::Function)))
+    .with_edge(EdgeConstraint::new(0, 1).with_kind(EdgeKindMatcher::AnyAst))
+    .with_edge(EdgeConstraint::new(0, 2).with_kind(EdgeKindMatcher::AnyAst))
+    .with_edge(EdgeConstraint::new(0, 3).with_kind(EdgeKindMatcher::AnyAst))
+    .with_min_confidence(0.6)
 }
 
 // ===========================================================================
@@ -843,9 +1033,24 @@ fn build_flyweight_pattern() -> CodePropertyGraph {
     ));
 
     // AST edges
-    cpg.add_edge(CpgEdge::new(EdgeId::new(0), flyweight, operation, CpgEdgeKind::AstChild));
-    cpg.add_edge(CpgEdge::new(EdgeId::new(1), factory, cache, CpgEdgeKind::AstChild));
-    cpg.add_edge(CpgEdge::new(EdgeId::new(2), factory, get_flyweight, CpgEdgeKind::AstChild));
+    cpg.add_edge(CpgEdge::new(
+        EdgeId::new(0),
+        flyweight,
+        operation,
+        CpgEdgeKind::AstChild,
+    ));
+    cpg.add_edge(CpgEdge::new(
+        EdgeId::new(1),
+        factory,
+        cache,
+        CpgEdgeKind::AstChild,
+    ));
+    cpg.add_edge(CpgEdge::new(
+        EdgeId::new(2),
+        factory,
+        get_flyweight,
+        CpgEdgeKind::AstChild,
+    ));
 
     cpg
 }
@@ -853,16 +1058,19 @@ fn build_flyweight_pattern() -> CodePropertyGraph {
 fn flyweight_template() -> PatternTemplate {
     // Node 4 (the factory's `getFlyweight` method) mirrors `build_flyweight_pattern`
     // so `node_constraints.len()` matches the pattern CPG's `node_count()` (5).
-    PatternTemplate::new("Flyweight", "Factory with cache returning shared Flyweight instances")
-        .with_node(NodeConstraint::new(0).with_kind(NodeKindMatcher::Exact(NodeKindTag::Trait)))
-        .with_node(NodeConstraint::new(1).with_kind(NodeKindMatcher::Exact(NodeKindTag::Function)))
-        .with_node(NodeConstraint::new(2).with_kind(NodeKindMatcher::Exact(NodeKindTag::Class)))
-        .with_node(NodeConstraint::new(3).with_kind(NodeKindMatcher::Exact(NodeKindTag::Field)))
-        .with_node(NodeConstraint::new(4).with_kind(NodeKindMatcher::Exact(NodeKindTag::Function)))
-        .with_edge(EdgeConstraint::new(0, 1).with_kind(EdgeKindMatcher::AnyAst))
-        .with_edge(EdgeConstraint::new(2, 3).with_kind(EdgeKindMatcher::AnyAst))
-        .with_edge(EdgeConstraint::new(2, 4).with_kind(EdgeKindMatcher::AnyAst))
-        .with_min_confidence(0.7)
+    PatternTemplate::new(
+        "Flyweight",
+        "Factory with cache returning shared Flyweight instances",
+    )
+    .with_node(NodeConstraint::new(0).with_kind(NodeKindMatcher::Exact(NodeKindTag::Trait)))
+    .with_node(NodeConstraint::new(1).with_kind(NodeKindMatcher::Exact(NodeKindTag::Function)))
+    .with_node(NodeConstraint::new(2).with_kind(NodeKindMatcher::Exact(NodeKindTag::Class)))
+    .with_node(NodeConstraint::new(3).with_kind(NodeKindMatcher::Exact(NodeKindTag::Field)))
+    .with_node(NodeConstraint::new(4).with_kind(NodeKindMatcher::Exact(NodeKindTag::Function)))
+    .with_edge(EdgeConstraint::new(0, 1).with_kind(EdgeKindMatcher::AnyAst))
+    .with_edge(EdgeConstraint::new(2, 3).with_kind(EdgeKindMatcher::AnyAst))
+    .with_edge(EdgeConstraint::new(2, 4).with_kind(EdgeKindMatcher::AnyAst))
+    .with_min_confidence(0.7)
 }
 
 // ===========================================================================
@@ -913,24 +1121,42 @@ fn build_proxy_pattern() -> CodePropertyGraph {
     ));
 
     // AST edges
-    cpg.add_edge(CpgEdge::new(EdgeId::new(0), subject, request, CpgEdgeKind::AstChild));
-    cpg.add_edge(CpgEdge::new(EdgeId::new(1), proxy, real_subject, CpgEdgeKind::AstChild));
+    cpg.add_edge(CpgEdge::new(
+        EdgeId::new(0),
+        subject,
+        request,
+        CpgEdgeKind::AstChild,
+    ));
+    cpg.add_edge(CpgEdge::new(
+        EdgeId::new(1),
+        proxy,
+        real_subject,
+        CpgEdgeKind::AstChild,
+    ));
 
     // Implements edge
-    cpg.add_edge(CpgEdge::new(EdgeId::new(2), proxy, subject, CpgEdgeKind::Implements));
+    cpg.add_edge(CpgEdge::new(
+        EdgeId::new(2),
+        proxy,
+        subject,
+        CpgEdgeKind::Implements,
+    ));
 
     cpg
 }
 
 fn proxy_template() -> PatternTemplate {
-    PatternTemplate::new("Proxy", "Class implementing Subject interface, holding real Subject reference")
-        .with_node(NodeConstraint::new(0).with_kind(NodeKindMatcher::Exact(NodeKindTag::Trait)))
-        .with_node(NodeConstraint::new(1).with_kind(NodeKindMatcher::Exact(NodeKindTag::Function)))
-        .with_node(NodeConstraint::new(2).with_kind(NodeKindMatcher::Exact(NodeKindTag::Class)))
-        .with_node(NodeConstraint::new(3).with_kind(NodeKindMatcher::Exact(NodeKindTag::Field)))
-        .with_edge(EdgeConstraint::new(0, 1).with_kind(EdgeKindMatcher::AnyAst))
-        .with_edge(EdgeConstraint::new(2, 3).with_kind(EdgeKindMatcher::AnyAst))
-        .with_min_confidence(0.7)
+    PatternTemplate::new(
+        "Proxy",
+        "Class implementing Subject interface, holding real Subject reference",
+    )
+    .with_node(NodeConstraint::new(0).with_kind(NodeKindMatcher::Exact(NodeKindTag::Trait)))
+    .with_node(NodeConstraint::new(1).with_kind(NodeKindMatcher::Exact(NodeKindTag::Function)))
+    .with_node(NodeConstraint::new(2).with_kind(NodeKindMatcher::Exact(NodeKindTag::Class)))
+    .with_node(NodeConstraint::new(3).with_kind(NodeKindMatcher::Exact(NodeKindTag::Field)))
+    .with_edge(EdgeConstraint::new(0, 1).with_kind(EdgeKindMatcher::AnyAst))
+    .with_edge(EdgeConstraint::new(2, 3).with_kind(EdgeKindMatcher::AnyAst))
+    .with_min_confidence(0.7)
 }
 
 // ===========================================================================
@@ -990,26 +1216,49 @@ fn build_chain_of_responsibility_pattern() -> CodePropertyGraph {
     ));
 
     // AST edges
-    cpg.add_edge(CpgEdge::new(EdgeId::new(0), handler, handle, CpgEdgeKind::AstChild));
-    cpg.add_edge(CpgEdge::new(EdgeId::new(1), handler, set_next, CpgEdgeKind::AstChild));
-    cpg.add_edge(CpgEdge::new(EdgeId::new(2), concrete, next, CpgEdgeKind::AstChild));
+    cpg.add_edge(CpgEdge::new(
+        EdgeId::new(0),
+        handler,
+        handle,
+        CpgEdgeKind::AstChild,
+    ));
+    cpg.add_edge(CpgEdge::new(
+        EdgeId::new(1),
+        handler,
+        set_next,
+        CpgEdgeKind::AstChild,
+    ));
+    cpg.add_edge(CpgEdge::new(
+        EdgeId::new(2),
+        concrete,
+        next,
+        CpgEdgeKind::AstChild,
+    ));
 
     // Implements edge
-    cpg.add_edge(CpgEdge::new(EdgeId::new(3), concrete, handler, CpgEdgeKind::Implements));
+    cpg.add_edge(CpgEdge::new(
+        EdgeId::new(3),
+        concrete,
+        handler,
+        CpgEdgeKind::Implements,
+    ));
 
     cpg
 }
 
 fn chain_of_responsibility_template() -> PatternTemplate {
-    PatternTemplate::new("Chain of Responsibility", "Handler with next handler field forming a chain")
-        .with_node(NodeConstraint::new(0).with_kind(NodeKindMatcher::Exact(NodeKindTag::Trait)))
-        .with_node(NodeConstraint::new(1).with_kind(NodeKindMatcher::Exact(NodeKindTag::Function)))
-        .with_node(NodeConstraint::new(2).with_kind(NodeKindMatcher::Exact(NodeKindTag::Function)))
-        .with_node(NodeConstraint::new(3).with_kind(NodeKindMatcher::Exact(NodeKindTag::Class)))
-        .with_node(NodeConstraint::new(4).with_kind(NodeKindMatcher::Exact(NodeKindTag::Field)))
-        .with_edge(EdgeConstraint::new(0, 1).with_kind(EdgeKindMatcher::AnyAst))
-        .with_edge(EdgeConstraint::new(3, 4).with_kind(EdgeKindMatcher::AnyAst))
-        .with_min_confidence(0.7)
+    PatternTemplate::new(
+        "Chain of Responsibility",
+        "Handler with next handler field forming a chain",
+    )
+    .with_node(NodeConstraint::new(0).with_kind(NodeKindMatcher::Exact(NodeKindTag::Trait)))
+    .with_node(NodeConstraint::new(1).with_kind(NodeKindMatcher::Exact(NodeKindTag::Function)))
+    .with_node(NodeConstraint::new(2).with_kind(NodeKindMatcher::Exact(NodeKindTag::Function)))
+    .with_node(NodeConstraint::new(3).with_kind(NodeKindMatcher::Exact(NodeKindTag::Class)))
+    .with_node(NodeConstraint::new(4).with_kind(NodeKindMatcher::Exact(NodeKindTag::Field)))
+    .with_edge(EdgeConstraint::new(0, 1).with_kind(EdgeKindMatcher::AnyAst))
+    .with_edge(EdgeConstraint::new(3, 4).with_kind(EdgeKindMatcher::AnyAst))
+    .with_min_confidence(0.7)
 }
 
 // ===========================================================================
@@ -1060,24 +1309,42 @@ fn build_command_pattern() -> CodePropertyGraph {
     ));
 
     // AST edges
-    cpg.add_edge(CpgEdge::new(EdgeId::new(0), command, execute, CpgEdgeKind::AstChild));
-    cpg.add_edge(CpgEdge::new(EdgeId::new(1), concrete, receiver, CpgEdgeKind::AstChild));
+    cpg.add_edge(CpgEdge::new(
+        EdgeId::new(0),
+        command,
+        execute,
+        CpgEdgeKind::AstChild,
+    ));
+    cpg.add_edge(CpgEdge::new(
+        EdgeId::new(1),
+        concrete,
+        receiver,
+        CpgEdgeKind::AstChild,
+    ));
 
     // Implements edge
-    cpg.add_edge(CpgEdge::new(EdgeId::new(2), concrete, command, CpgEdgeKind::Implements));
+    cpg.add_edge(CpgEdge::new(
+        EdgeId::new(2),
+        concrete,
+        command,
+        CpgEdgeKind::Implements,
+    ));
 
     cpg
 }
 
 fn command_template() -> PatternTemplate {
-    PatternTemplate::new("Command", "Command interface with execute(), ConcreteCommand with receiver")
-        .with_node(NodeConstraint::new(0).with_kind(NodeKindMatcher::Exact(NodeKindTag::Trait)))
-        .with_node(NodeConstraint::new(1).with_kind(NodeKindMatcher::Exact(NodeKindTag::Function)))
-        .with_node(NodeConstraint::new(2).with_kind(NodeKindMatcher::Exact(NodeKindTag::Class)))
-        .with_node(NodeConstraint::new(3).with_kind(NodeKindMatcher::Exact(NodeKindTag::Field)))
-        .with_edge(EdgeConstraint::new(0, 1).with_kind(EdgeKindMatcher::AnyAst))
-        .with_edge(EdgeConstraint::new(2, 3).with_kind(EdgeKindMatcher::AnyAst))
-        .with_min_confidence(0.7)
+    PatternTemplate::new(
+        "Command",
+        "Command interface with execute(), ConcreteCommand with receiver",
+    )
+    .with_node(NodeConstraint::new(0).with_kind(NodeKindMatcher::Exact(NodeKindTag::Trait)))
+    .with_node(NodeConstraint::new(1).with_kind(NodeKindMatcher::Exact(NodeKindTag::Function)))
+    .with_node(NodeConstraint::new(2).with_kind(NodeKindMatcher::Exact(NodeKindTag::Class)))
+    .with_node(NodeConstraint::new(3).with_kind(NodeKindMatcher::Exact(NodeKindTag::Field)))
+    .with_edge(EdgeConstraint::new(0, 1).with_kind(EdgeKindMatcher::AnyAst))
+    .with_edge(EdgeConstraint::new(2, 3).with_kind(EdgeKindMatcher::AnyAst))
+    .with_min_confidence(0.7)
 }
 
 // ===========================================================================
@@ -1127,32 +1394,50 @@ fn build_interpreter_pattern() -> CodePropertyGraph {
     ));
 
     // AST edges
-    cpg.add_edge(CpgEdge::new(EdgeId::new(0), expression, interpret, CpgEdgeKind::AstChild));
+    cpg.add_edge(CpgEdge::new(
+        EdgeId::new(0),
+        expression,
+        interpret,
+        CpgEdgeKind::AstChild,
+    ));
 
     // Implements edges
-    cpg.add_edge(CpgEdge::new(EdgeId::new(1), terminal, expression, CpgEdgeKind::Implements));
-    cpg.add_edge(CpgEdge::new(EdgeId::new(2), non_terminal, expression, CpgEdgeKind::Implements));
+    cpg.add_edge(CpgEdge::new(
+        EdgeId::new(1),
+        terminal,
+        expression,
+        CpgEdgeKind::Implements,
+    ));
+    cpg.add_edge(CpgEdge::new(
+        EdgeId::new(2),
+        non_terminal,
+        expression,
+        CpgEdgeKind::Implements,
+    ));
 
     cpg
 }
 
 fn interpreter_template() -> PatternTemplate {
-    PatternTemplate::new("Interpreter", "Expression interface with Terminal and NonTerminal implementations")
-        .with_node(NodeConstraint::new(0).with_kind(NodeKindMatcher::Exact(NodeKindTag::Trait)))
-        .with_node(
-            NodeConstraint::new(1)
-                .with_kind(NodeKindMatcher::Exact(NodeKindTag::Function))
-                .with_name_pattern("interpret"),
-        )
-        .with_node(NodeConstraint::new(2).with_kind(NodeKindMatcher::Exact(NodeKindTag::Class)))
-        // Node 3 (NonTerminalExpression) mirrors `build_interpreter_pattern` so
-        // `node_constraints.len()` matches the pattern CPG's `node_count()` (4).
-        // Like node 2 (TerminalExpression), it is related to the interface only
-        // by an `Implements` edge, which the template's AnyAst edges do not
-        // constrain — so it carries a node constraint but no edge constraint.
-        .with_node(NodeConstraint::new(3).with_kind(NodeKindMatcher::Exact(NodeKindTag::Class)))
-        .with_edge(EdgeConstraint::new(0, 1).with_kind(EdgeKindMatcher::AnyAst))
-        .with_min_confidence(0.7)
+    PatternTemplate::new(
+        "Interpreter",
+        "Expression interface with Terminal and NonTerminal implementations",
+    )
+    .with_node(NodeConstraint::new(0).with_kind(NodeKindMatcher::Exact(NodeKindTag::Trait)))
+    .with_node(
+        NodeConstraint::new(1)
+            .with_kind(NodeKindMatcher::Exact(NodeKindTag::Function))
+            .with_name_pattern("interpret"),
+    )
+    .with_node(NodeConstraint::new(2).with_kind(NodeKindMatcher::Exact(NodeKindTag::Class)))
+    // Node 3 (NonTerminalExpression) mirrors `build_interpreter_pattern` so
+    // `node_constraints.len()` matches the pattern CPG's `node_count()` (4).
+    // Like node 2 (TerminalExpression), it is related to the interface only
+    // by an `Implements` edge, which the template's AnyAst edges do not
+    // constrain — so it carries a node constraint but no edge constraint.
+    .with_node(NodeConstraint::new(3).with_kind(NodeKindMatcher::Exact(NodeKindTag::Class)))
+    .with_edge(EdgeConstraint::new(0, 1).with_kind(EdgeKindMatcher::AnyAst))
+    .with_min_confidence(0.7)
 }
 
 // ===========================================================================
@@ -1191,8 +1476,18 @@ fn build_iterator_pattern() -> CodePropertyGraph {
     ));
 
     // AST edges
-    cpg.add_edge(CpgEdge::new(EdgeId::new(0), iterator, next, CpgEdgeKind::AstChild));
-    cpg.add_edge(CpgEdge::new(EdgeId::new(1), iterator, has_next, CpgEdgeKind::AstChild));
+    cpg.add_edge(CpgEdge::new(
+        EdgeId::new(0),
+        iterator,
+        next,
+        CpgEdgeKind::AstChild,
+    ));
+    cpg.add_edge(CpgEdge::new(
+        EdgeId::new(1),
+        iterator,
+        has_next,
+        CpgEdgeKind::AstChild,
+    ));
 
     cpg
 }
@@ -1259,24 +1554,42 @@ fn build_mediator_pattern() -> CodePropertyGraph {
     ));
 
     // AST edges
-    cpg.add_edge(CpgEdge::new(EdgeId::new(0), mediator, notify, CpgEdgeKind::AstChild));
-    cpg.add_edge(CpgEdge::new(EdgeId::new(1), colleague, med_field, CpgEdgeKind::AstChild));
+    cpg.add_edge(CpgEdge::new(
+        EdgeId::new(0),
+        mediator,
+        notify,
+        CpgEdgeKind::AstChild,
+    ));
+    cpg.add_edge(CpgEdge::new(
+        EdgeId::new(1),
+        colleague,
+        med_field,
+        CpgEdgeKind::AstChild,
+    ));
 
     // Type reference
-    cpg.add_edge(CpgEdge::new(EdgeId::new(2), med_field, mediator, CpgEdgeKind::TypeOf));
+    cpg.add_edge(CpgEdge::new(
+        EdgeId::new(2),
+        med_field,
+        mediator,
+        CpgEdgeKind::TypeOf,
+    ));
 
     cpg
 }
 
 fn mediator_template() -> PatternTemplate {
-    PatternTemplate::new("Mediator", "Mediator interface with notify(), Colleagues holding Mediator reference")
-        .with_node(NodeConstraint::new(0).with_kind(NodeKindMatcher::Exact(NodeKindTag::Trait)))
-        .with_node(NodeConstraint::new(1).with_kind(NodeKindMatcher::Exact(NodeKindTag::Function)))
-        .with_node(NodeConstraint::new(2).with_kind(NodeKindMatcher::Exact(NodeKindTag::Class)))
-        .with_node(NodeConstraint::new(3).with_kind(NodeKindMatcher::Exact(NodeKindTag::Field)))
-        .with_edge(EdgeConstraint::new(0, 1).with_kind(EdgeKindMatcher::AnyAst))
-        .with_edge(EdgeConstraint::new(2, 3).with_kind(EdgeKindMatcher::AnyAst))
-        .with_min_confidence(0.7)
+    PatternTemplate::new(
+        "Mediator",
+        "Mediator interface with notify(), Colleagues holding Mediator reference",
+    )
+    .with_node(NodeConstraint::new(0).with_kind(NodeKindMatcher::Exact(NodeKindTag::Trait)))
+    .with_node(NodeConstraint::new(1).with_kind(NodeKindMatcher::Exact(NodeKindTag::Function)))
+    .with_node(NodeConstraint::new(2).with_kind(NodeKindMatcher::Exact(NodeKindTag::Class)))
+    .with_node(NodeConstraint::new(3).with_kind(NodeKindMatcher::Exact(NodeKindTag::Field)))
+    .with_edge(EdgeConstraint::new(0, 1).with_kind(EdgeKindMatcher::AnyAst))
+    .with_edge(EdgeConstraint::new(2, 3).with_kind(EdgeKindMatcher::AnyAst))
+    .with_min_confidence(0.7)
 }
 
 // ===========================================================================
@@ -1327,31 +1640,49 @@ fn build_memento_pattern() -> CodePropertyGraph {
     ));
 
     // AST edges
-    cpg.add_edge(CpgEdge::new(EdgeId::new(0), originator, state, CpgEdgeKind::AstChild));
-    cpg.add_edge(CpgEdge::new(EdgeId::new(1), originator, save, CpgEdgeKind::AstChild));
-    cpg.add_edge(CpgEdge::new(EdgeId::new(2), originator, restore, CpgEdgeKind::AstChild));
+    cpg.add_edge(CpgEdge::new(
+        EdgeId::new(0),
+        originator,
+        state,
+        CpgEdgeKind::AstChild,
+    ));
+    cpg.add_edge(CpgEdge::new(
+        EdgeId::new(1),
+        originator,
+        save,
+        CpgEdgeKind::AstChild,
+    ));
+    cpg.add_edge(CpgEdge::new(
+        EdgeId::new(2),
+        originator,
+        restore,
+        CpgEdgeKind::AstChild,
+    ));
 
     cpg
 }
 
 fn memento_template() -> PatternTemplate {
-    PatternTemplate::new("Memento", "Originator with save/restore methods and state field")
-        .with_node(NodeConstraint::new(0).with_kind(NodeKindMatcher::Exact(NodeKindTag::Class)))
-        .with_node(NodeConstraint::new(1).with_kind(NodeKindMatcher::Exact(NodeKindTag::Field)))
-        .with_node(
-            NodeConstraint::new(2)
-                .with_kind(NodeKindMatcher::Exact(NodeKindTag::Function))
-                .with_name_pattern("save"),
-        )
-        .with_node(
-            NodeConstraint::new(3)
-                .with_kind(NodeKindMatcher::Exact(NodeKindTag::Function))
-                .with_name_pattern("restore"),
-        )
-        .with_edge(EdgeConstraint::new(0, 1).with_kind(EdgeKindMatcher::AnyAst))
-        .with_edge(EdgeConstraint::new(0, 2).with_kind(EdgeKindMatcher::AnyAst))
-        .with_edge(EdgeConstraint::new(0, 3).with_kind(EdgeKindMatcher::AnyAst))
-        .with_min_confidence(0.8)
+    PatternTemplate::new(
+        "Memento",
+        "Originator with save/restore methods and state field",
+    )
+    .with_node(NodeConstraint::new(0).with_kind(NodeKindMatcher::Exact(NodeKindTag::Class)))
+    .with_node(NodeConstraint::new(1).with_kind(NodeKindMatcher::Exact(NodeKindTag::Field)))
+    .with_node(
+        NodeConstraint::new(2)
+            .with_kind(NodeKindMatcher::Exact(NodeKindTag::Function))
+            .with_name_pattern("save"),
+    )
+    .with_node(
+        NodeConstraint::new(3)
+            .with_kind(NodeKindMatcher::Exact(NodeKindTag::Function))
+            .with_name_pattern("restore"),
+    )
+    .with_edge(EdgeConstraint::new(0, 1).with_kind(EdgeKindMatcher::AnyAst))
+    .with_edge(EdgeConstraint::new(0, 2).with_kind(EdgeKindMatcher::AnyAst))
+    .with_edge(EdgeConstraint::new(0, 3).with_kind(EdgeKindMatcher::AnyAst))
+    .with_min_confidence(0.8)
 }
 
 // ===========================================================================
@@ -1420,26 +1751,49 @@ fn build_observer_pattern() -> CodePropertyGraph {
     ));
 
     // AST edges
-    cpg.add_edge(CpgEdge::new(EdgeId::new(0), subject, observers, CpgEdgeKind::AstChild));
-    cpg.add_edge(CpgEdge::new(EdgeId::new(1), subject, attach, CpgEdgeKind::AstChild));
-    cpg.add_edge(CpgEdge::new(EdgeId::new(2), subject, notify, CpgEdgeKind::AstChild));
-    cpg.add_edge(CpgEdge::new(EdgeId::new(3), observer, update, CpgEdgeKind::AstChild));
+    cpg.add_edge(CpgEdge::new(
+        EdgeId::new(0),
+        subject,
+        observers,
+        CpgEdgeKind::AstChild,
+    ));
+    cpg.add_edge(CpgEdge::new(
+        EdgeId::new(1),
+        subject,
+        attach,
+        CpgEdgeKind::AstChild,
+    ));
+    cpg.add_edge(CpgEdge::new(
+        EdgeId::new(2),
+        subject,
+        notify,
+        CpgEdgeKind::AstChild,
+    ));
+    cpg.add_edge(CpgEdge::new(
+        EdgeId::new(3),
+        observer,
+        update,
+        CpgEdgeKind::AstChild,
+    ));
 
     cpg
 }
 
 fn observer_template() -> PatternTemplate {
-    PatternTemplate::new("Observer", "Subject with observers collection and attach/notify methods")
-        .with_node(NodeConstraint::new(0).with_kind(NodeKindMatcher::Exact(NodeKindTag::Class)))
-        .with_node(NodeConstraint::new(1).with_kind(NodeKindMatcher::Exact(NodeKindTag::Field)))
-        .with_node(NodeConstraint::new(2).with_kind(NodeKindMatcher::Exact(NodeKindTag::Function)))
-        .with_node(NodeConstraint::new(3).with_kind(NodeKindMatcher::Exact(NodeKindTag::Function)))
-        .with_node(NodeConstraint::new(4).with_kind(NodeKindMatcher::Exact(NodeKindTag::Trait)))
-        .with_node(NodeConstraint::new(5).with_kind(NodeKindMatcher::Exact(NodeKindTag::Function)))
-        .with_edge(EdgeConstraint::new(0, 1).with_kind(EdgeKindMatcher::AnyAst))
-        .with_edge(EdgeConstraint::new(0, 2).with_kind(EdgeKindMatcher::AnyAst))
-        .with_edge(EdgeConstraint::new(4, 5).with_kind(EdgeKindMatcher::AnyAst))
-        .with_min_confidence(0.8)
+    PatternTemplate::new(
+        "Observer",
+        "Subject with observers collection and attach/notify methods",
+    )
+    .with_node(NodeConstraint::new(0).with_kind(NodeKindMatcher::Exact(NodeKindTag::Class)))
+    .with_node(NodeConstraint::new(1).with_kind(NodeKindMatcher::Exact(NodeKindTag::Field)))
+    .with_node(NodeConstraint::new(2).with_kind(NodeKindMatcher::Exact(NodeKindTag::Function)))
+    .with_node(NodeConstraint::new(3).with_kind(NodeKindMatcher::Exact(NodeKindTag::Function)))
+    .with_node(NodeConstraint::new(4).with_kind(NodeKindMatcher::Exact(NodeKindTag::Trait)))
+    .with_node(NodeConstraint::new(5).with_kind(NodeKindMatcher::Exact(NodeKindTag::Function)))
+    .with_edge(EdgeConstraint::new(0, 1).with_kind(EdgeKindMatcher::AnyAst))
+    .with_edge(EdgeConstraint::new(0, 2).with_kind(EdgeKindMatcher::AnyAst))
+    .with_edge(EdgeConstraint::new(4, 5).with_kind(EdgeKindMatcher::AnyAst))
+    .with_min_confidence(0.8)
 }
 
 // ===========================================================================
@@ -1499,12 +1853,32 @@ fn build_state_pattern() -> CodePropertyGraph {
     ));
 
     // AST edges
-    cpg.add_edge(CpgEdge::new(EdgeId::new(0), state, handle, CpgEdgeKind::AstChild));
-    cpg.add_edge(CpgEdge::new(EdgeId::new(1), context, state_field, CpgEdgeKind::AstChild));
-    cpg.add_edge(CpgEdge::new(EdgeId::new(2), context, set_state, CpgEdgeKind::AstChild));
+    cpg.add_edge(CpgEdge::new(
+        EdgeId::new(0),
+        state,
+        handle,
+        CpgEdgeKind::AstChild,
+    ));
+    cpg.add_edge(CpgEdge::new(
+        EdgeId::new(1),
+        context,
+        state_field,
+        CpgEdgeKind::AstChild,
+    ));
+    cpg.add_edge(CpgEdge::new(
+        EdgeId::new(2),
+        context,
+        set_state,
+        CpgEdgeKind::AstChild,
+    ));
 
     // Type reference
-    cpg.add_edge(CpgEdge::new(EdgeId::new(3), state_field, state, CpgEdgeKind::TypeOf));
+    cpg.add_edge(CpgEdge::new(
+        EdgeId::new(3),
+        state_field,
+        state,
+        CpgEdgeKind::TypeOf,
+    ));
 
     cpg
 }
@@ -1581,12 +1955,32 @@ fn build_strategy_pattern() -> CodePropertyGraph {
     ));
 
     // AST edges
-    cpg.add_edge(CpgEdge::new(EdgeId::new(0), strategy, execute, CpgEdgeKind::AstChild));
-    cpg.add_edge(CpgEdge::new(EdgeId::new(1), context, strategy_field, CpgEdgeKind::AstChild));
-    cpg.add_edge(CpgEdge::new(EdgeId::new(2), context, set_strategy, CpgEdgeKind::AstChild));
+    cpg.add_edge(CpgEdge::new(
+        EdgeId::new(0),
+        strategy,
+        execute,
+        CpgEdgeKind::AstChild,
+    ));
+    cpg.add_edge(CpgEdge::new(
+        EdgeId::new(1),
+        context,
+        strategy_field,
+        CpgEdgeKind::AstChild,
+    ));
+    cpg.add_edge(CpgEdge::new(
+        EdgeId::new(2),
+        context,
+        set_strategy,
+        CpgEdgeKind::AstChild,
+    ));
 
     // Type reference
-    cpg.add_edge(CpgEdge::new(EdgeId::new(3), strategy_field, strategy, CpgEdgeKind::TypeOf));
+    cpg.add_edge(CpgEdge::new(
+        EdgeId::new(3),
+        strategy_field,
+        strategy,
+        CpgEdgeKind::TypeOf,
+    ));
 
     cpg
 }
@@ -1594,16 +1988,19 @@ fn build_strategy_pattern() -> CodePropertyGraph {
 fn strategy_template() -> PatternTemplate {
     // Node 4 (the context's `setStrategy` method) mirrors `build_strategy_pattern`
     // so `node_constraints.len()` matches the pattern CPG's `node_count()` (5).
-    PatternTemplate::new("Strategy", "Context with Strategy field and setStrategy method")
-        .with_node(NodeConstraint::new(0).with_kind(NodeKindMatcher::Exact(NodeKindTag::Trait)))
-        .with_node(NodeConstraint::new(1).with_kind(NodeKindMatcher::Exact(NodeKindTag::Function)))
-        .with_node(NodeConstraint::new(2).with_kind(NodeKindMatcher::Exact(NodeKindTag::Class)))
-        .with_node(NodeConstraint::new(3).with_kind(NodeKindMatcher::Exact(NodeKindTag::Field)))
-        .with_node(NodeConstraint::new(4).with_kind(NodeKindMatcher::Exact(NodeKindTag::Function)))
-        .with_edge(EdgeConstraint::new(0, 1).with_kind(EdgeKindMatcher::AnyAst))
-        .with_edge(EdgeConstraint::new(2, 3).with_kind(EdgeKindMatcher::AnyAst))
-        .with_edge(EdgeConstraint::new(2, 4).with_kind(EdgeKindMatcher::AnyAst))
-        .with_min_confidence(0.7)
+    PatternTemplate::new(
+        "Strategy",
+        "Context with Strategy field and setStrategy method",
+    )
+    .with_node(NodeConstraint::new(0).with_kind(NodeKindMatcher::Exact(NodeKindTag::Trait)))
+    .with_node(NodeConstraint::new(1).with_kind(NodeKindMatcher::Exact(NodeKindTag::Function)))
+    .with_node(NodeConstraint::new(2).with_kind(NodeKindMatcher::Exact(NodeKindTag::Class)))
+    .with_node(NodeConstraint::new(3).with_kind(NodeKindMatcher::Exact(NodeKindTag::Field)))
+    .with_node(NodeConstraint::new(4).with_kind(NodeKindMatcher::Exact(NodeKindTag::Function)))
+    .with_edge(EdgeConstraint::new(0, 1).with_kind(EdgeKindMatcher::AnyAst))
+    .with_edge(EdgeConstraint::new(2, 3).with_kind(EdgeKindMatcher::AnyAst))
+    .with_edge(EdgeConstraint::new(2, 4).with_kind(EdgeKindMatcher::AnyAst))
+    .with_min_confidence(0.7)
 }
 
 // ===========================================================================
@@ -1652,27 +2049,55 @@ fn build_template_method_pattern() -> CodePropertyGraph {
     ));
 
     // AST edges
-    cpg.add_edge(CpgEdge::new(EdgeId::new(0), abstract_class, template_method, CpgEdgeKind::AstChild));
-    cpg.add_edge(CpgEdge::new(EdgeId::new(1), abstract_class, prim_op1, CpgEdgeKind::AstChild));
-    cpg.add_edge(CpgEdge::new(EdgeId::new(2), abstract_class, prim_op2, CpgEdgeKind::AstChild));
+    cpg.add_edge(CpgEdge::new(
+        EdgeId::new(0),
+        abstract_class,
+        template_method,
+        CpgEdgeKind::AstChild,
+    ));
+    cpg.add_edge(CpgEdge::new(
+        EdgeId::new(1),
+        abstract_class,
+        prim_op1,
+        CpgEdgeKind::AstChild,
+    ));
+    cpg.add_edge(CpgEdge::new(
+        EdgeId::new(2),
+        abstract_class,
+        prim_op2,
+        CpgEdgeKind::AstChild,
+    ));
 
     // Call edges from template method to primitive operations
-    cpg.add_edge(CpgEdge::new(EdgeId::new(3), template_method, prim_op1, CpgEdgeKind::CallSite));
-    cpg.add_edge(CpgEdge::new(EdgeId::new(4), template_method, prim_op2, CpgEdgeKind::CallSite));
+    cpg.add_edge(CpgEdge::new(
+        EdgeId::new(3),
+        template_method,
+        prim_op1,
+        CpgEdgeKind::CallSite,
+    ));
+    cpg.add_edge(CpgEdge::new(
+        EdgeId::new(4),
+        template_method,
+        prim_op2,
+        CpgEdgeKind::CallSite,
+    ));
 
     cpg
 }
 
 fn template_method_template() -> PatternTemplate {
-    PatternTemplate::new("Template Method", "Abstract class with template method calling abstract operations")
-        .with_node(NodeConstraint::new(0).with_kind(NodeKindMatcher::Exact(NodeKindTag::Class)))
-        .with_node(NodeConstraint::new(1).with_kind(NodeKindMatcher::Exact(NodeKindTag::Function)))
-        .with_node(NodeConstraint::new(2).with_kind(NodeKindMatcher::Exact(NodeKindTag::Function)))
-        .with_node(NodeConstraint::new(3).with_kind(NodeKindMatcher::Exact(NodeKindTag::Function)))
-        .with_edge(EdgeConstraint::new(0, 1).with_kind(EdgeKindMatcher::AnyAst))
-        .with_edge(EdgeConstraint::new(0, 2).with_kind(EdgeKindMatcher::AnyAst))
-        .with_edge(EdgeConstraint::new(0, 3).with_kind(EdgeKindMatcher::AnyAst))
-        .with_min_confidence(0.7)
+    PatternTemplate::new(
+        "Template Method",
+        "Abstract class with template method calling abstract operations",
+    )
+    .with_node(NodeConstraint::new(0).with_kind(NodeKindMatcher::Exact(NodeKindTag::Class)))
+    .with_node(NodeConstraint::new(1).with_kind(NodeKindMatcher::Exact(NodeKindTag::Function)))
+    .with_node(NodeConstraint::new(2).with_kind(NodeKindMatcher::Exact(NodeKindTag::Function)))
+    .with_node(NodeConstraint::new(3).with_kind(NodeKindMatcher::Exact(NodeKindTag::Function)))
+    .with_edge(EdgeConstraint::new(0, 1).with_kind(EdgeKindMatcher::AnyAst))
+    .with_edge(EdgeConstraint::new(0, 2).with_kind(EdgeKindMatcher::AnyAst))
+    .with_edge(EdgeConstraint::new(0, 3).with_kind(EdgeKindMatcher::AnyAst))
+    .with_min_confidence(0.7)
 }
 
 // ===========================================================================
@@ -1729,28 +2154,46 @@ fn build_visitor_pattern() -> CodePropertyGraph {
     ));
 
     // AST edges
-    cpg.add_edge(CpgEdge::new(EdgeId::new(0), visitor, visit_a, CpgEdgeKind::AstChild));
-    cpg.add_edge(CpgEdge::new(EdgeId::new(1), visitor, visit_b, CpgEdgeKind::AstChild));
-    cpg.add_edge(CpgEdge::new(EdgeId::new(2), element, accept, CpgEdgeKind::AstChild));
+    cpg.add_edge(CpgEdge::new(
+        EdgeId::new(0),
+        visitor,
+        visit_a,
+        CpgEdgeKind::AstChild,
+    ));
+    cpg.add_edge(CpgEdge::new(
+        EdgeId::new(1),
+        visitor,
+        visit_b,
+        CpgEdgeKind::AstChild,
+    ));
+    cpg.add_edge(CpgEdge::new(
+        EdgeId::new(2),
+        element,
+        accept,
+        CpgEdgeKind::AstChild,
+    ));
 
     cpg
 }
 
 fn visitor_template() -> PatternTemplate {
-    PatternTemplate::new("Visitor", "Visitor interface with visit methods, Element with accept")
-        .with_node(NodeConstraint::new(0).with_kind(NodeKindMatcher::Exact(NodeKindTag::Trait)))
-        .with_node(NodeConstraint::new(1).with_kind(NodeKindMatcher::Exact(NodeKindTag::Function)))
-        .with_node(NodeConstraint::new(2).with_kind(NodeKindMatcher::Exact(NodeKindTag::Function)))
-        .with_node(NodeConstraint::new(3).with_kind(NodeKindMatcher::Exact(NodeKindTag::Trait)))
-        .with_node(
-            NodeConstraint::new(4)
-                .with_kind(NodeKindMatcher::Exact(NodeKindTag::Function))
-                .with_name_pattern("accept"),
-        )
-        .with_edge(EdgeConstraint::new(0, 1).with_kind(EdgeKindMatcher::AnyAst))
-        .with_edge(EdgeConstraint::new(0, 2).with_kind(EdgeKindMatcher::AnyAst))
-        .with_edge(EdgeConstraint::new(3, 4).with_kind(EdgeKindMatcher::AnyAst))
-        .with_min_confidence(0.8)
+    PatternTemplate::new(
+        "Visitor",
+        "Visitor interface with visit methods, Element with accept",
+    )
+    .with_node(NodeConstraint::new(0).with_kind(NodeKindMatcher::Exact(NodeKindTag::Trait)))
+    .with_node(NodeConstraint::new(1).with_kind(NodeKindMatcher::Exact(NodeKindTag::Function)))
+    .with_node(NodeConstraint::new(2).with_kind(NodeKindMatcher::Exact(NodeKindTag::Function)))
+    .with_node(NodeConstraint::new(3).with_kind(NodeKindMatcher::Exact(NodeKindTag::Trait)))
+    .with_node(
+        NodeConstraint::new(4)
+            .with_kind(NodeKindMatcher::Exact(NodeKindTag::Function))
+            .with_name_pattern("accept"),
+    )
+    .with_edge(EdgeConstraint::new(0, 1).with_kind(EdgeKindMatcher::AnyAst))
+    .with_edge(EdgeConstraint::new(0, 2).with_kind(EdgeKindMatcher::AnyAst))
+    .with_edge(EdgeConstraint::new(3, 4).with_kind(EdgeKindMatcher::AnyAst))
+    .with_min_confidence(0.8)
 }
 
 #[cfg(test)]

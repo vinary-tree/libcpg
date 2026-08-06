@@ -3,10 +3,10 @@
 //! This module provides detection of the 23 Gang-of-Four design patterns using
 //! subgraph isomorphism matching via the VF2 algorithm.
 
-use crate::CodePropertyGraph;
-use crate::pattern::{PatternMatch, SubgraphMatcher, Vf2Matcher};
-use super::PatternDetector;
 use super::templates::{build_pattern_cpg, build_pattern_template};
+use super::PatternDetector;
+use crate::pattern::{PatternMatch, SubgraphMatcher, Vf2Matcher};
+use crate::CodePropertyGraph;
 
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
@@ -101,10 +101,18 @@ impl GofPattern {
     /// Returns the category of this pattern.
     pub fn category(&self) -> GofCategory {
         match self {
-            Self::AbstractFactory | Self::Builder | Self::FactoryMethod
-            | Self::Prototype | Self::Singleton => GofCategory::Creational,
-            Self::Adapter | Self::Bridge | Self::Composite | Self::Decorator
-            | Self::Facade | Self::Flyweight | Self::Proxy => GofCategory::Structural,
+            Self::AbstractFactory
+            | Self::Builder
+            | Self::FactoryMethod
+            | Self::Prototype
+            | Self::Singleton => GofCategory::Creational,
+            Self::Adapter
+            | Self::Bridge
+            | Self::Composite
+            | Self::Decorator
+            | Self::Facade
+            | Self::Flyweight
+            | Self::Proxy => GofCategory::Structural,
             _ => GofCategory::Behavioral,
         }
     }
@@ -202,7 +210,7 @@ impl PatternDetector for GofPatternDetector {
 
         // Create VF2 matcher with appropriate settings
         let matcher = Vf2Matcher::new()
-            .with_strict_kinds(false)  // Allow relaxed matching for better recall
+            .with_strict_kinds(false) // Allow relaxed matching for better recall
             .with_strict_edges(false);
 
         // Search for each pattern
@@ -218,8 +226,12 @@ impl PatternDetector for GofPatternDetector {
                 m.confidence = self.calculate_confidence(&m, &template);
 
                 // Add metadata
-                m.metadata.insert("category".to_string(), pattern.category().name().to_string());
-                m.metadata.insert("pattern_type".to_string(), "GoF".to_string());
+                m.metadata.insert(
+                    "category".to_string(),
+                    pattern.category().name().to_string(),
+                );
+                m.metadata
+                    .insert("pattern_type".to_string(), "GoF".to_string());
 
                 // Filter by confidence threshold
                 if m.confidence >= self.min_confidence {
@@ -230,7 +242,9 @@ impl PatternDetector for GofPatternDetector {
 
         // Sort by confidence (highest first)
         all_matches.sort_by(|a, b| {
-            b.confidence.partial_cmp(&a.confidence).unwrap_or(std::cmp::Ordering::Equal)
+            b.confidence
+                .partial_cmp(&a.confidence)
+                .unwrap_or(std::cmp::Ordering::Equal)
         });
 
         all_matches
@@ -238,10 +252,29 @@ impl PatternDetector for GofPatternDetector {
 
     fn supported_patterns(&self) -> &[&str] {
         &[
-            "Abstract Factory", "Builder", "Factory Method", "Prototype", "Singleton",
-            "Adapter", "Bridge", "Composite", "Decorator", "Facade", "Flyweight", "Proxy",
-            "Chain of Responsibility", "Command", "Interpreter", "Iterator", "Mediator",
-            "Memento", "Observer", "State", "Strategy", "Template Method", "Visitor",
+            "Abstract Factory",
+            "Builder",
+            "Factory Method",
+            "Prototype",
+            "Singleton",
+            "Adapter",
+            "Bridge",
+            "Composite",
+            "Decorator",
+            "Facade",
+            "Flyweight",
+            "Proxy",
+            "Chain of Responsibility",
+            "Command",
+            "Interpreter",
+            "Iterator",
+            "Mediator",
+            "Memento",
+            "Observer",
+            "State",
+            "Strategy",
+            "Template Method",
+            "Visitor",
         ]
     }
 }
@@ -280,8 +313,8 @@ impl GofPatternDetector {
 mod tests {
     use super::*;
     use crate::{
-        CpgNode, CpgNodeKind, CpgEdge, CpgEdgeKind, EdgeId, Language, SourceRange,
-        NodeId, Visibility, MethodSignature, DfgEdgeKind,
+        CpgEdge, CpgEdgeKind, CpgNode, CpgNodeKind, DfgEdgeKind, EdgeId, Language, MethodSignature,
+        NodeId, SourceRange, Visibility,
     };
     use smallvec::SmallVec;
     use std::sync::Arc;
@@ -320,7 +353,10 @@ mod tests {
         let cpg = CodePropertyGraph::new(Language::Rust);
 
         let matches = detector.detect(&cpg);
-        assert!(matches.is_empty(), "Empty CPG should have no pattern matches");
+        assert!(
+            matches.is_empty(),
+            "Empty CPG should have no pattern matches"
+        );
     }
 
     #[test]
@@ -365,11 +401,7 @@ mod tests {
             range,
         ));
 
-        let return_id = cpg.add_node(CpgNode::new(
-            NodeId::new(4),
-            CpgNodeKind::Return,
-            range,
-        ));
+        let return_id = cpg.add_node(CpgNode::new(NodeId::new(4), CpgNodeKind::Return, range));
 
         // Connect them
         cpg.add_edge(CpgEdge::new(
@@ -585,7 +617,10 @@ mod tests {
         for pattern in ALL_PATTERNS {
             assert!(!pattern.name().is_empty(), "{pattern:?}: empty name");
             let category = pattern.category();
-            assert!(!category.name().is_empty(), "{pattern:?}: empty category name");
+            assert!(
+                !category.name().is_empty(),
+                "{pattern:?}: empty category name"
+            );
             match category {
                 GofCategory::Creational => creational += 1,
                 GofCategory::Structural => structural += 1,
@@ -669,7 +704,11 @@ mod tests {
                 m.confidence,
                 min_confidence
             );
-            assert!(m.confidence <= 1.0, "confidence {} exceeds 1.0", m.confidence);
+            assert!(
+                m.confidence <= 1.0,
+                "confidence {} exceeds 1.0",
+                m.confidence
+            );
         }
         for pair in matches.windows(2) {
             assert!(
@@ -701,7 +740,9 @@ mod configuration {
     fn with_patterns_narrows_the_search() {
         let cpg = sample();
 
-        let all = GofPatternDetector::new().with_min_confidence(0.0).detect(&cpg);
+        let all = GofPatternDetector::new()
+            .with_min_confidence(0.0)
+            .detect(&cpg);
 
         let narrowed = GofPatternDetector::new()
             .with_min_confidence(0.0)
@@ -725,7 +766,11 @@ mod configuration {
             .with_min_confidence(0.0)
             .with_patterns(vec![])
             .detect(&cpg);
-        assert_eq!(empty_list.len(), all.len(), "an empty list searches everything");
+        assert_eq!(
+            empty_list.len(),
+            all.len(),
+            "an empty list searches everything"
+        );
     }
 
     /// The confidence threshold filters the results, and every surviving match
@@ -734,18 +779,33 @@ mod configuration {
     fn min_confidence_filters_results_and_metadata_is_attached() {
         let cpg = sample();
 
-        let permissive = GofPatternDetector::new().with_min_confidence(0.0).detect(&cpg);
+        let permissive = GofPatternDetector::new()
+            .with_min_confidence(0.0)
+            .detect(&cpg);
         for m in &permissive {
-            assert_eq!(m.metadata.get("pattern_type").map(String::as_str), Some("GoF"));
-            assert!(m.metadata.contains_key("category"), "the GoF category is recorded");
+            assert_eq!(
+                m.metadata.get("pattern_type").map(String::as_str),
+                Some("GoF")
+            );
+            assert!(
+                m.metadata.contains_key("category"),
+                "the GoF category is recorded"
+            );
             assert!((0.0..=1.0).contains(&m.confidence));
         }
 
-        let strict = GofPatternDetector::new().with_min_confidence(1.01).detect(&cpg);
+        let strict = GofPatternDetector::new()
+            .with_min_confidence(1.01)
+            .detect(&cpg);
         assert!(strict.is_empty(), "nothing can exceed a confidence of 1");
 
-        let mid = GofPatternDetector::new().with_min_confidence(0.5).detect(&cpg);
-        assert!(mid.len() <= permissive.len(), "raising the threshold never adds matches");
+        let mid = GofPatternDetector::new()
+            .with_min_confidence(0.5)
+            .detect(&cpg);
+        assert!(
+            mid.len() <= permissive.len(),
+            "raising the threshold never adds matches"
+        );
     }
 }
 

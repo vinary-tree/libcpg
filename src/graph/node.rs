@@ -1,8 +1,8 @@
 //! CPG node types and related structures.
 
-use std::sync::Arc;
 use rustc_hash::FxHashMap;
 use smallvec::SmallVec;
+use std::sync::Arc;
 use text_size::TextRange;
 
 #[cfg(feature = "serde")]
@@ -12,7 +12,7 @@ use serde::{Deserialize, Serialize};
 use super::serde_util::{arc_str, option_arc_str, smallvec_arc_str_2};
 
 /// Unique identifier for a node in the CPG.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct NodeId(pub u32);
 
@@ -848,22 +848,46 @@ mod tests {
         assert_eq!(n.children[1], NodeId::new(3));
         assert_eq!(n.parent, Some(NodeId::new(0)));
         assert_eq!(
-            n.properties.get(&PropertyKey::Name).and_then(|v| v.as_str()),
+            n.properties
+                .get(&PropertyKey::Name)
+                .and_then(|v| v.as_str()),
             Some("x")
         );
     }
 
     #[test]
     fn name_for_representative_variants() {
-        assert_eq!(node(CpgNodeKind::Module { name: "m".into() }).name(), Some("m"));
         assert_eq!(
-            node(CpgNodeKind::Class { name: "C".into(), is_abstract: false }).name(),
+            node(CpgNodeKind::Module { name: "m".into() }).name(),
+            Some("m")
+        );
+        assert_eq!(
+            node(CpgNodeKind::Class {
+                name: "C".into(),
+                is_abstract: false
+            })
+            .name(),
             Some("C")
         );
-        assert_eq!(node(CpgNodeKind::Struct { name: "S".into() }).name(), Some("S"));
-        assert_eq!(node(CpgNodeKind::Enum { name: "E".into() }).name(), Some("E"));
-        assert_eq!(node(CpgNodeKind::Trait { name: "T".into() }).name(), Some("T"));
-        assert_eq!(node(CpgNodeKind::Function { signature: sig("f") }).name(), Some("f"));
+        assert_eq!(
+            node(CpgNodeKind::Struct { name: "S".into() }).name(),
+            Some("S")
+        );
+        assert_eq!(
+            node(CpgNodeKind::Enum { name: "E".into() }).name(),
+            Some("E")
+        );
+        assert_eq!(
+            node(CpgNodeKind::Trait { name: "T".into() }).name(),
+            Some("T")
+        );
+        assert_eq!(
+            node(CpgNodeKind::Function {
+                signature: sig("f")
+            })
+            .name(),
+            Some("f")
+        );
         assert_eq!(
             node(CpgNodeKind::Variable {
                 name: "v".into(),
@@ -893,25 +917,62 @@ mod tests {
             Some("p")
         );
         assert_eq!(
-            node(CpgNodeKind::Identifier { name: "x".into(), definition: None }).name(),
+            node(CpgNodeKind::Identifier {
+                name: "x".into(),
+                definition: None
+            })
+            .name(),
             Some("x")
         );
-        assert_eq!(node(CpgNodeKind::MemberAccess { member: "mem".into() }).name(), Some("mem"));
-        assert_eq!(node(CpgNodeKind::Import { path: "std::io".into() }).name(), Some("std::io"));
-        assert_eq!(node(CpgNodeKind::Attribute { name: "attr".into() }).name(), Some("attr"));
-        assert_eq!(node(CpgNodeKind::Macro { name: "mac".into() }).name(), Some("mac"));
-        assert_eq!(node(CpgNodeKind::GenericParam { name: "G".into() }).name(), Some("G"));
+        assert_eq!(
+            node(CpgNodeKind::MemberAccess {
+                member: "mem".into()
+            })
+            .name(),
+            Some("mem")
+        );
+        assert_eq!(
+            node(CpgNodeKind::Import {
+                path: "std::io".into()
+            })
+            .name(),
+            Some("std::io")
+        );
+        assert_eq!(
+            node(CpgNodeKind::Attribute {
+                name: "attr".into()
+            })
+            .name(),
+            Some("attr")
+        );
+        assert_eq!(
+            node(CpgNodeKind::Macro { name: "mac".into() }).name(),
+            Some("mac")
+        );
+        assert_eq!(
+            node(CpgNodeKind::GenericParam { name: "G".into() }).name(),
+            Some("G")
+        );
 
         // Variants that carry no name.
         assert_eq!(node(CpgNodeKind::Root).name(), None);
         assert_eq!(node(CpgNodeKind::Return).name(), None);
-        assert_eq!(node(CpgNodeKind::Literal { kind: LiteralKind::Null }).name(), None);
+        assert_eq!(
+            node(CpgNodeKind::Literal {
+                kind: LiteralKind::Null
+            })
+            .name(),
+            None
+        );
         assert_eq!(node(CpgNodeKind::IndexAccess).name(), None);
     }
 
     #[test]
     fn is_declaration_predicate() {
-        assert!(node(CpgNodeKind::Function { signature: sig("f") }).is_declaration());
+        assert!(node(CpgNodeKind::Function {
+            signature: sig("f")
+        })
+        .is_declaration());
         assert!(node(CpgNodeKind::Variable {
             name: "v".into(),
             var_type: None,
@@ -919,7 +980,11 @@ mod tests {
             is_mutable: false
         })
         .is_declaration());
-        assert!(node(CpgNodeKind::Class { name: "C".into(), is_abstract: false }).is_declaration());
+        assert!(node(CpgNodeKind::Class {
+            name: "C".into(),
+            is_abstract: false
+        })
+        .is_declaration());
         assert!(node(CpgNodeKind::Parameter {
             name: "p".into(),
             param_type: None,
@@ -927,7 +992,10 @@ mod tests {
         })
         .is_declaration());
         assert!(!node(CpgNodeKind::If).is_declaration());
-        assert!(!node(CpgNodeKind::Literal { kind: LiteralKind::Null }).is_declaration());
+        assert!(!node(CpgNodeKind::Literal {
+            kind: LiteralKind::Null
+        })
+        .is_declaration());
         assert!(!node(CpgNodeKind::Root).is_declaration());
     }
 
@@ -945,31 +1013,60 @@ mod tests {
             CpgNodeKind::Throw,
             CpgNodeKind::Try,
         ] {
-            assert!(node(k.clone()).is_statement(), "{k:?} should be a statement");
+            assert!(
+                node(k.clone()).is_statement(),
+                "{k:?} should be a statement"
+            );
         }
-        assert!(!node(CpgNodeKind::Function { signature: sig("f") }).is_statement());
-        assert!(!node(CpgNodeKind::BinaryOp { operator: "+".into() }).is_statement());
+        assert!(!node(CpgNodeKind::Function {
+            signature: sig("f")
+        })
+        .is_statement());
+        assert!(!node(CpgNodeKind::BinaryOp {
+            operator: "+".into()
+        })
+        .is_statement());
         assert!(!node(CpgNodeKind::Else).is_statement());
     }
 
     #[test]
     fn is_expression_predicate() {
         for k in [
-            CpgNodeKind::BinaryOp { operator: "+".into() },
-            CpgNodeKind::UnaryOp { operator: "-".into() },
-            CpgNodeKind::Assignment { operator: "=".into() },
-            CpgNodeKind::Call { target: None, is_method: false },
+            CpgNodeKind::BinaryOp {
+                operator: "+".into(),
+            },
+            CpgNodeKind::UnaryOp {
+                operator: "-".into(),
+            },
+            CpgNodeKind::Assignment {
+                operator: "=".into(),
+            },
+            CpgNodeKind::Call {
+                target: None,
+                is_method: false,
+            },
             CpgNodeKind::MemberAccess { member: "m".into() },
             CpgNodeKind::IndexAccess,
-            CpgNodeKind::Identifier { name: "x".into(), definition: None },
-            CpgNodeKind::Literal { kind: LiteralKind::Bool(true) },
+            CpgNodeKind::Identifier {
+                name: "x".into(),
+                definition: None,
+            },
+            CpgNodeKind::Literal {
+                kind: LiteralKind::Bool(true),
+            },
             CpgNodeKind::Await,
             CpgNodeKind::Yield,
         ] {
-            assert!(node(k.clone()).is_expression(), "{k:?} should be an expression");
+            assert!(
+                node(k.clone()).is_expression(),
+                "{k:?} should be an expression"
+            );
         }
         assert!(!node(CpgNodeKind::If).is_expression());
-        assert!(!node(CpgNodeKind::Function { signature: sig("f") }).is_expression());
+        assert!(!node(CpgNodeKind::Function {
+            signature: sig("f")
+        })
+        .is_expression());
     }
 
     #[test]
@@ -986,16 +1083,31 @@ mod tests {
             CpgNodeKind::Throw,
             CpgNodeKind::Try,
         ] {
-            assert!(node(k.clone()).is_control_flow(), "{k:?} should be control flow");
+            assert!(
+                node(k.clone()).is_control_flow(),
+                "{k:?} should be control flow"
+            );
         }
-        assert!(!node(CpgNodeKind::Block { scope: ScopeId::GLOBAL }).is_control_flow());
-        assert!(!node(CpgNodeKind::BinaryOp { operator: "+".into() }).is_control_flow());
-        assert!(!node(CpgNodeKind::Function { signature: sig("f") }).is_control_flow());
+        assert!(!node(CpgNodeKind::Block {
+            scope: ScopeId::GLOBAL
+        })
+        .is_control_flow());
+        assert!(!node(CpgNodeKind::BinaryOp {
+            operator: "+".into()
+        })
+        .is_control_flow());
+        assert!(!node(CpgNodeKind::Function {
+            signature: sig("f")
+        })
+        .is_control_flow());
     }
 
     #[test]
     fn is_error_predicate() {
-        assert!(node(CpgNodeKind::Error { message: "oops".into() }).is_error());
+        assert!(node(CpgNodeKind::Error {
+            message: "oops".into()
+        })
+        .is_error());
         assert!(!node(CpgNodeKind::Root).is_error());
         assert!(!node(CpgNodeKind::Unknown { kind: "x".into() }).is_error());
     }
@@ -1005,13 +1117,19 @@ mod tests {
         assert_eq!(LiteralKind::Integer(5), LiteralKind::Integer(5));
         assert_ne!(LiteralKind::Integer(5), LiteralKind::Integer(6));
         assert_ne!(LiteralKind::Integer(1), LiteralKind::Float(1.0));
-        assert_eq!(LiteralKind::String("a".into()), LiteralKind::String("a".into()));
+        assert_eq!(
+            LiteralKind::String("a".into()),
+            LiteralKind::String("a".into())
+        );
         assert_eq!(LiteralKind::Char('z'), LiteralKind::Char('z'));
         assert_eq!(LiteralKind::Bool(false), LiteralKind::Bool(false));
         assert_eq!(LiteralKind::Null, LiteralKind::Null);
         assert_eq!(LiteralKind::Array, LiteralKind::Array);
         assert_eq!(LiteralKind::Object, LiteralKind::Object);
-        assert_eq!(LiteralKind::Regex("[a-z]".into()), LiteralKind::Regex("[a-z]".into()));
+        assert_eq!(
+            LiteralKind::Regex("[a-z]".into()),
+            LiteralKind::Regex("[a-z]".into())
+        );
         assert_ne!(LiteralKind::Array, LiteralKind::Object);
     }
 }
@@ -1081,15 +1199,24 @@ mod serde_tests {
     fn serde_leaf_types_round_trip() {
         let id = NodeId::new(42);
         let s = serde_json::to_string(&id).expect("serialize NodeId");
-        assert_eq!(serde_json::from_str::<NodeId>(&s).expect("deser NodeId"), id);
+        assert_eq!(
+            serde_json::from_str::<NodeId>(&s).expect("deser NodeId"),
+            id
+        );
 
         let r = SourceRange::new(1, 9, 0, 1, 2, 3);
         let s = serde_json::to_string(&r).expect("serialize SourceRange");
-        assert_eq!(serde_json::from_str::<SourceRange>(&s).expect("deser SourceRange"), r);
+        assert_eq!(
+            serde_json::from_str::<SourceRange>(&s).expect("deser SourceRange"),
+            r
+        );
 
         let lk = LiteralKind::Integer(-7);
         let s = serde_json::to_string(&lk).expect("serialize LiteralKind");
-        assert_eq!(serde_json::from_str::<LiteralKind>(&s).expect("deser LiteralKind"), lk);
+        assert_eq!(
+            serde_json::from_str::<LiteralKind>(&s).expect("deser LiteralKind"),
+            lk
+        );
     }
 
     #[test]
@@ -1106,8 +1233,13 @@ mod serde_tests {
                     visibility: Visibility::Public,
                 },
             },
-            CpgNodeKind::Identifier { name: "x".into(), definition: Some(NodeId::new(3)) },
-            CpgNodeKind::Literal { kind: LiteralKind::String("hi".into()) },
+            CpgNodeKind::Identifier {
+                name: "x".into(),
+                definition: Some(NodeId::new(3)),
+            },
+            CpgNodeKind::Literal {
+                kind: LiteralKind::String("hi".into()),
+            },
             CpgNodeKind::Variable {
                 name: "v".into(),
                 var_type: Some(TypeInfo::new("u8")),
@@ -1129,7 +1261,10 @@ mod serde_tests {
         // would test serde_json rather than CpgNode. Every other field is set.
         let node = CpgNode::new(
             NodeId::new(5),
-            CpgNodeKind::Identifier { name: "x".into(), definition: None },
+            CpgNodeKind::Identifier {
+                name: "x".into(),
+                definition: None,
+            },
             SourceRange::from_bytes(2, 4),
         )
         .with_text("x")
@@ -1167,7 +1302,9 @@ mod serde_tests {
             2.0009e143,
             -1.797_693_134_862_315_7e308,
         ] {
-            let k = CpgNodeKind::Literal { kind: LiteralKind::Float(f) };
+            let k = CpgNodeKind::Literal {
+                kind: LiteralKind::Float(f),
+            };
             let s = serde_json::to_string(&k).expect("serialize float literal");
             let back: CpgNodeKind = serde_json::from_str(&s).expect("deser float literal");
             assert_eq!(k, back);

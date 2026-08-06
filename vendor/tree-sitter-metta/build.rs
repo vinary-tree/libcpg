@@ -11,9 +11,8 @@ fn main() {
     // grammar. Kept as an absolute path (consistent with how libcpg's
     // dev-dependency previously referenced this crate) so we recompile, never
     // copy, the upstream parser.
-    let src_dir = PathBuf::from(
-        "/home/dylon/Workspace/f1r3fly.io/MeTTa-Compiler/tree-sitter-metta/src",
-    );
+    let src_dir =
+        PathBuf::from("/home/dylon/Workspace/f1r3fly.io/MeTTa-Compiler/tree-sitter-metta/src");
 
     let parser_path = src_dir.join("parser.c");
     let scanner_path = src_dir.join("scanner.c");

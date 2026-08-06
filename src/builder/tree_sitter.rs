@@ -26,10 +26,11 @@
 //! // CFG edges for control flow, and DFG edges for data flow.
 //! ```
 
+use super::{CfgExtractor, CpgBuilder, CpgBuilderConfig, DfgExtractor, NodeMapper, ParserRegistry};
 use crate::{
-    CpgEdgeKind, CodePropertyGraph, CpgNode, CpgNodeKind, Language, NodeId, SourceRange, Result, Error,
+    CodePropertyGraph, CpgEdgeKind, CpgNode, CpgNodeKind, Error, Language, NodeId, Result,
+    SourceRange,
 };
-use super::{CpgBuilder, CpgBuilderConfig, CfgExtractor, DfgExtractor, NodeMapper, ParserRegistry};
 
 /// CPG builder using tree-sitter for parsing.
 ///
@@ -128,20 +129,20 @@ impl CpgBuilder for TreeSitterCpgBuilder {
 
         // Get the tree-sitter language from the registry
         let registry = ParserRegistry::global();
-        let ts_language = registry.get(language).ok_or_else(|| {
-            Error::UnsupportedLanguage(language.name().to_string())
-        })?;
+        let ts_language = registry
+            .get(language)
+            .ok_or_else(|| Error::UnsupportedLanguage(language.name().to_string()))?;
 
         // Create parser and set language
         let mut parser = tree_sitter::Parser::new();
-        parser.set_language(&ts_language).map_err(|e| {
-            Error::Construction(format!("Failed to set parser language: {}", e))
-        })?;
+        parser
+            .set_language(&ts_language)
+            .map_err(|e| Error::Construction(format!("Failed to set parser language: {}", e)))?;
 
         // Parse the source code
-        let tree = parser.parse(source, None).ok_or_else(|| {
-            Error::Construction("Failed to parse source code".to_string())
-        })?;
+        let tree = parser
+            .parse(source, None)
+            .ok_or_else(|| Error::Construction("Failed to parse source code".to_string()))?;
 
         // Delegate the post-parse pipeline (AST + CFG + DFG) to the shared
         // `build_from_tree` entry point so both paths stay identical.
@@ -217,10 +218,7 @@ impl TreeSitterCpgBuilder {
         let cpg_kind = mapper.map_kind(ts_kind, ts_node, source);
 
         // Create source range from tree-sitter positions
-        let range = SourceRange::from_bytes(
-            ts_node.start_byte() as u32,
-            ts_node.end_byte() as u32,
-        );
+        let range = SourceRange::from_bytes(ts_node.start_byte() as u32, ts_node.end_byte() as u32);
 
         // Create the CPG node
         let cpg_node = CpgNode::new(NodeId::new(0), cpg_kind.clone(), range);
@@ -270,7 +268,9 @@ mod tests {
     fn test_build_rust() {
         let builder = TreeSitterCpgBuilder::new();
         let source = "fn main() { println!(\"hello\"); }";
-        let cpg = builder.build(source, Language::Rust).expect("build should succeed");
+        let cpg = builder
+            .build(source, Language::Rust)
+            .expect("build should succeed");
 
         // Should have multiple nodes (root, function, block, etc.)
         assert!(cpg.node_count() > 1);
@@ -282,7 +282,9 @@ mod tests {
     fn test_build_python() {
         let builder = TreeSitterCpgBuilder::new();
         let source = "def main():\n    print('hello')";
-        let cpg = builder.build(source, Language::Python).expect("build should succeed");
+        let cpg = builder
+            .build(source, Language::Python)
+            .expect("build should succeed");
 
         assert!(cpg.node_count() > 1);
         assert_eq!(cpg.language(), Language::Python);
@@ -293,7 +295,9 @@ mod tests {
     fn test_build_javascript() {
         let builder = TreeSitterCpgBuilder::new();
         let source = "function main() { console.log('hello'); }";
-        let cpg = builder.build(source, Language::JavaScript).expect("build should succeed");
+        let cpg = builder
+            .build(source, Language::JavaScript)
+            .expect("build should succeed");
 
         assert!(cpg.node_count() > 1);
         assert_eq!(cpg.language(), Language::JavaScript);
@@ -340,7 +344,9 @@ mod tests {
             fn foo() {}
             fn bar() {}
         "#;
-        let cpg = builder.build(source, Language::Rust).expect("build should succeed");
+        let cpg = builder
+            .build(source, Language::Rust)
+            .expect("build should succeed");
 
         // Should have CFG entry points for both functions
         let entry_points: Vec<_> = cpg.cfg_entries().to_vec();
@@ -384,7 +390,9 @@ mod tests {
         let config = CpgBuilderConfig::new().with_source(true);
         let builder = TreeSitterCpgBuilder::with_config(config);
         let source = "fn main() {}";
-        let cpg = builder.build(source, Language::Rust).expect("build should succeed");
+        let cpg = builder
+            .build(source, Language::Rust)
+            .expect("build should succeed");
 
         assert!(cpg.source_code().is_some());
         assert_eq!(cpg.source_code().unwrap(), source);
@@ -488,7 +496,10 @@ mod tests {
             .build("<div class=\"x\">hi</div>", Language::Html)
             .expect("build html");
         assert!(cpg.node_count() > 1);
-        assert!(has_meaningful_kind(&cpg), "html text/attribute ⇒ Literal/Attribute");
+        assert!(
+            has_meaningful_kind(&cpg),
+            "html text/attribute ⇒ Literal/Attribute"
+        );
     }
 
     #[test]
@@ -498,7 +509,10 @@ mod tests {
             .build("a { color: red; }", Language::Css)
             .expect("build css");
         assert!(cpg.node_count() > 1);
-        assert!(has_meaningful_kind(&cpg), "css rule ⇒ Block/Identifier/Variable");
+        assert!(
+            has_meaningful_kind(&cpg),
+            "css rule ⇒ Block/Identifier/Variable"
+        );
     }
 
     #[test]
@@ -528,7 +542,10 @@ mod tests {
             .build("# Title\n\nSome text.\n", Language::Markdown)
             .expect("build markdown");
         assert!(cpg.node_count() > 1);
-        assert!(has_meaningful_kind(&cpg), "markdown section/paragraph ⇒ Block");
+        assert!(
+            has_meaningful_kind(&cpg),
+            "markdown section/paragraph ⇒ Block"
+        );
     }
 }
 

@@ -1,7 +1,7 @@
 //! Control flow pattern analysis for algorithm detection.
 
-use std::sync::Arc;
 use crate::{CodePropertyGraph, CpgNodeKind, NodeId};
+use std::sync::Arc;
 
 /// Analyzes control flow patterns.
 #[derive(Debug, Default)]
@@ -58,7 +58,11 @@ impl ControlFlowAnalyzer {
     /// Looks for call nodes within the function that call the function itself
     /// (direct recursion) or that are part of a mutually recursive cycle
     /// (indirect recursion). Also detects tail recursion patterns.
-    pub fn detect_recursion(&self, cpg: &CodePropertyGraph, function: NodeId) -> Option<RecursionPattern> {
+    pub fn detect_recursion(
+        &self,
+        cpg: &CodePropertyGraph,
+        function: NodeId,
+    ) -> Option<RecursionPattern> {
         let func_node = cpg.node(function)?;
 
         // Extract function name
@@ -111,13 +115,20 @@ impl ControlFlowAnalyzer {
         // Find base cases: return statements that don't contain recursive calls
         for &return_id in &return_nodes {
             let return_descendants = cpg.ast_descendants(return_id);
-            let has_recursive_call = return_descendants.iter().any(|id| recursive_calls.contains(id));
+            let has_recursive_call = return_descendants
+                .iter()
+                .any(|id| recursive_calls.contains(id));
             if !has_recursive_call {
                 // Check if the return is guarded by a conditional (proper base case)
                 let ancestors = cpg.ast_ancestors(return_id);
                 let is_guarded = ancestors.iter().any(|&id| {
                     cpg.node(id)
-                        .map(|n| matches!(n.kind, CpgNodeKind::If | CpgNodeKind::Match | CpgNodeKind::MatchArm))
+                        .map(|n| {
+                            matches!(
+                                n.kind,
+                                CpgNodeKind::If | CpgNodeKind::Match | CpgNodeKind::MatchArm
+                            )
+                        })
                         .unwrap_or(false)
                 });
                 if is_guarded {
@@ -235,7 +246,9 @@ impl ControlFlowAnalyzer {
         let children = cpg.ast_children(call_node);
         for child_id in children {
             if let Some(child) = cpg.node(child_id) {
-                if let CpgNodeKind::Identifier { name, .. } | CpgNodeKind::MemberAccess { member: name } = &child.kind {
+                if let CpgNodeKind::Identifier { name, .. }
+                | CpgNodeKind::MemberAccess { member: name } = &child.kind
+                {
                     let name_lower = name.to_lowercase();
                     if name_lower.contains("enumerate")
                         || name_lower.contains("range")
@@ -277,7 +290,12 @@ impl ControlFlowAnalyzer {
     }
 
     /// Checks if a call node calls a specific function by name.
-    fn is_call_to_function(&self, cpg: &CodePropertyGraph, call_node: NodeId, target_name: &Arc<str>) -> bool {
+    fn is_call_to_function(
+        &self,
+        cpg: &CodePropertyGraph,
+        call_node: NodeId,
+        target_name: &Arc<str>,
+    ) -> bool {
         let children = cpg.ast_children(call_node);
         for child_id in children {
             if let Some(child) = cpg.node(child_id) {
@@ -299,7 +317,12 @@ impl ControlFlowAnalyzer {
     }
 
     /// Checks if a call is in tail position (last operation before return).
-    fn is_tail_call(&self, cpg: &CodePropertyGraph, call_node: NodeId, return_nodes: &[NodeId]) -> bool {
+    fn is_tail_call(
+        &self,
+        cpg: &CodePropertyGraph,
+        call_node: NodeId,
+        return_nodes: &[NodeId],
+    ) -> bool {
         // A call is in tail position if:
         // 1. It's the expression being returned, OR
         // 2. It's the last statement in a block that's the body of a function
@@ -316,7 +339,8 @@ impl ControlFlowAnalyzer {
             if return_descendants.contains(&call_node) {
                 // Only count as tail if it's the outermost call in the return
                 // Check that no other operations wrap the call
-                let ancestors_to_return: Vec<NodeId> = cpg.ast_ancestors(call_node)
+                let ancestors_to_return: Vec<NodeId> = cpg
+                    .ast_ancestors(call_node)
                     .into_iter()
                     .take_while(|&id| id != return_id)
                     .collect();
@@ -324,11 +348,14 @@ impl ControlFlowAnalyzer {
                 // If only blocks/parens between call and return, it's still tail
                 let has_wrapping_op = ancestors_to_return.iter().any(|&id| {
                     cpg.node(id)
-                        .map(|n| matches!(n.kind,
-                            CpgNodeKind::BinaryOp { .. }
-                            | CpgNodeKind::UnaryOp { .. }
-                            | CpgNodeKind::Call { .. }
-                        ))
+                        .map(|n| {
+                            matches!(
+                                n.kind,
+                                CpgNodeKind::BinaryOp { .. }
+                                    | CpgNodeKind::UnaryOp { .. }
+                                    | CpgNodeKind::Call { .. }
+                            )
+                        })
                         .unwrap_or(false)
                 });
 
@@ -395,8 +422,11 @@ pub enum RecursionKind {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{CpgNode, CodePropertyGraph, Language, SourceRange, MethodSignature, Visibility, CpgEdgeKind, ScopeId};
     use crate::testutil::wf_child;
+    use crate::{
+        CodePropertyGraph, CpgEdgeKind, CpgNode, Language, MethodSignature, ScopeId, SourceRange,
+        Visibility,
+    };
 
     fn create_test_cpg_with_loop() -> (CodePropertyGraph, NodeId) {
         let mut cpg = CodePropertyGraph::new(Language::Rust);
@@ -419,7 +449,9 @@ mod tests {
 
         let block = cpg.add_node(CpgNode::new(
             NodeId::new(0),
-            CpgNodeKind::Block { scope: ScopeId::GLOBAL },
+            CpgNodeKind::Block {
+                scope: ScopeId::GLOBAL,
+            },
             SourceRange::default(),
         ));
         cpg.connect(func, block, CpgEdgeKind::AstChild);
@@ -454,27 +486,23 @@ mod tests {
 
         let mut block_node = CpgNode::new(
             NodeId::new(0),
-            CpgNodeKind::Block { scope: ScopeId::GLOBAL },
+            CpgNodeKind::Block {
+                scope: ScopeId::GLOBAL,
+            },
             SourceRange::default(),
         );
         block_node.parent = Some(func);
         let block = cpg.add_node(block_node);
         cpg.connect(func, block, CpgEdgeKind::AstChild);
 
-        let mut outer_loop_node = CpgNode::new(
-            NodeId::new(0),
-            CpgNodeKind::For,
-            SourceRange::default(),
-        );
+        let mut outer_loop_node =
+            CpgNode::new(NodeId::new(0), CpgNodeKind::For, SourceRange::default());
         outer_loop_node.parent = Some(block);
         let outer_loop = cpg.add_node(outer_loop_node);
         cpg.connect(block, outer_loop, CpgEdgeKind::AstChild);
 
-        let mut inner_loop_node = CpgNode::new(
-            NodeId::new(0),
-            CpgNodeKind::While,
-            SourceRange::default(),
-        );
+        let mut inner_loop_node =
+            CpgNode::new(NodeId::new(0), CpgNodeKind::While, SourceRange::default());
         inner_loop_node.parent = Some(outer_loop);
         let inner_loop = cpg.add_node(inner_loop_node);
         cpg.connect(outer_loop, inner_loop, CpgEdgeKind::AstChild);
@@ -502,8 +530,14 @@ mod tests {
         assert_eq!(loops.len(), 2);
 
         // Find outer and inner loops
-        let outer = loops.iter().find(|l| l.kind == LoopKind::For).expect("outer loop");
-        let inner = loops.iter().find(|l| l.kind == LoopKind::While).expect("inner loop");
+        let outer = loops
+            .iter()
+            .find(|l| l.kind == LoopKind::For)
+            .expect("outer loop");
+        let inner = loops
+            .iter()
+            .find(|l| l.kind == LoopKind::While)
+            .expect("inner loop");
 
         assert_eq!(outer.depth, 1);
         assert_eq!(inner.depth, 2);
@@ -585,15 +619,27 @@ mod tests {
         wf_child(
             &mut cpg,
             base_ret,
-            CpgNodeKind::Literal { kind: crate::LiteralKind::Integer(1) },
+            CpgNodeKind::Literal {
+                kind: crate::LiteralKind::Integer(1),
+            },
         );
 
         // Direct (non-tail) self-call: Call -> Identifier("fact").
-        let call = wf_child(&mut cpg, func, CpgNodeKind::Call { target: None, is_method: false });
+        let call = wf_child(
+            &mut cpg,
+            func,
+            CpgNodeKind::Call {
+                target: None,
+                is_method: false,
+            },
+        );
         wf_child(
             &mut cpg,
             call,
-            CpgNodeKind::Identifier { name: "fact".into(), definition: None },
+            CpgNodeKind::Identifier {
+                name: "fact".into(),
+                definition: None,
+            },
         );
 
         let rec = ControlFlowAnalyzer::new()
@@ -614,11 +660,21 @@ mod tests {
         let func = make_function(&mut cpg, "go");
 
         let ret = wf_child(&mut cpg, func, CpgNodeKind::Return);
-        let call = wf_child(&mut cpg, ret, CpgNodeKind::Call { target: None, is_method: false });
+        let call = wf_child(
+            &mut cpg,
+            ret,
+            CpgNodeKind::Call {
+                target: None,
+                is_method: false,
+            },
+        );
         wf_child(
             &mut cpg,
             call,
-            CpgNodeKind::Identifier { name: "go".into(), definition: None },
+            CpgNodeKind::Identifier {
+                name: "go".into(),
+                definition: None,
+            },
         );
 
         let rec = ControlFlowAnalyzer::new()
@@ -635,8 +691,21 @@ mod tests {
         // fn walk() { self.walk(); } — member-access self call is direct recursion.
         let mut cpg = CodePropertyGraph::new(Language::Rust);
         let func = make_function(&mut cpg, "walk");
-        let call = wf_child(&mut cpg, func, CpgNodeKind::Call { target: None, is_method: true });
-        wf_child(&mut cpg, call, CpgNodeKind::MemberAccess { member: "walk".into() });
+        let call = wf_child(
+            &mut cpg,
+            func,
+            CpgNodeKind::Call {
+                target: None,
+                is_method: true,
+            },
+        );
+        wf_child(
+            &mut cpg,
+            call,
+            CpgNodeKind::MemberAccess {
+                member: "walk".into(),
+            },
+        );
 
         let rec = ControlFlowAnalyzer::new()
             .detect_recursion(&cpg, func)
@@ -655,7 +724,12 @@ mod proptests {
     fn function_root(g: &CodePropertyGraph) -> NodeId {
         node_ids(g)
             .into_iter()
-            .find(|&id| matches!(g.node(id).map(|n| &n.kind), Some(CpgNodeKind::Function { .. })))
+            .find(|&id| {
+                matches!(
+                    g.node(id).map(|n| &n.kind),
+                    Some(CpgNodeKind::Function { .. })
+                )
+            })
             .expect("well-formed cpg has a Function root")
     }
 
@@ -736,12 +810,21 @@ mod loop_classification {
             },
             SourceRange::default(),
         ));
-        let body = wf_child(cpg, func, CpgNodeKind::Block { scope: ScopeId::GLOBAL });
+        let body = wf_child(
+            cpg,
+            func,
+            CpgNodeKind::Block {
+                scope: ScopeId::GLOBAL,
+            },
+        );
         (func, body)
     }
 
     fn ident(name: &str) -> CpgNodeKind {
-        CpgNodeKind::Identifier { name: name.into(), definition: None }
+        CpgNodeKind::Identifier {
+            name: name.into(),
+            definition: None,
+        }
     }
 
     /// The single loop `detect_loops` finds in `cpg` below `function`.
@@ -762,7 +845,9 @@ mod loop_classification {
             // Frontends that model `do … while` as an opaque node are honored
             // by name, since the CPG vocabulary has no dedicated kind for it.
             (
-                CpgNodeKind::Unknown { kind: "do_statement".into() },
+                CpgNodeKind::Unknown {
+                    kind: "do_statement".into(),
+                },
                 LoopKind::DoWhile,
             ),
         ] {
@@ -778,8 +863,16 @@ mod loop_classification {
         // A non-loop opaque node is not a loop at all.
         let mut cpg = CodePropertyGraph::new(Language::Rust);
         let (func, body) = func_with_body(&mut cpg);
-        wf_child(&mut cpg, body, CpgNodeKind::Unknown { kind: "match_arm".into() });
-        assert!(ControlFlowAnalyzer::new().detect_loops(&cpg, func).is_empty());
+        wf_child(
+            &mut cpg,
+            body,
+            CpgNodeKind::Unknown {
+                kind: "match_arm".into(),
+            },
+        );
+        assert!(ControlFlowAnalyzer::new()
+            .detect_loops(&cpg, func)
+            .is_empty());
     }
 
     /// Depth counts enclosing loops, so a triply-nested loop reports depth 3.
@@ -793,7 +886,13 @@ mod loop_classification {
         for _ in 0..3 {
             let head = wf_child(&mut cpg, parent, CpgNodeKind::For);
             headers.push(head);
-            parent = wf_child(&mut cpg, head, CpgNodeKind::Block { scope: ScopeId::GLOBAL });
+            parent = wf_child(
+                &mut cpg,
+                head,
+                CpgNodeKind::Block {
+                    scope: ScopeId::GLOBAL,
+                },
+            );
         }
 
         let loops = ControlFlowAnalyzer::new().detect_loops(&cpg, func);
@@ -815,14 +914,26 @@ mod loop_classification {
         let mut cpg = CodePropertyGraph::new(Language::Rust);
         let (func, body) = func_with_body(&mut cpg);
         let head = wf_child(&mut cpg, body, CpgNodeKind::For);
-        wf_child(&mut cpg, head, CpgNodeKind::BinaryOp { operator: "..".into() });
+        wf_child(
+            &mut cpg,
+            head,
+            CpgNodeKind::BinaryOp {
+                operator: "..".into(),
+            },
+        );
         assert!(only_loop(&cpg, func).is_counted);
 
         // Range expression spelled as an opaque node kind.
         let mut cpg = CodePropertyGraph::new(Language::Rust);
         let (func, body) = func_with_body(&mut cpg);
         let head = wf_child(&mut cpg, body, CpgNodeKind::For);
-        wf_child(&mut cpg, head, CpgNodeKind::Unknown { kind: "range_expr".into() });
+        wf_child(
+            &mut cpg,
+            head,
+            CpgNodeKind::Unknown {
+                kind: "range_expr".into(),
+            },
+        );
         assert!(only_loop(&cpg, func).is_counted);
 
         // Counting iterator adaptor (`.enumerate()`).
@@ -832,9 +943,18 @@ mod loop_classification {
         let call = wf_child(
             &mut cpg,
             head,
-            CpgNodeKind::Call { target: None, is_method: true },
+            CpgNodeKind::Call {
+                target: None,
+                is_method: true,
+            },
         );
-        wf_child(&mut cpg, call, CpgNodeKind::MemberAccess { member: "enumerate".into() });
+        wf_child(
+            &mut cpg,
+            call,
+            CpgNodeKind::MemberAccess {
+                member: "enumerate".into(),
+            },
+        );
         assert!(only_loop(&cpg, func).is_counted);
 
         // A call that is not a counting adaptor still leaves the default in
@@ -845,10 +965,16 @@ mod loop_classification {
         let call = wf_child(
             &mut cpg,
             head,
-            CpgNodeKind::Call { target: None, is_method: true },
+            CpgNodeKind::Call {
+                target: None,
+                is_method: true,
+            },
         );
         wf_child(&mut cpg, call, ident("lines"));
-        assert!(only_loop(&cpg, func).is_counted, "`for` defaults to counted");
+        assert!(
+            only_loop(&cpg, func).is_counted,
+            "`for` defaults to counted"
+        );
     }
 
     /// A `while`/`do…while` is counted only when it carries *both* a comparison
@@ -860,19 +986,31 @@ mod loop_classification {
             let mut cpg = CodePropertyGraph::new(Language::Rust);
             let (func, body) = func_with_body(&mut cpg);
             let head = wf_child(&mut cpg, body, loop_kind);
-            let inner = wf_child(&mut cpg, head, CpgNodeKind::Block { scope: ScopeId::GLOBAL });
+            let inner = wf_child(
+                &mut cpg,
+                head,
+                CpgNodeKind::Block {
+                    scope: ScopeId::GLOBAL,
+                },
+            );
             for e in extras {
                 wf_child(&mut cpg, inner, e.clone());
             }
             only_loop(&cpg, func).is_counted
         }
 
-        let cmp = CpgNodeKind::BinaryOp { operator: "<".into() };
-        let inc = CpgNodeKind::UnaryOp { operator: "++".into() };
+        let cmp = CpgNodeKind::BinaryOp {
+            operator: "<".into(),
+        };
+        let inc = CpgNodeKind::UnaryOp {
+            operator: "++".into(),
+        };
 
         for loop_kind in [
             CpgNodeKind::While,
-            CpgNodeKind::Unknown { kind: "do_statement".into() },
+            CpgNodeKind::Unknown {
+                kind: "do_statement".into(),
+            },
         ] {
             assert!(
                 counted(loop_kind.clone(), &[cmp.clone(), inc.clone()]),
@@ -894,7 +1032,12 @@ mod loop_classification {
             assert!(
                 counted(
                     CpgNodeKind::While,
-                    &[CpgNodeKind::BinaryOp { operator: op.into() }, inc.clone()],
+                    &[
+                        CpgNodeKind::BinaryOp {
+                            operator: op.into()
+                        },
+                        inc.clone()
+                    ],
                 ),
                 "`{op}` is a comparison"
             );
@@ -902,7 +1045,12 @@ mod loop_classification {
         // … and a non-comparison operator is not.
         assert!(!counted(
             CpgNodeKind::While,
-            &[CpgNodeKind::BinaryOp { operator: "+".into() }, inc.clone()],
+            &[
+                CpgNodeKind::BinaryOp {
+                    operator: "+".into()
+                },
+                inc.clone()
+            ],
         ));
 
         // Every induction step spelling is recognized …
@@ -910,7 +1058,12 @@ mod loop_classification {
             assert!(
                 counted(
                     CpgNodeKind::While,
-                    &[cmp.clone(), CpgNodeKind::UnaryOp { operator: op.into() }],
+                    &[
+                        cmp.clone(),
+                        CpgNodeKind::UnaryOp {
+                            operator: op.into()
+                        }
+                    ],
                 ),
                 "`{op}` is an induction step"
             );
@@ -919,7 +1072,12 @@ mod loop_classification {
             assert!(
                 counted(
                     CpgNodeKind::While,
-                    &[cmp.clone(), CpgNodeKind::Assignment { operator: op.into() }],
+                    &[
+                        cmp.clone(),
+                        CpgNodeKind::Assignment {
+                            operator: op.into()
+                        }
+                    ],
                 ),
                 "`{op}` is an induction step"
             );
@@ -927,14 +1085,21 @@ mod loop_classification {
         // … and a plain assignment is not an induction step.
         assert!(!counted(
             CpgNodeKind::While,
-            &[cmp.clone(), CpgNodeKind::Assignment { operator: "=".into() }],
+            &[
+                cmp.clone(),
+                CpgNodeKind::Assignment {
+                    operator: "=".into()
+                }
+            ],
         ));
         // Nor is a literal, which exercises the non-operator fall-through.
         assert!(!counted(
             CpgNodeKind::While,
             &[
                 cmp,
-                CpgNodeKind::Literal { kind: LiteralKind::Integer(1) },
+                CpgNodeKind::Literal {
+                    kind: LiteralKind::Integer(1)
+                },
             ],
         ));
     }
@@ -944,7 +1109,14 @@ mod loop_classification {
     #[test]
     fn iterator_adaptor_and_do_while_vocabularies() {
         // The adaptor is named either by a bare identifier or by a method.
-        for word in ["enumerate", "range", "take", "zip", "take_while", "char_range"] {
+        for word in [
+            "enumerate",
+            "range",
+            "take",
+            "zip",
+            "take_while",
+            "char_range",
+        ] {
             for as_member in [false, true] {
                 let mut cpg = CodePropertyGraph::new(Language::Rust);
                 let (func, body) = func_with_body(&mut cpg);
@@ -952,10 +1124,15 @@ mod loop_classification {
                 let call = wf_child(
                     &mut cpg,
                     head,
-                    CpgNodeKind::Call { target: None, is_method: as_member },
+                    CpgNodeKind::Call {
+                        target: None,
+                        is_method: as_member,
+                    },
                 );
                 let named = if as_member {
-                    CpgNodeKind::MemberAccess { member: word.into() }
+                    CpgNodeKind::MemberAccess {
+                        member: word.into(),
+                    }
                 } else {
                     ident(word)
                 };
@@ -974,7 +1151,9 @@ mod loop_classification {
             wf_child(
                 &mut cpg,
                 body,
-                CpgNodeKind::Unknown { kind: spelling.into() },
+                CpgNodeKind::Unknown {
+                    kind: spelling.into(),
+                },
             );
             assert_eq!(
                 only_loop(&cpg, func).kind,
@@ -988,8 +1167,17 @@ mod loop_classification {
             let mut cpg = CodePropertyGraph::new(Language::Rust);
             let (func, body) = func_with_body(&mut cpg);
             let head = wf_child(&mut cpg, body, CpgNodeKind::For);
-            wf_child(&mut cpg, head, CpgNodeKind::Unknown { kind: spelling.into() });
-            assert!(only_loop(&cpg, func).is_counted, "`{spelling}` bounds the loop");
+            wf_child(
+                &mut cpg,
+                head,
+                CpgNodeKind::Unknown {
+                    kind: spelling.into(),
+                },
+            );
+            assert!(
+                only_loop(&cpg, func).is_counted,
+                "`{spelling}` bounds the loop"
+            );
         }
     }
 
@@ -999,9 +1187,27 @@ mod loop_classification {
         let mut cpg = CodePropertyGraph::new(Language::Rust);
         let (func, body) = func_with_body(&mut cpg);
         let head = wf_child(&mut cpg, body, CpgNodeKind::Loop);
-        let inner = wf_child(&mut cpg, head, CpgNodeKind::Block { scope: ScopeId::GLOBAL });
-        wf_child(&mut cpg, inner, CpgNodeKind::BinaryOp { operator: "<".into() });
-        wf_child(&mut cpg, inner, CpgNodeKind::UnaryOp { operator: "++".into() });
+        let inner = wf_child(
+            &mut cpg,
+            head,
+            CpgNodeKind::Block {
+                scope: ScopeId::GLOBAL,
+            },
+        );
+        wf_child(
+            &mut cpg,
+            inner,
+            CpgNodeKind::BinaryOp {
+                operator: "<".into(),
+            },
+        );
+        wf_child(
+            &mut cpg,
+            inner,
+            CpgNodeKind::UnaryOp {
+                operator: "++".into(),
+            },
+        );
 
         let found = only_loop(&cpg, func);
         assert_eq!(found.kind, LoopKind::Infinite);

@@ -81,7 +81,10 @@ impl CfgEdgeKind {
 
     /// Returns true if this is a loop-related edge.
     pub fn is_loop(&self) -> bool {
-        matches!(self, Self::LoopBack | Self::LoopExit | Self::Break | Self::Continue)
+        matches!(
+            self,
+            Self::LoopBack | Self::LoopExit | Self::Break | Self::Continue
+        )
     }
 
     /// Returns true if this is an exception-related edge.
@@ -125,7 +128,10 @@ pub enum DfgEdgeKind {
 impl DfgEdgeKind {
     /// Returns true if this is a read operation.
     pub fn is_read(&self) -> bool {
-        matches!(self, Self::DefUse | Self::FieldRead | Self::IndexRead | Self::Dereference)
+        matches!(
+            self,
+            Self::DefUse | Self::FieldRead | Self::IndexRead | Self::Dereference
+        )
     }
 
     /// Returns true if this is a write operation.
@@ -470,10 +476,13 @@ mod tests {
         // Backward kinds.
         assert!(!CpgEdge::new(EdgeId::new(0), s, t, CpgEdgeKind::AstParent).is_forward());
         assert!(!CpgEdge::new(EdgeId::new(0), s, t, CpgEdgeKind::AstPrevSibling).is_forward());
-        assert!(
-            !CpgEdge::new(EdgeId::new(0), s, t, CpgEdgeKind::DataFlow(DfgEdgeKind::UseDef))
-                .is_forward()
-        );
+        assert!(!CpgEdge::new(
+            EdgeId::new(0),
+            s,
+            t,
+            CpgEdgeKind::DataFlow(DfgEdgeKind::UseDef)
+        )
+        .is_forward());
     }
 }
 
@@ -558,7 +567,10 @@ mod serde_tests {
 
         let eid = EdgeId::new(99);
         let s = serde_json::to_string(&eid).expect("serialize EdgeId");
-        assert_eq!(serde_json::from_str::<EdgeId>(&s).expect("deserialize EdgeId"), eid);
+        assert_eq!(
+            serde_json::from_str::<EdgeId>(&s).expect("deserialize EdgeId"),
+            eid
+        );
     }
 
     proptest! {

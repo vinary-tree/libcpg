@@ -209,9 +209,7 @@ fn compute_control_dependence(cpg: &CodePropertyGraph, function: NodeId) -> Vec<
         if b == VIRTUAL_EXIT {
             continue;
         }
-        let preds: Vec<u32> = reverse
-            .neighbors_directed(b, Direction::Incoming)
-            .collect();
+        let preds: Vec<u32> = reverse.neighbors_directed(b, Direction::Incoming).collect();
         if preds.len() < 2 {
             continue;
         }
@@ -239,8 +237,7 @@ fn compute_control_dependence(cpg: &CodePropertyGraph, function: NodeId) -> Vec<
 /// the DFG's def-use / reaching-definition edges whose endpoints both lie within
 /// the function's AST subtree.
 fn compute_data_dependence(cpg: &CodePropertyGraph, function: NodeId) -> Vec<(NodeId, NodeId)> {
-    let mut function_nodes: FxHashSet<NodeId> =
-        cpg.ast_descendants(function).into_iter().collect();
+    let mut function_nodes: FxHashSet<NodeId> = cpg.ast_descendants(function).into_iter().collect();
     function_nodes.insert(function);
 
     let mut seen: FxHashSet<(u32, u32)> = FxHashSet::default();
@@ -539,11 +536,7 @@ mod tests {
         let mut cpg = TreeSitterCpgBuilder::new()
             .build(source, Language::Rust)
             .expect("build should succeed");
-        let func = cpg
-            .functions()
-            .map(|n| n.id)
-            .next()
-            .expect("function node");
+        let func = cpg.functions().map(|n| n.id).next().expect("function node");
 
         PdgBuilder::new().build(&mut cpg, func);
         assert!(
@@ -567,11 +560,7 @@ mod tests {
         let mut cpg = TreeSitterCpgBuilder::new()
             .build(source, Language::Rust)
             .expect("build should succeed");
-        let func = cpg
-            .functions()
-            .map(|n| n.id)
-            .next()
-            .expect("function node");
+        let func = cpg.functions().map(|n| n.id).next().expect("function node");
 
         PdgBuilder::new().build(&mut cpg, func);
         assert_eq!(control_dependence_count(&cpg), 0);

@@ -2,8 +2,8 @@
 //!
 //! Maps CPG languages to tree-sitter parser Language objects.
 
-use std::sync::OnceLock;
 use rustc_hash::FxHashMap;
+use std::sync::OnceLock;
 use tree_sitter::Language as TsLanguage;
 
 use crate::Language;
@@ -45,7 +45,10 @@ impl ParserRegistry {
         // JavaScript
         #[cfg(feature = "lang-javascript")]
         {
-            parsers.insert(Language::JavaScript, tree_sitter_javascript::LANGUAGE.into());
+            parsers.insert(
+                Language::JavaScript,
+                tree_sitter_javascript::LANGUAGE.into(),
+            );
         }
 
         // TypeScript

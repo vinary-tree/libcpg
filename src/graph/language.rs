@@ -266,7 +266,10 @@ impl Language {
 
     /// Returns true if this is a systems programming language.
     pub fn is_systems(&self) -> bool {
-        matches!(self, Self::Rust | Self::C | Self::Cpp | Self::Go | Self::Zig)
+        matches!(
+            self,
+            Self::Rust | Self::C | Self::Cpp | Self::Go | Self::Zig
+        )
     }
 
     /// Returns true if this is a JVM language.
@@ -328,15 +331,29 @@ impl Language {
     /// Returns the paradigm(s) this language primarily supports.
     pub fn paradigms(&self) -> &'static [Paradigm] {
         match self {
-            Self::Rust => &[Paradigm::Imperative, Paradigm::Functional, Paradigm::Concurrent],
+            Self::Rust => &[
+                Paradigm::Imperative,
+                Paradigm::Functional,
+                Paradigm::Concurrent,
+            ],
             Self::C => &[Paradigm::Imperative, Paradigm::Procedural],
-            Self::Cpp => &[Paradigm::Imperative, Paradigm::ObjectOriented, Paradigm::Functional],
+            Self::Cpp => &[
+                Paradigm::Imperative,
+                Paradigm::ObjectOriented,
+                Paradigm::Functional,
+            ],
             Self::Go => &[Paradigm::Imperative, Paradigm::Concurrent],
             Self::Java => &[Paradigm::ObjectOriented, Paradigm::Imperative],
-            Self::Python => &[Paradigm::ObjectOriented, Paradigm::Imperative, Paradigm::Functional],
-            Self::JavaScript | Self::TypeScript => {
-                &[Paradigm::ObjectOriented, Paradigm::Functional, Paradigm::Reactive]
-            }
+            Self::Python => &[
+                Paradigm::ObjectOriented,
+                Paradigm::Imperative,
+                Paradigm::Functional,
+            ],
+            Self::JavaScript | Self::TypeScript => &[
+                Paradigm::ObjectOriented,
+                Paradigm::Functional,
+                Paradigm::Reactive,
+            ],
             Self::Haskell => &[Paradigm::Functional],
             Self::Elixir | Self::Erlang => &[Paradigm::Functional, Paradigm::Concurrent],
             Self::Rholang => &[Paradigm::Concurrent, Paradigm::ProcessCalculus],
@@ -481,7 +498,13 @@ mod tests {
 
     #[test]
     fn category_predicates() {
-        for l in [Language::Rust, Language::C, Language::Cpp, Language::Go, Language::Zig] {
+        for l in [
+            Language::Rust,
+            Language::C,
+            Language::Cpp,
+            Language::Go,
+            Language::Zig,
+        ] {
             assert!(l.is_systems(), "{l:?} should be a systems language");
         }
         for l in [
@@ -544,10 +567,14 @@ mod tests {
     fn paradigms_representative() {
         assert!(Language::Rust.paradigms().contains(&Paradigm::Concurrent));
         assert!(Language::Rust.paradigms().contains(&Paradigm::Functional));
-        assert!(Language::Rholang.paradigms().contains(&Paradigm::ProcessCalculus));
+        assert!(Language::Rholang
+            .paradigms()
+            .contains(&Paradigm::ProcessCalculus));
         assert!(Language::MeTTa.paradigms().contains(&Paradigm::Logic));
         assert_eq!(Language::Haskell.paradigms().len(), 1);
-        assert!(Language::Haskell.paradigms().contains(&Paradigm::Functional));
+        assert!(Language::Haskell
+            .paradigms()
+            .contains(&Paradigm::Functional));
         // Languages that fall through to the `_ => &[]` arm have no paradigms.
         assert!(Language::Unknown.paradigms().is_empty());
         assert!(Language::Zig.paradigms().is_empty());

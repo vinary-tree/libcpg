@@ -1,6 +1,6 @@
 //! Code metrics for pattern detection.
 
-use crate::{CodePropertyGraph, CpgNodeKind, CpgEdgeKind, NodeId};
+use crate::{CodePropertyGraph, CpgEdgeKind, CpgNodeKind, NodeId};
 use rustc_hash::{FxHashMap, FxHashSet};
 
 /// Code metrics useful for pattern detection.
@@ -167,7 +167,11 @@ impl PatternMetrics {
 
         // Check each field to see if its type references another class
         for node in cpg.nodes() {
-            if let CpgNodeKind::Field { field_type: Some(type_info), .. } = &node.kind {
+            if let CpgNodeKind::Field {
+                field_type: Some(type_info),
+                ..
+            } = &node.kind
+            {
                 if class_type_names.contains(type_info.name.as_ref()) {
                     composition_count += 1;
                 }
@@ -199,7 +203,10 @@ impl PatternMetrics {
         let mut class_count = 0;
 
         for (class_id, methods) in class_methods {
-            let fields = class_fields.get(class_id).map(|f| f.as_slice()).unwrap_or(&[]);
+            let fields = class_fields
+                .get(class_id)
+                .map(|f| f.as_slice())
+                .unwrap_or(&[]);
 
             if methods.len() < 2 || fields.is_empty() {
                 // If less than 2 methods or no fields, LCOM is 0 (perfectly cohesive)
@@ -207,7 +214,8 @@ impl PatternMetrics {
             }
 
             // Build field access sets for each method
-            let mut method_field_access: FxHashMap<NodeId, FxHashSet<NodeId>> = FxHashMap::default();
+            let mut method_field_access: FxHashMap<NodeId, FxHashSet<NodeId>> =
+                FxHashMap::default();
 
             for &method_id in methods {
                 let accessed_fields = Self::find_accessed_fields(cpg, method_id, fields);
@@ -329,21 +337,30 @@ impl PatternMetrics {
                 if let Some(node) = cpg.node(desc_id) {
                     match &node.kind {
                         // Field types
-                        CpgNodeKind::Field { field_type: Some(type_info), .. } => {
+                        CpgNodeKind::Field {
+                            field_type: Some(type_info),
+                            ..
+                        } => {
                             let type_name = type_info.name.as_ref();
                             if class_name != Some(type_name) {
                                 coupled_classes.insert(type_name);
                             }
                         }
                         // Variable types
-                        CpgNodeKind::Variable { var_type: Some(type_info), .. } => {
+                        CpgNodeKind::Variable {
+                            var_type: Some(type_info),
+                            ..
+                        } => {
                             let type_name = type_info.name.as_ref();
                             if class_name != Some(type_name) {
                                 coupled_classes.insert(type_name);
                             }
                         }
                         // Parameter types
-                        CpgNodeKind::Parameter { param_type: Some(type_info), .. } => {
+                        CpgNodeKind::Parameter {
+                            param_type: Some(type_info),
+                            ..
+                        } => {
                             let type_name = type_info.name.as_ref();
                             if class_name != Some(type_name) {
                                 coupled_classes.insert(type_name);
@@ -418,19 +435,26 @@ mod tests {
         // Add two classes
         cpg.add_node(CpgNode::new(
             NodeId::new(0),
-            CpgNodeKind::Class { name: Arc::from("Foo"), is_abstract: false },
+            CpgNodeKind::Class {
+                name: Arc::from("Foo"),
+                is_abstract: false,
+            },
             SourceRange::default(),
         ));
         cpg.add_node(CpgNode::new(
             NodeId::new(0),
-            CpgNodeKind::Struct { name: Arc::from("Bar") },
+            CpgNodeKind::Struct {
+                name: Arc::from("Bar"),
+            },
             SourceRange::default(),
         ));
 
         // Add one trait
         cpg.add_node(CpgNode::new(
             NodeId::new(0),
-            CpgNodeKind::Trait { name: Arc::from("Baz") },
+            CpgNodeKind::Trait {
+                name: Arc::from("Baz"),
+            },
             SourceRange::default(),
         ));
 
@@ -442,24 +466,32 @@ mod tests {
 
     #[test]
     fn test_inheritance_counting() {
-        use std::sync::Arc;
         use crate::CpgEdgeKind;
+        use std::sync::Arc;
 
         let mut cpg = CodePropertyGraph::new(Language::Rust);
 
         let class1 = cpg.add_node(CpgNode::new(
             NodeId::new(0),
-            CpgNodeKind::Class { name: Arc::from("Child"), is_abstract: false },
+            CpgNodeKind::Class {
+                name: Arc::from("Child"),
+                is_abstract: false,
+            },
             SourceRange::default(),
         ));
         let class2 = cpg.add_node(CpgNode::new(
             NodeId::new(0),
-            CpgNodeKind::Class { name: Arc::from("Parent"), is_abstract: false },
+            CpgNodeKind::Class {
+                name: Arc::from("Parent"),
+                is_abstract: false,
+            },
             SourceRange::default(),
         ));
         let trait1 = cpg.add_node(CpgNode::new(
             NodeId::new(0),
-            CpgNodeKind::Trait { name: Arc::from("SomeTrait") },
+            CpgNodeKind::Trait {
+                name: Arc::from("SomeTrait"),
+            },
             SourceRange::default(),
         ));
 
@@ -477,14 +509,17 @@ mod tests {
         use std::sync::Arc;
         cpg.add_node(CpgNode::new(
             NodeId::new(0),
-            CpgNodeKind::Class { name: Arc::from(name), is_abstract: false },
+            CpgNodeKind::Class {
+                name: Arc::from(name),
+                is_abstract: false,
+            },
             SourceRange::default(),
         ))
     }
 
     fn add_field(cpg: &mut CodePropertyGraph, name: &str, ty: Option<&str>) -> NodeId {
-        use std::sync::Arc;
         use crate::{TypeInfo, Visibility};
+        use std::sync::Arc;
         cpg.add_node(CpgNode::new(
             NodeId::new(0),
             CpgNodeKind::Field {
@@ -497,9 +532,9 @@ mod tests {
     }
 
     fn add_method(cpg: &mut CodePropertyGraph, name: &str) -> NodeId {
-        use std::sync::Arc;
         use crate::{MethodSignature, Visibility};
         use smallvec::SmallVec;
+        use std::sync::Arc;
         cpg.add_node(CpgNode::new(
             NodeId::new(0),
             CpgNodeKind::Function {
@@ -520,7 +555,10 @@ mod tests {
         use std::sync::Arc;
         cpg.add_node(CpgNode::new(
             NodeId::new(0),
-            CpgNodeKind::Identifier { name: Arc::from(name), definition: None },
+            CpgNodeKind::Identifier {
+                name: Arc::from(name),
+                definition: None,
+            },
             SourceRange::default(),
         ))
     }
@@ -536,7 +574,9 @@ mod tests {
         // A second type so the `engine` field couples Widget to it (CBO path).
         let engine = cpg.add_node(CpgNode::new(
             NodeId::new(0),
-            CpgNodeKind::Struct { name: std::sync::Arc::from("Engine") },
+            CpgNodeKind::Struct {
+                name: std::sync::Arc::from("Engine"),
+            },
             SourceRange::default(),
         ));
 
@@ -567,14 +607,21 @@ mod tests {
         assert_eq!(m.class_count, 2, "Widget (class) + Engine (struct)");
         assert_eq!(m.interface_count, 0);
         assert_eq!(m.inheritance_count, 0);
-        assert_eq!(m.composition_count, 1, "engine field is typed as a known class");
+        assert_eq!(
+            m.composition_count, 1,
+            "engine field is typed as a known class"
+        );
         assert!(
             (m.avg_methods_per_class - 1.5).abs() < 1e-9,
             "3 methods over 2 classes = 1.5, got {}",
             m.avg_methods_per_class
         );
         // LCOM numeric path: cohesion in [0,1] and specifically 1/3.
-        assert!((0.0..=1.0).contains(&m.cohesion), "cohesion {} out of range", m.cohesion);
+        assert!(
+            (0.0..=1.0).contains(&m.cohesion),
+            "cohesion {} out of range",
+            m.cohesion
+        );
         assert!(
             (m.cohesion - (1.0 / 3.0)).abs() < 1e-9,
             "expected LCOM 1/3, got {}",
@@ -598,12 +645,17 @@ mod tests {
         let r = SourceRange::default();
         let class = cpg.add_node(CpgNode::new(
             NodeId::new(0),
-            CpgNodeKind::Class { name: Arc::from("Cyclic"), is_abstract: false },
+            CpgNodeKind::Class {
+                name: Arc::from("Cyclic"),
+                is_abstract: false,
+            },
             r,
         ));
         let block = cpg.add_node(CpgNode::new(
             NodeId::new(0),
-            CpgNodeKind::Block { scope: crate::ScopeId::GLOBAL },
+            CpgNodeKind::Block {
+                scope: crate::ScopeId::GLOBAL,
+            },
             r,
         ));
         // class -> block -> block (self loop) -> class (back edge): all AstChild.
@@ -678,21 +730,39 @@ mod cohesion_and_coupling {
         let class_id = add(
             &mut cpg,
             None,
-            CpgNodeKind::Class { name: Arc::from("C"), is_abstract: false },
+            CpgNodeKind::Class {
+                name: Arc::from("C"),
+                is_abstract: false,
+            },
         );
         for f in fields {
             field(&mut cpg, class_id, f);
         }
         for (i, reads) in access.iter().enumerate() {
             let m = method(&mut cpg, class_id, &format!("m{i}"));
-            let body = add(&mut cpg, Some(m), CpgNodeKind::Block { scope: ScopeId::GLOBAL });
+            let body = add(
+                &mut cpg,
+                Some(m),
+                CpgNodeKind::Block {
+                    scope: ScopeId::GLOBAL,
+                },
+            );
             for r in reads.iter() {
                 // Field reads appear both as `self.f` and as a bare name.
-                add(&mut cpg, Some(body), CpgNodeKind::MemberAccess { member: Arc::from(*r) });
                 add(
                     &mut cpg,
                     Some(body),
-                    CpgNodeKind::Identifier { name: Arc::from(*r), definition: None },
+                    CpgNodeKind::MemberAccess {
+                        member: Arc::from(*r),
+                    },
+                );
+                add(
+                    &mut cpg,
+                    Some(body),
+                    CpgNodeKind::Identifier {
+                        name: Arc::from(*r),
+                        definition: None,
+                    },
                 );
             }
         }
@@ -749,7 +819,10 @@ mod cohesion_and_coupling {
             let class_id = add(
                 &mut cpg,
                 None,
-                CpgNodeKind::Class { name: Arc::from("C"), is_abstract: false },
+                CpgNodeKind::Class {
+                    name: Arc::from("C"),
+                    is_abstract: false,
+                },
             );
             for k in kinds {
                 add(&mut cpg, Some(class_id), k);
@@ -773,7 +846,9 @@ mod cohesion_and_coupling {
             param_type: Some(TypeInfo::new(t)),
             is_variadic: false,
         };
-        let annotation = |t: &str| CpgNodeKind::TypeAnnotation { type_info: TypeInfo::new(t) };
+        let annotation = |t: &str| CpgNodeKind::TypeAnnotation {
+            type_info: TypeInfo::new(t),
+        };
 
         // No type references at all.
         assert_eq!(coupling_with(vec![]), 0.0);
@@ -793,7 +868,12 @@ mod cohesion_and_coupling {
 
         // A self-reference is not coupling.
         assert_eq!(
-            coupling_with(vec![typed_field("C"), typed_var("C"), typed_param("C"), annotation("C")]),
+            coupling_with(vec![
+                typed_field("C"),
+                typed_var("C"),
+                typed_param("C"),
+                annotation("C")
+            ]),
             0.0,
             "a class is not coupled to itself"
         );
@@ -816,12 +896,18 @@ mod cohesion_and_coupling {
             let class_id = add(
                 &mut cpg,
                 None,
-                CpgNodeKind::Class { name: Arc::from("C"), is_abstract: false },
+                CpgNodeKind::Class {
+                    name: Arc::from("C"),
+                    is_abstract: false,
+                },
             );
             let base = add(
                 &mut cpg,
                 None,
-                CpgNodeKind::Class { name: Arc::from("Base"), is_abstract: true },
+                CpgNodeKind::Class {
+                    name: Arc::from("Base"),
+                    is_abstract: true,
+                },
             );
             cpg.connect(class_id, base, kind);
             PatternMetrics::compute(&cpg)

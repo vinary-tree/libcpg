@@ -12,8 +12,8 @@ use ndarray::Array1;
 #[cfg(feature = "gnn")]
 use rand::Rng;
 
-use crate::{CodePropertyGraph, NodeId, CpgNodeKind};
 use super::GraphNeuralNetwork;
+use crate::{CodePropertyGraph, CpgNodeKind, NodeId};
 
 /// CPGNN - Graph Neural Network for Code Property Graphs.
 ///
@@ -111,7 +111,9 @@ impl CpgGnn {
             CpgNodeKind::Class { .. } | CpgNodeKind::Struct { .. } => features[2] = 1.0,
             CpgNodeKind::Function { .. } => features[3] = 1.0,
             CpgNodeKind::Variable { .. } | CpgNodeKind::Field { .. } => features[4] = 1.0,
-            CpgNodeKind::If | CpgNodeKind::While | CpgNodeKind::For | CpgNodeKind::Loop => features[5] = 1.0,
+            CpgNodeKind::If | CpgNodeKind::While | CpgNodeKind::For | CpgNodeKind::Loop => {
+                features[5] = 1.0
+            }
             CpgNodeKind::Return | CpgNodeKind::Break | CpgNodeKind::Continue => features[6] = 1.0,
             CpgNodeKind::Call { .. } => features[7] = 1.0,
             CpgNodeKind::BinaryOp { .. } | CpgNodeKind::UnaryOp { .. } => features[8] = 1.0,
@@ -143,7 +145,9 @@ impl GraphNeuralNetwork for CpgGnn {
                 let mut new_embeddings = FxHashMap::default();
 
                 for node in self.cpg.nodes() {
-                    let current = embeddings.get(&node.id).cloned()
+                    let current = embeddings
+                        .get(&node.id)
+                        .cloned()
                         .unwrap_or_else(|| Array1::zeros(self.embedding_dim));
 
                     // Aggregate neighbor embeddings
@@ -272,14 +276,12 @@ impl GraphNeuralNetwork for CpgGnn {
 #[cfg(all(test, feature = "gnn"))]
 mod tests {
     use super::*;
-    use crate::{CpgNode, SourceRange, Language, CpgEdgeKind};
+    use crate::{CpgEdgeKind, CpgNode, Language, SourceRange};
 
     #[test]
     fn test_cpgnn_creation() {
         let cpg = CodePropertyGraph::new(Language::Rust);
-        let gnn = CpgGnn::new(cpg)
-            .with_embedding_dim(64)
-            .with_num_layers(2);
+        let gnn = CpgGnn::new(cpg).with_embedding_dim(64).with_num_layers(2);
 
         assert_eq!(gnn.embedding_dim(), 64);
         assert!(!gnn.is_initialized());
@@ -288,8 +290,16 @@ mod tests {
     #[test]
     fn test_cpgnn_propagation() {
         let mut cpg = CodePropertyGraph::new(Language::Rust);
-        let n1 = cpg.add_node(CpgNode::new(NodeId::new(0), CpgNodeKind::Root, SourceRange::default()));
-        let n2 = cpg.add_node(CpgNode::new(NodeId::new(0), CpgNodeKind::If, SourceRange::default()));
+        let n1 = cpg.add_node(CpgNode::new(
+            NodeId::new(0),
+            CpgNodeKind::Root,
+            SourceRange::default(),
+        ));
+        let n2 = cpg.add_node(CpgNode::new(
+            NodeId::new(0),
+            CpgNodeKind::If,
+            SourceRange::default(),
+        ));
         cpg.connect(n1, n2, CpgEdgeKind::AstChild);
 
         let mut gnn = CpgGnn::new(cpg).with_embedding_dim(32);
@@ -303,8 +313,16 @@ mod tests {
     #[test]
     fn test_cpgnn_builders_and_cpg_accessor() {
         let mut cpg = CodePropertyGraph::new(Language::Rust);
-        cpg.add_node(CpgNode::new(NodeId::new(0), CpgNodeKind::Root, SourceRange::default()));
-        cpg.add_node(CpgNode::new(NodeId::new(0), CpgNodeKind::If, SourceRange::default()));
+        cpg.add_node(CpgNode::new(
+            NodeId::new(0),
+            CpgNodeKind::Root,
+            SourceRange::default(),
+        ));
+        cpg.add_node(CpgNode::new(
+            NodeId::new(0),
+            CpgNodeKind::If,
+            SourceRange::default(),
+        ));
 
         // The builder chain returns `Self`; `cpg()` hands back the moved-in graph
         // unchanged (same node count), and `with_embedding_dim` is observable.
@@ -321,10 +339,8 @@ mod tests {
         // count) — so verify they mutate state via the derived `Debug` view,
         // without coupling to the exact format string.
         let base = CpgGnn::new(CodePropertyGraph::new(Language::Rust));
-        let more_layers =
-            CpgGnn::new(CodePropertyGraph::new(Language::Rust)).with_num_layers(9);
-        let more_dropout =
-            CpgGnn::new(CodePropertyGraph::new(Language::Rust)).with_dropout(0.75);
+        let more_layers = CpgGnn::new(CodePropertyGraph::new(Language::Rust)).with_num_layers(9);
+        let more_dropout = CpgGnn::new(CodePropertyGraph::new(Language::Rust)).with_dropout(0.75);
         assert_ne!(format!("{base:?}"), format!("{more_layers:?}"));
         assert_ne!(format!("{base:?}"), format!("{more_dropout:?}"));
     }
@@ -332,8 +348,16 @@ mod tests {
     #[test]
     fn test_cpgnn_subgraph_embedding_and_reset() {
         let mut cpg = CodePropertyGraph::new(Language::Rust);
-        let n1 = cpg.add_node(CpgNode::new(NodeId::new(0), CpgNodeKind::Root, SourceRange::default()));
-        let n2 = cpg.add_node(CpgNode::new(NodeId::new(0), CpgNodeKind::If, SourceRange::default()));
+        let n1 = cpg.add_node(CpgNode::new(
+            NodeId::new(0),
+            CpgNodeKind::Root,
+            SourceRange::default(),
+        ));
+        let n2 = cpg.add_node(CpgNode::new(
+            NodeId::new(0),
+            CpgNodeKind::If,
+            SourceRange::default(),
+        ));
         cpg.connect(n1, n2, CpgEdgeKind::AstChild);
 
         let mut gnn = CpgGnn::new(cpg).with_embedding_dim(16);
@@ -437,7 +461,10 @@ mod pooling_edges {
         gnn.propagate(1); // second pass: no re-initialization
         assert!(gnn.is_initialized());
         for (i, id) in ids.iter().enumerate() {
-            assert_eq!(gnn.node_embedding(*id).expect("still embedded").len(), widths[i]);
+            assert_eq!(
+                gnn.node_embedding(*id).expect("still embedded").len(),
+                widths[i]
+            );
         }
 
         gnn.reset();
