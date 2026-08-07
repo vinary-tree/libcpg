@@ -7,20 +7,19 @@ start
 :warm up
 (prime caches / branch predictors);<<#F1F3F5>>
 :perf record --call-graph lbr
-(or criterion, when added);<<#FFF3BF>>
+or run criterion;<<#FFF3BF>>
 :tee output to a file
 (run once, analyze many);<<#F1F3F5>>
 :generate + analyze perf report
 in parallel;<<#FFF3BF>>
 stop
 note right
-  <b>Documented current gap:</b> runnable benchmarks
-  are not yet wired up. <i>criterion 0.5</i> is a
-  dev-dependency, but both <latex>[[bench]]</latex>
-  targets in Cargo.toml are commented out
-  ("Benchmarks will be added when implementations
-  are complete"). Until then the amber steps use
-  <i>perf</i> directly.
+  <b>Current coverage:</b> the active
+  <i>scc_analysis</i> criterion target measures
+  paths, rings, and cyclic clusters. Construction,
+  DFG/PDG, VF2, and GNN still need focused
+  <latex>[[bench]]</latex> targets before making
+  performance claims about those surfaces.
 end note
 legend right
   |= colour |= role |

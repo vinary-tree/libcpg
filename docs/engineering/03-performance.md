@@ -63,7 +63,7 @@ dimension, $`k`$ = Weisfeiler-Lehman iterations (3).
 | CFG extraction (per function) | $`O(n)`$ | A per-construct walk over the function's AST children. |
 | DFG reaching-defs (per function) | $`O(I \cdot n)`$ | An [AST-ordered sweep](../GLOSSARY.md#ast-ordered-reaching-definitions); $`I`$ is bounded by `max_iterations` (default 100), with loop bodies swept twice. |
 | PDG construction (per function) | near-linear in $`V + E`$ of the CFG | `petgraph::dominators::simple_fast` on the reversed CFG plus a Cytron reverse-dominance-frontier walk. |
-| CFG/call-graph SCC decomposition | $`O(V + E)`$ | Iterative Kosaraju passes plus construction of the condensation DAG; explicit stacks avoid native-stack growth with path depth. |
+| CFG/call-graph SCC decomposition | $`O(V + E)`$ after adjacency normalization | Iterative Tarjan plus condensation construction; dense indices avoid traversal hash lookups, and explicit stacks avoid native-stack growth with path depth. |
 | [`backward_slice`](../GLOSSARY.md#backward-slice--forward-slice) / `forward_slice` | $`O(V + E)`$, capped at `max_nodes` | Breadth-first over PDG edges; returns as soon as the slice reaches `max_nodes`. |
 | [VF2](../GLOSSARY.md#vf2) `find_matches` | worst case $`O(N!\,N)`$; pruned in practice | Feasibility rules and `max_matches` cut the state space dramatically; see [`theory/05-subgraph-isomorphism-vf2.md`](../theory/05-subgraph-isomorphism-vf2.md). |
 | [Jaccard](../GLOSSARY.md#jaccard-similarity) similarity | $`O(V_1 + V_2)`$ | Over the two graphs' node-kind multisets. |
@@ -76,31 +76,34 @@ its `max_matches` cap and strict-matching toggles matter for untrusted input
 made to *terminate* by the `max_iterations` fixpoint cap rather than a proof of
 monotone convergence, so it is bounded even on pathological control flow.
 
-## Benchmarking: a documented gap
+## Benchmark coverage and remaining gaps
 
-There are currently **no runnable benchmarks**. `criterion 0.5` is a
-dev-dependency, but both `[[bench]]` targets in `Cargo.toml` are commented out:
+The SCC analysis has an active Criterion target. It measures feature-free public
+call-graph analysis over 1,000- and 10,000-function paths, rings, and cyclic
+clusters:
 
 ```toml
-# Cargo.toml (excerpt) — benches are NOT active
-# Benchmarks will be added when implementations are complete
-# [[bench]]
-# name = "cpg_construction"
-# harness = false
-
-# [[bench]]
-# name = "pattern_matching"
-# harness = false
+[[bench]]
+name = "scc_analysis"
+harness = false
 ```
 
-So `cargo bench` has no targets, and none of the costs above have been measured on
-this codebase. Any optimization work must therefore start by *adding* benchmarks —
-optimizing without a baseline would violate the project's data-driven discipline.
+Run it directly, or save and compare named baselines:
+
+```sh
+cargo bench --bench scc_analysis --no-default-features
+cargo bench --bench scc_analysis --no-default-features -- --save-baseline before
+cargo bench --bench scc_analysis --no-default-features -- --baseline before
+```
+
+CPG construction, pattern matching, DFG/PDG analysis, and GNN propagation still
+lack runnable benchmarks. Optimization work on those surfaces must begin by
+adding a focused target and establishing a baseline.
 
 ### How to add a benchmark
 
-1. **Uncomment (or add) a `[[bench]]` target** in `Cargo.toml` and create the
-   matching file under `benches/` (the directory does not exist yet — create it):
+1. **Add a `[[bench]]` target** in `Cargo.toml` and its matching file under
+   `benches/`:
 
    ```toml
    # Cargo.toml
@@ -167,6 +170,6 @@ The same methodology, framed as a scientific protocol, is in
 
 - [Build and features](01-build-and-features.md) — which dependencies each feature
   pulls in.
-- [Testing](02-testing.md) — the (currently benchmark-free) test tree.
+- [Testing](02-testing.md) — correctness tests and benchmark coverage.
 - [`security/01`](../security/01-input-and-resource-hardening.md) — the bounds that
   keep worst-case costs finite on hostile input.

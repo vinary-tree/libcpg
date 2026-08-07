@@ -1,7 +1,8 @@
 //! Strongly-connected-component analysis for CFG and call-graph projections.
 //!
-//! The implementation uses an iterative Kosaraju decomposition. Both graph
-//! traversals and AST scope discovery use explicit work stacks, so deeply
+//! The implementation uses an iterative Tarjan decomposition over dense
+//! internal vertex indices. Graph traversal and AST scope discovery use
+//! explicit work stacks, so deeply
 //! nested source or long graph paths cannot overflow the native stack.
 
 use std::collections::BTreeMap;
@@ -165,14 +166,10 @@ pub fn control_flow_sccs(
 /// Unresolved calls and edges to non-function targets do not invent vertices.
 pub fn call_graph_sccs(cpg: &CodePropertyGraph) -> SccDecomposition {
     let nodes = sorted_nodes(cpg.functions().map(|node| node.id));
-    let node_set: FxHashSet<NodeId> = nodes.iter().copied().collect();
-    let mut adjacency: FxHashMap<NodeId, Vec<NodeId>> = nodes
-        .iter()
-        .copied()
-        .map(|node| (node, Vec::new()))
-        .collect();
+    let node_indices = dense_node_indices(&nodes);
+    let mut adjacency = vec![Vec::new(); nodes.len()];
 
-    for &caller in &nodes {
+    for (caller_index, &caller) in nodes.iter().enumerate() {
         for source in function_scope_nodes(cpg, caller) {
             if let Some(node) = cpg.node(source) {
                 if let CpgNodeKind::Call {
@@ -180,8 +177,8 @@ pub fn call_graph_sccs(cpg: &CodePropertyGraph) -> SccDecomposition {
                     ..
                 } = &node.kind
                 {
-                    if node_set.contains(target) {
-                        adjacency.entry(caller).or_default().push(*target);
+                    if let Some(&target_index) = node_indices.get(target) {
+                        adjacency[caller_index].push(target_index);
                     }
                 }
             }
@@ -189,14 +186,17 @@ pub fn call_graph_sccs(cpg: &CodePropertyGraph) -> SccDecomposition {
             for edge in cpg.outgoing_edges(source) {
                 let is_resolved_call = edge.kind.is_call()
                     || matches!(edge.kind, CpgEdgeKind::ControlFlow(CfgEdgeKind::Call));
-                if is_resolved_call && node_set.contains(&edge.target) {
-                    adjacency.entry(caller).or_default().push(edge.target);
+                if is_resolved_call {
+                    if let Some(&target_index) = node_indices.get(&edge.target) {
+                        adjacency[caller_index].push(target_index);
+                    }
                 }
             }
         }
     }
 
     normalize_adjacency(&mut adjacency);
+    drop(node_indices);
     decompose(SccProjection::CallGraph, nodes, adjacency)
 }
 
@@ -235,129 +235,167 @@ fn sorted_nodes(nodes: impl IntoIterator<Item = NodeId>) -> Vec<NodeId> {
     nodes
 }
 
+type DenseNodeId = u32;
+
+fn dense_node_indices(nodes: &[NodeId]) -> FxHashMap<NodeId, DenseNodeId> {
+    let mut indices = FxHashMap::default();
+    indices.reserve(nodes.len());
+    for (index, &node) in nodes.iter().enumerate() {
+        let index = DenseNodeId::try_from(index)
+            .expect("projected node count cannot exceed the NodeId domain");
+        indices.insert(node, index);
+    }
+    indices
+}
+
 fn adjacency_from_edges(
     nodes: &[NodeId],
     edges: impl IntoIterator<Item = (NodeId, NodeId)>,
-) -> FxHashMap<NodeId, Vec<NodeId>> {
-    let node_set: FxHashSet<NodeId> = nodes.iter().copied().collect();
-    let mut adjacency: FxHashMap<NodeId, Vec<NodeId>> = nodes
-        .iter()
-        .copied()
-        .map(|node| (node, Vec::new()))
-        .collect();
+) -> Vec<Vec<DenseNodeId>> {
+    let node_indices = dense_node_indices(nodes);
+    let mut adjacency = vec![Vec::new(); nodes.len()];
     for (source, target) in edges {
-        if node_set.contains(&source) && node_set.contains(&target) {
-            adjacency.entry(source).or_default().push(target);
+        if let (Some(&source_index), Some(&target_index)) =
+            (node_indices.get(&source), node_indices.get(&target))
+        {
+            adjacency[source_index as usize].push(target_index);
         }
     }
     normalize_adjacency(&mut adjacency);
     adjacency
 }
 
-fn normalize_adjacency(adjacency: &mut FxHashMap<NodeId, Vec<NodeId>>) {
-    for successors in adjacency.values_mut() {
-        successors.sort_unstable_by_key(|node| node.as_u32());
+fn normalize_adjacency(adjacency: &mut [Vec<DenseNodeId>]) {
+    for successors in adjacency {
+        successors.sort_unstable();
         successors.dedup();
     }
 }
 
-/// Iterative Kosaraju decomposition over a normalized adjacency map.
+#[derive(Debug, Clone, Copy)]
+struct DfsFrame {
+    node: usize,
+    next_successor: usize,
+}
+
+/// Iterative Tarjan decomposition over normalized dense adjacency lists.
 fn decompose(
     projection: SccProjection,
     nodes: Vec<NodeId>,
-    adjacency: FxHashMap<NodeId, Vec<NodeId>>,
+    adjacency: Vec<Vec<DenseNodeId>>,
 ) -> SccDecomposition {
-    let mut reverse: FxHashMap<NodeId, Vec<NodeId>> = nodes
-        .iter()
-        .copied()
-        .map(|node| (node, Vec::new()))
-        .collect();
-    for (&source, targets) in &adjacency {
-        for &target in targets {
-            reverse.entry(target).or_default().push(source);
-        }
-    }
-    normalize_adjacency(&mut reverse);
+    const UNVISITED: usize = usize::MAX;
+    const ASSIGNED: usize = usize::MAX - 1;
 
-    let mut visited = FxHashSet::default();
-    let mut finish_order = Vec::with_capacity(nodes.len());
-    for &start in &nodes {
-        if visited.contains(&start) {
-            continue;
-        }
-        let mut stack = vec![(start, false)];
-        while let Some((node, exiting)) = stack.pop() {
-            if exiting {
-                finish_order.push(node);
-                continue;
-            }
-            if !visited.insert(node) {
-                continue;
-            }
-            stack.push((node, true));
-            if let Some(successors) = adjacency.get(&node) {
-                for &successor in successors.iter().rev() {
-                    if !visited.contains(&successor) {
-                        stack.push((successor, false));
-                    }
-                }
-            }
-        }
-    }
-
-    visited.clear();
+    debug_assert_eq!(nodes.len(), adjacency.len());
+    let node_count = nodes.len();
+    let mut discovery = vec![UNVISITED; node_count];
+    let mut low_link = vec![0; node_count];
+    let mut next_index = 0usize;
+    let mut active_nodes = Vec::with_capacity(node_count);
+    let mut dfs_stack = Vec::with_capacity(node_count);
     let mut component_nodes = Vec::new();
-    for &start in finish_order.iter().rev() {
-        if !visited.insert(start) {
+
+    for start in 0..node_count {
+        if discovery[start] != UNVISITED {
             continue;
         }
-        let mut component = Vec::new();
-        let mut stack = vec![start];
-        while let Some(node) = stack.pop() {
-            component.push(node);
-            if let Some(predecessors) = reverse.get(&node) {
-                for &predecessor in predecessors.iter().rev() {
-                    if visited.insert(predecessor) {
-                        stack.push(predecessor);
+
+        debug_assert!(next_index < ASSIGNED);
+        discovery[start] = next_index;
+        low_link[start] = next_index;
+        next_index += 1;
+        active_nodes.push(start);
+        dfs_stack.push(DfsFrame {
+            node: start,
+            next_successor: 0,
+        });
+
+        while let Some(frame) = dfs_stack.last().copied() {
+            let node = frame.node;
+            if frame.next_successor < adjacency[node].len() {
+                let successor = adjacency[node][frame.next_successor] as usize;
+                dfs_stack
+                    .last_mut()
+                    .expect("the current Tarjan DFS frame must exist")
+                    .next_successor += 1;
+
+                match discovery[successor] {
+                    UNVISITED => {
+                        debug_assert!(next_index < ASSIGNED);
+                        discovery[successor] = next_index;
+                        low_link[successor] = next_index;
+                        next_index += 1;
+                        active_nodes.push(successor);
+                        dfs_stack.push(DfsFrame {
+                            node: successor,
+                            next_successor: 0,
+                        });
+                    }
+                    ASSIGNED => {}
+                    successor_index => {
+                        low_link[node] = low_link[node].min(successor_index);
                     }
                 }
+                continue;
+            }
+
+            dfs_stack.pop();
+            if low_link[node] == discovery[node] {
+                let mut component = Vec::new();
+                loop {
+                    let member = active_nodes
+                        .pop()
+                        .expect("a Tarjan component root must remain on the active stack");
+                    discovery[member] = ASSIGNED;
+                    component.push(member);
+                    if member == node {
+                        break;
+                    }
+                }
+                component.sort_unstable();
+                component_nodes.push(component);
+            }
+
+            if let Some(parent) = dfs_stack.last() {
+                low_link[parent.node] = low_link[parent.node].min(low_link[node]);
             }
         }
-        component.sort_unstable_by_key(|node| node.as_u32());
-        component_nodes.push(component);
     }
 
+    debug_assert!(active_nodes.is_empty());
     component_nodes
-        .sort_unstable_by_key(|component| component.first().map_or(u32::MAX, |node| node.as_u32()));
+        .sort_unstable_by_key(|component| component.first().copied().unwrap_or(usize::MAX));
 
     let mut components = Vec::with_capacity(component_nodes.len());
     let mut component_by_node = BTreeMap::new();
-    for (id, component_nodes) in component_nodes.into_iter().enumerate() {
-        let cyclic = component_nodes.len() > 1
-            || component_nodes.first().is_some_and(|node| {
-                adjacency
-                    .get(node)
-                    .is_some_and(|successors| successors.contains(node))
+    let mut component_by_index = vec![usize::MAX; node_count];
+    for (id, component_indices) in component_nodes.into_iter().enumerate() {
+        let cyclic = component_indices.len() > 1
+            || component_indices.first().is_some_and(|&node| {
+                adjacency[node]
+                    .binary_search(&(node as DenseNodeId))
+                    .is_ok()
             });
-        for &node in &component_nodes {
+        let mut component_node_ids = Vec::with_capacity(component_indices.len());
+        for node_index in component_indices {
+            let node = nodes[node_index];
+            component_by_index[node_index] = id;
             component_by_node.insert(node, id);
+            component_node_ids.push(node);
         }
         components.push(SccComponent {
             id,
-            nodes: component_nodes,
+            nodes: component_node_ids,
             cyclic,
         });
     }
 
     let mut condensation_set = FxHashSet::default();
-    for (&source, targets) in &adjacency {
-        let Some(&source_component) = component_by_node.get(&source) else {
-            continue;
-        };
-        for target in targets {
-            let Some(&target_component) = component_by_node.get(target) else {
-                continue;
-            };
+    for (source, targets) in adjacency.iter().enumerate() {
+        let source_component = component_by_index[source];
+        for &target in targets {
+            let target_component = component_by_index[target as usize];
             if source_component != target_component {
                 condensation_set.insert((source_component, target_component));
             }
@@ -591,16 +629,13 @@ mod tests {
     fn iterative_decomposition_handles_a_deep_graph_without_native_recursion() {
         const NODE_COUNT: u32 = 50_000;
         let nodes: Vec<NodeId> = (0..NODE_COUNT).map(NodeId::new).collect();
-        let adjacency: FxHashMap<NodeId, Vec<NodeId>> = nodes
-            .iter()
-            .copied()
+        let adjacency: Vec<Vec<DenseNodeId>> = (0..NODE_COUNT)
             .map(|node| {
-                let successors = if node.as_u32() + 1 < NODE_COUNT {
-                    vec![NodeId::new(node.as_u32() + 1)]
+                if node + 1 < NODE_COUNT {
+                    vec![node + 1]
                 } else {
                     Vec::new()
-                };
-                (node, successors)
+                }
             })
             .collect();
 
@@ -611,6 +646,63 @@ mod tests {
         assert_eq!(result.condensation_edges.len(), NODE_COUNT as usize - 1);
     }
 
+    #[test]
+    fn iterative_decomposition_handles_a_deep_cycle_without_native_recursion() {
+        const NODE_COUNT: u32 = 50_000;
+        let nodes: Vec<NodeId> = (0..NODE_COUNT).map(NodeId::new).collect();
+        let adjacency: Vec<Vec<DenseNodeId>> = (0..NODE_COUNT)
+            .map(|node| vec![(node + 1) % NODE_COUNT])
+            .collect();
+
+        let result = decompose(SccProjection::CallGraph, nodes, adjacency);
+        assert_eq!(result.node_count(), NODE_COUNT as usize);
+        assert_eq!(result.components.len(), 1);
+        assert_eq!(result.components[0].nodes.len(), NODE_COUNT as usize);
+        assert!(result.components[0].cyclic);
+        assert!(result.condensation_edges.is_empty());
+    }
+
+    #[test]
+    fn iterative_tarjan_is_deterministic_for_sparse_node_ids() {
+        let nodes = vec![
+            NodeId::new(7),
+            NodeId::new(1_000_000),
+            NodeId::new(u32::MAX),
+        ];
+        let edges = [
+            (nodes[0], nodes[2]),
+            (nodes[2], nodes[0]),
+            (nodes[1], nodes[2]),
+            (nodes[1], nodes[1]),
+        ];
+        let forward = decompose(
+            SccProjection::CallGraph,
+            nodes.clone(),
+            adjacency_from_edges(&nodes, edges.iter().copied()),
+        );
+        let reversed_with_duplicates = decompose(
+            SccProjection::CallGraph,
+            nodes.clone(),
+            adjacency_from_edges(
+                &nodes,
+                edges.iter().rev().copied().chain(edges.iter().copied()),
+            ),
+        );
+
+        assert_eq!(reversed_with_duplicates, forward);
+        assert_eq!(forward.components[0].nodes, vec![nodes[0], nodes[2]]);
+        assert_eq!(forward.components[1].nodes, vec![nodes[1]]);
+        assert!(forward.components[0].is_multi_node_cycle());
+        assert!(forward.components[1].is_self_cycle());
+        assert_eq!(
+            forward.condensation_edges,
+            vec![SccCondensationEdge {
+                source: 1,
+                target: 0,
+            }]
+        );
+    }
+
     proptest! {
         #![proptest_config(ProptestConfig::with_cases(256))]
 
@@ -618,7 +710,7 @@ mod tests {
         /// iterative implementation returns exactly petgraph's Tarjan
         /// partition, including singleton self-loop components.
         #[test]
-        fn iterative_kosaraju_matches_petgraph_tarjan(
+        fn iterative_tarjan_matches_petgraph_tarjan(
             node_count in 1usize..24,
             raw_edges in prop::collection::vec((0usize..24, 0usize..24), 0..96),
         ) {

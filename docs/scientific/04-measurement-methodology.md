@@ -1,19 +1,30 @@
 # Measurement methodology
 
-**Honest headline: `libcpg` ships no runnable benchmarks today.** The correctness pillar ([00](00-overview.md)–[03](03-vf2-completeness.md)) is specified by 474 automated tests — 399 example-based, 63 property-based, plus 12 public-API integration and malformed-input robustness tests (see [engineering/02 — Testing](../engineering/02-testing.md)) — but there is *no* timing evidence in the crate: the `[[bench]]` targets are commented out, `benches/` does not exist, and `examples/` is empty. This page does two things: it documents that gap precisely, and it specifies the **rigorous protocol** to establish performance claims once benchmarks are added, so that any future measurement is reproducible, controlled, and analyzed with scientific discipline rather than reported ad hoc.
+**Honest headline: `libcpg` ships one runnable benchmark today.** The active
+`scc_analysis` Criterion target measures exact call-graph SCC decomposition over
+three synthetic graph families at two sizes. Other major performance surfaces —
+construction, DFG/PDG analysis, VF2, and GNN propagation — still lack timing
+evidence. The correctness suite and current counts are documented in
+[engineering/02 — Testing](../engineering/02-testing.md).
 
-This is deliberately the one page in the scientific pillar with *no* corroborating experiment to quote — because none exists yet. Saying so plainly is the point.
+This page documents both the shipped SCC harness and the **rigorous protocol**
+for extending that evidence so measurements remain reproducible, controlled,
+and auditable rather than reported ad hoc.
 
-## 1. The current state (the documented gap)
+## 1. The current state
 
-The dev-tooling for benchmarking is present but not wired. `Cargo.toml` carries the harness as a dev-dependency and leaves the bench targets commented out with an explicit note:
+`criterion` is wired as a dev-dependency and the SCC benchmark is active. The
+two older candidate targets remain commented out:
 
 ```toml
 [dev-dependencies]
 criterion = "0.5"
 proptest = "1.5"
 
-# Benchmarks will be added when implementations are complete
+[[bench]]
+name = "scc_analysis"
+harness = false
+
 # [[bench]]
 # name = "cpg_construction"
 # harness = false
@@ -25,12 +36,18 @@ proptest = "1.5"
 
 Concretely, the gap is:
 
-- **No `benches/`** directory and **no `[[bench]]`** target active — `cargo bench` runs nothing.
-- **`examples/` and `tests/` are empty** — there are no example programs or integration harnesses to time.
-- **`criterion` is a dev-dependency only**, so the statistical harness is available the moment a bench file and stanza are added, but nothing invokes it.
-- All 474 tests are **correctness** tests (inline `#[cfg(test)]` modules plus `tests/integration.rs` and `tests/robustness.rs`); none asserts a duration.
+- **`benches/scc_analysis.rs` is active.** It measures 1,000- and
+  10,000-function paths, rings, and cyclic clusters through the public
+  `call_graph_sccs` entry point.
+- **Construction, DFG/PDG, VF2, and GNN have no benchmark targets.** Their
+  expected costs remain analytical rather than empirical.
+- **Automated tests remain correctness tests.** They intentionally do not
+  assert wall-clock durations, which would be unstable across machines.
+- **`examples/` remains empty.** There are no runnable example programs to use
+  as end-to-end workloads.
 
-Nothing below should be read as a claim about `libcpg`'s current speed. It is the method to *obtain* such claims correctly.
+Timing evidence from the SCC target applies only to its named graph families and
+sizes; it must not be generalized to the unbenchmarked surfaces.
 
 ![The measurement pipeline: control → measure → profile → analyze](../diagrams/measurement-methodology.svg)
 
@@ -68,11 +85,26 @@ taskset -c 3 cargo bench --features lang-rust --bench cpg_construction \
 
 Additional controls, in order of impact: reserve the pinned core (`isolcpus`/`nohz_full` at boot, or at least a quiet machine), disable simultaneous multithreading on the measured core, and record the exact CPU model, microcode, kernel, and toolchain version alongside every result so a number can be reproduced. Record hardware specifications with the results — a throughput figure without its machine is not reproducible.
 
-## 4. The harness: criterion, added deliberately
+## 4. The Criterion harness
 
-`criterion` (already a dev-dependency) supplies warm-up, statistical sampling, outlier detection, and regression comparison across runs. Wiring it is two steps.
+`criterion` supplies warm-up, statistical sampling, outlier detection, and
+regression comparison across runs. The shipped SCC target can be run directly
+or used for named before/after baselines:
 
-**Step 1 — un-comment the bench stanza** in `Cargo.toml` (`harness = false` hands timing to criterion rather than libtest):
+```sh
+cargo bench --bench scc_analysis --no-default-features
+cargo bench --bench scc_analysis --no-default-features -- --save-baseline before
+cargo bench --bench scc_analysis --no-default-features -- --baseline before
+```
+
+The benchmark constructs each CPG outside the timed loop and passes it through
+`black_box`; the measured operation is the complete public SCC projection,
+decomposition, cycle classification, and condensation construction.
+
+Wiring the next performance surface is two steps.
+
+**Step 1 — add or uncomment its bench stanza** in `Cargo.toml` (`harness =
+false` hands timing to criterion rather than libtest):
 
 ```toml
 [[bench]]
@@ -84,7 +116,8 @@ name = "pattern_matching"
 harness = false
 ```
 
-**Step 2 — add the bench file.** A construction benchmark over Mode A (needs the grammar). This is a *proposed* file, not shipped:
+**Step 2 — add the bench file.** A construction benchmark over Mode A needs the
+grammar. This remains a proposed file, not a shipped target:
 
 ```rust
 // PROPOSED benches/cpg_construction.rs — NOT shipped (see §1). Requires the
@@ -189,6 +222,7 @@ The candidate benchmarks below are ordered by measurement priority. The "expecte
 
 | Operation | Entry point | Expected cost | Why it needs measuring |
 |---|---|---|---|
+| **SCC decomposition (active)** | `call_graph_sccs` | $`O(V + E)`$ after normalization | The shipped path/ring/cluster benchmark checks scaling across many singleton SCCs, one large SCC, and a condensation DAG of small SCCs. |
 | CPG construction | `build` / `build_from_tree` | $`O(n)`$ in tree size | Baseline for every downstream analysis; dominated by the tree-walk. |
 | Reaching-defs sweep | `DfgExtractor::extract` | ~$`O(n)`$ per function (loop bodies swept twice) | The P7c sweep is the DFG's hot path; see [02](02-reaching-defs-validation.md). |
 | PDG + slicing | `PdgBuilder::build`, `backward_slice` | dominator computation + bounded BFS | On-demand and per-function; slice bounds cap the traversal. |
@@ -199,8 +233,14 @@ VF2's factorial worst case is exactly why the pattern-matching bench in §4 is f
 
 ## 8. Deterministic oracles you can already assert
 
-While *timing* is unproven, several outputs are exactly reproducible and make excellent regression oracles to pair with any benchmark — they let a performance change be validated for *correctness* at the same time it is measured for *speed*:
+Several outputs are exactly reproducible and make excellent regression oracles
+to pair with benchmarks — they let a performance change be validated for
+*correctness* at the same time it is measured for *speed*:
 
+- **SCC partition** — every projected node occurs in exactly one component,
+  components and members retain stable node-id ordering, and the condensation
+  graph is acyclic. The SCC property suite compares the partition with
+  `petgraph`'s independent Tarjan implementation.
 - **Shape equivalence** — `node_count()` / `edge_count()` agreement between `build` and `build_from_tree` (proved in [01](01-cpg-invariants-and-equivalence.md#4-the-equivalence-theorem-build--build_from_tree)); a construction optimization that changes a count has changed the graph and is wrong.
 - **[Cyclomatic complexity](../GLOSSARY.md#cyclomatic-complexity)** — `cyclomatic_complexity()` computes $`M = E - N + 2`$ over the CFG (McCabe [[6]](#references)); it is a closed-form integer, ideal as a fast, exact correctness check embedded in a construction benchmark.
 

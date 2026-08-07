@@ -198,7 +198,11 @@ tree-sitter-rholang = { package = "rholang-tree-sitter", path = "/home/dylon/Wor
 # shim once that crate adopts tree-sitter-language / tree-sitter 0.26.
 tree-sitter-metta = { package = "tree-sitter-metta", path = "vendor/tree-sitter-metta" }
 
-# Benchmarks will be added when implementations are complete
+[[bench]]
+name = "scc_analysis"
+harness = false
+
+# Candidate targets for performance surfaces outside SCC analysis
 # [[bench]]
 # name = "cpg_construction"
 # harness = false

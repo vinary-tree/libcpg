@@ -22,17 +22,17 @@ think to write down.
 
 | Kind | Count | Where |
 | --- | ---: | --- |
-| Example-based `#[test]` functions | 407 | inline `#[cfg(test)] mod …` next to the code |
-| Property-based properties (in 27 `proptest!` blocks) | 64 | inline `mod proptests` / `mod …_regression` |
+| Example-based `#[test]` functions | 399 | inline `#[cfg(test)] mod …` next to the code |
+| Property-based properties (in 27 `proptest!` blocks) | 63 | inline `mod proptests` / `mod …_regression` |
 | Public-API integration tests | 8 | `tests/integration.rs` |
 | Malformed-input robustness tests | 5 | `tests/robustness.rs` |
-| **Total** | **484** | |
+| **Total** | **475** | |
 
 That is up from **99** inline tests and **zero** property tests before this work.
 
 Each property runs many generated cases (`ProptestConfig::with_cases(N)`, with
 `N` tuned to the cost of the property: 256 for cheap structural laws, 128 for
-mid-weight ones, 64 for parser-backed ones, 32 for the heaviest), so the 64
+mid-weight ones, 64 for parser-backed ones, 32 for the heaviest), so the 63
 properties execute on the order of ten thousand distinct inputs per run.
 
 ### Not every test compiles under every build
@@ -42,10 +42,10 @@ on the features enabled:
 
 | Command | Lib tests | Notes |
 | --- | ---: | --- |
-| `cargo test` | 182 | `default = []`: the feature-free surface only |
-| `cargo test --features "full rholang metta"` | 459 | the maximal matrix, including the Mode-B mappers |
+| `cargo test` | 184 | `default = []`: the feature-free surface only |
+| `cargo test --features "full rholang metta"` | 462 | the maximal matrix, including the Mode-B mappers |
 
-The feature-free 182 exercise the graph model, exact CFG/call-graph SCC
+The feature-free 184 exercise the graph model, exact CFG/call-graph SCC
 decomposition, the CFG/DFG/PDG extractors, VF2, and similarity by building CPGs
 **by hand** — no grammar required. This is what
 the [`arb_well_formed_cpg`](#the-generators) generator exists for.
@@ -270,13 +270,13 @@ dependencies and are not part of the `full` feature set.
 | --- | --- |
 | `examples/` directory | present but **empty** — no runnable `cargo run --example …` programs. |
 | Doctests | none run — every code fence in a doc comment is marked `ignore` / `rust,ignore`, so `cargo test --doc` executes nothing. Feature-gating individual doctests in a `default = []` crate is awkward; the snippets are instead validated by the documentation snippet-check harness. |
-| Benchmarks | `criterion 0.5` is a dev-dependency, but both `[[bench]]` targets in `Cargo.toml` are **commented out**, so `cargo bench` has no targets. See [performance](03-performance.md). |
+| Benchmarks | `benches/scc_analysis.rs` is an active Criterion target covering 1,000- and 10,000-function paths, rings, and cyclic clusters. Other performance surfaces remain unbenchmarked; see [performance](03-performance.md). |
 | `ml-linfa`, `gpu` | not exercised: optional heavy dependencies outside the `full` feature set. |
 
 ## Related pages
 
 - [Build and features](01-build-and-features.md) — the feature subsets used above.
-- [Performance](03-performance.md) — the benchmarking gap and how to close it.
+- [Performance](03-performance.md) — current SCC measurements and the remaining benchmarking gaps.
 - [`scientific/00-overview.md`](../scientific/00-overview.md) — how these tests
   are read as validation evidence.
 - [`security/01-input-and-resource-hardening.md`](../security/01-input-and-resource-hardening.md)

@@ -101,20 +101,25 @@ resolution.
 
 ## Algorithm and complexity
 
-The implementation uses Kosaraju's two-pass SCC algorithm with normalized
-adjacency lists. Graph traversal and AST scope discovery use explicit work
-stacks rather than native recursion, so long paths and deeply nested source do
-not risk call-stack overflow. For a projection with $`V`$ vertices and $`E`$
-edges, decomposition takes $`O(V + E)`$ time and $`O(V + E)`$ auxiliary space.
-Contracting each SCC yields the returned condensation graph, which is always a
-directed acyclic graph.
+The implementation uses Tarjan's SCC algorithm over normalized adjacency lists
+and dense internal vertex indices. Discovery indices and low-link values live
+in contiguous arrays; an explicit DFS-frame stack simulates recursive entry and
+return, while a second stack holds the active component candidates. Long paths
+therefore cannot overflow the native call stack. Tarjan visits each normalized
+edge once and does not construct the transpose graph required by Kosaraju.
+
+For a normalized projection with $`V`$ vertices and $`E`$ edges, decomposition
+and condensation construction take $`O(V + E)`$ time and $`O(V + E)`$ auxiliary
+space, including the projected adjacency itself. Normalizing duplicate edges
+adds $`O(\sum_v d_v \log d_v)`$ sorting work. Contracting each SCC yields the
+returned condensation graph, which is always a directed acyclic graph.
 
 Validation includes hand-built CFG and call-graph cases, malformed input and
-nested-scope boundaries, singleton self-loops, a 50,000-node path, serde
-round-tripping, and property-based differential testing against `petgraph`'s
-Tarjan implementation.
+nested-scope boundaries, singleton self-loops, a 50,000-node path, a 50,000-node
+cycle, sparse node ids, serde round-tripping, and property-based differential
+testing against `petgraph`'s independent Tarjan implementation.
 
 ## References
 
-- Aho, A. V., Hopcroft, J. E., Ullman, J. D. (1974). *The Design and Analysis of Computer Algorithms.* Addison-Wesley. ISBN 978-0201000290. (Kosaraju's algorithm.)
+- Tarjan, R. E. (1972). *Depth-First Search and Linear Graph Algorithms.* SIAM Journal on Computing 1(2), 146–160. DOI: [10.1137/0201010](https://doi.org/10.1137/0201010).
 - Cormen, T. H., Leiserson, C. E., Rivest, R. L., Stein, C. (2009). *Introduction to Algorithms* (3rd ed.). MIT Press. ISBN 978-0262033848. (Strongly connected components and condensation graphs.)
