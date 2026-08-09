@@ -89,7 +89,7 @@ full = ["gnn", "design-patterns", "algorithm-detection", "serde", "ml-rules", "l
 
 [dependencies]
 # Core graph library
-petgraph = "0.6"
+petgraph = "0.7"
 
 # Parallel processing
 rayon = "1.10"
