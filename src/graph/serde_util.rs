@@ -1,4 +1,4 @@
-//! Serde utilities for Arc<str> and related types.
+//! Serde utilities for `Arc<str>` and related types.
 //!
 //! This module provides custom serialization/deserialization for types
 //! that don't have native serde support.
@@ -7,7 +7,7 @@ use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use smallvec::SmallVec;
 use std::sync::Arc;
 
-/// Serialize Arc<str> as a string.
+/// Serialize `Arc<str>` as a string.
 pub fn serialize_arc_str<S>(value: &Arc<str>, serializer: S) -> Result<S::Ok, S::Error>
 where
     S: Serializer,
@@ -15,7 +15,7 @@ where
     value.as_ref().serialize(serializer)
 }
 
-/// Deserialize Arc<str> from a string.
+/// Deserialize `Arc<str>` from a string.
 pub fn deserialize_arc_str<'de, D>(deserializer: D) -> Result<Arc<str>, D::Error>
 where
     D: Deserializer<'de>,
@@ -24,7 +24,7 @@ where
     Ok(Arc::from(s.as_str()))
 }
 
-/// Module for serializing Arc<str> fields.
+/// Module for serializing `Arc<str>` fields.
 pub mod arc_str {
     use super::*;
 
@@ -43,7 +43,7 @@ pub mod arc_str {
     }
 }
 
-/// Module for serializing Option<Arc<str>> fields.
+/// Module for serializing `Option<Arc<str>>` fields.
 pub mod option_arc_str {
     use super::*;
 
@@ -66,7 +66,7 @@ pub mod option_arc_str {
     }
 }
 
-/// Module for serializing SmallVec<[Arc<str>; 2]> fields specifically.
+/// Module for serializing `SmallVec<[Arc<str>; 2]>` fields specifically.
 pub mod smallvec_arc_str_2 {
     use super::*;
 

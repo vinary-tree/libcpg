@@ -78,13 +78,27 @@ monotone convergence, so it is bounded even on pathological control flow.
 
 ## Benchmark coverage and remaining gaps
 
-The SCC analysis has an active Criterion target. It measures feature-free public
-call-graph analysis over 1,000- and 10,000-function paths, rings, and cyclic
-clusters:
+Three feature-free Criterion targets are active. Every target constructs and
+checks a deterministic oracle before Criterion enters the timed loop:
+
+- `scc_analysis` measures public call-graph decomposition over 1,000- and
+  10,000-function paths, rings, and cyclic clusters;
+- `cpg_construction` measures deterministic graph-arena construction over
+  1,000- and 10,000-node paths;
+- `pattern_matching` measures bounded VF2 matching over 256- and 4,096-node
+  paths.
 
 ```toml
 [[bench]]
 name = "scc_analysis"
+harness = false
+
+[[bench]]
+name = "cpg_construction"
+harness = false
+
+[[bench]]
+name = "pattern_matching"
 harness = false
 ```
 
@@ -94,11 +108,13 @@ Run it directly, or save and compare named baselines:
 cargo bench --bench scc_analysis --no-default-features
 cargo bench --bench scc_analysis --no-default-features -- --save-baseline before
 cargo bench --bench scc_analysis --no-default-features -- --baseline before
+./scripts/bench.sh cpg_construction --save-baseline before
+./scripts/bench.sh pattern_matching --save-baseline before
 ```
 
-CPG construction, pattern matching, DFG/PDG analysis, and GNN propagation still
-lack runnable benchmarks. Optimization work on those surfaces must begin by
-adding a focused target and establishing a baseline.
+DFG/PDG analysis, whole-corpus analysis, and GNN propagation still lack runnable
+benchmarks. Their owning analysis tasks add focused targets and establish
+correctness oracles before optimization.
 
 ### How to add a benchmark
 

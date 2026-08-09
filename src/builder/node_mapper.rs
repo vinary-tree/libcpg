@@ -162,8 +162,8 @@ impl NodeMapper {
         }
     }
 
-    /// Node-aware inclusion test used by the builder walk
-    /// ([`crate::builder::tree_sitter`]). It layers a check that *requires* the
+    /// Node-aware inclusion test used by the [`crate::builder::TreeSitterCpgBuilder`]
+    /// walk. It layers a check that *requires* the
     /// raw node on top of the string-keyed [`Self::should_include`]: for
     /// Rholang it drops anonymous keyword/operator/punctuation **tokens**
     /// (`is_named() == false`), which the string test cannot filter because

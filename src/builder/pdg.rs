@@ -82,9 +82,9 @@ impl PdgBuilder {
     ///
     /// Requires that `function`'s CFG (`ControlFlow` edges) and DFG (`DataFlow`
     /// edges) have already been extracted — i.e. `cpg` came from
-    /// [`crate::builder::TreeSitterCpgBuilder::build`] (or `build_from_tree`)
-    /// with `build_cfg`/`build_dfg` enabled, or the extractors were run
-    /// manually.
+    /// [`crate::builder::CpgBuilder::build`] (or
+    /// [`crate::builder::TreeSitterCpgBuilder::build_from_tree`]) with
+    /// `build_cfg`/`build_dfg` enabled, or the extractors were run manually.
     pub fn build(&self, cpg: &mut CodePropertyGraph, function: NodeId) {
         // Compute both dependence relations while only borrowing `cpg`
         // immutably, then emit. Snapshot existing PDG edges first so a re-build

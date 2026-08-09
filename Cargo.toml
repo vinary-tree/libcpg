@@ -202,11 +202,10 @@ tree-sitter-metta = { package = "tree-sitter-metta", path = "vendor/tree-sitter-
 name = "scc_analysis"
 harness = false
 
-# Candidate targets for performance surfaces outside SCC analysis
-# [[bench]]
-# name = "cpg_construction"
-# harness = false
+[[bench]]
+name = "cpg_construction"
+harness = false
 
-# [[bench]]
-# name = "pattern_matching"
-# harness = false
+[[bench]]
+name = "pattern_matching"
+harness = false

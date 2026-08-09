@@ -69,8 +69,12 @@ cargo test --features lang-rust builder::tree_sitter
 cargo test proptests
 
 # Coverage (aliases defined in `.cargo/config.toml`).
-cargo cov-text     # terminal summary
-cargo cov          # HTML report
+cargo cov-text             # stable line/region summary
+cargo cov                  # stable HTML report
+cargo +nightly cov-branch  # nightly branch summary
+
+# The complete local verification gate (logs are captured and cleaned).
+./scripts/verify.sh
 ```
 
 `.config/nextest.toml` sets a `slow-timeout` so a runaway property is killed
@@ -226,18 +230,17 @@ the crate and flatter the result.
 
 ```sh
 cargo cov-text                      # line + region, stable toolchain
-cargo +nightly llvm-cov --branch \
-  --features "full rholang metta"   # branch coverage needs nightly
+cargo +nightly cov-branch           # branch coverage needs nightly
 ```
 
 | Metric | Coverage | Lowest file |
 | --- | ---: | --- |
-| Lines | **97.40 %** | 93.88 % (`dpml.rs`) |
-| Regions | **97.45 %** | — |
-| Functions | **97.93 %** | — |
-| Branches | **81.34 %** | see below |
+| Lines | **97.65 %** | 91.67 % (`language.rs`) |
+| Regions | **97.56 %** | — |
+| Functions | **97.81 %** | — |
+| Branches | **81.56 %** | see below |
 
-Every source file is at or above 93.8 % line coverage; eleven are at 100 %.
+Every source file is above 90 % line coverage; eleven are at 100 %.
 
 **On branch coverage.** `-Z coverage-options=branch` is nightly-only, and it
 counts *condition outcomes* (`if`, `&&`, `||`, `while`) — not `match` arms,

@@ -390,8 +390,8 @@ impl<'a> Vf2State<'a> {
         pairs
     }
 
-    /// Adds a mapping, recording a [`Vf2Frame`] so the change can be undone
-    /// exactly on backtrack.
+    /// Adds a mapping and records an internal undo frame so the change can be
+    /// reversed exactly on backtrack.
     pub fn push_mapping(&mut self, pattern_node: NodeId, target_node: NodeId) {
         self.mapping.insert(pattern_node, target_node);
         self.reverse_mapping.insert(target_node, pattern_node);

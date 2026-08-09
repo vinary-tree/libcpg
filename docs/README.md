@@ -155,7 +155,7 @@ actual availability for a given build is `ParserRegistry::supports(lang)`.
 - **Accuracy** — every type, method, and snippet is written against the real
   API and annotated with the feature flag it needs.
 - **Math** — expressions use GitHub math spans (inline ``$`…`$``, display
-  ` ```math ` blocks), never bare `$…$` or unicode literals.
+  fenced `math` blocks), never bare `$…$` or unicode literals.
 - **Diagrams** — every figure is a committed PlantUML/Graphviz source rendered
   to a committed SVG; see the [diagram catalog](diagrams/README.md).
 - **Citations** — claims from the literature link to DOIs where they exist; each

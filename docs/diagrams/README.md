@@ -28,7 +28,7 @@ for f in *.dot; do dot -Tsvg "$f" -o "${f%.dot}.svg"; done   # render all Graphv
 grep -lF -e "contains errors" -e "syntax error" -e "deprecated" -e "Please use CSS" *.svg
 ```
 
-Toolchain used: PlantUML (JLaTeXMath-enabled) + Graphviz `dot` 15.1.0. A figure passes the gate when its SVG contains no error/deprecation marker and is not a tiny error card (all committed SVGs are ≥ 5 KB).
+Toolchain used: PlantUML (JLaTeXMath-enabled) + Graphviz `dot` 15.1.0. A figure passes the gate when its SVG contains no error/deprecation marker and is not a tiny error card (all committed SVGs are at least 1 KiB).
 
 ## Figure index
 
