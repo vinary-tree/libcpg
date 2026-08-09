@@ -94,11 +94,11 @@ A reusable solution to a recurring design problem. `libcpg` detects the 23 [Gang
 
 ### Dominator / Post-dominator
 
-Node $`d`$ **dominates** node $`n`$ if every path from entry to $`n`$ passes through $`d`$; $`p`$ **post-dominates** $`n`$ if every path from $`n`$ to exit passes through $`p`$. Post-dominators are dominators computed on the *reversed* CFG. `libcpg` uses `petgraph`'s `dominators::simple_fast` for this. Prerequisite for [control dependence](#control-dependence). See [`theory/04-program-dependence-and-slicing.md`](theory/04-program-dependence-and-slicing.md).
+Node $`d`$ **dominates** node $`n`$ if every path from entry to $`n`$ passes through $`d`$; $`p`$ **post-dominates** $`n`$ if every modeled path from $`n`$ to exit passes through $`p`$. Post-dominators are dominators computed on the *reversed* CFG. `libcpg` exposes deterministic `DominatorTree` and `PostDominatorTree` results from one feature-free Cooper–Harvey–Kennedy engine. Prerequisite for [control dependence](#control-dependence). See [`components/graph/dominator-analysis.md`](components/graph/dominator-analysis.md).
 
 ### Dominance frontier / Reverse dominance frontier
 
-The **dominance frontier** of node $`d`$ is the set of nodes where $`d`$'s dominance "stops" — the join points just beyond $`d`$'s dominated region (Cytron et al. [[3]](#references)). Computing it on the *reversed* CFG (the **reverse dominance frontier**) yields exactly the [control-dependence](#control-dependence) relation. See [`theory/04-program-dependence-and-slicing.md`](theory/04-program-dependence-and-slicing.md).
+The **dominance frontier** of node $`d`$ is the set of nodes where $`d`$'s dominance "stops" — the join points just beyond $`d`$'s dominated region (Cytron et al. [[3]](#references)). Computing it on the *reversed* CFG (the **reverse dominance frontier**) yields exactly the [control-dependence](#control-dependence) relation. See [`components/graph/dominator-analysis.md`](components/graph/dominator-analysis.md) and [`theory/04-program-dependence-and-slicing.md`](theory/04-program-dependence-and-slicing.md).
 
 ### DPML (Design-Pattern Markup Language)
 
@@ -182,7 +182,7 @@ A declarative description of a pattern as node constraints (`NodeConstraint`) an
 
 ### petgraph
 
-The Rust graph library `libcpg` builds on. `CodePropertyGraph` wraps a `petgraph::graph::DiGraph<CpgNode, CpgEdge>`, and PDG construction reuses `petgraph`'s dominator algorithm. Chosen for its mature graph algorithms and stable `NodeIndex`/`EdgeIndex` model. See [`design/0001-unified-overlay-graph.md`](design/0001-unified-overlay-graph.md).
+The Rust graph library `libcpg` builds on. `CodePropertyGraph` wraps a `petgraph::graph::DiGraph<CpgNode, CpgEdge>` for storage and stable `NodeIndex`/`EdgeIndex` adjacency. Exact dominance uses libcpg's deterministic `GraphProjection` engine; petgraph's independent dominator implementation is a test oracle. See [`design/0001-unified-overlay-graph.md`](design/0001-unified-overlay-graph.md).
 
 ### Program Dependence Graph (PDG)
 

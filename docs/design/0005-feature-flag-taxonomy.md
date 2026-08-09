@@ -111,7 +111,7 @@ documents the intent and is future-proof.)
 ### Positive
 
 - **Minimal downstream cost.** A consumer compiles exactly the grammars and
-  analyses it names; the graph core, exact SCC decomposition, the always-on
+  analyses it names; the graph core, exact dominator/SCC analysis, the always-on
   `pattern` matcher, and the PDG/slicing layer are feature-free and always available.
 - **The duplicate-symbol hazard is avoided by construction.** No grammar is
   linked by default, so a consumer that also links grammars (pgmcp) does not

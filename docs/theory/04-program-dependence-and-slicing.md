@@ -26,10 +26,13 @@ Fix a CFG with a single $`\mathit{entry}`$ and a single $`\mathit{exit}`$.
   to $`\mathit{exit}`$ passes through $`p`$. Post-domination is
   domination computed on the **reversed** CFG rooted at $`\mathit{exit}`$.
 
-`libcpg` obtains both from `petgraph`'s `dominators::simple_fast`, the
-Cooper–Harvey–Kennedy iterative dominator algorithm: run it on the CFG for
-dominators, or on a reversed view rooted at a virtual exit for **post-dominators**.
-Post-dominators are the prerequisite for control dependence.
+`libcpg` exposes both through one deterministic implementation of the
+Cooper–Harvey–Kennedy iterative dominator algorithm. `dominator_tree` runs it
+on any [`GraphProjection`](../components/graph/projections.md);
+`post_dominator_tree` runs it on a reversed CFG rooted at a synthetic exit.
+Post-dominators are the prerequisite for control dependence. See the
+[component contract](../components/graph/dominator-analysis.md) for the public
+result types, exit modeling, convergence cap, and complexity.
 
 ## 2. Dominance frontier and control dependence
 
@@ -74,24 +77,28 @@ CPG's shared node set. It is run **on demand** (never during initial constructio
 and is [idempotent](../GLOSSARY.md#idempotent) — it snapshots existing PDG edges and
 skips duplicates, so a re-build adds nothing.
 
-### Control dependence — the five steps
+### Control dependence — one public analysis
 
 Following §2, the builder computes $`\mathrm{RDF}`$ directly:
 
 ```text
-compute_control_dependence(cpg, function):
+post_dominator_tree(cpg, function):
  1. NODES ← intraprocedural CFG nodes reachable from `function` over ControlFlow
             edges, EXCLUDING `Call` edges (they cross into callees).
- 2. Build the REVERSE CFG as a graph keyed by node id, plus a virtual EXIT
-    (id = u32::MAX, which never collides with a real id). For every forward
+ 2. Build a deterministic projection and reverse it. Add a synthetic exit as
+    the next dense index, outside the stable NodeId domain. For every forward
     edge a→b add the reverse edge b→a.
- 3. Connect EXIT to every real exit: recorded function exits (e.g. a loop
+ 3. Connect the synthetic exit to every real exit: recorded function exits (e.g. a loop
     guard's false branch), structural sinks, and Return/Throw nodes. Ensure
-    every node can reach EXIT so post-dominance is total.
- 4. POSTDOM ← simple_fast(reverse CFG, EXIT)          # immediate post-dominators
+    every node can reach the synthetic root so post-dominance is total.
+ 4. POSTDOM ← bounded deterministic CHK(reverse CFG, synthetic exit)
  5. RDF walk (Cytron et al.): for each join b with ≥ 2 reverse-CFG predecessors,
     walk each predecessor up the post-dominator tree until ipdom(b); every node
-    visited is control-dependent on b. Emit ControlDependence  b → dependent.
+    visited is control-dependent on b. Record ControlDependence b → dependent.
+
+PdgBuilder(cpg, function):
+  tree ← post_dominator_tree(cpg, function)
+  emit tree.control_dependence_edges()
 ```
 
 Two deliberate choices are worth noting. The builder walks the **real**
@@ -99,8 +106,11 @@ Two deliberate choices are worth noting. The builder walks the **real**
 nodes (the CFG's connective tissue) and would fragment the graph. And exits are taken
 from `cfg_exits()`, not sink-detection alone, because a `while` guard is a genuine
 exit (its false branch leaves the loop) yet still has a successor, so it is not a
-sink. The virtual `EXIT` at `u32::MAX` makes post-dominance total even for functions
-with multiple returns.
+sink. A dense synthetic exit avoids sentinel collisions and makes
+post-dominance total for functions with multiple returns. An exit-free CFG has
+no meaningful post-dominance relation and returns an empty tree; a mixed
+finite/infinite CFG attaches its infinite region directly to the synthetic
+root rather than inventing a real exit path.
 
 ### Data dependence — reprojection
 
@@ -187,8 +197,9 @@ fn slice_around(cpg: &mut CodePropertyGraph, function: NodeId, criterion: NodeId
 over the resulting PDG edges. All three are on the crate's **feature-free** surface —
 no cargo feature is needed. A step-by-step worked slice and its interpretation are in
 [`usage/04-program-slicing.md`](../usage/04-program-slicing.md), and the construction
-internals (virtual EXIT, `simple_fast`, the Cytron walk) in
-[`components/builder/pdg-and-slicing.md`](../components/builder/pdg-and-slicing.md).
+internals (synthetic exit, deterministic CHK, and the Cytron walk) in
+[`components/graph/dominator-analysis.md`](../components/graph/dominator-analysis.md)
+and [`components/builder/pdg-and-slicing.md`](../components/builder/pdg-and-slicing.md).
 
 ## Cross-references
 

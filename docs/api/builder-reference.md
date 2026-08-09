@@ -406,8 +406,9 @@ pub struct PdgBuilder { /* private */ }
 `build` requires that `function`'s CFG and DFG already exist. It computes
 [control dependence](../GLOSSARY.md#control-dependence) [[1]](#references) as the
 **reverse dominance frontier**: it forms the intraprocedural CFG, adds a virtual
-`EXIT` node (id `u32::MAX`) linked from every real exit, computes post-dominators
-with `petgraph::algo::dominators::simple_fast` on the reversed CFG, and walks the
+exit as a collision-free dense index linked from every real exit, and consumes
+the public deterministic [`post_dominator_tree`](../components/graph/dominator-analysis.md)
+result. That analysis uses bounded Cooper–Harvey–Kennedy post-dominators and the
 Cytron et al. [[2]](#references) frontier. [Data dependence](../GLOSSARY.md#data-dependence)
 edges re-project the DFG's `DefUse`/`ReachingDef` edges within the function.
 

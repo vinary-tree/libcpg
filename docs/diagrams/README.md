@@ -39,7 +39,7 @@ Grouped by subject. Each row: the source (its `.svg` sibling is embedded by the 
 |---|---|---|---|
 | `cpg-overlay.dot` | graph | AST⊕CFG⊕DFG overlays on one shared node set (hero figure) | README, docs/README, theory/00–01, architecture/graph-data-model, api/graph-reference, components/graph/overview, design/0001 |
 | `cpg-vs-traditional.dot` | graph | Three separate views vs one unified CPG | theory/00, architecture/overview |
-| `module-architecture.puml` | component | Crate modules, always-on projections/SCC analysis, and feature gates | architecture/overview, design/00 |
+| `module-architecture.puml` | component | Crate modules, always-on projections/dominator/SCC analysis, and feature gates | architecture/overview, design/00 |
 | `construction-pipeline.puml` | activity | parse → AST → CFG → DFG build | architecture/data-flow, components/builder/overview, api/builder-reference, usage/01 |
 | `analysis-pipeline.puml` | activity | CPG → SCC, PDG/slice, VF2/GoF, algorithm, GNN | architecture/data-flow |
 | `feature-flag-map.puml` | mindmap | Cargo feature taxonomy (`default = []`) | design/0005, engineering/01, usage/00 |
@@ -50,6 +50,7 @@ Grouped by subject. Each row: the source (its `.svg` sibling is embedded by the 
 | `node-kind-taxonomy.puml` | mindmap | The 45 `CpgNodeKind` variants by group | theory/01, architecture/graph-data-model, api/graph-reference, components/graph/nodes |
 | `edge-kind-taxonomy.puml` | mindmap | `CpgEdgeKind` grouped (AST/CFG/DFG/PDG/…) | theory/01, architecture/graph-data-model, api/graph-reference, components/graph/edges |
 | `projection-csr.puml` | component | CPG overlay selection and deterministic forward/reverse CSR construction | components/graph/projections |
+| `dominator-analysis.puml` | component | Shared CHK engine for forward dominance, reversed-CFG post-dominance, and PDG control edges | components/graph/dominator-analysis |
 
 ### Control flow, data flow, dependence
 | Source | Type | Depicts | Embedded by |

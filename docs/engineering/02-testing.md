@@ -22,17 +22,17 @@ think to write down.
 
 | Kind | Count | Where |
 | --- | ---: | --- |
-| Example-based `#[test]` functions | 399 | inline `#[cfg(test)] mod …` next to the code |
-| Property-based properties (in 27 `proptest!` blocks) | 63 | inline `mod proptests` / `mod …_regression` |
-| Public-API integration tests | 8 | `tests/integration.rs` |
+| Example-based library tests | 416 | inline `#[cfg(test)] mod …` next to the code |
+| Property-based properties (in 29 `proptest!` blocks) | 66 | inline `mod proptests` / `mod …_regression` and exact-analysis modules |
+| Public-API integration tests | 11 | `tests/integration.rs` |
 | Malformed-input robustness tests | 5 | `tests/robustness.rs` |
-| **Total** | **475** | |
+| **Total** | **498** | |
 
 That is up from **99** inline tests and **zero** property tests before this work.
 
 Each property runs many generated cases (`ProptestConfig::with_cases(N)`, with
 `N` tuned to the cost of the property: 256 for cheap structural laws, 128 for
-mid-weight ones, 64 for parser-backed ones, 32 for the heaviest), so the 63
+mid-weight ones, 64 for parser-backed ones, 32 for the heaviest), so the 66
 properties execute on the order of ten thousand distinct inputs per run.
 
 ### Not every test compiles under every build
@@ -42,11 +42,11 @@ on the features enabled:
 
 | Command | Lib tests | Notes |
 | --- | ---: | --- |
-| `cargo test` | 184 | `default = []`: the feature-free surface only |
-| `cargo test --features "full rholang metta"` | 462 | the maximal matrix, including the Mode-B mappers |
+| `cargo test` | 202 | `default = []`: the feature-free surface only |
+| `cargo test --features "full rholang metta"` | 482 | the maximal matrix, including the Mode-B mappers |
 
-The feature-free 184 exercise the graph model, exact CFG/call-graph SCC
-decomposition, the CFG/DFG/PDG extractors, VF2, and similarity by building CPGs
+The feature-free 202 exercise the graph model, exact dominator/post-dominator
+and CFG/call-graph SCC analyses, the CFG/DFG/PDG extractors, VF2, and similarity by building CPGs
 **by hand** — no grammar required. This is what
 the [`arb_well_formed_cpg`](#the-generators) generator exists for.
 
@@ -108,12 +108,14 @@ return.
 
 ## What the properties assert
 
-The invariants fall into seven families.
+The invariants fall into nine families.
 
 | Family | Representative laws |
 | --- | --- |
 | **Round-trip / identity** | $`\mathit{deserialize} \circ \mathit{serialize} = \mathrm{id}`$ over the whole serializable surface; `NodeId`/`EdgeId`/`SourceRange` conversions; `Language` extension round-trip; $`\mathit{from\_kind} \circ \mathit{to\_cpg\_node\_kind} = \mathrm{id}`$ |
 | **Structural** | `add_node` yields sequential ids; `connect` is defined iff both endpoints exist; `ast_children` preserves insertion order; $`M = E - N + 2`$ (`cyclomatic_complexity`); `ast_depth` is bounded by the node count |
+| **Graph projections** | CSR nodes and adjacency are sorted; parallel-edge weights merge deterministically; transpose is an involution; all overlay constructors equal direct typed-edge traversal and do not mutate the CPG |
+| **Dominance** | CHK immediate dominators equal `petgraph::algo::dominators::simple_fast` under edge permutations; post-dominators and control edges equal the former PDG oracle; `PdgBuilder` emits exactly `PostDominatorTree::control_dependence_edges`; a 25,000-node path is stack-safe |
 | **SCC decomposition** | Every projected node occurs in exactly one component; the partition matches `petgraph::algo::tarjan_scc`; singleton cycles require a self-loop; the condensation graph is acyclic; a 50,000-node path does not overflow the native stack |
 | **Idempotency** | a second `CfgExtractor::extract` / `DfgExtractor::extract` / `PdgBuilder::build` adds no edges |
 | **Slicing** | $`\lvert S\rvert \le \mathit{max\_nodes}`$; the criterion is in its own backward slice; $`\mathit{max\_nodes} = 0 \Rightarrow S = \varnothing`$; $`S`$ is monotone in $`\mathit{max\_nodes}`$; every sliced id is a real node |
@@ -190,7 +192,7 @@ grammars (see [below](#defects-found-by-this-suite)).
 ## Defects found by this suite
 
 Property and robustness tests are worth their cost only if they find real bugs.
-This suite found **twelve**, each fixed at the source and frozen as a regression
+This suite found **fifteen**, each fixed at the source and frozen as a regression
 test beside the fix:
 
 | # | Defect | Consequence | Found by |
@@ -209,6 +211,7 @@ test beside the fix:
 | 12 | 6 `NodeMapper` arms could never fire against the pinned grammars | constructs silently degraded to `Unknown` | mapping tables |
 | 13 | every Rust method call was reported as `is_method: false` | tree-sitter-rust has no `method_call_expression`; `recv.m()` is a `call_expression` over a `field_expression`, so the flag has to be read off the callee | mapping tables |
 | 14 | `async fn` was never detected as async (Rust, and latently Python) | tree-sitter-rust groups `async` under a `function_modifiers` node, so the direct-child check never saw it | mapping tables |
+| 15 | a cyclic `idom` map from malformed serialized data made `dominators_of` unbounded | a consumer collecting the iterator could run indefinitely or exhaust memory | robustness review |
 
 Defects 2, 3 and 7 were found by generated input within seconds of the
 robustness suite first running — none of them is reachable from any
@@ -219,7 +222,7 @@ about a grammar that had quietly stopped being true.
 The recursion guards (2, 3) use a **path** set rather than a global visited set,
 so a node legitimately reachable from two disjoint branches is still processed
 on each path; only a genuine cycle is cut. Tree inputs are unaffected
-bit-for-bit, which the 418 example-based tests confirm.
+bit-for-bit, which the example-based regression suite confirms.
 
 ## Coverage
 
@@ -235,12 +238,14 @@ cargo +nightly cov-branch           # branch coverage needs nightly
 
 | Metric | Coverage | Lowest file |
 | --- | ---: | --- |
-| Lines | **97.71 %** | 91.67 % (`language.rs`) |
-| Regions | **97.63 %** | — |
-| Functions | **97.92 %** | — |
-| Branches | **82.18 %** | see below |
+| Lines | **97.73 %** | 91.67 % (`language.rs`) |
+| Regions | **97.67 %** | — |
+| Functions | **97.93 %** | — |
+| Branches | **82.08 %** | see below |
 
 Every source file is above 90 % line coverage; eleven are at 100 %.
+The new `analysis/dominators.rs` module measures **97.72 %** line and
+**81.58 %** branch coverage, above the epic's 90 % / 80 % thresholds.
 
 **On branch coverage.** `-Z coverage-options=branch` is nightly-only, and it
 counts *condition outcomes* (`if`, `&&`, `||`, `while`) — not `match` arms,

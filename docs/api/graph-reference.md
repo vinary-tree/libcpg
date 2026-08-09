@@ -222,6 +222,27 @@ their weights; sorted nodes and adjacency make the result independent of input
 enumeration order. See the complete [projection component guide](../components/graph/projections.md)
 for field invariants, scope boundaries, complexity, pseudocode, and examples.
 
+### Dominators and post-dominators
+
+The feature-free dominance API is exported from the crate root and
+`libcpg::analysis`:
+
+| Function | Signature | Result |
+|---|---|---|
+| `dominator_tree` | `fn(&GraphProjection, NodeId) -> Result<DominatorTree, AnalysisError>` | Dominators of projection nodes reachable from the selected root. |
+| `post_dominator_tree` | `fn(&CodePropertyGraph, NodeId) -> Result<PostDominatorTree, AnalysisError>` | Post-dominators and reverse dominance frontier for one function CFG. |
+
+`DominatorTree` exposes deterministic `idom`, `children`, and `frontier` maps,
+plus `immediate_dominator`, constant-time `dominates`, and the
+`dominators_of` ancestor iterator. `PostDominatorTree` exposes sorted `exits`,
+real `ipdom` relations, `virtual_children`, and its reverse `frontier`, plus
+constant-time `post_dominates`, `control_dependence_edges`, and `is_empty`.
+`PdgBuilder` uses that public control-dependence relation directly.
+
+See the [dominator component guide](../components/graph/dominator-analysis.md)
+for exit modeling, unreachable-node semantics, CHK/Cytron pseudocode,
+complexity, validation, and examples.
+
 ### Strongly-connected components
 
 These feature-free functions compute exact SCC partitions over two graph
@@ -763,7 +784,8 @@ and `add_edge_with_id` rather than `add_node`/`add_edge`.
 - Component guides: [graph overview](../components/graph/overview.md),
   [nodes](../components/graph/nodes.md), [edges](../components/graph/edges.md),
   [traversal](../components/graph/traversal.md),
-  [deterministic projections](../components/graph/projections.md), and
+  [deterministic projections](../components/graph/projections.md),
+  [dominator analysis](../components/graph/dominator-analysis.md), and
   [SCC analysis](../components/graph/scc-analysis.md).
 
 ---

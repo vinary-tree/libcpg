@@ -26,9 +26,8 @@
 //!    recorded exits — e.g. a loop guard's false branch — plus structural sinks
 //!    and `Return`/`Throw`).
 //! 3. Compute **post-dominators** = dominators of the CFG with edges reversed,
-//!    rooted at `EXIT`. petgraph's [`simple_fast`] gives the immediate-dominator
-//!    map directly; running it on a reversed view yields immediate
-//!    post-dominators for free.
+//!    rooted at `EXIT`. [`crate::post_dominator_tree`] uses the deterministic
+//!    Cooper–Harvey–Kennedy algorithm and returns immediate post-dominators.
 //! 4. Compute the **post-dominance frontier** (a.k.a. reverse dominance
 //!    frontier, RDF) via the Cytron et al. walk.
 //! 5. `b` is control-dependent on `a` iff `a ∈ RDF(b)`. Emit `a -> b`.
@@ -49,17 +48,10 @@
 
 use std::collections::VecDeque;
 
-use petgraph::algo::dominators::simple_fast;
-use petgraph::graphmap::DiGraphMap;
 use petgraph::Direction;
 use rustc_hash::FxHashSet;
 
-use crate::{CfgEdgeKind, CodePropertyGraph, CpgEdgeKind, CpgNodeKind, DfgEdgeKind, NodeId};
-
-/// Sentinel node id for the virtual CFG exit used during post-dominator
-/// computation. Real CPG node ids are small sequential `u32`s, so `u32::MAX`
-/// never collides.
-const VIRTUAL_EXIT: u32 = u32::MAX;
+use crate::{post_dominator_tree, CodePropertyGraph, CpgEdgeKind, DfgEdgeKind, NodeId};
 
 /// Builds Program Dependence Graph edges (control + data dependence) onto an
 /// existing [`CodePropertyGraph`] that already carries CFG and DFG edges.
@@ -122,115 +114,10 @@ impl PdgBuilder {
 /// as its own controller (self-dependence via the back edge), matching the
 /// Ferrante–Ottenstein–Warren construction.
 fn compute_control_dependence(cpg: &CodePropertyGraph, function: NodeId) -> Vec<(NodeId, NodeId)> {
-    // 1. Intraprocedural CFG node set: reachable from `function` over
-    //    `ControlFlow` edges, excluding `Call` edges (which cross into callees).
-    let mut cfg_nodes: FxHashSet<NodeId> = FxHashSet::default();
-    cfg_nodes.insert(function);
-    let mut stack = vec![function];
-    while let Some(node) = stack.pop() {
-        for (succ, kind) in cpg.cfg_successors(node) {
-            if matches!(kind, CfgEdgeKind::Call) {
-                continue;
-            }
-            if cfg_nodes.insert(succ) {
-                stack.push(succ);
-            }
-        }
+    match post_dominator_tree(cpg, function) {
+        Ok(tree) => tree.control_dependence_edges(),
+        Err(_) => Vec::new(),
     }
-    if cfg_nodes.len() < 2 {
-        return Vec::new();
-    }
-
-    // 2. Reverse CFG as a DiGraphMap keyed by NodeId.0, plus the virtual EXIT.
-    //    For each forward edge (a -> b) add the reverse edge (b -> a); post-
-    //    dominators are the dominators of this reversed graph rooted at EXIT.
-    let mut reverse: DiGraphMap<u32, ()> =
-        DiGraphMap::with_capacity(cfg_nodes.len() + 1, cfg_nodes.len() * 2);
-    reverse.add_node(VIRTUAL_EXIT);
-    for &node in &cfg_nodes {
-        reverse.add_node(node.0);
-    }
-    let mut has_successor: FxHashSet<NodeId> = FxHashSet::default();
-    for &node in &cfg_nodes {
-        for (succ, kind) in cpg.cfg_successors(node) {
-            if matches!(kind, CfgEdgeKind::Call) || !cfg_nodes.contains(&succ) {
-                continue;
-            }
-            reverse.add_edge(succ.0, node.0, ());
-            has_successor.insert(node);
-        }
-    }
-
-    // 3. Exits: the CFG builder's recorded function exits (e.g. a loop guard's
-    //    false branch — NOT a sink), plus structural sinks, plus Return/Throw.
-    let recorded_exits: FxHashSet<NodeId> = cpg
-        .cfg_exits()
-        .iter()
-        .copied()
-        .filter(|n| cfg_nodes.contains(n))
-        .collect();
-    let mut connected_any_exit = false;
-    for &node in &cfg_nodes {
-        let is_return_or_throw = matches!(
-            cpg.node(node).map(|n| &n.kind),
-            Some(CpgNodeKind::Return) | Some(CpgNodeKind::Throw)
-        );
-        if !has_successor.contains(&node) || is_return_or_throw || recorded_exits.contains(&node) {
-            reverse.add_edge(VIRTUAL_EXIT, node.0, ());
-            connected_any_exit = true;
-        }
-    }
-    if !connected_any_exit {
-        // No exits at all (e.g. a single unbounded loop): post-dominance is
-        // undefined. Degrade gracefully — emit no control dependence.
-        return Vec::new();
-    }
-
-    // 3b. Ensure every node can reach EXIT so post-dominators are total. Any
-    //     node still unreachable from EXIT (an infinite loop with no recorded
-    //     exit) is connected directly — a standard, sound virtual edge.
-    let reachable = reachable_from(&reverse, VIRTUAL_EXIT);
-    for &node in &cfg_nodes {
-        if !reachable.contains(&node.0) {
-            reverse.add_edge(VIRTUAL_EXIT, node.0, ());
-        }
-    }
-
-    // 4. Post-dominator tree = dominators of the reverse CFG rooted at EXIT.
-    let postdom = simple_fast(&reverse, VIRTUAL_EXIT);
-
-    // 5. Reverse dominance frontier (Cytron et al. 1991). For each join `b`
-    //    (>= 2 predecessors in the reverse CFG), walk each predecessor up the
-    //    post-dominator tree to ipdom(b); every visited node is control-
-    //    dependent on `b`. Emit (controller = b, dependent = visited).
-    let mut edges: Vec<(NodeId, NodeId)> = Vec::new();
-    let mut seen: FxHashSet<(u32, u32)> = FxHashSet::default();
-    for b in reverse.nodes() {
-        if b == VIRTUAL_EXIT {
-            continue;
-        }
-        let preds: Vec<u32> = reverse.neighbors_directed(b, Direction::Incoming).collect();
-        if preds.len() < 2 {
-            continue;
-        }
-        let ipdom_b = match postdom.immediate_dominator(b) {
-            Some(dom) => dom,
-            None => continue,
-        };
-        for pred in preds {
-            let mut runner = pred;
-            while runner != ipdom_b {
-                if runner != VIRTUAL_EXIT && seen.insert((b, runner)) {
-                    edges.push((NodeId::new(b), NodeId::new(runner)));
-                }
-                match postdom.immediate_dominator(runner) {
-                    Some(dom) => runner = dom,
-                    None => break,
-                }
-            }
-        }
-    }
-    edges
 }
 
 /// Computes the data-dependence edges `(def, use)` for `function` by projecting
@@ -254,21 +141,6 @@ fn compute_data_dependence(cpg: &CodePropertyGraph, function: NodeId) -> Vec<(No
         }
     }
     edges
-}
-
-/// Reachable-node set from `start` over the outgoing edges of `graph`.
-fn reachable_from(graph: &DiGraphMap<u32, ()>, start: u32) -> FxHashSet<u32> {
-    let mut seen: FxHashSet<u32> = FxHashSet::default();
-    seen.insert(start);
-    let mut stack = vec![start];
-    while let Some(node) = stack.pop() {
-        for next in graph.neighbors_directed(node, Direction::Outgoing) {
-            if seen.insert(next) {
-                stack.push(next);
-            }
-        }
-    }
-    seen
 }
 
 /// Backward program slice (Weiser 1981): every node the `criterion`
@@ -347,8 +219,8 @@ fn slice(
 mod tests {
     use super::*;
     use crate::{
-        CfgExtractor, CpgNode, DfgExtractor, Language, MethodSignature, ScopeId, SourceRange,
-        Visibility,
+        CfgExtractor, CpgNode, CpgNodeKind, DfgExtractor, Language, MethodSignature, ScopeId,
+        SourceRange, Visibility,
     };
 
     /// Adds a node of `kind` as an AST child of `parent`, wiring the AstChild

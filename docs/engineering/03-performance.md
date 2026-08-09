@@ -13,7 +13,7 @@ These are the choices the code actually makes, and why:
 
 | Concern | Choice | Why |
 | --- | --- | --- |
-| Graph storage | [`petgraph`](../GLOSSARY.md#petgraph) `DiGraph<CpgNode, CpgEdge>` | Mature, well-tested directed-graph store with stable `NodeIndex`/`EdgeIndex` handles and ready-made algorithms — notably `dominators::simple_fast`, reused for PDG construction. One store holds all four [overlays](../GLOSSARY.md#code-property-graph-cpg). |
+| Graph storage | [`petgraph`](../GLOSSARY.md#petgraph) `DiGraph<CpgNode, CpgEdge>` | Mature, well-tested directed-graph store with stable `NodeIndex`/`EdgeIndex` handles. One store holds all four [overlays](../GLOSSARY.md#code-property-graph-cpg); exact analyses use normalized `GraphProjection` CSR views. |
 | Id → index maps | `rustc_hash::FxHashMap` / `FxHashSet` | The CPG keeps `NodeId → NodeIndex` (and edge) maps for O(1)-expected lookup. `FxHash` is a fast, non-cryptographic hasher — a good fit because keys are library-assigned `u32` ids, not attacker-controlled strings. (Security implications: [`security/01`](../security/01-input-and-resource-hardening.md).) |
 | Per-node child lists | `smallvec::SmallVec<[NodeId; 4]>` | `CpgNode::children` stores up to four child ids **inline**, with no heap allocation — the common case for AST fan-out — spilling to the heap only for wider nodes. |
 | Shared source text | `std::sync::Arc<str>` | `CpgNode::text`, operator strings, and string/regex literal payloads are `Arc<str>`: immutable, shared, and cloned in O(1) by bumping a refcount instead of copying bytes. |
@@ -62,7 +62,8 @@ dimension, $`k`$ = Weisfeiler-Lehman iterations (3).
 | CPG construction (AST walk) | $`O(n)`$ | One depth-first pass over the parse tree, one `CpgNode` per kept tree-sitter node. |
 | CFG extraction (per function) | $`O(n)`$ | A per-construct walk over the function's AST children. |
 | DFG reaching-defs (per function) | $`O(I \cdot n)`$ | An [AST-ordered sweep](../GLOSSARY.md#ast-ordered-reaching-definitions); $`I`$ is bounded by `max_iterations` (default 100), with loop bodies swept twice. |
-| PDG construction (per function) | near-linear in $`V + E`$ of the CFG | `petgraph::dominators::simple_fast` on the reversed CFG plus a Cytron reverse-dominance-frontier walk. |
+| Dominator/post-dominator tree | worst case $`O(VE)`$ time, $`O(V + E)`$ auxiliary space | Deterministic CHK fixed point with a $`V + 2`$ pass cap, Cytron frontier, and iterative Euler intervals; ancestry queries are $`O(1)`$. |
+| PDG construction (per function) | worst case $`O(VE)`$ for control dependence, plus a DFG scan | Reuses the public post-dominator tree's reverse frontier, then emits deduplicated control and data dependence edges. |
 | CFG/call-graph SCC decomposition | $`O(V + E)`$ after adjacency normalization | Iterative Tarjan plus condensation construction; dense indices avoid traversal hash lookups, and explicit stacks avoid native-stack growth with path depth. |
 | [`backward_slice`](../GLOSSARY.md#backward-slice--forward-slice) / `forward_slice` | $`O(V + E)`$, capped at `max_nodes` | Breadth-first over PDG edges; returns as soon as the slice reaches `max_nodes`. |
 | [VF2](../GLOSSARY.md#vf2) `find_matches` | worst case $`O(N!\,N)`$; pruned in practice | Feasibility rules and `max_matches` cut the state space dramatically; see [`theory/05-subgraph-isomorphism-vf2.md`](../theory/05-subgraph-isomorphism-vf2.md). |

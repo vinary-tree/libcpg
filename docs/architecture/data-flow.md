@@ -3,7 +3,7 @@
 This page traces how information moves through libcpg in two phases:
 
 1. the **construction pipeline** — source text becomes a [Code Property Graph](../GLOSSARY.md#code-property-graph-cpg) (Yamaguchi et al. [[1]](#references)) with AST, [CFG](../GLOSSARY.md#control-flow-graph-cfg), and [DFG](../GLOSSARY.md#data-flow-graph-dfg) overlays; and
-2. the **analysis pipeline** — a constructed CPG is queried by exact [SCC](../GLOSSARY.md#strongly-connected-component-scc) decomposition, the [PDG](../GLOSSARY.md#program-dependence-graph-pdg)/slicer, the [VF2](../GLOSSARY.md#vf2) and [GoF](../GLOSSARY.md#gang-of-four-gof) detectors, the algorithm/complexity heuristics, and the [GNN](../GLOSSARY.md#graph-neural-network-gnn).
+2. the **analysis pipeline** — a constructed CPG is queried by exact [dominator/post-dominator](../components/graph/dominator-analysis.md) and [SCC](../GLOSSARY.md#strongly-connected-component-scc) analyses, the [PDG](../GLOSSARY.md#program-dependence-graph-pdg)/slicer, the [VF2](../GLOSSARY.md#vf2) and [GoF](../GLOSSARY.md#gang-of-four-gof) detectors, the algorithm/complexity heuristics, and the [GNN](../GLOSSARY.md#graph-neural-network-gnn).
 
 "Data flow" here means both the program's own data-flow overlay *and* the flow of data through libcpg's stages. This is a rewrite of an earlier draft that invented `BranchTrue`/`UseUse`/`Phi` edge kinds, an SSA-based DFG, a parse/embedding cache, and a bincode format — none of which exist. The real edge model is [`CpgEdgeKind::ControlFlow(CfgEdgeKind)`](../GLOSSARY.md#control-flow-graph-cfg) / [`DataFlow(DfgEdgeKind)`](../GLOSSARY.md#data-flow-graph-dfg), the DFG is [AST-ordered reaching definitions](../GLOSSARY.md#ast-ordered-reaching-definitions), and persistence is plain derive-based serde.
 
@@ -154,7 +154,7 @@ A constructed CPG is the substrate for several independent analyses. Each consum
 
 ![Activity diagram fanning a CPG out to SCC, PDG/slice, VF2/GoF, algorithm, and GNN analyses](../diagrams/analysis-pipeline.svg)
 
-*Figure — a constructed CPG fans out to exact SCC decomposition, the on-demand PDG/slicer, the VF2 and GoF pattern detectors, the algorithm/complexity heuristics, and the GNN. Source: [`diagrams/analysis-pipeline.puml`](../diagrams/analysis-pipeline.puml).*
+*Figure — a constructed CPG fans out to exact structural analysis, the on-demand PDG/slicer, the VF2 and GoF pattern detectors, the algorithm/complexity heuristics, and the GNN. Source: [`diagrams/analysis-pipeline.puml`](../diagrams/analysis-pipeline.puml).*
 
 ### Strongly-connected components (feature-free)
 
@@ -167,7 +167,7 @@ edges and does not guess unresolved calls. See the
 
 ### Program dependence and slicing (feature-free)
 
-`PdgBuilder::build(&mut cpg, function)` adds the [PDG](../GLOSSARY.md#program-dependence-graph-pdg) overlay for one function: [`ControlDependence`](../GLOSSARY.md#control-dependence) edges (computed as the [reverse dominance frontier](../GLOSSARY.md#dominance-frontier--reverse-dominance-frontier) of the CFG — a virtual `EXIT`, `petgraph`'s `dominators::simple_fast` on the reversed CFG, then the Cytron et al. frontier walk [[3]](#references)) and [`DataDependence`](../GLOSSARY.md#data-dependence) edges (re-projected from the DFG's `DefUse`/`ReachingDef` edges), following Ferrante–Ottenstein–Warren [[2]](#references). With the PDG in place, [program slicing](../GLOSSARY.md#program-slicing) (Weiser [[7]](#references)) is a bounded breadth-first traversal:
+`PdgBuilder::build(&mut cpg, function)` adds the [PDG](../GLOSSARY.md#program-dependence-graph-pdg) overlay for one function: [`ControlDependence`](../GLOSSARY.md#control-dependence) edges (taken directly from the public [`PostDominatorTree`](../components/graph/dominator-analysis.md), which computes the CFG's [reverse dominance frontier](../GLOSSARY.md#dominance-frontier--reverse-dominance-frontier) using a synthetic exit, deterministic CHK post-dominators, and the Cytron et al. frontier walk [[3]](#references)) and [`DataDependence`](../GLOSSARY.md#data-dependence) edges (re-projected from the DFG's `DefUse`/`ReachingDef` edges), following Ferrante–Ottenstein–Warren [[2]](#references). With the PDG in place, [program slicing](../GLOSSARY.md#program-slicing) (Weiser [[7]](#references)) is a bounded breadth-first traversal:
 
 ```rust
 use libcpg::{PdgBuilder, backward_slice, forward_slice};

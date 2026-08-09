@@ -66,10 +66,45 @@ mod scc_analysis {
     }
 }
 
+mod dominator_analysis {
+    use libcpg::{dominator_tree, GraphProjection, NodeId, ProjectionKind};
+
+    #[test]
+    fn root_api_computes_dominators_without_language_features() {
+        let root = NodeId::new(10);
+        let left = NodeId::new(20);
+        let right = NodeId::new(30);
+        let join = NodeId::new(40);
+        let projection = GraphProjection::from_edges(
+            ProjectionKind::External,
+            [root, left, right, join],
+            [
+                (root, left, 1.0),
+                (root, right, 1.0),
+                (left, join, 1.0),
+                (right, join, 1.0),
+            ],
+        );
+
+        let tree = dominator_tree(&projection, root).expect("valid projection root");
+        assert_eq!(tree.immediate_dominator(join), Some(root));
+        assert_eq!(tree.frontier[&left], vec![join]);
+        assert_eq!(tree.frontier[&right], vec![join]);
+        assert!(tree.dominates(root, join));
+        assert_eq!(
+            tree.dominators_of(join).collect::<Vec<_>>(),
+            vec![join, root]
+        );
+    }
+}
+
 #[cfg(feature = "lang-rust")]
 mod rust_pipeline {
+    use std::collections::BTreeSet;
+
     use libcpg::{
-        backward_slice, forward_slice, CpgBuilder, Language, PdgBuilder, TreeSitterCpgBuilder,
+        backward_slice, cfg_projection, dominator_tree, forward_slice, post_dominator_tree,
+        CpgBuilder, CpgEdgeKind, Language, PdgBuilder, TreeSitterCpgBuilder,
     };
 
     const SRC: &str = "fn f(x: i32) -> i32 { let y = x + 1; if y > 0 { y } else { 0 } }";
@@ -105,6 +140,41 @@ mod rust_pipeline {
         let before = cpg.edge_count();
         PdgBuilder::new().build(&mut cpg, func);
         assert_eq!(before, cpg.edge_count());
+    }
+
+    #[test]
+    fn parsed_cfg_dominators_and_pdg_control_edges_share_one_analysis() {
+        let mut cpg = build();
+        let function = cpg
+            .functions()
+            .map(|node| node.id)
+            .next()
+            .expect("a function");
+        let cfg = cfg_projection(&cpg, function).expect("function CFG");
+        let dominators = dominator_tree(&cfg, function).expect("function dominators");
+        assert!(dominators.dominates(function, function));
+        assert!(!dominators.idom.is_empty());
+        assert!(dominators
+            .idom
+            .keys()
+            .copied()
+            .all(|node| dominators.dominates(function, node)));
+
+        let post_dominators =
+            post_dominator_tree(&cpg, function).expect("function post-dominators");
+        assert!(!post_dominators.is_empty());
+        let expected: BTreeSet<_> = post_dominators
+            .control_dependence_edges()
+            .into_iter()
+            .collect();
+
+        PdgBuilder::new().build(&mut cpg, function);
+        let actual: BTreeSet<_> = cpg
+            .edges()
+            .filter(|edge| matches!(edge.kind, CpgEdgeKind::ControlDependence))
+            .map(|edge| (edge.source, edge.target))
+            .collect();
+        assert_eq!(actual, expected);
     }
 }
 

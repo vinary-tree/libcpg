@@ -67,9 +67,10 @@ pub use graph::{
 
 pub use analysis::{
     call_graph_projection, call_graph_sccs, cfg_projection, control_flow_sccs, dfg_projection,
-    module_graph_projection, pdg_projection, projection_of, AnalysisError, FunctionCfgView,
-    GraphProjection, ProjectionError, ProjectionKind, SccAnalysisError, SccComponent,
-    SccCondensationEdge, SccDecomposition, SccProjection, UndirectedProjection,
+    dominator_tree, module_graph_projection, pdg_projection, post_dominator_tree, projection_of,
+    AnalysisError, DominatorTree, FunctionCfgView, GraphProjection, PostDominatorTree,
+    ProjectionError, ProjectionKind, SccAnalysisError, SccComponent, SccCondensationEdge,
+    SccDecomposition, SccProjection, UndirectedProjection,
 };
 
 pub use builder::{

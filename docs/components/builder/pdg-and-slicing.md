@@ -53,20 +53,20 @@ $`n`$ to the exit passes through $`p`$. Node $`b`$ is control-dependent on branc
 $`a`$ precisely when $`b`$ post-dominates a successor of $`a`$ but not $`a`$ itself
 — the reverse-dominance-frontier condition.
 
-`compute_control_dependence` implements this in six steps:
+`PdgBuilder` delegates this relation to the public, feature-free
+[`post_dominator_tree`](../graph/dominator-analysis.md) API:
 
 ```text
-compute_control_dependence(function):
+post_dominator_tree(function):
 
     # 1. Intraprocedural CFG node set: reachable from `function` over
     #    ControlFlow edges, EXCLUDING Call edges (which cross into callees).
     cfg_nodes ← DFS from function over non-Call ControlFlow successors
     if |cfg_nodes| < 2: return []
 
-    # 2. Build the REVERSE CFG as a DiGraphMap keyed by NodeId.0, plus a
-    #    virtual EXIT sentinel (u32::MAX — real ids are small, so no collision).
-    #    For each forward edge (a → b) add reverse edge (b → a).
-    reverse ← { EXIT } ∪ cfg_nodes
+    # 2. Build a deterministic GraphProjection, then a reversed dense CFG.
+    #    The virtual exit is the next dense index, not a sentinel NodeId.
+    reverse ← { synthetic_exit } ∪ cfg_nodes
     for each non-Call ControlFlow edge (a → b) with a,b ∈ cfg_nodes:
         reverse.add_edge(b, a)
 
@@ -75,36 +75,46 @@ compute_control_dependence(function):
     #    (no successor), and Return/Throw nodes.
     for node in cfg_nodes:
         if node has no successor or is Return/Throw or node ∈ cfg_exits():
-            reverse.add_edge(EXIT, node)
+            reverse.add_edge(synthetic_exit, node)
     if no exit was connected: return []          # post-dominance undefined
 
-    # 3b. Ensure every node can reach EXIT (an infinite loop with no recorded
-    #     exit is wired to EXIT directly — a sound virtual edge).
-    for node not reachable from EXIT in `reverse`: reverse.add_edge(EXIT, node)
+    # 3b. Ensure every node can reach the synthetic exit in the reversed view.
+    #     Infinite regions are direct virtual children, not children of a real exit.
+    for node not reachable from synthetic_exit in reverse:
+        reverse.add_edge(synthetic_exit, node)
 
-    # 4. Post-dominators = dominators of the reverse CFG rooted at EXIT.
-    postdom ← simple_fast(reverse, EXIT)          # petgraph immediate-dominators
+    # 4. Post-dominators = dominators of the reverse CFG rooted at the exit.
+    #    The shared CHK engine uses deterministic RPO and a |V| + 2 pass cap.
+    postdom ← CHK(reverse, synthetic_exit)
 
     # 5. Reverse dominance frontier (Cytron et al.). A node `c` that is a JOIN
     #    in the reverse CFG (>= 2 predecessors there = a FORK in the forward
     #    CFG, i.e. a branch) controls every node on the post-dominator-tree
     #    walk from each predecessor up to ipdom(c).
-    for c in reverse.nodes(), c ≠ EXIT:
+    for c in reverse.nodes(), c ≠ synthetic_exit:
         preds ← reverse-CFG predecessors of c
         if |preds| < 2: continue
         ipdom_c ← postdom.immediate_dominator(c)
         for p in preds:
             runner ← p
             while runner ≠ ipdom_c:
-                if runner ≠ EXIT: emit ControlDependence(c → runner)
+                if runner ≠ synthetic_exit: record frontier[runner] += c
                 runner ← postdom.immediate_dominator(runner)
+
+    return PostDominatorTree(postdom, frontier)
+
+PdgBuilder(function):
+    tree ← post_dominator_tree(function)
+    emit tree.control_dependence_edges() as ControlDependence edges
 ```
 
-`simple_fast` is petgraph's Cooper–Harvey–Kennedy immediate-dominator algorithm; running it
-on a reversed view yields immediate **post**-dominators for free. A loop guard legitimately
-appears as its own controller (self-dependence via the back edge), matching the
-Ferrante–Ottenstein–Warren construction — the inline test
-`while_body_control_dependent_on_guard` asserts exactly this.
+The shared implementation is libcpg's deterministic Cooper–Harvey–Kennedy
+engine over `GraphProjection`; `petgraph::dominators::simple_fast` is retained
+only as an independent property-test oracle. A loop guard legitimately appears
+as its own controller (self-dependence via the back edge), matching the
+Ferrante–Ottenstein–Warren construction. The inline test
+`while_body_control_dependent_on_guard` asserts exactly this, and differential
+property tests prove that the refactor preserves the former PDG edge set.
 
 ![Dominance frontier: post-dominator tree of the reverse CFG and the frontier nodes that become control-dependence edges.](../../diagrams/dominance-frontier.svg)
 

@@ -3,6 +3,7 @@
 //! Unlike the feature-gated algorithm-family detector, analyses in this module
 //! compute graph properties exactly. They are available with `default = []`.
 
+mod dominators;
 mod projection;
 mod scc;
 
@@ -13,6 +14,8 @@ pub use projection::{
     projection_of, FunctionCfgView, GraphProjection, ProjectionError, ProjectionKind,
     UndirectedProjection,
 };
+
+pub use dominators::{dominator_tree, post_dominator_tree, DominatorTree, PostDominatorTree};
 
 pub use scc::{
     call_graph_sccs, control_flow_sccs, SccAnalysisError, SccComponent, SccCondensationEdge,

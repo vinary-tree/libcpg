@@ -1,0 +1,41 @@
+@startuml
+!include _libcpg-theme.iuml
+title Dominator analysis — one deterministic engine, two directions
+
+rectangle "GraphProjection\nforward + reverse CSR" as PROJECTION #DBE4FF
+rectangle "iterative reverse postorder\nsorted adjacency" as RPO #FFE8CC
+rectangle "Cooper–Harvey–Kennedy\nbounded idom fixed point" as CHK #FFF3BF
+rectangle "tree + Cytron frontier\niterative Euler intervals" as RESULTS #D3F9D8
+rectangle "DominatorTree\nidom · dominates · frontier" as DOM #C3FAE8
+rectangle "function CFG reversed\nsynthetic exit root" as REVERSE #E5DBFF
+rectangle "PostDominatorTree\nipdom · reverse frontier" as POSTDOM #D0BFFF
+rectangle "PdgBuilder\nControlDependence edges" as PDG #FFC9C9
+
+PROJECTION --> RPO : dominator_tree(root)
+RPO --> CHK
+CHK --> RESULTS
+RESULTS --> DOM
+
+PROJECTION --> REVERSE : post_dominator_tree(function)
+REVERSE --> RPO
+RESULTS --> POSTDOM
+POSTDOM --> PDG : sorted controller → dependent
+
+note bottom of CHK
+  Pass cap: analyzed vertices + 2.
+  Production code is feature-free;
+  petgraph is a test oracle only.
+end note
+
+legend right
+  |= colour |= role |
+  |<#DBE4FF>| deterministic graph substrate |
+  |<#FFE8CC>| traversal order |
+  |<#FFF3BF>| bounded fixed point |
+  |<#D3F9D8>| shared derived relations |
+  |<#C3FAE8>| forward dominance API |
+  |<#E5DBFF>| reversed CFG preparation |
+  |<#D0BFFF>| post-dominance API |
+  |<#FFC9C9>| PDG consumer |
+endlegend
+@enduml

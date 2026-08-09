@@ -37,7 +37,7 @@ fn main() -> Result<(), libcpg::Error> {
 }
 ```
 
-If you constructed the CPG with `with_cfg(false)` or `with_dfg(false)`, run the extractors first (`CfgExtractor::new().extract(&mut cpg)` then `DfgExtractor::new().extract(&mut cpg)`) before `PdgBuilder`. The construction details — the virtual `EXIT`, `petgraph`'s `simple_fast` dominators, and the Cytron frontier walk — are in [PDG and Slicing](../components/builder/pdg-and-slicing.md).
+If you constructed the CPG with `with_cfg(false)` or `with_dfg(false)`, run the extractors first (`CfgExtractor::new().extract(&mut cpg)` then `DfgExtractor::new().extract(&mut cpg)`) before `PdgBuilder`. The construction details — the collision-free synthetic exit, deterministic CHK post-dominators, and the Cytron frontier walk — are in [PDG and Slicing](../components/builder/pdg-and-slicing.md); the reusable result contract is in [Dominator and post-dominator analysis](../components/graph/dominator-analysis.md).
 
 ---
 

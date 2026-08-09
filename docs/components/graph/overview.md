@@ -3,7 +3,7 @@
 The `graph` module holds the data structures at the heart of `libcpg`: the
 [Code Property Graph](../../GLOSSARY.md#code-property-graph-cpg) (CPG) and the
 node, edge, and identifier types it is built from. Everything else in the crate
-— the builders, graph projections, SCC analysis, the pattern matchers, the slicer, the GNN — reads
+— the builders, graph projections, dominator and SCC analyses, the pattern matchers, the slicer, the GNN — reads
 from or writes to this one structure. This page explains what a CPG is, why `libcpg` merges
 several program views into a single graph, how that graph is stored, and how you
 create and inspect one.
@@ -94,9 +94,10 @@ pub struct CodePropertyGraph {
 }
 ```
 
-Why this design? petgraph gives `libcpg` mature, well-tested graph algorithms
-(the [PDG](../../GLOSSARY.md#program-dependence-graph-pdg) builder reuses
-petgraph's dominator routine directly) and a stable `NodeIndex` model. The
+Why this design? petgraph gives `libcpg` a mature graph store and a stable
+`NodeIndex` model. Exact analyses operate on deterministic
+[`GraphProjection`](projections.md) CSR views; the [dominator engine](dominator-analysis.md)
+uses petgraph only as an independent test oracle. The
 `node_index_map` / `edge_index_map` tables let callers hold small, `Copy`,
 serialisation-friendly [`NodeId`](nodes.md#nodeid) / `EdgeId` handles while the
 graph internally uses petgraph indices — so an id survives being written to disk
@@ -268,6 +269,10 @@ So the safe pattern is: build (single-threaded, `&mut`), then analyse
   types, plus a worked taint/reachability walk.
 - [Deterministic projections](projections.md) — payload-free forward/reverse
   CSR views used by exact analyses.
+- [Dominators and post-dominators](dominator-analysis.md) — immediate
+  dominators, frontiers, constant-time ancestry, and PDG control dependence.
+- [Strongly-connected components](scc-analysis.md) — exact CFG loops and
+  call-graph recursion clusters.
 - [`api/graph-reference.md`](../../api/graph-reference.md) — the precise,
   method-by-method API reference for `CodePropertyGraph`.
 - [`theory/01-code-property-graphs.md`](../../theory/01-code-property-graphs.md)

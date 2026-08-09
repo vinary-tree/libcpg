@@ -106,6 +106,17 @@ extractor.extract(&mut cpg); // bounded reaching-defs
 Because termination rests on this cap rather than on a proof of monotone
 convergence, keep it positive; a value of `0` would skip the fixpoint loop entirely.
 
+## Dominance: structural convergence cap
+
+[`dominator_tree`](../components/graph/dominator-analysis.md) and
+`post_dominator_tree` run the deterministic CHK fixed point for at most the
+analyzed vertex count plus two passes. A non-converging analysis returns
+`AnalysisError::IterationLimitExceeded`; it cannot spin indefinitely. Reverse
+postorder and Euler intervals use explicit work stacks, so an adversarially deep
+CFG grows heap storage instead of the native call stack. The worst-case work is
+still $`O(VE)`$, so callers processing untrusted inputs should continue to cap
+source and CPG size.
+
 ## Slicing: `max_nodes`
 
 [Backward and forward slices](../GLOSSARY.md#backward-slice--forward-slice) are

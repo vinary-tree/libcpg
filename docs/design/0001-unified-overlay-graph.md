@@ -29,12 +29,12 @@ to store the views:
   then its syntactic parent, then its control-flow successors, never leaving the
   structure and never translating an identity.
 
-`libcpg` also wants to reuse mature graph algorithms rather than re-implement
-them — most concretely `petgraph`'s dominator routine, which the PDG builder
-uses (`petgraph::algo::dominators::simple_fast`; see
-[`0004`](0004-relaxed-vf2-detection.md)'s sibling PDG layer and
-[`../theory/04-program-dependence-and-slicing.md`](../theory/04-program-dependence-and-slicing.md)).
-And it wants **stable node identities**: a `NodeId` handed to a caller must keep
+`libcpg` also wants a mature graph store and independently implemented
+algorithm oracles. `petgraph` supplies both; exact production analyses now
+normalize selected overlays into deterministic
+[`GraphProjection`](../components/graph/projections.md) CSR views, while
+petgraph remains a differential-test oracle. And libcpg wants **stable node
+identities**: a `NodeId` handed to a caller must keep
 meaning for the life of the graph, even though a raw graph library's internal
 indices can move.
 
@@ -136,9 +136,10 @@ function's control-flow overlay — McCabe's metric, surfaced as
   `range`, and properties are held a single time regardless of how many overlays
   touch the node; the [`Arc<str>`](../GLOSSARY.md#petgraph) interning means even
   the label text is shared.
-- **Mature algorithms come for free.** Because the store *is* a `petgraph`
-  graph, the PDG builder calls `petgraph`'s `dominators::simple_fast` directly on
-  the (reversed) CFG overlay instead of shipping a bespoke dominator pass.
+- **Mature storage and independent oracles come for free.** The shared store is
+  a `petgraph` graph. Exact analyses project its stable `NodeId` relations into
+  deterministic CSR; property tests compare libcpg's dominator and SCC engines
+  with petgraph's independent implementations.
 - **Stable ids survive mutation.** The `NodeId → NodeIndex` map means public ids
   are not perturbed by internal graph operations; callers can cache them.
 - **One serialization boundary.** With the `serde` feature the entire graph —
