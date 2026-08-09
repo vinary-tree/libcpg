@@ -54,7 +54,7 @@ source ──parse──▶ AST  ──(build_cfg)──▶ +CFG  ──(build_d
 
 ### 4. Empty default feature set
 
-`default = []`: with no Cargo features, `build(source, language)` fails for **every** language (the [parser registry](../GLOSSARY.md#tree-sitter) is empty), and only the feature-free surface works — hand-built CPGs, `build_from_tree`, the CFG/DFG/PDG extractors, exact CFG/call-graph SCC decomposition, VF2 matching, and slicing. Optional analyses live behind features: `gnn`, `design-patterns`, `algorithm-detection`, `serde`, `ml-linfa`/`ml-rules`, and the Mode-B toggles `rholang`/`metta`. The umbrella `full = [gnn, design-patterns, algorithm-detection, serde, ml-rules, lang-all]` (it excludes `rholang`, `metta`, `gpu`, and `ml-linfa`). The rationale — compile time, dependency surface, and duplicate-symbol avoidance — is captured in [`../design/0005-feature-flag-taxonomy.md`](../design/0005-feature-flag-taxonomy.md).
+`default = []`: with no Cargo features, `build(source, language)` fails for **every** language (the [parser registry](../GLOSSARY.md#tree-sitter) is empty), and only the feature-free surface works — hand-built CPGs, `build_from_tree`, the CFG/DFG/PDG extractors, deterministic CSR projections, exact CFG/call-graph SCC decomposition, VF2 matching, and slicing. Optional analyses live behind features: `gnn`, `design-patterns`, `algorithm-detection`, `serde`, `ml-linfa`/`ml-rules`, and the Mode-B toggles `rholang`/`metta`. The umbrella `full = [gnn, design-patterns, algorithm-detection, serde, ml-rules, lang-all]` (it excludes `rholang`, `metta`, `gpu`, and `ml-linfa`). The rationale — compile time, dependency surface, and duplicate-symbol avoidance — is captured in [`../design/0005-feature-flag-taxonomy.md`](../design/0005-feature-flag-taxonomy.md).
 
 ### 5. Thread-safety, honestly
 
@@ -62,7 +62,7 @@ The public types are built for concurrency but do **not** silently parallelize:
 
 - `CodePropertyGraph` is a plain owned value: it is **mutable** during construction (`add_node`, `connect`, and the extractors all mutate it) and implements `Clone`. It is *not* "immutable after construction".
 - The matcher and detector traits are `Send + Sync` (`SubgraphMatcher`, `PatternDetector`, `AlgorithmDetector`, `CpgBuilder`), so a caller can run them across files or functions with its own thread pool.
-- `rayon` is a declared dependency and the crate is written to be parallelizable, but the current extractors and detectors iterate functions **sequentially** — no `par_iter` is wired in `src/` yet. There are **no** atomic progress counters and **no** SIMD paths; the `gpu` feature is reserved with no code behind it. Benchmarking is a documented gap (criterion is a dev-dependency, `[[bench]]` targets are commented out). See [`../engineering/03-performance.md`](../engineering/03-performance.md).
+- `rayon` is a declared dependency and the crate is written to be parallelizable, but the current extractors and detectors iterate functions **sequentially** — no `par_iter` is wired in `src/` yet. There are **no** atomic progress counters and **no** SIMD paths; the `gpu` feature is reserved with no code behind it. Three Criterion targets currently measure SCC analysis, CPG construction, and pattern matching; remaining benchmark gaps are tracked in [`../engineering/03-performance.md`](../engineering/03-performance.md).
 
 ## Module map
 

@@ -166,10 +166,19 @@ pub fn control_flow_sccs(
 /// Unresolved calls and edges to non-function targets do not invent vertices.
 pub fn call_graph_sccs(cpg: &CodePropertyGraph) -> SccDecomposition {
     let nodes = sorted_nodes(cpg.functions().map(|node| node.id));
-    let node_indices = dense_node_indices(&nodes);
-    let mut adjacency = vec![Vec::new(); nodes.len()];
+    let adjacency = adjacency_from_edges(&nodes, call_graph_edges(cpg, &nodes));
+    decompose(SccProjection::CallGraph, nodes, adjacency)
+}
 
-    for (caller_index, &caller) in nodes.iter().enumerate() {
+/// Derives resolved caller-function to callee-function edges for `nodes`.
+///
+/// Both SCC analysis and the public call-graph projection consume this helper
+/// so their interpretation of CPG call encodings cannot drift apart.
+pub(crate) fn call_graph_edges(cpg: &CodePropertyGraph, nodes: &[NodeId]) -> Vec<(NodeId, NodeId)> {
+    let node_indices = dense_node_indices(nodes);
+    let mut edges = FxHashSet::default();
+
+    for &caller in nodes {
         for source in function_scope_nodes(cpg, caller) {
             if let Some(node) = cpg.node(source) {
                 if let CpgNodeKind::Call {
@@ -177,8 +186,8 @@ pub fn call_graph_sccs(cpg: &CodePropertyGraph) -> SccDecomposition {
                     ..
                 } = &node.kind
                 {
-                    if let Some(&target_index) = node_indices.get(target) {
-                        adjacency[caller_index].push(target_index);
+                    if node_indices.contains_key(target) {
+                        edges.insert((caller, *target));
                     }
                 }
             }
@@ -186,24 +195,22 @@ pub fn call_graph_sccs(cpg: &CodePropertyGraph) -> SccDecomposition {
             for edge in cpg.outgoing_edges(source) {
                 let is_resolved_call = edge.kind.is_call()
                     || matches!(edge.kind, CpgEdgeKind::ControlFlow(CfgEdgeKind::Call));
-                if is_resolved_call {
-                    if let Some(&target_index) = node_indices.get(&edge.target) {
-                        adjacency[caller_index].push(target_index);
-                    }
+                if is_resolved_call && node_indices.contains_key(&edge.target) {
+                    edges.insert((caller, edge.target));
                 }
             }
         }
     }
 
-    normalize_adjacency(&mut adjacency);
-    drop(node_indices);
-    decompose(SccProjection::CallGraph, nodes, adjacency)
+    let mut edges: Vec<_> = edges.into_iter().collect();
+    edges.sort_unstable_by_key(|(source, target)| (*source, *target));
+    edges
 }
 
 /// Returns a function and its AST descendants, stopping before nested
 /// functions. The traversal follows edges rather than parent pointers so it is
 /// correct for both parser-built and hand-built CPGs.
-fn function_scope_nodes(cpg: &CodePropertyGraph, function: NodeId) -> FxHashSet<NodeId> {
+pub(crate) fn function_scope_nodes(cpg: &CodePropertyGraph, function: NodeId) -> FxHashSet<NodeId> {
     let mut scope = FxHashSet::default();
     let mut stack = vec![function];
 
@@ -228,14 +235,14 @@ fn function_scope_nodes(cpg: &CodePropertyGraph, function: NodeId) -> FxHashSet<
     scope
 }
 
-fn sorted_nodes(nodes: impl IntoIterator<Item = NodeId>) -> Vec<NodeId> {
+pub(crate) fn sorted_nodes(nodes: impl IntoIterator<Item = NodeId>) -> Vec<NodeId> {
     let mut nodes: Vec<NodeId> = nodes.into_iter().collect();
     nodes.sort_unstable_by_key(|node| node.as_u32());
     nodes.dedup();
     nodes
 }
 
-type DenseNodeId = u32;
+pub(crate) type DenseNodeId = u32;
 
 fn dense_node_indices(nodes: &[NodeId]) -> FxHashMap<NodeId, DenseNodeId> {
     let mut indices = FxHashMap::default();
@@ -248,7 +255,7 @@ fn dense_node_indices(nodes: &[NodeId]) -> FxHashMap<NodeId, DenseNodeId> {
     indices
 }
 
-fn adjacency_from_edges(
+pub(crate) fn adjacency_from_edges(
     nodes: &[NodeId],
     edges: impl IntoIterator<Item = (NodeId, NodeId)>,
 ) -> Vec<Vec<DenseNodeId>> {
@@ -265,7 +272,7 @@ fn adjacency_from_edges(
     adjacency
 }
 
-fn normalize_adjacency(adjacency: &mut [Vec<DenseNodeId>]) {
+pub(crate) fn normalize_adjacency(adjacency: &mut [Vec<DenseNodeId>]) {
     for successors in adjacency {
         successors.sort_unstable();
         successors.dedup();
@@ -279,7 +286,7 @@ struct DfsFrame {
 }
 
 /// Iterative Tarjan decomposition over normalized dense adjacency lists.
-fn decompose(
+pub(crate) fn decompose(
     projection: SccProjection,
     nodes: Vec<NodeId>,
     adjacency: Vec<Vec<DenseNodeId>>,
@@ -759,14 +766,20 @@ mod tests {
                 node_count,
             );
 
+            let projection = actual.condensation_projection();
+            prop_assert_eq!(projection.node_count(), actual.components.len());
+            for (component_id, component) in actual.components.iter().enumerate() {
+                prop_assert_eq!(projection.node_id(component_id as u32), component.nodes[0]);
+            }
+
             let mut condensation = petgraph::graph::DiGraph::<(), ()>::new();
-            let condensation_nodes: Vec<_> = (0..actual.components.len())
+            let condensation_nodes: Vec<_> = (0..projection.node_count())
                 .map(|_| condensation.add_node(()))
                 .collect();
-            for edge in &actual.condensation_edges {
+            for (source, target, _) in projection.edges() {
                 condensation.add_edge(
-                    condensation_nodes[edge.source],
-                    condensation_nodes[edge.target],
+                    condensation_nodes[source as usize],
+                    condensation_nodes[target as usize],
                     (),
                 );
             }

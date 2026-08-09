@@ -58,6 +58,7 @@ every function in the CPG, including isolated functions.
 | `component_of(node)` | The component containing `node`, if it was projected. |
 | `cyclic_components()` | Only components that contain a directed cycle. |
 | `is_acyclic()` | Whether the projection contains no directed cycle. |
+| `condensation_projection()` | Payload-free CSR view of the condensation DAG, represented by each component's smallest node id. |
 
 Members within a component are sorted by node id. A component with two or more
 nodes is cyclic; a singleton is cyclic only if it has a self-loop. The

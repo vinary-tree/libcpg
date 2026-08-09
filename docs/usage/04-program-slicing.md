@@ -175,4 +175,3 @@ The def-use edge produced by the DFG is re-projected by `PdgBuilder` as a `DataD
 ## References
 
 1. Weiser, M. (1984). *Program Slicing.* IEEE Transactions on Software Engineering SE-10(4). DOI: [10.1109/TSE.1984.5010248](https://doi.org/10.1109/TSE.1984.5010248) (originally ICSE '81).
-</content>

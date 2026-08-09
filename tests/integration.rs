@@ -109,6 +109,114 @@ mod rust_pipeline {
 }
 
 #[cfg(feature = "lang-rust")]
+mod graph_projections {
+    use std::collections::BTreeSet;
+
+    use libcpg::{
+        call_graph_projection, cfg_projection, dfg_projection, module_graph_projection,
+        pdg_projection, CodePropertyGraph, CpgBuilder, CpgEdgeKind, CpgNode, CpgNodeKind,
+        GraphProjection, Language, NodeId, PdgBuilder, SourceRange, TreeSitterCpgBuilder,
+    };
+
+    const SRC: &str = r#"
+        fn callee(x: i32) -> i32 { x + 1 }
+        fn caller(flag: bool) -> i32 {
+            let value = callee(1);
+            if flag { value } else { 0 }
+        }
+    "#;
+
+    fn projected_edges(projection: &GraphProjection) -> BTreeSet<(NodeId, NodeId)> {
+        projection
+            .edges()
+            .map(|(source, target, _)| (projection.node_id(source), projection.node_id(target)))
+            .collect()
+    }
+
+    fn direct_edges(
+        cpg: &CodePropertyGraph,
+        projection: &GraphProjection,
+        include: impl Fn(&CpgEdgeKind) -> bool,
+    ) -> BTreeSet<(NodeId, NodeId)> {
+        cpg.edges()
+            .filter(|edge| {
+                include(&edge.kind)
+                    && projection.dense_index(edge.source).is_some()
+                    && projection.dense_index(edge.target).is_some()
+            })
+            .map(|edge| (edge.source, edge.target))
+            .collect()
+    }
+
+    #[test]
+    fn parsed_corpus_projections_equal_direct_overlay_traversal() {
+        let mut cpg = TreeSitterCpgBuilder::new()
+            .build(SRC, Language::Rust)
+            .expect("build parsed Rust corpus");
+        let caller = cpg
+            .functions()
+            .find(|node| node.name() == Some("caller"))
+            .map(|node| node.id)
+            .expect("caller function");
+        let callee = cpg
+            .functions()
+            .find(|node| node.name() == Some("callee"))
+            .map(|node| node.id)
+            .expect("callee function");
+        let call = cpg
+            .calls()
+            .find(|node| cpg.ast_ancestors(node.id).contains(&caller))
+            .map(|node| node.id)
+            .expect("call expression in caller");
+        cpg.connect(call, callee, CpgEdgeKind::StaticCall);
+
+        let root = cpg
+            .nodes()
+            .find(|node| matches!(node.kind, CpgNodeKind::Root))
+            .map(|node| node.id)
+            .expect("parsed root");
+        let module = cpg.add_node(CpgNode::new(
+            NodeId::new(0),
+            CpgNodeKind::Module {
+                name: "dependency".into(),
+            },
+            SourceRange::default(),
+        ));
+        cpg.connect(root, module, CpgEdgeKind::Imports);
+        PdgBuilder::new().build(&mut cpg, caller);
+
+        let before = (cpg.node_count(), cpg.edge_count());
+        let cfg = cfg_projection(&cpg, caller).expect("caller CFG");
+        let dfg = dfg_projection(&cpg, None);
+        let pdg = pdg_projection(&cpg, caller).expect("caller PDG");
+        let modules = module_graph_projection(&cpg);
+        let calls = call_graph_projection(&cpg);
+
+        assert_eq!(
+            projected_edges(&cfg),
+            direct_edges(&cpg, &cfg, |kind| {
+                kind.is_cfg()
+                    && !matches!(kind, CpgEdgeKind::ControlFlow(libcpg::CfgEdgeKind::Call))
+            })
+        );
+        assert_eq!(
+            projected_edges(&dfg),
+            direct_edges(&cpg, &dfg, CpgEdgeKind::is_dfg)
+        );
+        assert_eq!(
+            projected_edges(&pdg),
+            direct_edges(&cpg, &pdg, CpgEdgeKind::is_pdg)
+        );
+        assert_eq!(
+            projected_edges(&modules),
+            direct_edges(&cpg, &modules, |kind| matches!(kind, CpgEdgeKind::Imports))
+        );
+        assert_eq!(projected_edges(&calls), BTreeSet::from([(caller, callee)]));
+        assert_eq!((cpg.node_count(), cpg.edge_count()), before);
+    }
+}
+
+#[cfg(feature = "lang-rust")]
 mod matching {
     use libcpg::pattern::{GraphSimilarity, SimilarityMetric, SubgraphMatcher, Vf2Matcher};
     use libcpg::{CpgBuilder, Language, TreeSitterCpgBuilder};

@@ -311,4 +311,3 @@ across threads and keeps every closure a pure read, which is exactly what the
   dependence edges and bounded slicing for precise reachability.
 - [`api/graph-reference.md`](../../api/graph-reference.md) — the complete
   method-by-method reference.
-</content>

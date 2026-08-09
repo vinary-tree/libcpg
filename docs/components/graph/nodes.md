@@ -396,4 +396,3 @@ if let Some(v) = node.properties.get(&PropertyKey::Name) {
 - [Overview](overview.md) — the CPG at a glance.
 - [`api/graph-reference.md`](../../api/graph-reference.md) — the exhaustive
   node-type reference.
-</content>

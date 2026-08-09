@@ -3,7 +3,7 @@
 The `graph` module holds the data structures at the heart of `libcpg`: the
 [Code Property Graph](../../GLOSSARY.md#code-property-graph-cpg) (CPG) and the
 node, edge, and identifier types it is built from. Everything else in the crate
-— the builders, SCC analysis, the pattern matchers, the slicer, the GNN — reads
+— the builders, graph projections, SCC analysis, the pattern matchers, the slicer, the GNN — reads
 from or writes to this one structure. This page explains what a CPG is, why `libcpg` merges
 several program views into a single graph, how that graph is stored, and how you
 create and inspect one.
@@ -266,6 +266,8 @@ So the safe pattern is: build (single-threaded, `&mut`), then analyse
   `DfgEdgeKind` (13) taxonomies, with classifier helpers.
 - [Traversal](traversal.md) — the navigation accessors and their exact return
   types, plus a worked taint/reachability walk.
+- [Deterministic projections](projections.md) — payload-free forward/reverse
+  CSR views used by exact analyses.
 - [`api/graph-reference.md`](../../api/graph-reference.md) — the precise,
   method-by-method API reference for `CodePropertyGraph`.
 - [`theory/01-code-property-graphs.md`](../../theory/01-code-property-graphs.md)
@@ -274,5 +276,3 @@ So the safe pattern is: build (single-threaded, `&mut`), then analyse
 ## References
 
 1. Yamaguchi, F., Golde, N., Arp, D., Rieck, K. (2014). *Modeling and Discovering Vulnerabilities with Code Property Graphs.* 2014 IEEE Symposium on Security and Privacy. DOI: [10.1109/SP.2014.44](https://doi.org/10.1109/SP.2014.44)
-</content>
-</invoke>

@@ -219,4 +219,3 @@ The `$x` classifier (`classify_metta_var`) walks the parent chain to distinguish
 ## References
 
 1. Yamaguchi, F., Golde, N., Arp, D., Rieck, K. (2014). *Modeling and Discovering Vulnerabilities with Code Property Graphs.* 2014 IEEE Symposium on Security and Privacy. DOI: [10.1109/SP.2014.44](https://doi.org/10.1109/SP.2014.44)
-</content>

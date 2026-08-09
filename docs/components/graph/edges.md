@@ -281,4 +281,3 @@ return borrowed `&CpgEdge`, so filtering is allocation-free until you `collect`.
   produced.
 - [`api/graph-reference.md`](../../api/graph-reference.md) — the exhaustive
   edge-kind reference.
-</content>

@@ -242,4 +242,3 @@ Both extractors also have `with_config` constructors for finer control (fall-thr
 ## References
 
 This guide relies on no external literature of its own; the concepts it uses (the CPG, its overlays, and Mode B) are cited where they are defined — see the [glossary references](../GLOSSARY.md#references) and [ADR-0002](../design/0002-mode-b-build-from-tree.md).
-</content>

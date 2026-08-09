@@ -6,6 +6,11 @@ cd "$repository_root"
 
 failed=0
 
+if rg -n -F -e '</content>' -e '</invoke>' docs --glob '*.md'; then
+    echo 'documentation contains leaked tool-protocol markup' >&2
+    failed=1
+fi
+
 while IFS= read -r source; do
     rendered="${source%.*}.svg"
     if [[ ! -s "$rendered" ]]; then

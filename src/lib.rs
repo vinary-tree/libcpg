@@ -8,6 +8,7 @@
 //!
 //! - **Graph Construction**: Build CPGs from source code via tree-sitter ASTs
 //! - **SCC Analysis**: Decompose per-function CFGs and resolved call graphs
+//! - **Graph Projections**: Build deterministic forward/reverse CSR views
 //! - **Pattern Detection**: Detect design patterns using subgraph isomorphism (VF2/VF3)
 //! - **Algorithm Analysis**: Extract algorithm signatures and estimate complexity
 //! - **GNN Support**: Graph neural network message passing for semantic embeddings
@@ -65,8 +66,10 @@ pub use graph::{
 };
 
 pub use analysis::{
-    call_graph_sccs, control_flow_sccs, SccAnalysisError, SccComponent, SccCondensationEdge,
-    SccDecomposition, SccProjection,
+    call_graph_projection, call_graph_sccs, cfg_projection, control_flow_sccs, dfg_projection,
+    module_graph_projection, pdg_projection, projection_of, AnalysisError, FunctionCfgView,
+    GraphProjection, ProjectionError, ProjectionKind, SccAnalysisError, SccComponent,
+    SccCondensationEdge, SccDecomposition, SccProjection, UndirectedProjection,
 };
 
 pub use builder::{
@@ -86,6 +89,10 @@ pub type Result<T> = std::result::Result<T, Error>;
 /// Error types for libcpg operations.
 #[derive(Debug, thiserror::Error)]
 pub enum Error {
+    /// Error reported by an exact structural analysis.
+    #[error(transparent)]
+    Analysis(#[from] analysis::AnalysisError),
+
     /// Error during graph construction.
     #[error("Graph construction error: {0}")]
     Construction(String),

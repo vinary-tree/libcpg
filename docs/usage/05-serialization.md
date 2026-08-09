@@ -149,4 +149,3 @@ So a serialised embedding preserves its `node_id` and `dim` (and, for a `Subgrap
 ## References
 
 This guide relies on no external literature; serialisation here is standard serde usage. See the [glossary references](../GLOSSARY.md#references) for the works underpinning the graph model it serialises.
-</content>

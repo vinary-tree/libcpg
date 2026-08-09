@@ -102,8 +102,8 @@ Comprehensive documentation lives under [`docs/`](docs/README.md):
 - **[Theory](docs/theory/00-overview.md)** — the CPG model, control/data flow, program dependence & slicing, subgraph isomorphism, similarity, pattern detection, complexity, and GNNs, with proofs, math, and citations.
 - **[Architecture](docs/architecture/overview.md)** — module map, the graph data model, construction & analysis pipelines, and language frontends.
 - **[Design decisions](docs/design/00-overview.md)** — ADR-style records (unified overlay, Mode B, AST-ordered reaching defs, relaxed VF2, feature taxonomy).
-- **[API reference](docs/api/graph-reference.md)** — graph/SCC, builder, and pattern/algorithm/GNN reference.
-- **[Components](docs/README.md#components)** — graph and SCC analysis, builder, patterns, algorithms, and GNN internals.
+- **[API reference](docs/api/graph-reference.md)** — graph/projection/SCC, builder, and pattern/algorithm/GNN reference.
+- **[Components](docs/README.md#components)** — graph projections and SCC analysis, builder, patterns, algorithms, and GNN internals.
 - **[Usage guides](docs/usage/00-getting-started.md)** — task-oriented how-tos.
 - **[Engineering](docs/engineering/00-overview.md)** · **[Scientific validation](docs/scientific/00-overview.md)** · **[Security](docs/security/00-threat-model.md)**.
 - **[Glossary](docs/GLOSSARY.md)** and the **[diagram catalog](docs/diagrams/README.md)**.

@@ -200,6 +200,28 @@ where $`E`$ is the number of CFG edges and $`N`$ the number of CFG
 nodes (`cfg_nodes().count()`); when there are no CFG nodes it returns $`1`$.
 The implementation uses a saturating subtraction, so it never underflows.
 
+### Deterministic graph projections
+
+`GraphProjection` is the feature-free, payload-free compressed-sparse-row view
+used by exact graph analyses. These constructors are exported from the crate
+root and `libcpg::analysis`:
+
+| Function | Signature | Projection |
+|---|---|---|
+| `call_graph_projection` | `fn(&CodePropertyGraph) -> GraphProjection` | resolved calls between all functions |
+| `module_graph_projection` | `fn(&CodePropertyGraph) -> GraphProjection` | `Imports` between `Root` / `Module` nodes |
+| `cfg_projection` | `fn(&CodePropertyGraph, NodeId) -> Result<GraphProjection, ProjectionError>` | one intraprocedural CFG |
+| `dfg_projection` | `fn(&CodePropertyGraph, Option<NodeId>) -> GraphProjection` | global or AST-scoped DFG |
+| `pdg_projection` | `fn(&CodePropertyGraph, NodeId) -> Result<GraphProjection, ProjectionError>` | one function's PDG |
+| `projection_of` | generic node / edge / weight predicates | caller-selected relation |
+
+`GraphProjection::from_edges` is the external-graph adapter. Accessors include
+`dense_index`, `node_id`, `successors`, `predecessors`, `successor_weights`,
+`edges`, `transpose`, and `undirected`. Parallel edges are merged by summing
+their weights; sorted nodes and adjacency make the result independent of input
+enumeration order. See the complete [projection component guide](../components/graph/projections.md)
+for field invariants, scope boundaries, complexity, pseudocode, and examples.
+
 ### Strongly-connected components
 
 These feature-free functions compute exact SCC partitions over two graph
@@ -661,6 +683,7 @@ languages **`Rholang`** and **`MeTTa`**, plus `Unknown` (the `Default`).
 pub type Result<T> = std::result::Result<T, Error>;
 
 pub enum Error {
+    Analysis(#[from] analysis::AnalysisError),
     Construction(String),
     PatternMatch(String),
     #[cfg(feature = "gnn")] Gnn(String),
@@ -679,6 +702,7 @@ propagate I/O errors from, e.g., `build_file`.
 
 | Variant | Raised when |
 |---------|-------------|
+| `Analysis(AnalysisError)` | An exact analysis rejects its node, projection, iteration limit, or resource budget. |
 | `Construction(String)` | Parse failure, oversized input, or malformed graph construction. |
 | `PatternMatch(String)` | A pattern-matching operation failed. |
 | `Gnn(String)` *(gnn)* | A GNN operation failed. |
@@ -738,7 +762,8 @@ and `add_edge_with_id` rather than `add_node`/`add_edge`.
   [data flow](../architecture/data-flow.md) — the design behind the model.
 - Component guides: [graph overview](../components/graph/overview.md),
   [nodes](../components/graph/nodes.md), [edges](../components/graph/edges.md),
-  [traversal](../components/graph/traversal.md), and
+  [traversal](../components/graph/traversal.md),
+  [deterministic projections](../components/graph/projections.md), and
   [SCC analysis](../components/graph/scc-analysis.md).
 
 ---

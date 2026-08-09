@@ -92,7 +92,7 @@ let slice = backward_slice(&cpg, func, 256);         // bounded backward slice
 ### Components
 
 #### Graph core
-[Overview](components/graph/overview.md) · [Nodes](components/graph/nodes.md) · [Edges](components/graph/edges.md) · [Traversal](components/graph/traversal.md) · [Strongly-connected components](components/graph/scc-analysis.md)
+[Overview](components/graph/overview.md) · [Nodes](components/graph/nodes.md) · [Edges](components/graph/edges.md) · [Traversal](components/graph/traversal.md) · [Deterministic projections](components/graph/projections.md) · [Strongly-connected components](components/graph/scc-analysis.md)
 
 #### Builder
 [Overview](components/builder/overview.md) · [CFG extraction](components/builder/cfg.md) · [DFG extraction](components/builder/dfg.md) · [PDG & slicing](components/builder/pdg-and-slicing.md) · [Node mapper](components/builder/node-mapper.md)

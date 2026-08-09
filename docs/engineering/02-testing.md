@@ -235,10 +235,10 @@ cargo +nightly cov-branch           # branch coverage needs nightly
 
 | Metric | Coverage | Lowest file |
 | --- | ---: | --- |
-| Lines | **97.65 %** | 91.67 % (`language.rs`) |
-| Regions | **97.56 %** | — |
-| Functions | **97.81 %** | — |
-| Branches | **81.56 %** | see below |
+| Lines | **97.71 %** | 91.67 % (`language.rs`) |
+| Regions | **97.63 %** | — |
+| Functions | **97.92 %** | — |
+| Branches | **82.18 %** | see below |
 
 Every source file is above 90 % line coverage; eleven are at 100 %.
 

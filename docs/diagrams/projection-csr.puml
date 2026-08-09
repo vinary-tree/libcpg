@@ -1,0 +1,35 @@
+@startuml
+!include _libcpg-theme.iuml
+title GraphProjection — deterministic read-only CSR substrate
+
+rectangle "CodePropertyGraph\nshared NodeId space" as CPG #DBE4FF
+rectangle "node + edge filters\nover one overlay" as FILTER #FFE8CC
+rectangle "canonical normalization\nsort nodes and edges\nmerge parallel weights" as NORMALIZE #FFF3BF
+database "forward CSR\noffsets + targets\n+ optional weights" as FORWARD #D3F9D8
+database "reverse CSR\nrev_offsets + rev_targets" as REVERSE #C3FAE8
+rectangle "exact analyses\ndominance · centrality\ncommunities · paths" as ANALYSES #E5DBFF
+
+CPG --> FILTER : immutable traversal
+FILTER --> NORMALIZE : NodeId endpoint triples
+NORMALIZE --> FORWARD : ascending source, target
+NORMALIZE --> REVERSE : transpose then sort
+FORWARD --> ANALYSES : successors(d)
+REVERSE --> ANALYSES : predecessors(d)
+ANALYSES ..> CPG : results echo stable NodeId
+
+note bottom of NORMALIZE
+  Duplicate (source, target) edges are merged.
+  Their weights are sorted before summation,
+  making input enumeration order irrelevant.
+end note
+
+legend right
+  |= colour |= role |
+  |<#DBE4FF>| source CPG |
+  |<#FFE8CC>| overlay selection |
+  |<#FFF3BF>| deterministic normalization |
+  |<#D3F9D8>| forward adjacency |
+  |<#C3FAE8>| reverse adjacency |
+  |<#E5DBFF>| analysis consumers |
+endlegend
+@enduml

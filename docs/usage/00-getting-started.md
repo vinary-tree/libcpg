@@ -218,5 +218,3 @@ For the conceptual foundations, start at the [theory overview](../theory/00-over
 ## References
 
 1. Yamaguchi, F., Golde, N., Arp, D., Rieck, K. (2014). *Modeling and Discovering Vulnerabilities with Code Property Graphs.* 2014 IEEE Symposium on Security and Privacy. DOI: [10.1109/SP.2014.44](https://doi.org/10.1109/SP.2014.44)
-</content>
-</invoke>
