@@ -273,6 +273,9 @@ So the safe pattern is: build (single-threaded, `&mut`), then analyse
   dominators, frontiers, constant-time ancestry, and PDG control dependence.
 - [Strongly-connected components](scc-analysis.md) — exact CFG loops and
   call-graph recursion clusters.
+- [Natural loops and nesting](loop-analysis.md) — dominator-qualified headers,
+  shared latches, conservative irreducible regions, strict nesting, and loop
+  exits.
 - [Evidence-bounded call resolution](call-resolution.md) — deterministic
   lexical symbols, confidence tiers, and the conservative boundary between
   recorded evidence and definite call topology.

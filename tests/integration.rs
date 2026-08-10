@@ -104,8 +104,8 @@ mod rust_pipeline {
 
     use libcpg::{
         backward_slice, call_graph_projection, cfg_projection, dominator_tree, forward_slice,
-        post_dominator_tree, CpgBuilder, CpgBuilderConfig, CpgEdgeKind, CpgNodeKind, DfgEdgeKind,
-        Language, LiteralKind, PdgBuilder, TreeSitterCpgBuilder,
+        loop_forest, post_dominator_tree, CpgBuilder, CpgBuilderConfig, CpgEdgeKind, CpgNodeKind,
+        DfgEdgeKind, Language, LiteralKind, PdgBuilder, TreeSitterCpgBuilder,
     };
 
     const SRC: &str = "fn f(x: i32) -> i32 { let y = x + 1; if y > 0 { y } else { 0 } }";
@@ -176,6 +176,38 @@ mod rust_pipeline {
             .map(|edge| (edge.source, edge.target))
             .collect();
         assert_eq!(actual, expected);
+    }
+
+    #[test]
+    fn parsed_nested_loops_produce_a_forest_and_loop_exit_edges() {
+        const LOOPS_SRC: &str = r#"
+            fn loops(mut n: i32) {
+                while n > 0 {
+                    while n > 1 { n -= 2; }
+                    n -= 1;
+                }
+                let done = n;
+            }
+        "#;
+        let cpg = TreeSitterCpgBuilder::new()
+            .build(LOOPS_SRC, Language::Rust)
+            .expect("build nested loops");
+        let function = cpg.functions().next().expect("loops function").id;
+        let forest = loop_forest(&cpg, function).expect("natural-loop forest");
+
+        assert_eq!(forest.loops.len(), 2);
+        assert_eq!(forest.roots.len(), 1);
+        assert_eq!(forest.max_depth(), 2);
+        assert!(forest
+            .loops
+            .iter()
+            .all(|natural_loop| !natural_loop.irreducible));
+        assert!(cpg.edges().any(|edge| {
+            matches!(
+                edge.kind,
+                CpgEdgeKind::ControlFlow(libcpg::CfgEdgeKind::LoopExit)
+            )
+        }));
     }
 
     #[test]

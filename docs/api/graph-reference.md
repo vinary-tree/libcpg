@@ -287,6 +287,26 @@ clusters; singleton SCCs are marked cyclic only when they have a self-loop.
 See the [SCC component guide](../components/graph/scc-analysis.md) for projection
 boundaries, accepted call encodings, complexity, and examples.
 
+### Natural loops and nesting
+
+The feature-free loop API uses the shared reachable function CFG and dominator
+engine:
+
+| Function | Signature | Result |
+|---|---|---|
+| `loop_forest` | `fn loop_forest(&CodePropertyGraph, NodeId) -> Result<LoopForest, AnalysisError>` | Dominator-qualified natural loops, whole-SCC irreducible regions, strict nesting, innermost membership, and exit edges for one function. |
+
+`LoopForest` exposes `loops`, `loop_of_node`, and `roots`, plus
+`innermost`, `max_depth`, and `is_back_edge`. Each `NaturalLoop` records its
+stable `id`, `header`, `entries`, `latches`, `body`, `exits`, `parent`,
+`children`, `depth`, and `irreducible` flag. Each `LoopExitEdge` records
+`source`, `target`, and the original `CfgEdgeKind`. Invalid selectors return the
+same `UnknownNode` / `NotAFunction` variants as post-dominance.
+
+See the [natural-loop component guide](../components/graph/loop-analysis.md)
+for definitions, natural and irreducible pseudocode, builder `LoopExit`
+semantics, nesting invariants, complexity, citations, and validation oracles.
+
 ### Subgraph extraction
 
 | Method | Signature | Notes |

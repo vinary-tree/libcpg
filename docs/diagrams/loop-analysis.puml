@@ -1,0 +1,66 @@
+@startuml
+!include _libcpg-theme.iuml
+title Natural-loop analysis — evidence, regions, and nesting
+
+rectangle "CodePropertyGraph\ntyped CFG overlay" as CPG #F1F3F5
+rectangle "FunctionCfgView\nreachable · intraprocedural · non-Call" as SCOPE #D8F5A2
+rectangle "DominatorTree\nconstant-time dominance" as DOM #C3FAE8
+rectangle "scan CFG edges\n<latex>t \to h</latex>" as SCAN #DBE4FF
+rectangle "dominance decision\n<latex>h\;\operatorname{dom}\;t</latex>?" as BACK #FFF3BF
+rectangle "reverse predecessor closure\nmerge latches by header" as NATURAL #D3F9D8
+rectangle "iterative Tarjan SCC + DFS intervals" as SCC #FFE8CC
+rectangle "irreducibility decision\nnon-dominating retreating edge?" as IRREDUCIBLE #FFD8A8
+rectangle "whole-SCC irreducible region" as REGION #FFC9C9
+rectangle "strict body containment\nsmallest enclosing parent" as NEST #E5DBFF
+rectangle "LoopForest\nloops · membership · roots" as FOREST #D0BFFF
+
+rectangle "CfgExtractor::process_block" as BUILDER #F1F3F5
+rectangle "scope decision\ncontinuation leaves AST loop?" as LEAVES #FFF3BF
+rectangle "Sequential" as SEQUENTIAL #DBE4FF
+rectangle "LoopExit\nsame edge count" as LOOP_EXIT #D3F9D8
+
+CPG --> SCOPE : loop_forest(function)
+SCOPE --> DOM
+SCOPE --> SCAN
+DOM --> BACK
+SCAN --> BACK
+BACK --> NATURAL : yes · natural back edge
+BACK --> SCC : no
+SCC --> IRREDUCIBLE
+IRREDUCIBLE --> REGION : yes · conservative region
+IRREDUCIBLE --> NEST : no cycle evidence
+NATURAL --> NEST
+REGION --> NEST
+NEST --> FOREST
+
+BUILDER --> LEAVES : one fallthrough site
+LEAVES --> LOOP_EXIT : yes
+LEAVES --> SEQUENTIAL : no
+LOOP_EXIT ..> CPG : typed CFG edge
+SEQUENTIAL ..> CPG : typed CFG edge
+
+note bottom of NATURAL
+  Body = header plus the reverse predecessor
+  closure of every dominator-qualified latch.
+end note
+
+note bottom of REGION
+  Irreducible regions are explicit over-approximations;
+  they are never reported as natural back edges.
+end note
+
+legend right
+  |= colour |= role |
+  |<#F1F3F5>| source or builder stage |
+  |<#D8F5A2>| shared function scope |
+  |<#C3FAE8>| dominance evidence |
+  |<#DBE4FF>| deterministic scan / ordinary continuation |
+  |<#FFF3BF>| evidence decision |
+  |<#D3F9D8>| natural-loop / loop-exit result |
+  |<#FFE8CC>| SCC and DFS substrate |
+  |<#FFD8A8>| irreducibility decision |
+  |<#FFC9C9>| conservative irreducible region |
+  |<#E5DBFF>| nesting construction |
+  |<#D0BFFF>| public forest API |
+endlegend
+@enduml

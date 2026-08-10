@@ -80,6 +80,16 @@ recognise iteration, and the branch edges are what
 [control dependence](../GLOSSARY.md#control-dependence) is computed from in
 [Theory 04](04-program-dependence-and-slicing.md).
 
+`LoopBack` is a builder classification; an exact **natural back edge** also
+requires its target to dominate its source. The feature-free
+[`loop_forest`](../components/graph/loop-analysis.md) analysis applies that
+dominance test, computes the reverse predecessor closure of every shared-header
+latch set, and nests the resulting bodies. A non-dominating retreating edge in
+a cyclic strongly-connected component is reported explicitly as irreducible.
+`LoopExit` is emitted by retyping the existing block continuation when it leaves
+an AST loop scope, so the classification changes while $`E`$, $`N`$, and hence
+$`M = E - N + 2`$ do not.
+
 ![Control-flow graph of a small function with edge kinds labelled](../diagrams/cfg-example.svg)
 
 *Figure — the CFG of a small function, each edge annotated with its `CfgEdgeKind`. Source: [`diagrams/cfg-example.dot`](../diagrams/cfg-example.dot).*

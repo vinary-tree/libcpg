@@ -172,7 +172,7 @@ impl CfgExtractor {
                 cpg.connect_unique(
                     exit,
                     child_id,
-                    CpgEdgeKind::ControlFlow(CfgEdgeKind::Sequential),
+                    CpgEdgeKind::ControlFlow(Self::continuation_edge_kind(cpg, exit, child_id)),
                 );
             }
 
@@ -212,6 +212,40 @@ impl CfgExtractor {
             smallvec::smallvec![block_id]
         } else {
             all_exits
+        }
+    }
+
+    /// Classifies the fallthrough from one completed statement to the next.
+    ///
+    /// Loop handlers deliberately return their normal and `break` exits to the
+    /// enclosing block. That block owns the one continuation-emission site, so it
+    /// can retype a formerly sequential edge without adding a second edge. An
+    /// exit leaves a loop when the source is nested in that loop (or is its header)
+    /// and the next statement is not.
+    fn continuation_edge_kind(
+        cpg: &CodePropertyGraph,
+        source: NodeId,
+        target: NodeId,
+    ) -> CfgEdgeKind {
+        let mut target_scope: FxHashSet<NodeId> = cpg.ast_ancestors(target).into_iter().collect();
+        target_scope.insert(target);
+
+        if std::iter::once(source)
+            .chain(cpg.ast_ancestors(source))
+            .filter_map(|node| cpg.node(node).map(|node| (node.id, &node.kind)))
+            .any(|(node, kind)| {
+                let child_count = cpg.ast_children(node).len();
+                let is_well_formed_loop = match kind {
+                    CpgNodeKind::While => child_count >= 2,
+                    CpgNodeKind::For | CpgNodeKind::Loop => child_count >= 1,
+                    _ => false,
+                };
+                is_well_formed_loop && !target_scope.contains(&node)
+            })
+        {
+            CfgEdgeKind::LoopExit
+        } else {
+            CfgEdgeKind::Sequential
         }
     }
 
@@ -338,8 +372,29 @@ impl CfgExtractor {
             return smallvec::smallvec![while_id];
         }
 
-        let condition = children[0];
-        let body = children[1];
+        let Some(body) = children
+            .iter()
+            .rev()
+            .copied()
+            .find(|&child| {
+                matches!(
+                    cpg.node(child).map(|node| &node.kind),
+                    Some(CpgNodeKind::Block { .. })
+                )
+            })
+            .or_else(|| children.last().copied())
+        else {
+            return smallvec::smallvec![while_id];
+        };
+        let Some(condition) = children
+            .iter()
+            .copied()
+            .filter(|&child| child != body)
+            .find(|&child| !is_loop_syntax_token(cpg, child))
+            .or_else(|| children.iter().copied().find(|&child| child != body))
+        else {
+            return smallvec::smallvec![while_id];
+        };
 
         // Push loop context for break/continue handling
         ctx.push_loop(while_id, condition);
@@ -445,7 +500,17 @@ impl CfgExtractor {
             return smallvec::smallvec![loop_id];
         }
 
-        let body = children[0];
+        let body = children
+            .iter()
+            .rev()
+            .copied()
+            .find(|&child| {
+                matches!(
+                    cpg.node(child).map(|node| &node.kind),
+                    Some(CpgNodeKind::Block { .. })
+                )
+            })
+            .unwrap_or(children[0]);
 
         ctx.push_loop(loop_id, loop_id);
 
@@ -804,9 +869,19 @@ impl CfgExtractor {
             );
         }
 
-        // Process all children
-        let mut exits = smallvec::smallvec![];
+        // Evaluate every child in AST order. Returning the final child's exits
+        // without chaining the intervening children makes those exits
+        // unreachable; loop handlers would then attach a back edge to an
+        // unreachable expression operand in parser-built graphs.
+        let mut exits: SmallVec<[NodeId; 4]> = smallvec::smallvec![];
         for &child in &children {
+            for &exit in &exits {
+                cpg.connect_unique(
+                    exit,
+                    child,
+                    CpgEdgeKind::ControlFlow(CfgEdgeKind::Sequential),
+                );
+            }
             exits = self.process_node(cpg, child, ctx);
         }
 
@@ -818,6 +893,14 @@ impl Default for CfgExtractor {
     fn default() -> Self {
         Self::new()
     }
+}
+
+fn is_loop_syntax_token(cpg: &CodePropertyGraph, node: NodeId) -> bool {
+    matches!(
+        cpg.node(node).map(|node| &node.kind),
+        Some(CpgNodeKind::Unknown { kind })
+            if matches!(kind.as_ref(), "while" | "until" | "do" | "(" | ")" | ":")
+    )
 }
 
 /// Context for CFG extraction, tracking loop and try structures.
@@ -1215,6 +1298,67 @@ mod tests {
             cpg.stats().cfg_edges,
             "extract must be idempotent (connect_unique)"
         );
+    }
+
+    /// Leaving a `while` retypes the existing fallthrough edge as `LoopExit`.
+    /// The pre-retyping golden counts prove that no edge or node is added and
+    /// that cyclomatic complexity is unchanged.
+    #[test]
+    fn while_fallthrough_is_one_loop_exit_with_stable_graph_counts() {
+        let mut cpg = CodePropertyGraph::new(Language::Rust);
+        let (func, body) = shell(&mut cpg);
+        let while_node = ast_child(&mut cpg, body, CpgNodeKind::While);
+        let guard = ast_child(&mut cpg, while_node, ident("condition"));
+        let loop_body = ast_child(&mut cpg, while_node, block());
+        let _work = ast_child(&mut cpg, loop_body, ident("work"));
+        let after = ast_child(&mut cpg, body, ident("after"));
+
+        CfgExtractor::new().extract_function_cfg(&mut cpg, func);
+
+        assert!(has_cfg(&cpg, guard, after, CfgEdgeKind::LoopExit));
+        assert!(!has_cfg(&cpg, guard, after, CfgEdgeKind::Sequential));
+        assert_eq!(cpg.stats().cfg_edges, 7, "the old edge-count golden");
+        assert_eq!(cpg.cyclomatic_complexity(), 2, "the old complexity golden");
+
+        let blocks = BasicBlockIdentifier::new().identify(&cpg, func);
+        assert!(
+            blocks.contains_key(&after),
+            "a loop exit target is a leader"
+        );
+        assert!(
+            blocks
+                .values()
+                .all(|nodes| !(nodes.contains(&guard) && nodes.contains(&after))),
+            "a LoopExit edge terminates its source basic block"
+        );
+    }
+
+    /// Both header-based `for` fallthrough and explicit `break` fallthrough
+    /// use the same single continuation-emission site.
+    #[test]
+    fn for_and_break_continuations_are_loop_exits() {
+        let mut for_cpg = CodePropertyGraph::new(Language::Rust);
+        let (for_func, for_body) = shell(&mut for_cpg);
+        let for_node = ast_child(&mut for_cpg, for_body, CpgNodeKind::For);
+        let for_loop_body = ast_child(&mut for_cpg, for_node, block());
+        let _work = ast_child(&mut for_cpg, for_loop_body, ident("work"));
+        let after_for = ast_child(&mut for_cpg, for_body, ident("after_for"));
+        CfgExtractor::new().extract_function_cfg(&mut for_cpg, for_func);
+        assert!(has_cfg(
+            &for_cpg,
+            for_node,
+            after_for,
+            CfgEdgeKind::LoopExit
+        ));
+
+        let mut loop_cpg = CodePropertyGraph::new(Language::Rust);
+        let (loop_func, outer_body) = shell(&mut loop_cpg);
+        let loop_node = ast_child(&mut loop_cpg, outer_body, CpgNodeKind::Loop);
+        let loop_body = ast_child(&mut loop_cpg, loop_node, block());
+        let brk = ast_child(&mut loop_cpg, loop_body, CpgNodeKind::Break);
+        let after_loop = ast_child(&mut loop_cpg, outer_body, ident("after_loop"));
+        CfgExtractor::new().extract_function_cfg(&mut loop_cpg, loop_func);
+        assert!(has_cfg(&loop_cpg, brk, after_loop, CfgEdgeKind::LoopExit));
     }
 
     // ================= per-handler control-flow semantics =================
@@ -1832,6 +1976,35 @@ mod proptests {
             let after_first = cpg.stats().cfg_edges;
             CfgExtractor::new().extract(&mut cpg);
             prop_assert_eq!(after_first, cpg.stats().cfg_edges);
+        }
+
+        /// Across bounded nested statement trees, every emitted sequential
+        /// edge remains within its surrounding loops and every `LoopExit`
+        /// crosses at least one loop boundary. Loop-exit targets are basic
+        /// block leaders because `CfgEdgeKind::is_loop` classifies the edge.
+        #[test]
+        fn prop_loop_exit_classification_matches_ast_scope(mut cpg in arb_well_formed_cpg()) {
+            CfgExtractor::new().extract(&mut cpg);
+            let function = cpg.functions().next().expect("generated function").id;
+            let blocks = BasicBlockIdentifier::new().identify(&cpg, function);
+
+            for edge in cpg.edges() {
+                let CpgEdgeKind::ControlFlow(kind) = &edge.kind else {
+                    continue;
+                };
+                let expected = CfgExtractor::continuation_edge_kind(
+                    &cpg,
+                    edge.source,
+                    edge.target,
+                );
+                if *kind == CfgEdgeKind::Sequential {
+                    prop_assert_ne!(expected, CfgEdgeKind::LoopExit);
+                }
+                if *kind == CfgEdgeKind::LoopExit {
+                    prop_assert_eq!(expected, CfgEdgeKind::LoopExit);
+                    prop_assert!(blocks.contains_key(&edge.target));
+                }
+            }
         }
     }
 }

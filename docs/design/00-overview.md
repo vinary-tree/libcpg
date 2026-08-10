@@ -50,13 +50,16 @@ alternatives is folklore, and a decision without its costs is marketing.
 | [0004 — Relaxed VF2 detection](0004-relaxed-vf2-detection.md) | Detect Gang-of-Four patterns with a *relaxed* (category-level) VF2 matcher plus a completeness-scaled confidence, not strict isomorphism or pure ML. | Accepted |
 | [0005 — Feature-flag taxonomy](0005-feature-flag-taxonomy.md) | `default = []`: every grammar and optional analysis family is opt-in via Cargo features, grouped into `lang-*` sets and an umbrella `full`; core graph analyses remain feature-free. | Accepted |
 | [0006 — Evidence-bounded call resolution](0006-evidence-bounded-call-resolution.md) | Record every call-resolution outcome out of graph, but materialize call topology only when an approved evidence tier identifies one unique target. | Accepted |
+| [0007 — Dominator-based natural-loop forest](0007-dominator-natural-loop-forest.md) | Qualify natural back edges with dominance, expose irreducible SCC regions explicitly, nest by strict body containment, and retype loop-leaving continuations as `LoopExit`. | Accepted |
 
-These six are not independent. ADR-0001 fixes the substrate that all analyses
+These seven are not independent. ADR-0001 fixes the substrate that all analyses
 write onto; ADR-0002 and ADR-0005 together explain how a language reaches that
 substrate and what you must switch on to get there; ADR-0003 and ADR-0004 are
 two analyses *over* the substrate (one always-on, one feature-gated) that each
 chose a pragmatic algorithm over a textbook-maximal one; ADR-0006 defines when
-parsed call syntax may become interprocedural graph topology. Read 0001 first.
+parsed call syntax may become interprocedural graph topology; ADR-0007 combines
+the shared CFG scope, dominance, and SCC substrate into natural-loop structure.
+Read 0001 first.
 
 ![Module architecture of libcpg, showing the graph core and the analysis modules layered over it](../diagrams/module-architecture.svg)
 
@@ -68,7 +71,7 @@ parsed call syntax may become interprocedural graph topology. Read 0001 first.
   (`0001`…). Numbers are never reused; a reversed decision is marked
   *Superseded* and a new record supersedes it, so history stays legible.
 - **Status lifecycle.** `Proposed → Accepted → (Superseded by NNNN | Deprecated)`.
-  All six current records are **Accepted** and reflect the shipped `v0.1.1`
+  All seven current records are **Accepted** and reflect the shipped `v0.1.1`
   code.
 - **Grounding.** Every claim here is traceable to source: the
   [`Cargo.toml`](../engineering/01-build-and-features.md) feature block, the

@@ -28,6 +28,13 @@ A structural category of algorithm (sorting, searching, graph traversal, dynamic
 
 A [program slice](#program-slicing). The **backward** slice of a node $`s`$ is the set of nodes that can affect $`s`$ (its transitive [PDG](#program-dependence-graph-pdg) predecessors); the **forward** slice is the set of nodes that $`s`$ can affect (its transitive successors). `libcpg` computes them as bounded breadth-first traversals — `backward_slice(&cpg, s, max_nodes)` and `forward_slice(&cpg, s, max_nodes)` — after [`ControlDependence`](#control-dependence) and [`DataDependence`](#data-dependence) edges have been added. The `max_nodes` argument caps the result. Introduced by Weiser [[8]](#references). See [`usage/04-program-slicing.md`](usage/04-program-slicing.md).
 
+### Back edge / Header / Latch
+
+For a control-flow graph with entry $`r`$, an edge $`t \to h`$ is a **natural
+back edge** when $`h`$ dominates $`t`$. The target $`h`$ is the loop **header**
+and the source $`t`$ is a **latch**. Multiple latches may share one header and
+therefore one natural loop. See [Natural loop / Loop forest](#natural-loop--loop-forest).
+
 ### Basic block
 
 A maximal straight-line run of statements with a single entry and single exit — no branches in except at the top, none out except at the bottom. `BasicBlockIdentifier` groups CFG nodes into basic blocks. Basic blocks are the classic unit of control-flow analysis; `libcpg` operates at AST-node granularity but can identify block leaders. See [`components/builder/cfg.md`](components/builder/cfg.md).
@@ -152,6 +159,13 @@ An operation that has the same effect whether applied once or many times. `CfgEx
 
 A **graph isomorphism** is a bijection between two graphs' nodes that preserves edges. **Subgraph isomorphism** asks whether a (small) *pattern* graph is isomorphic to some subgraph of a (large) *target* graph — the core question in pattern detection. It is NP-complete in general; `libcpg` solves it with [VF2](#vf2). See [`theory/05-subgraph-isomorphism-vf2.md`](theory/05-subgraph-isomorphism-vf2.md).
 
+### Irreducible loop region
+
+A cyclic control-flow region with no single dominating header, commonly because
+control enters at multiple nodes. `libcpg` detects non-dominating DFS retreating
+edges and reports the whole cyclic SCC with `NaturalLoop::irreducible = true`,
+making the conservative approximation explicit (Havlak [[17]](#references)).
+
 ### Jaccard similarity
 
 The size of the intersection over the size of the union of two sets:
@@ -187,6 +201,14 @@ A language for the [F1R3FLY.io](#rholang) / Hyperon ecosystem based on rewriting
 ### Mode B / `build_from_tree`
 
 The construction path where the **caller supplies an already-parsed** `tree_sitter::Tree` and `libcpg` builds the CPG from it: `TreeSitterCpgBuilder::build_from_tree(&tree, source, language)`. It needs no `lang-*` feature (the caller owns the grammar), skips the `max_file_size` check, and is the only path for [Rholang](#rholang) and [MeTTa](#metta). "Mode A" is the internal-parse path (`build`). See [`design/0002-mode-b-build-from-tree.md`](design/0002-mode-b-build-from-tree.md).
+
+### Natural loop / Loop forest
+
+A **natural loop** is the [header](#back-edge--header--latch) plus the reverse
+predecessor closure of all its latches. A **loop forest** nests loop bodies by
+strict set containment and records each node's innermost loop. `libcpg` exposes
+`LoopForest`, `NaturalLoop`, and `LoopExitEdge` through feature-free
+`loop_forest`. See [`components/graph/loop-analysis.md`](components/graph/loop-analysis.md).
 
 ### Node kind / Edge kind
 
@@ -293,3 +315,6 @@ used by the complexity analyzer to classify recursive functions (e.g. $`a = b = 
 13. Cormen, T. H., Leiserson, C. E., Rivest, R. L., Stein, C. (2009). *Introduction to Algorithms* (3rd ed.). MIT Press. ISBN 978-0262033848 (no DOI). *(Master Theorem.)*
 14. Aho, A. V., Lam, M. S., Sethi, R., Ullman, J. D. (2006). *Compilers: Principles, Techniques, and Tools* (2nd ed.). Addison-Wesley. ISBN 978-0321486813 (no DOI). *(Reaching definitions, data-flow analysis.)*
 15. Chidamber, S. R., Kemerer, C. F. (1994). *A Metrics Suite for Object Oriented Design.* IEEE Transactions on Software Engineering 20(6). DOI: [10.1109/32.295895](https://doi.org/10.1109/32.295895) *(LCOM/CBO, used by `PatternMetrics`.)*
+16. Aho, A. V., Sethi, R., Ullman, J. D. (1986). *Compilers: Principles, Techniques, and Tools.* Addison-Wesley. ISBN 0-201-10088-6 (no DOI). *(Natural loops.)*
+17. Havlak, P. (1997). *Nesting of Reducible and Irreducible Loops.* ACM TOPLAS 19(4), 557–567. DOI: [10.1145/258005.258029](https://doi.org/10.1145/258005.258029)
+18. Ramalingam, G. (1999). *Identifying Loops in Almost Linear Time.* ACM TOPLAS 21(2), 175–188. DOI: [10.1145/316686.316687](https://doi.org/10.1145/316686.316687)

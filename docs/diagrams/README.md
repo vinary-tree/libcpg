@@ -1,6 +1,6 @@
 # Diagram catalog
 
-Every figure in the `libcpg` documentation is a **committed source** (`.puml` for PlantUML, `.dot` for Graphviz) rendered to a **committed `.svg`** that the Markdown pages embed. Sources are version-controlled so figures are reproducible and reviewable; SVGs are committed so they render on GitHub (which does not render PlantUML/Graphviz inline). This directory holds all 51 figures plus the shared theme.
+Every figure in the `libcpg` documentation is a **committed source** (`.puml` for PlantUML, `.dot` for Graphviz) rendered to a **committed `.svg`** that the Markdown pages embed. Sources are version-controlled so figures are reproducible and reviewable; SVGs are committed so they render on GitHub (which does not render PlantUML/Graphviz inline). This directory holds all 52 figures plus the shared theme.
 
 ## Conventions
 
@@ -51,6 +51,7 @@ Grouped by subject. Each row: the source (its `.svg` sibling is embedded by the 
 | `edge-kind-taxonomy.puml` | mindmap | `CpgEdgeKind` grouped (AST/CFG/DFG/PDG/…) | theory/01, architecture/graph-data-model, api/graph-reference, components/graph/edges |
 | `projection-csr.puml` | component | CPG overlay selection and deterministic forward/reverse CSR construction | components/graph/projections |
 | `dominator-analysis.puml` | component | Shared CHK engine for forward dominance, reversed-CFG post-dominance, and PDG control edges | components/graph/dominator-analysis |
+| `loop-analysis.puml` | activity/component flow | Shared CFG scope and dominance evidence → natural/irreducible regions → strict nesting; builder continuation → `LoopExit` | components/graph/loop-analysis |
 | `call-resolution.puml` | activity | Lexical symbols and syntax evidence crossing the guarded topology boundary | components/graph/call-resolution |
 
 ### Control flow, data flow, dependence

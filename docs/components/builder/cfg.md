@@ -80,7 +80,7 @@ extract_function_cfg(function):
     cpg.add_cfg_entry(function)
     body ← cpg.ast_children(function).last()        # the block
     if body exists:
-        cpg.connect(function, body, ControlFlow(Sequential))
+        cpg.connect_unique(function, body, ControlFlow(Sequential))
         exits ← process_node(body, ctx)             # ctx = fresh CfgContext
         for e in exits: cpg.add_cfg_exit(e)
 ```
@@ -102,7 +102,7 @@ edges and hands its exits back to the caller, which chains them into the next st
 |---------------|---------|---------------|----------------|
 | `Block { .. }` | `process_block` | `Sequential` between consecutive statements | last statement's exits (or the block if empty) |
 | `If` | `process_if` | condition → then `ConditionalTrue`; condition → else `ConditionalFalse` | then-exits + else-exits (or the condition, when there is no `else`) |
-| `While` | `process_while` | condition → body `ConditionalTrue`; body-exits → condition `LoopBack` | the condition (false branch) + break targets |
+| `While` | `process_while` | semantic condition → final block `ConditionalTrue`; body-exits → condition `LoopBack` | the condition (false branch) + break targets |
 | `For` | `process_for` | header → body `ConditionalTrue`; body-exits → header `LoopBack` | the `for` node + break targets |
 | `Loop` | `process_loop` | loop → body `Sequential`; body-exits → loop `LoopBack` | **break targets only** (an infinite loop exits only via `break`) |
 | `Match` | `process_match` | source → each arm `Case` | union of arm-body exits |
@@ -112,7 +112,7 @@ edges and hands its exits back to the caller, which chains them into the next st
 | `Try` | `process_try` | body/catch → finally `Sequential`; (`throw` wires the `Throw` edges) | finally-exits, or body+catch exits |
 | `Throw` | `process_throw` | throw → value `Sequential`; throw → each in-scope catch `Throw` | none |
 | `Call { .. }` | `process_call` *(if `include_call_edges`)* | call → args `Sequential`; call → resolved `target` `Call` | the call node |
-| *anything else* | `process_sequential` | node → first child `Sequential` | last child's exits |
+| *anything else* | `process_sequential` | node → first child, then each child-exit → next child, all `Sequential` | final child's exits |
 
 ### `if` — the shape of a branch
 
@@ -140,7 +140,10 @@ process_if(if_node):
 ### `block` — chaining and terminators
 
 `process_block` connects the block entry to its first statement, then chains each
-statement's exits into the next with `Sequential` edges. A **terminator**
+statement's exits into the next. The edge is ordinarily `Sequential`; it is
+retyped to `LoopExit` when the source belongs to an AST loop scope that does not
+contain the target. This is the extractor's single loop-continuation emission
+site, so retyping does not add an edge or alter cyclomatic complexity. A **terminator**
 (`Return`, `Break`, `Continue`, `Throw`) does not pass control to the following statement:
 the block records its exits and stops threading (subsequent statements are still processed
 for completeness but are unreachable).
@@ -162,6 +165,12 @@ carries this non-local information down the walk as two stacks:
   before processing the try body; `process_throw` reads the innermost frame and wires a
   `Throw` edge from the throw to each catch handler.
 
+Parser frontends may retain keyword and delimiter children. `process_while`
+therefore selects the semantic condition and final block instead of assuming
+that child zero is always the guard; `process_loop` likewise selects its final
+block. The generic sequential handler connects *all* expression children in AST
+order, ensuring that the exit handed to a loop-back edge is reachable.
+
 This is a textbook use of an explicit stack to reconstruct lexical nesting during a single
 pass — the same shape the DFG uses for its reaching environment
 ([`dfg.md`](dfg.md)) and the PDG for its post-dominator walk
@@ -173,7 +182,7 @@ pass — the same shape the DFG uses for its reaching environment
 
 Every control-flow edge is `CpgEdgeKind::ControlFlow(CfgEdgeKind)`. The `CfgEdgeKind`
 enumeration is the full vocabulary of control transitions; the current `CfgExtractor`
-emits nine of the fourteen, and the rest are reserved for richer producers or downstream
+emits ten of the fourteen, and the rest are reserved for richer producers or downstream
 tools. Being explicit about which are emitted keeps the documentation honest.
 
 | Variant | Meaning | Emitted by `CfgExtractor`? |
@@ -182,7 +191,7 @@ tools. Being explicit about which are emitted keeps the documentation honest.
 | `ConditionalTrue` | Branch taken when the condition holds | ✓ |
 | `ConditionalFalse` | Branch taken when the condition fails | ✓ |
 | `LoopBack` | Back edge from a loop body to its header | ✓ |
-| `LoopExit` | Edge leaving a loop | — (loop exit is modelled by returning the guard as an exit) |
+| `LoopExit` | Continuation from a loop guard/header or `break` to a node outside that loop | ✓ |
 | `Break` | `break` to a loop header | ✓ |
 | `Continue` | `continue` to a loop's continue target | ✓ |
 | `Return` | Return transfer | — (`return` wires its value with `Sequential`; the node is marked a CFG exit) |
@@ -290,13 +299,12 @@ relation to test-path counts live in
 
 ## Re-running the extractor
 
-`extract` is meant to run **once** per build, as construction phase 3. The CFG entry/exit
-registries deduplicate (`add_cfg_entry`/`add_cfg_exit` ignore repeats), but the control-flow
-*edges* are emitted via `cpg.connect`, which appends an edge unconditionally; re-running
-`extract` on the same graph would therefore add parallel `ControlFlow` edges. Run it once
-on a freshly built AST (which is what `TreeSitterCpgBuilder` does), or clear the CFG first
-if you must re-extract. (By contrast the [DFG def-use sweep](dfg.md#idempotency) and the
-[PDG builder](pdg-and-slicing.md) deduplicate explicitly and are safe to re-run.)
+`extract` is construction phase 3, and it is also idempotent. CFG entry/exit
+registries deduplicate, while every control-flow emission uses
+`cpg.connect_unique`; re-running extraction therefore leaves edge count and
+edge classification unchanged. This includes loop continuations: the first run
+emits exactly one `LoopExit`, and later runs find that same typed edge rather
+than adding a parallel edge. The DFG and PDG stages are likewise safe to rerun.
 
 ---
 
@@ -307,6 +315,8 @@ if you must re-extract. (By contrast the [DFG def-use sweep](dfg.md#idempotency)
 - [`pdg-and-slicing.md`](pdg-and-slicing.md) — how the CFG's edges and recorded exits feed
   post-dominator and control-dependence computation.
 - [`../graph/edges.md`](../graph/edges.md) — the full `CpgEdgeKind` / `CfgEdgeKind` tables.
+- [`../graph/loop-analysis.md`](../graph/loop-analysis.md) — how dominators,
+  reverse closure, and SCC evidence turn these CFG edges into a nesting forest.
 - [`../../api/builder-reference.md`](../../api/builder-reference.md) — `CfgExtractor`,
   `CfgExtractorConfig`, and `BasicBlockIdentifier` signatures.
 - [`../../theory/02-control-flow-and-complexity.md`](../../theory/02-control-flow-and-complexity.md)

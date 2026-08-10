@@ -285,6 +285,20 @@ fn exercise_every_analysis(cpg: &CodePropertyGraph, func: NodeId) {
     // --- extractors ---
     let mut work = cpg.clone();
     libcpg::CfgExtractor::new().extract(&mut work);
+    let loops = libcpg::loop_forest(&work, func).expect("func remains a function");
+    assert!(loops.max_depth() <= loops.loops.len());
+    for natural_loop in &loops.loops {
+        assert!(
+            natural_loop
+                .body
+                .iter()
+                .all(|node| work.node(*node).is_some()),
+            "loop bodies contain only real nodes"
+        );
+        if let Some(parent) = natural_loop.parent {
+            assert!(natural_loop.body.len() < loops.loops[parent].body.len());
+        }
+    }
     let first_resolution = libcpg::resolve_calls(&mut work, &libcpg::ResolveConfig::default());
     libcpg::DfgExtractor::new().extract(&mut work);
     libcpg::PdgBuilder::new().build(&mut work, func);
@@ -413,6 +427,10 @@ fn an_absent_node_id_is_inert_everywhere() {
     assert_eq!(
         libcpg::control_flow_sccs(&cpg, dangling()),
         Err(libcpg::SccAnalysisError::UnknownNode(dangling()))
+    );
+    assert_eq!(
+        libcpg::loop_forest(&cpg, dangling()),
+        Err(libcpg::AnalysisError::UnknownNode(dangling()))
     );
 
     let mut work = cpg.clone();

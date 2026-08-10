@@ -67,11 +67,12 @@ pub use graph::{
 
 pub use analysis::{
     build_symbol_table, call_graph_projection, call_graph_sccs, cfg_projection, control_flow_sccs,
-    dfg_projection, dominator_tree, module_graph_projection, pdg_projection, post_dominator_tree,
-    projection_of, resolve_calls, AnalysisError, CallGraphResolution, CallResolution, Confidence,
-    DominatorTree, GraphProjection, PostDominatorTree, ProjectionError, ProjectionKind,
-    ResolveConfig, SccAnalysisError, SccComponent, SccCondensationEdge, SccDecomposition,
-    SccProjection, SymbolCandidates, SymbolTable, UndirectedProjection,
+    dfg_projection, dominator_tree, loop_forest, module_graph_projection, pdg_projection,
+    post_dominator_tree, projection_of, resolve_calls, AnalysisError, CallGraphResolution,
+    CallResolution, Confidence, DominatorTree, GraphProjection, LoopExitEdge, LoopForest,
+    NaturalLoop, PostDominatorTree, ProjectionError, ProjectionKind, ResolveConfig,
+    SccAnalysisError, SccComponent, SccCondensationEdge, SccDecomposition, SccProjection,
+    SymbolCandidates, SymbolTable, UndirectedProjection,
 };
 
 pub use builder::{
