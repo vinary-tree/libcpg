@@ -66,7 +66,8 @@ pub fn build_from_tree(
 ```
 
 Its post-parse pipeline is **identical** to `build` — AST construction, then
-config-gated CFG and DFG extraction — with two differences: it skips the
+config-gated CFG, evidence-bounded call-resolution, and DFG extraction — with
+two differences: it skips the
 internal parse (the caller did it) and it skips the `max_file_size` guard (the
 caller already owns and sized the tree; see
 [`../security/01-input-and-resource-hardening.md`](../security/01-input-and-resource-hardening.md)).
@@ -171,9 +172,9 @@ duplicate-symbol hazard cannot arise from libcpg's side.
 - **The duplicate-`tree_sitter_<lang>` link error is designed out.** Empty
   runtime features plus test-only dev-deps plus pgmcp-matched pins mean the
   shared C symbols stay single-version.
-- **One pipeline, two doors.** `build` and `build_from_tree` share the AST → CFG
-  → DFG post-parse pipeline, so the two paths cannot silently diverge — pinned by
-  the equivalence test.
+- **One pipeline, two doors.** `build` and `build_from_tree` share the AST →
+  CFG → optional call-resolution → DFG post-parse pipeline, so the two paths
+  cannot silently diverge — pinned by the equivalence test.
 
 ### Negative
 
@@ -217,7 +218,11 @@ duplicate-symbol hazard cannot arise from libcpg's side.
 
 ![Mode-B sequence: the caller parses with its own grammar and hands the tree to build_from_tree](../diagrams/mode-b-sequence.svg)
 
-*Figure — Mode B: the caller (e.g. pgmcp) parses `source` with its own tree-sitter grammar and passes the resulting `Tree` to `build_from_tree`, which runs the same AST → CFG → DFG pipeline as `build`. Source: [`diagrams/mode-b-sequence.puml`](../diagrams/mode-b-sequence.puml).*
+*Figure — Mode B: the caller (e.g. pgmcp) parses `source` with its own
+tree-sitter grammar and passes the resulting `Tree` to `build_from_tree`,
+which runs the same AST → CFG → optional call-resolution → DFG pipeline as
+`build`. Source:
+[`diagrams/mode-b-sequence.puml`](../diagrams/mode-b-sequence.puml).*
 
 ![The language frontend pipeline: Mode A internal parse versus Mode B caller-supplied tree, both converging on the NodeMapper](../diagrams/language-frontend-pipeline.svg)
 

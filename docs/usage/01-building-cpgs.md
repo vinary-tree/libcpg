@@ -9,16 +9,20 @@ There are two construction **modes**, both provided by `TreeSitterCpgBuilder`:
 
 Both modes run the **same post-parse pipeline**, so a CPG built either way is identical in shape (a property libcpg asserts in its own test suite — see [below](#build--build_from_tree-are-equivalent)).
 
-![The construction pipeline: source is parsed to a tree-sitter tree, converted to AST nodes with AstChild edges, then the CFG and DFG extractors add their overlays.](../diagrams/construction-pipeline.svg)
+![The construction pipeline: source becomes AST nodes, then CFG, optional evidence-bounded call resolution, and DFG stages enrich the same graph.](../diagrams/construction-pipeline.svg)
 
-*Figure — the four-stage construction pipeline shared by both build modes. Source: [`diagrams/construction-pipeline.puml`](../diagrams/construction-pipeline.puml).*
+*Figure — the five-stage construction pipeline shared by both build modes.
+Source: [`diagrams/construction-pipeline.puml`](../diagrams/construction-pipeline.puml).*
 
-The four stages are:
+The five stages are:
 
 1. **Parse** — tree-sitter turns source text into a concrete syntax tree.
 2. **AST construction** — `NodeMapper` maps each tree-sitter node kind to a [`CpgNodeKind`](../components/graph/nodes.md), wiring `AstChild` edges and parent pointers, and seeding a CFG entry for every `Function`.
 3. **CFG extraction** — `CfgExtractor` adds [control-flow](../GLOSSARY.md#control-flow-graph-cfg) edges (config-gated).
-4. **DFG extraction** — `DfgExtractor` runs [AST-ordered reaching definitions](../GLOSSARY.md#ast-ordered-reaching-definitions) and adds [data-flow](../GLOSSARY.md#data-flow-graph-dfg) edges (config-gated).
+4. **Call resolution** — when `resolve_imports` is enabled,
+   `resolve_calls` creates only uniquely supported call targets and records
+   all other evidence out of graph.
+5. **DFG extraction** — `DfgExtractor` runs [AST-ordered reaching definitions](../GLOSSARY.md#ast-ordered-reaching-definitions) and adds [data-flow](../GLOSSARY.md#data-flow-graph-dfg) edges (config-gated).
 
 ---
 
@@ -80,8 +84,9 @@ fn main() -> Result<(), libcpg::Error> {
     let config = CpgBuilderConfig::new()
         .with_source(true)      // retain the source text on the CPG
         .with_cfg(true)         // run the CFG extractor (default: true)
-        .with_dfg(false)        // skip the DFG extractor
-        .with_comments(true);   // keep comment nodes in the AST
+        .with_dfg(true)
+        .with_comments(true)
+        .with_import_resolution(true); // resolve unique calls before DFG
 
     let builder = TreeSitterCpgBuilder::with_config(config);
     let cpg = builder.build("fn main() { /* hi */ }", Language::Rust)?;
@@ -99,7 +104,13 @@ The full set of knobs, with their defaults:
 | `build_dfg` | `with_dfg(bool)` | `true` | Run `DfgExtractor` after CFG |
 | `include_comments` | `with_comments(bool)` | `false` | Emit `Comment` nodes instead of dropping them |
 | `max_file_size` | `with_max_file_size(usize)` | `10 * 1024 * 1024` | Reject larger sources in **`build`** (see note) |
-| `resolve_imports` | `with_import_resolution(bool)` | `false` | Reserved for cross-file reference resolution |
+| `resolve_imports` | `with_import_resolution(bool)` | `false` | Run evidence-bounded call/import resolution after CFG and before DFG |
+
+The historical option name is source-compatible. It does not load external
+packages: an import absent from the current CPG is recorded as `External` and
+creates no graph edge. See the
+[call-resolution guide](../components/graph/call-resolution.md) for the complete
+evidence matrix and direct post-pass API.
 
 **Why skip an overlay?** If you only need syntactic structure (say, to count node kinds), setting `with_cfg(false).with_dfg(false)` builds just the AST and skips the two most expensive stages. If you later change your mind, the extractors are [idempotent](../GLOSSARY.md#idempotent) and can be run by hand — see [Running extractors manually](#running-extractors-manually).
 

@@ -9,9 +9,12 @@ This page traces how information moves through libcpg in two phases:
 
 ## The construction pipeline
 
-![Activity diagram of parse to AST to CFG to DFG construction](../diagrams/construction-pipeline.svg)
+![Activity diagram of parse to AST to CFG to optional call resolution to DFG construction](../diagrams/construction-pipeline.svg)
 
-*Figure — the construction pipeline: parse (Mode A) or accept a caller-supplied tree (Mode B), build the AST, then run the config-gated CFG and DFG passes. Source: [`diagrams/construction-pipeline.puml`](../diagrams/construction-pipeline.puml).*
+*Figure — the construction pipeline: parse (Mode A) or accept a caller-supplied
+tree (Mode B), build the AST, then run config-gated CFG, call-resolution, and
+DFG passes. Source:
+[`diagrams/construction-pipeline.puml`](../diagrams/construction-pipeline.puml).*
 
 Both entry points share one post-parse pipeline. `TreeSitterCpgBuilder::build` parses internally then delegates to `build_from_tree`, so the two paths are byte-for-byte equivalent (a regression test asserts identical `node_count`, `edge_count`, and `language`).
 
@@ -85,7 +88,19 @@ M = E - N + 2
 
 where $`E`$ and $`N`$ are the CFG edge and node counts of a single-entry/single-exit component. `cpg.cyclomatic_complexity()` computes it directly.
 
-### Stage 3 — DFG extraction
+### Stage 3 — evidence-bounded call resolution
+
+When `CpgBuilderConfig::resolve_imports` is `true`, the feature-free
+[`resolve_calls`](../components/graph/call-resolution.md) post-pass builds
+lexical scope symbols and classifies every processed call. Only one uniquely
+supported in-graph target becomes `Call::target` plus labeled
+`Reference`, `StaticCall`/`DynamicCall`, and `CallSite` edges.
+Ambiguous, external, and unresolved outcomes remain out-of-graph evidence
+records. Running this stage before the DFG activates its existing parameter and
+return-value construction without guessing call topology. The option defaults
+to `false`, so prior construction shape is unchanged.
+
+### Stage 4 — DFG extraction
 
 `DfgExtractor` adds [`DataFlow`](../GLOSSARY.md#data-flow-graph-dfg) edges. Its strategy is **[AST-ordered reaching definitions](../GLOSSARY.md#ast-ordered-reaching-definitions)** — a single flow-sensitive sweep over AST nodes in source order — **not** [SSA](../GLOSSARY.md#static-single-assignment-ssa) and **not** a classical CFG fixed point. (Two earlier CFG-based approaches remain in the source under `#[cfg(any())]`, never compiled, as an executable record of why they failed: nested-expression identifier uses are not CFG nodes, so a CFG-keyed reaching set never reached them.)
 

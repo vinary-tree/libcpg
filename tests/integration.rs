@@ -103,8 +103,9 @@ mod rust_pipeline {
     use std::collections::BTreeSet;
 
     use libcpg::{
-        backward_slice, cfg_projection, dominator_tree, forward_slice, post_dominator_tree,
-        CpgBuilder, CpgEdgeKind, Language, PdgBuilder, TreeSitterCpgBuilder,
+        backward_slice, call_graph_projection, cfg_projection, dominator_tree, forward_slice,
+        post_dominator_tree, CpgBuilder, CpgBuilderConfig, CpgEdgeKind, CpgNodeKind, DfgEdgeKind,
+        Language, LiteralKind, PdgBuilder, TreeSitterCpgBuilder,
     };
 
     const SRC: &str = "fn f(x: i32) -> i32 { let y = x + 1; if y > 0 { y } else { 0 } }";
@@ -175,6 +176,99 @@ mod rust_pipeline {
             .map(|edge| (edge.source, edge.target))
             .collect();
         assert_eq!(actual, expected);
+    }
+
+    #[test]
+    fn opt_in_resolution_materializes_calls_before_interprocedural_dfg() {
+        const RESOLVE_SRC: &str = r#"
+            fn callee(x: i32) -> i32 { return x; }
+            fn caller() -> i32 { callee(41) }
+        "#;
+        let unresolved = TreeSitterCpgBuilder::new()
+            .build(RESOLVE_SRC, Language::Rust)
+            .expect("default unresolved CPG");
+        let unresolved_call = unresolved.calls().next().expect("parsed call").id;
+        assert!(matches!(
+            unresolved.node(unresolved_call).map(|node| &node.kind),
+            Some(CpgNodeKind::Call { target: None, .. })
+        ));
+
+        let cpg = TreeSitterCpgBuilder::with_config(
+            CpgBuilderConfig::default().with_import_resolution(true),
+        )
+        .build(RESOLVE_SRC, Language::Rust)
+        .expect("resolved CPG");
+        let callee = cpg
+            .functions()
+            .find(|node| node.name() == Some("callee"))
+            .map(|node| node.id)
+            .expect("callee function");
+        let caller = cpg
+            .functions()
+            .find(|node| node.name() == Some("caller"))
+            .map(|node| node.id)
+            .expect("caller function");
+        let call = cpg
+            .calls()
+            .find(|node| cpg.ast_ancestors(node.id).contains(&caller))
+            .map(|node| node.id)
+            .expect("caller call site");
+        assert!(matches!(
+            cpg.node(call).map(|node| &node.kind),
+            Some(CpgNodeKind::Call {
+                target: Some(target),
+                ..
+            }) if *target == callee
+        ));
+        assert_eq!(cpg.callees(call), vec![callee]);
+        assert_eq!(cpg.callers(callee), vec![call]);
+        let call_graph = call_graph_projection(&cpg);
+        assert_eq!(
+            call_graph
+                .edges()
+                .map(|(source, target, _)| {
+                    (call_graph.node_id(source), call_graph.node_id(target))
+                })
+                .collect::<BTreeSet<_>>(),
+            BTreeSet::from([(caller, callee)])
+        );
+        assert!(cpg.edges_between(call, callee).into_iter().all(|edge| {
+            !matches!(
+                edge.kind,
+                CpgEdgeKind::Reference
+                    | CpgEdgeKind::StaticCall
+                    | CpgEdgeKind::DynamicCall
+                    | CpgEdgeKind::CallSite
+            ) || edge.label.as_deref() == Some("exact_in_file")
+        }));
+
+        let parameter = cpg
+            .nodes()
+            .find(|node| {
+                matches!(&node.kind, CpgNodeKind::Parameter { name, .. } if name.as_ref() == "x")
+                    && cpg.ast_ancestors(node.id).contains(&callee)
+            })
+            .map(|node| node.id)
+            .expect("callee parameter");
+        let parameter_sources: Vec<_> = cpg
+            .edges()
+            .filter(|edge| {
+                edge.target == parameter
+                    && matches!(edge.kind, CpgEdgeKind::DataFlow(DfgEdgeKind::Parameter))
+            })
+            .map(|edge| edge.source)
+            .collect();
+        assert_eq!(parameter_sources.len(), 1);
+        assert!(matches!(
+            cpg.node(parameter_sources[0]).map(|node| &node.kind),
+            Some(CpgNodeKind::Literal {
+                kind: LiteralKind::Integer(41)
+            })
+        ));
+        assert!(cpg.edges().any(|edge| {
+            edge.target == call
+                && matches!(edge.kind, CpgEdgeKind::DataFlow(DfgEdgeKind::ReturnValue))
+        }));
     }
 }
 

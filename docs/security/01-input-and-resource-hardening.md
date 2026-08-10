@@ -9,8 +9,8 @@ timeout).
 
 ![Resource bounds that keep libcpg finite on large or untrusted input](../diagrams/resource-bounds.svg)
 
-*Figure — the four bound families: construction (`max_file_size`), VF2 matching
-(`max_matches`, strict toggles), DFG (`max_iterations`), and slicing (`max_nodes`).
+*Figure — finite-work safeguards for construction, call resolution, VF2
+matching, the structural DFG sweep, and slicing.
 Source: [`diagrams/resource-bounds.puml`](../diagrams/resource-bounds.puml).*
 
 ## The bounds at a glance
@@ -18,9 +18,12 @@ Source: [`diagrams/resource-bounds.puml`](../diagrams/resource-bounds.puml).*
 | Bound | Default | Enforced in | Effect when exceeded |
 | --- | --- | --- | --- |
 | `CpgBuilderConfig::max_file_size` | 10 MB | `build` only (not `build_from_tree`) | `build` returns `Error::Construction` before parsing |
+| `ResolveConfig::max_scope_depth` | `128` | scope and callee-name walks | traversal stops at the configured depth or the first repeated node |
+| `ResolveConfig::max_candidates_per_name` | `64` | lexical/global symbol buckets | full ambiguity count is preserved, but excess candidate IDs are not retained |
+| `ResolveConfig::max_calls` | `100_000` | sorted call-node enumeration | higher `NodeId` calls remain untouched after the cap |
 | `Vf2Matcher::max_matches` | `0` (unlimited) | `pattern::Vf2Matcher` | search short-circuits once the match count is reached |
 | `Vf2Matcher` strict toggles | `strict_kinds`/`strict_edges` off | `pattern::Vf2Matcher` | tighter feasibility test prunes branches earlier |
-| `DfgExtractorConfig::max_iterations` | `100` | `DfgExtractor` | reaching-definitions sweep stops iterating (guaranteed termination) |
+| DFG structural guards | always on | `DfgExtractor` | loop bodies receive exactly two passes; an AST path set cuts malformed cycles |
 | `backward_slice` / `forward_slice` `max_nodes` | *(caller-supplied argument)* | crate-root slice fns | BFS returns as soon as the slice reaches `max_nodes` |
 | AST traversal guards | *(always on)* | `ast_descendants` / `ast_ancestors` / `ast_depth`, SCC scope discovery, `CfgExtractor`, DFG reaching-defs | a cyclic `AstChild` graph terminates instead of looping or overflowing the stack |
 
@@ -58,6 +61,38 @@ the tree. If your Mode-B input is untrusted, you must bound it yourself before
 parsing (next section). This is a deliberate design property, not an oversight; see
 [`design/0002-mode-b-build-from-tree.md`](../design/0002-mode-b-build-from-tree.md).
 
+## Call resolution: scope, candidate, and call caps
+
+[`resolve_calls`](../components/graph/call-resolution.md) processes calls in
+ascending `NodeId` order and exposes three independent work/evidence bounds.
+The defaults are suitable for ordinary source; applications analyzing hostile
+hand-built or deserialized CPGs can tighten them:
+
+```rust
+use libcpg::{
+    resolve_calls, CallGraphResolution, CodePropertyGraph, ResolveConfig,
+};
+
+fn resolve_bounded(cpg: &mut CodePropertyGraph) -> CallGraphResolution {
+    let config = ResolveConfig {
+        max_scope_depth: 32,
+        max_candidates_per_name: 16,
+        max_calls: 10_000,
+        resolve_methods: false,
+    };
+    resolve_calls(cpg, &config)
+}
+```
+
+`max_scope_depth` bounds lexical parent walks and callee-subtree depth; visited
+sets stop parent/child cycles earlier. `max_candidates_per_name` limits only
+retained identifiers: the resolver preserves the full distinct count, so
+truncation cannot turn an ambiguous name into a unique one. `max_calls` is a
+hard prefix budget over deterministically sorted calls. Calls beyond it are not
+recorded or mutated. These controls bound resolver work without weakening the
+evidence boundary: ambiguous, external, and unresolved calls never create
+topology.
+
 ## Pattern matching: VF2
 
 [VF2](../GLOSSARY.md#vf2) subgraph isomorphism is worst-case super-exponential —
@@ -86,25 +121,18 @@ Note that the [Gang-of-Four detector](../GLOSSARY.md#gang-of-four-gof) uses a
 untrusted input, bound the surrounding work instead — cap the number of patterns
 searched and the size of the CPG (via `max_file_size`).
 
-## Data flow: `max_iterations`
+## Data flow: structural sweep bounds
 
 The [reaching-definitions](../GLOSSARY.md#reaching-definition) analysis is an
 [AST-ordered sweep](../GLOSSARY.md#ast-ordered-reaching-definitions) with a loop
-double-pass; `DfgExtractorConfig::max_iterations` (default `100`) caps how many
-times it may iterate, guaranteeing termination even on pathological control flow.
-Lower it if you want a harder ceiling on per-function DFG work:
+double-pass. It does not iterate to a data-flow fixed point: ordinary AST
+regions receive one structural visit, loop bodies receive exactly two, and a
+path set cuts malformed AST cycles. Consequently termination follows from the
+finite graph and explicit structural bounds.
 
-```rust
-// requires: no features (builder is always compiled)
-use libcpg::{DfgExtractor, DfgExtractorConfig};
-
-let config = DfgExtractorConfig { max_iterations: 20, ..Default::default() };
-let extractor = DfgExtractor::with_config(config);
-extractor.extract(&mut cpg); // bounded reaching-defs
-```
-
-Because termination rests on this cap rather than on a proof of monotone
-convergence, keep it positive; a value of `0` would skip the fixpoint loop entirely.
+`DfgExtractorConfig::max_iterations` is retained for source compatibility with
+the retired CFG fixed-point implementation and is not consulted by the live
+AST-ordered sweep. It must not be relied upon as a live security control.
 
 ## Dominance: structural convergence cap
 
@@ -212,6 +240,7 @@ correctness**: an analysis may return a meaningless answer, but it must
 | `ast_descendants`, `ast_ancestors`, `ast_depth` | a **visited set** — each node is expanded at most once, so the walk is bounded by the node count |
 | `ast_ancestors` | additionally stops at a parent pointer that names a node not in the graph, rather than returning an id `node()` cannot resolve |
 | `control_flow_sccs` / `call_graph_sccs` | a visited set guards AST scope discovery; dense discovery/low-link arrays and explicit DFS/component stacks make iterative Tarjan visit every projected vertex and normalized edge without consuming native stack per path element |
+| `build_symbol_table` / `resolve_calls` | visited sets cut parent and callee-subtree cycles; deterministic scope-depth, candidate-retention, and call-count caps bound configured work |
 | `CfgExtractor::process_node` (and every `process_*` handler) | a **path set** on `CfgContext` — a node already on the current recursion path becomes its own exit instead of being re-entered |
 | DFG reaching definitions (`visit_reaching`) | a **path set** — same rule |
 
@@ -232,8 +261,8 @@ over each one — see
    `build_from_tree` — it applies neither.
 3. **Cap `Vf2Matcher::max_matches`** (and enable the strict toggles) whenever you
    match patterns against untrusted graphs.
-4. **Keep `DfgExtractorConfig::max_iterations` positive but modest** if you need a
-   tighter DFG ceiling than 100.
+4. **Tighten all three `ResolveConfig` caps** for direct resolution of hostile
+   hand-built or deserialized graphs.
 5. **Pass a sensible `max_nodes`** to every slice call.
 6. **Deserialize only trusted graphs** (see the [threat model](00-threat-model.md)
    and [`usage/05-serialization.md`](../usage/05-serialization.md)).

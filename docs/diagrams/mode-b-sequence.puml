@@ -15,7 +15,9 @@ note right of B
   only construction path for Rholang and MeTTa.
 end note
 B -> G : AST nodes + AstChild edges + parent pointers
-B -> G : CfgExtractor / DfgExtractor (config-gated)
+B -> G : CfgExtractor (config-gated)
+B -> G : resolve_calls (config-gated; before DFG)
+B -> G : DfgExtractor (config-gated)
 B --> Host : CodePropertyGraph
 deactivate B
 @enduml

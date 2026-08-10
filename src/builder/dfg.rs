@@ -20,7 +20,9 @@ pub struct DfgExtractorConfig {
     pub include_return_values: bool,
     /// Whether to track alias relationships.
     pub track_aliases: bool,
-    /// Maximum iterations for reaching definitions fixpoint.
+    /// Compatibility cap for the retired CFG fixed-point implementation.
+    ///
+    /// The live AST-ordered sweep does not consult this field.
     pub max_iterations: usize,
 }
 
@@ -306,22 +308,30 @@ impl DfgExtractor {
         function: NodeId,
         collector: &DefUseCollector,
     ) {
-        // Find parameter nodes
-        let params: Vec<NodeId> = cpg
-            .ast_children(function)
-            .into_iter()
+        // Parameter syntax is commonly nested below a grammar-specific list
+        // wrapper. Select every parameter in this function's lexical AST scope
+        // (but never a nested function) and restore source order explicitly.
+        let scope = crate::analysis::function_scope_nodes(cpg, function);
+        let mut params: Vec<NodeId> = scope
+            .iter()
+            .copied()
             .filter(|&id| {
                 cpg.node(id)
                     .map(|n| matches!(n.kind, CpgNodeKind::Parameter { .. }))
                     .unwrap_or(false)
             })
             .collect();
+        params.sort_unstable_by_key(|&id| {
+            cpg.node(id)
+                .map(|node| (node.range.start, node.range.end, id))
+                .unwrap_or((u32::MAX, u32::MAX, id))
+        });
 
         // Find call sites that call this function
         let callers = cpg.callers(function);
 
         for caller in callers {
-            let call_args = cpg.ast_children(caller);
+            let call_args = call_arguments(cpg, caller);
 
             // Match arguments to parameters
             for (i, &param) in params.iter().enumerate() {
@@ -331,14 +341,10 @@ impl DfgExtractor {
             }
         }
 
-        // Also connect uses of parameters *declared as direct children of the
-        // function* to their parameter definition. This is an idempotent
-        // supplement to the primary `build_def_use_edges` sweep (which already
-        // links parameter uses flow-sensitively wherever the parameters are
-        // reachable in the AST); it is a no-op for parser-built graphs, where
-        // parameters are nested under a `parameters` wrapper rather than direct
-        // children. Dedup against existing DefUse edges keeps it idempotent and
-        // avoids double-linking the uses the sweep already connected.
+        // Also connect uses to their parameter definition. This is an
+        // idempotent supplement to the primary `build_def_use_edges` sweep,
+        // which already links parameter uses flow-sensitively. Deduplication
+        // avoids double-linking those uses.
         let mut existing_def_use: FxHashSet<(u32, u32)> = cpg
             .edges()
             .filter_map(|e| match e.kind {
@@ -372,15 +378,21 @@ impl DfgExtractor {
         _collector: &DefUseCollector,
     ) {
         // Find return statements
-        let returns: Vec<NodeId> = cpg
-            .ast_descendants(function)
-            .into_iter()
+        let scope = crate::analysis::function_scope_nodes(cpg, function);
+        let mut returns: Vec<NodeId> = scope
+            .iter()
+            .copied()
             .filter(|&id| {
                 cpg.node(id)
                     .map(|n| matches!(n.kind, CpgNodeKind::Return))
                     .unwrap_or(false)
             })
             .collect();
+        returns.sort_unstable_by_key(|&id| {
+            cpg.node(id)
+                .map(|node| (node.range.start, node.range.end, id))
+                .unwrap_or((u32::MAX, u32::MAX, id))
+        });
 
         // Find call sites that call this function
         let callers = cpg.callers(function);
@@ -435,6 +447,49 @@ impl DfgExtractor {
             }
         }
     }
+}
+
+/// Returns call arguments in source order without including callee syntax.
+///
+/// Tree-sitter grammars commonly retain one transparent argument-list wrapper
+/// below a `Call`; Mode-B process-calculus mappers may instead flatten the
+/// arguments directly. Supporting both shapes keeps the interprocedural DFG
+/// language-agnostic.
+fn call_arguments(cpg: &CodePropertyGraph, call: NodeId) -> Vec<NodeId> {
+    let mut children = cpg.ast_children(call);
+    if children.is_empty() {
+        return Vec::new();
+    }
+    children.remove(0);
+
+    let mut arguments = Vec::new();
+    for child in children {
+        let is_container = cpg.node(child).is_some_and(|node| {
+            matches!(
+                &node.kind,
+                CpgNodeKind::Unknown { kind }
+                    if matches!(
+                        kind.as_ref(),
+                        "arguments"
+                            | "argument_list"
+                            | "arguments_list"
+                            | "call_arguments"
+                            | "actual_parameters"
+                    )
+            )
+        });
+        if is_container {
+            arguments.extend(cpg.ast_children(child));
+        } else {
+            arguments.push(child);
+        }
+    }
+    arguments.sort_unstable_by_key(|&id| {
+        cpg.node(id)
+            .map(|node| (node.range.start, node.range.end, id))
+            .unwrap_or((u32::MAX, u32::MAX, id))
+    });
+    arguments
 }
 
 impl Default for DfgExtractor {
@@ -1685,7 +1740,10 @@ mod config_flags {
         assert!(d.include_parameters);
         assert!(d.include_return_values);
         assert!(d.include_field_access);
-        assert!(d.max_iterations > 0, "the fixpoint has an iteration bound");
+        assert_eq!(
+            d.max_iterations, 100,
+            "the retired fixed-point compatibility field keeps its stable default"
+        );
     }
 }
 
@@ -1761,7 +1819,9 @@ mod cyclic_ast_regression {
 mod proptests {
     use super::*;
     use crate::testutil::*;
-    use crate::CfgExtractor;
+    use crate::{
+        CfgExtractor, CpgNode, Language, LiteralKind, MethodSignature, SourceRange, Visibility,
+    };
     use proptest::prelude::*;
 
     proptest! {
@@ -1778,6 +1838,133 @@ mod proptests {
             let after_first = cpg.stats().dfg_edges;
             DfgExtractor::new().extract(&mut cpg);
             prop_assert_eq!(after_first, cpg.stats().dfg_edges);
+        }
+
+        /// Grammar argument/parameter wrappers must not shift positional
+        /// interprocedural flow. The property covers every arity in the
+        /// configured range and also places an excluded nested-function
+        /// parameter beside the real parameters.
+        #[test]
+        fn prop_wrapped_arguments_match_function_scoped_parameters(
+            arity in 0usize..16,
+        ) {
+            let mut cpg = CodePropertyGraph::new(Language::Rust);
+            let callee = cpg.add_node(CpgNode::new(
+                NodeId::new(0),
+                CpgNodeKind::Function {
+                    signature: MethodSignature {
+                        name: "callee".into(),
+                        params: Default::default(),
+                        return_type: None,
+                        is_static: false,
+                        is_async: false,
+                        visibility: Visibility::Private,
+                    },
+                },
+                SourceRange::default(),
+            ));
+            let parameter_list = wf_child(
+                &mut cpg,
+                callee,
+                CpgNodeKind::Unknown {
+                    kind: "parameters".into(),
+                },
+            );
+            let mut parameters = Vec::with_capacity(arity);
+            for index in 0..arity {
+                parameters.push(wf_child(
+                    &mut cpg,
+                    parameter_list,
+                    CpgNodeKind::Parameter {
+                        name: format!("p{index}").into(),
+                        param_type: None,
+                        is_variadic: false,
+                    },
+                ));
+            }
+
+            let nested = wf_child(
+                &mut cpg,
+                callee,
+                CpgNodeKind::Function {
+                    signature: MethodSignature {
+                        name: "nested".into(),
+                        params: Default::default(),
+                        return_type: None,
+                        is_static: false,
+                        is_async: false,
+                        visibility: Visibility::Private,
+                    },
+                },
+            );
+            let excluded_parameter = wf_child(
+                &mut cpg,
+                nested,
+                CpgNodeKind::Parameter {
+                    name: "excluded".into(),
+                    param_type: None,
+                    is_variadic: false,
+                },
+            );
+
+            let call = cpg.add_node(CpgNode::new(
+                NodeId::new(0),
+                CpgNodeKind::Call {
+                    target: Some(callee),
+                    is_method: false,
+                },
+                SourceRange::default(),
+            ));
+            wf_child(
+                &mut cpg,
+                call,
+                CpgNodeKind::Identifier {
+                    name: "callee".into(),
+                    definition: Some(callee),
+                },
+            );
+            let argument_list = wf_child(
+                &mut cpg,
+                call,
+                CpgNodeKind::Unknown {
+                    kind: "arguments".into(),
+                },
+            );
+            let mut arguments = Vec::with_capacity(arity);
+            for index in 0..arity {
+                arguments.push(wf_child(
+                    &mut cpg,
+                    argument_list,
+                    CpgNodeKind::Literal {
+                        kind: LiteralKind::Integer(index as i64),
+                    },
+                ));
+            }
+            cpg.connect(call, callee, CpgEdgeKind::StaticCall);
+            cpg.connect(call, callee, CpgEdgeKind::CallSite);
+
+            DfgExtractor::new().extract_function_dfg(&mut cpg, callee);
+
+            let actual: FxHashSet<_> = cpg
+                .edges()
+                .filter_map(|edge| match edge.kind {
+                    CpgEdgeKind::DataFlow(DfgEdgeKind::Parameter) => {
+                        Some((edge.source, edge.target))
+                    }
+                    _ => None,
+                })
+                .collect();
+            let expected: FxHashSet<_> = arguments
+                .into_iter()
+                .zip(parameters.into_iter())
+                .collect();
+            prop_assert_eq!(actual, expected);
+            prop_assert!(cpg
+                .incoming_edges(excluded_parameter)
+                .all(|edge| !matches!(
+                    edge.kind,
+                    CpgEdgeKind::DataFlow(DfgEdgeKind::Parameter)
+                )));
         }
     }
 }

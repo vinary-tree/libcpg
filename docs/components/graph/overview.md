@@ -273,6 +273,9 @@ So the safe pattern is: build (single-threaded, `&mut`), then analyse
   dominators, frontiers, constant-time ancestry, and PDG control dependence.
 - [Strongly-connected components](scc-analysis.md) — exact CFG loops and
   call-graph recursion clusters.
+- [Evidence-bounded call resolution](call-resolution.md) — deterministic
+  lexical symbols, confidence tiers, and the conservative boundary between
+  recorded evidence and definite call topology.
 - [`api/graph-reference.md`](../../api/graph-reference.md) — the precise,
   method-by-method API reference for `CodePropertyGraph`.
 - [`theory/01-code-property-graphs.md`](../../theory/01-code-property-graphs.md)

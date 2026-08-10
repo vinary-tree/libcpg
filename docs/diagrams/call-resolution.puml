@@ -1,0 +1,47 @@
+@startuml
+!include _libcpg-theme.iuml
+title Call resolution — evidence records are broader than graph topology
+
+start
+:CodePropertyGraph
+Call syntax + AST parents;<<#DBE4FF>>
+:build_symbol_table
+bounded functions · imports · scopes;<<#C3FAE8>>
+:sort calls by NodeId
+reconstruct name from first AST child subtree;<<#FFE8CC>>
+:classify evidence
+lexical → import → bare name;<<#FFF3BF>>
+:record CallGraphResolution
+for every processed call;<<#E5DBFF>>
+
+if (unique approved evidence tier?) then (yes)
+  :set Call.target
+  emit labeled Reference +
+  Static/Dynamic + CallSite;<<#D3F9D8>>
+  :call SCCs + callers/callees
+  interprocedural DFG;<<#D0BFFF>>
+else (ambiguous / external / unresolved)
+  :leave target empty
+  emit no resolution or call edge;<<#FFC9C9>>
+endif
+stop
+
+note right
+  Approved: ExactInFile, ExactViaImport,
+  ExactViaBinding, BareNameUnique.
+  Candidate count is measured before truncation.
+end note
+
+legend right
+  |= colour |= role |
+  |<#DBE4FF>| source CPG |
+  |<#C3FAE8>| lexical symbols |
+  |<#FFE8CC>| syntax evidence |
+  |<#FFF3BF>| deterministic classification |
+  |<#E5DBFF>| out-of-graph record |
+  |<#FFD8A8>| topology boundary |
+  |<#D3F9D8>| emitted definite topology |
+  |<#FFC9C9>| conservative no-edge outcome |
+  |<#D0BFFF>| downstream consumers |
+endlegend
+@enduml

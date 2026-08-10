@@ -12,6 +12,12 @@ if (config.build_cfg?) then (yes)
 adds ControlFlow(CfgEdgeKind) edges;<<#D3F9D8>>
 else (no)
 endif
+if (config.resolve_imports?) then (yes)
+  :resolve_calls(&mut cpg)
+records bounded evidence and adds only
+uniquely supported call topology;<<#C3FAE8>>
+else (no)
+endif
 if (config.build_dfg?) then (yes)
   :DfgExtractor.extract(&mut cpg)
 adds DataFlow(DfgEdgeKind) edges
@@ -24,6 +30,7 @@ legend right
   |= colour |= layer |
   |<#DBE4FF>| AST |
   |<#D3F9D8>| CFG |
+  |<#C3FAE8>| call resolution |
   |<#FFF3BF>| DFG |
 endlegend
 @enduml

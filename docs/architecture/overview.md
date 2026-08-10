@@ -40,17 +40,33 @@ Frontends normalize language-specific syntax to shared vocabulary:
 
 ### 3. Staged, on-demand construction
 
-Construction proceeds in stages, and the later stages are optional so a caller can pay only for what it queries. The AST is always built; CFG and DFG extraction are gated by `CpgBuilderConfig`; the PDG is **never** built during construction — it is added on demand per function.
+Construction proceeds in stages, and the later stages are optional so a caller
+can pay only for what it queries. The AST is always built; CFG, evidence-bounded
+call resolution, and DFG extraction are gated by `CpgBuilderConfig`; the PDG
+is **never** built during construction — it is added on demand per function.
 
 ```text
-source ──parse──▶ AST  ──(build_cfg)──▶ +CFG  ──(build_dfg)──▶ +DFG        [construction]
-                                                                  │
-                                                    PdgBuilder::build(&mut cpg, fn)   [on demand]
-                                                                  ▼
-                                                              +PDG (control + data dependence)
+source ──parse──▶ AST ──(build_cfg)──▶ +CFG
+                                      │
+                           (resolve_imports)
+                                      ▼
+                               +definite calls
+                                      │
+                                (build_dfg)
+                                      ▼
+                                    +DFG       [construction]
+                                      │
+                         PdgBuilder::build(&mut cpg, fn)
+                                      ▼
+                         +PDG (control + data dependence) [on demand]
 ```
 
-`CpgBuilderConfig` is the real knob set — `retain_source`, `build_cfg` (default `true`), `build_dfg` (default `true`), `include_comments`, `max_file_size` (default 10 MiB), `resolve_imports`. There is no `enable_cfg`/`enable_dfg`/`enable_cache` field; there is no cache. The [`data-flow.md`](data-flow.md) page walks the full pipeline.
+`CpgBuilderConfig` is the real knob set — `retain_source`, `build_cfg`
+(default `true`), `build_dfg` (default `true`), `include_comments`,
+`max_file_size` (default 10 MiB), and `resolve_imports` (default `false`;
+evidence-bounded call resolution before DFG). There is no
+`enable_cfg`/`enable_dfg`/`enable_cache` field; there is no cache. The
+[`data-flow.md`](data-flow.md) page walks the full pipeline.
 
 ### 4. Empty default feature set
 
@@ -99,6 +115,8 @@ So VF2 matching is available with `default = []`; GoF detection requires `--feat
 - `ParserRegistry` — the `OnceLock` global mapping a `Language` to its feature-gated tree-sitter grammar.
 - `NodeMapper` — the per-language `map_kind` dispatch (including `map_rholang`/`map_metta`).
 - `CfgExtractor` / `DfgExtractor` — the CFG and DFG passes; both `extract(&mut cpg)` idempotently.
+- `analysis::resolve_calls` — the opt-in, feature-free lexical/import
+  resolver that records every outcome and emits only uniquely supported calls.
 - `PdgBuilder` — adds `ControlDependence` + `DataDependence` edges on demand; `backward_slice` / `forward_slice` traverse them.
 
 ## Error model

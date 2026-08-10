@@ -128,8 +128,9 @@ and its build pipeline.
 | --- | --- | --- |
 | Oversized source (DoS) | `max_file_size` guard in `build` (10 MB default) | [hardening §max_file_size](01-input-and-resource-hardening.md#construction-max_file_size) |
 | Oversized source via Mode B | Caller must bound size/time before `build_from_tree` | [hardening §parser timeouts](01-input-and-resource-hardening.md#parser-timeouts-are-the-callers-job) |
+| Expensive/adversarial call resolution | Scope-depth, retained-candidate, and sorted-call caps plus cycle guards | [hardening §call resolution](01-input-and-resource-hardening.md#call-resolution-scope-candidate-and-call-caps) |
 | Explosive pattern search | VF2 `max_matches` cap + strict toggles | [hardening §VF2](01-input-and-resource-hardening.md#pattern-matching-vf2) |
-| Non-terminating data flow | DFG `max_iterations` fixpoint cap (100) | [hardening §DFG](01-input-and-resource-hardening.md#data-flow-max_iterations) |
+| Non-terminating data flow | Structural AST sweep, two loop passes, and a malformed-cycle path guard | [hardening §DFG](01-input-and-resource-hardening.md#data-flow-structural-sweep-bounds) |
 | Unbounded slice | `backward_slice` / `forward_slice` `max_nodes` cap | [hardening §slicing](01-input-and-resource-hardening.md#slicing-max_nodes) |
 | Untrusted serialized graph | Deserialize only trusted bytes | [`usage/05-serialization.md`](../usage/05-serialization.md) |
 | Over-trusting heuristics | Treat pattern/algorithm/GNN output as advisory | this page |

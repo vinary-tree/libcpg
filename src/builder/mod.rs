@@ -106,7 +106,7 @@ pub struct CpgBuilderConfig {
     pub include_comments: bool,
     /// Maximum file size to process (in bytes).
     pub max_file_size: usize,
-    /// Whether to resolve cross-file references.
+    /// Whether to run the evidence-bounded call/import resolution post-pass.
     pub resolve_imports: bool,
 }
 
@@ -159,7 +159,7 @@ impl CpgBuilderConfig {
         self
     }
 
-    /// Sets whether to resolve imports.
+    /// Sets whether to resolve uniquely supported call/import targets.
     pub fn with_import_resolution(mut self, resolve: bool) -> Self {
         self.resolve_imports = resolve;
         self

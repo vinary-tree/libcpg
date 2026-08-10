@@ -2,7 +2,8 @@
 
 This page is the authoritative reference for **constructing and enriching**
 `libcpg` graphs: the [`CpgBuilder`](#cpgbuilder-trait) trait and its
-tree-sitter implementation, the CFG and DFG extractors, the on-demand
+tree-sitter implementation, the CFG and DFG extractors, the opt-in
+[call-resolution post-pass](../components/graph/call-resolution.md), the on-demand
 [PDG](../GLOSSARY.md#program-dependence-graph-pdg) builder and program slicers,
 and the parser registry and node mapper that back the tree-sitter frontend.
 Every signature is transcribed from `src/builder/`.
@@ -12,9 +13,12 @@ For the *shape* of the graphs these APIs produce, see the
 [Pattern reference](pattern-reference.md). Term definitions live in the
 [Glossary](../GLOSSARY.md).
 
-![The CPG construction pipeline: parse, AST, CFG, DFG](../diagrams/construction-pipeline.svg)
+![The CPG construction pipeline: parse, AST, CFG, optional call resolution, DFG](../diagrams/construction-pipeline.svg)
 
-*Figure — the construction pipeline: tree-sitter parse → AST conversion → config-gated CFG extraction → config-gated DFG extraction. Source: [`diagrams/construction-pipeline.puml`](../diagrams/construction-pipeline.puml).*
+*Figure — the construction pipeline: tree-sitter parse → AST conversion →
+config-gated CFG extraction → opt-in evidence-bounded call resolution →
+config-gated DFG extraction. Source:
+[`diagrams/construction-pipeline.puml`](../diagrams/construction-pipeline.puml).*
 
 ---
 
@@ -99,7 +103,7 @@ pub struct CpgBuilderConfig {
 | `build_dfg` | `true` | Run the [`DfgExtractor`](#dfgextractor--dfgextractorconfig) after CFG. |
 | `include_comments` | `false` | Keep comment nodes in the AST. |
 | `max_file_size` | `10 * 1024 * 1024` (10 MiB) | Reject larger inputs in `build` (see the [security guidance](#security--max_file_size-applies-only-to-build)). |
-| `resolve_imports` | `false` | Reserved for cross-file reference resolution. |
+| `resolve_imports` | `false` | Run evidence-bounded call/import resolution after CFG and before DFG extraction. |
 
 Builder methods (each returns `Self`): `new()`, `with_source(bool)`,
 `with_cfg(bool)`, `with_dfg(bool)`, `with_comments(bool)`,
@@ -113,9 +117,16 @@ use libcpg::CpgBuilderConfig;
 let config = CpgBuilderConfig::new()
     .with_source(true)      // retain the source string
     .with_cfg(true)
-    .with_dfg(false)        // AST + CFG only
-    .with_comments(true);
+    .with_dfg(true)
+    .with_comments(true)
+    .with_import_resolution(true); // resolve unique calls before interprocedural DFG
 ```
+
+The historical field/method name says “imports,” but the implemented post-pass
+also resolves in-file lexical and unique bare-name calls. A visible import whose
+target is absent from the current CPG remains an `External` evidence record and
+creates no edge. The default remains `false`, preserving the established graph
+shape. See [Evidence-bounded call resolution](../components/graph/call-resolution.md).
 
 ---
 
@@ -159,7 +170,7 @@ assert!(cpg.node_count() > 1);
 
 ![Mode B: the caller parses with its own grammar and hands the tree to build_from_tree](../diagrams/mode-b-sequence.svg)
 
-*Figure — the Mode-B sequence: a caller (e.g. pgmcp) that already links a grammar parses the source itself and hands the `tree_sitter::Tree` to `build_from_tree`, which runs the identical AST → CFG → DFG pipeline without a `lang-*` feature. Source: [`diagrams/mode-b-sequence.puml`](../diagrams/mode-b-sequence.puml).*
+*Figure — the Mode-B sequence: a caller (e.g. pgmcp) that already links a grammar parses the source itself and hands the `tree_sitter::Tree` to `build_from_tree`, which runs the identical AST → CFG → optional call-resolution → DFG pipeline without a `lang-*` feature. Source: [`diagrams/mode-b-sequence.puml`](../diagrams/mode-b-sequence.puml).*
 
 [Mode B](../GLOSSARY.md#mode-b--build_from_tree) is for a caller that has *already*
 parsed the source with a tree-sitter grammar it owns. It:

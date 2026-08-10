@@ -470,7 +470,8 @@ impl CodePropertyGraph {
 
     /// Returns callees of a call site.
     pub fn callees(&self, call_site: NodeId) -> Vec<NodeId> {
-        self.outgoing_edges(call_site)
+        let mut callees: Vec<_> = self
+            .outgoing_edges(call_site)
             .filter_map(|e| {
                 if matches!(
                     e.kind,
@@ -481,12 +482,16 @@ impl CodePropertyGraph {
                     None
                 }
             })
-            .collect()
+            .collect();
+        callees.sort_unstable();
+        callees.dedup();
+        callees
     }
 
     /// Returns callers of a function.
     pub fn callers(&self, function: NodeId) -> Vec<NodeId> {
-        self.incoming_edges(function)
+        let mut callers: Vec<_> = self
+            .incoming_edges(function)
             .filter_map(|e| {
                 if matches!(
                     e.kind,
@@ -497,7 +502,10 @@ impl CodePropertyGraph {
                     None
                 }
             })
-            .collect()
+            .collect();
+        callers.sort_unstable();
+        callers.dedup();
+        callers
     }
 
     // ========== Query by Kind ==========

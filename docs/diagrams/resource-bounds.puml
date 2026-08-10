@@ -8,6 +8,16 @@ caption Resource bounds that keep libcpg's work finite on large or untrusted inp
 build() rejects larger source before parsing.
 build_from_tree (Mode B) skips it —
 the caller already owns a bounded tree.;
+**[#FFE3E3] Call resolution
+***[#F1F3F5]:max_scope_depth = 128
+bounds parent and callee-subtree depth
+and visited sets cut malformed cycles.;
+***[#F1F3F5]:max_candidates_per_name = 64
+bounds retained candidate identifiers
+without changing the full ambiguity count.;
+***[#F1F3F5]:max_calls = 100,000
+processes a deterministic NodeId prefix
+and leaves later calls untouched.;
 **[#FFE3E3] VF2 matching
 ***[#F1F3F5]:max_matches cap (0 = unlimited default)
 short-circuits the state-space search
@@ -16,9 +26,9 @@ once the match limit is reached.;
 tighten the feasibility test, pruning
 infeasible branches earlier.;
 **[#FFE3E3] DFG
-***[#F1F3F5]:max_iterations = 100
-caps the reaching-definitions fixpoint
-sweeps so it always terminates.;
+***[#F1F3F5]:structural AST sweep
+one ordinary pass, exactly two loop-body passes,
+and a path set that cuts malformed cycles.;
 **[#FFE3E3] Slicing
 ***[#F1F3F5]:max_nodes on backward_slice / forward_slice
 bounds the PDG reverse/forward BFS —

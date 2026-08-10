@@ -34,7 +34,7 @@ Under `default = []` the registry is empty, so `supported_languages()` still lis
 
 **Mode A — `build(source, language)`** is the internal-parse path. It enforces `config.max_file_size`, looks the grammar up in the registry (erroring if absent), parses, and then *delegates to Mode B* for the post-parse pipeline. It therefore needs the matching `lang-*` feature.
 
-**Mode B — [`build_from_tree`](../GLOSSARY.md#mode-b--build_from_tree)`(&tree, source, language)`** accepts a `tree_sitter::Tree` the caller already parsed. It needs **no** `lang-*` feature (the caller owns the grammar), skips the `max_file_size` check, and runs the identical AST → CFG → DFG pipeline. Because Mode A funnels through Mode B, the two produce structurally identical graphs — a regression test asserts equal `node_count`, `edge_count`, and `language` for the same source.
+**Mode B — [`build_from_tree`](../GLOSSARY.md#mode-b--build_from_tree)`(&tree, source, language)`** accepts a `tree_sitter::Tree` the caller already parsed. It needs **no** `lang-*` feature (the caller owns the grammar), skips the `max_file_size` check, and runs the identical AST → CFG → optional call-resolution → DFG pipeline. Because Mode A funnels through Mode B, the two produce structurally identical graphs — a regression test asserts equal `node_count`, `edge_count`, and `language` for the same source and configuration.
 
 ```rust
 // Mode B: the caller has already parsed `source` with a grammar it links itself.
@@ -48,7 +48,10 @@ fn build(tree: &tree_sitter::Tree, source: &str) -> libcpg::Result<libcpg::CodeP
 
 ![Sequence diagram of build_from_tree with a caller-supplied grammar](../diagrams/mode-b-sequence.svg)
 
-*Figure — Mode B: the caller parses with its own grammar and hands the tree to `build_from_tree`, which runs AST construction then the CFG/DFG passes. Source: [`diagrams/mode-b-sequence.puml`](../diagrams/mode-b-sequence.puml).*
+*Figure — Mode B: the caller parses with its own grammar and hands the tree to
+`build_from_tree`, which runs AST construction followed by the configured CFG,
+call-resolution, and DFG passes. Source:
+[`diagrams/mode-b-sequence.puml`](../diagrams/mode-b-sequence.puml).*
 
 `build_file(&Path)` is a convenience over Mode A: it reads the file, infers the language with `Language::from_extension` (which lowercases, strips a leading `.`, and returns `Language::Unknown` — never an `Option` — for unrecognized extensions), and records the path on the resulting graph.
 

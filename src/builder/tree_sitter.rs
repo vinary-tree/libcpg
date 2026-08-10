@@ -10,7 +10,9 @@
 //! 1. **Parsing**: Tree-sitter parses source code into a concrete syntax tree
 //! 2. **AST Construction**: Convert tree-sitter nodes to CPG nodes with AST edges
 //! 3. **CFG Extraction**: [`CfgExtractor`] analyzes control flow constructs
-//! 4. **DFG Extraction**: [`DfgExtractor`] performs reaching definitions analysis
+//! 4. **Call Resolution** (opt-in): the feature-free resolver materializes
+//!    uniquely supported call targets
+//! 5. **DFG Extraction**: [`DfgExtractor`] performs reaching definitions analysis
 //!
 //! ## Example
 //!
@@ -28,8 +30,8 @@
 
 use super::{CfgExtractor, CpgBuilder, CpgBuilderConfig, DfgExtractor, NodeMapper, ParserRegistry};
 use crate::{
-    CodePropertyGraph, CpgEdgeKind, CpgNode, CpgNodeKind, Error, Language, NodeId, Result,
-    SourceRange,
+    resolve_calls, CodePropertyGraph, CpgEdgeKind, CpgNode, CpgNodeKind, Error, Language, NodeId,
+    ResolveConfig, Result, SourceRange,
 };
 
 /// CPG builder using tree-sitter for parsing.
@@ -77,8 +79,10 @@ impl TreeSitterCpgBuilder {
     /// nodes fall through to the generic mapping).
     ///
     /// The post-parse pipeline is identical to [`CpgBuilder::build`]: AST
-    /// construction, then config-gated CFG and DFG extraction. Unlike `build`,
-    /// no `max_file_size` check is applied — the caller already owns the tree.
+    /// construction, then config-gated CFG, call-resolution, and DFG stages.
+    /// Resolution runs before the DFG so parameter/return edges can consume
+    /// resolved call sites. Unlike `build`, no `max_file_size` check is applied
+    /// — the caller already owns the tree.
     pub fn build_from_tree(
         &self,
         tree: &tree_sitter::Tree,
@@ -101,7 +105,13 @@ impl TreeSitterCpgBuilder {
             cfg_extractor.extract(&mut cpg);
         }
 
-        // Phase 3: Extract DFG
+        // Phase 3: Resolve uniquely supported call targets before the
+        // interprocedural DFG helpers inspect callers and callees.
+        if self.config.resolve_imports {
+            resolve_calls(&mut cpg, &ResolveConfig::default());
+        }
+
+        // Phase 4: Extract DFG
         if self.config.build_dfg {
             let dfg_extractor = DfgExtractor::new();
             dfg_extractor.extract(&mut cpg);

@@ -22,18 +22,19 @@ think to write down.
 
 | Kind | Count | Where |
 | --- | ---: | --- |
-| Example-based library tests | 416 | inline `#[cfg(test)] mod …` next to the code |
-| Property-based properties (in 29 `proptest!` blocks) | 66 | inline `mod proptests` / `mod …_regression` and exact-analysis modules |
-| Public-API integration tests | 11 | `tests/integration.rs` |
+| All-feature library tests | 499 | inline `#[cfg(test)] mod …` next to the code; includes examples and properties |
+| Public-API integration tests | 12 | `tests/integration.rs` |
 | Malformed-input robustness tests | 5 | `tests/robustness.rs` |
-| **Total** | **498** | |
+| **Executable test cases** | **516** | excludes three ignored rustdoc examples |
+| `proptest!` blocks (subset of the library/robustness rows) | 31 | inline property and regression modules |
 
-That is up from **99** inline tests and **zero** property tests before this work.
+The all-feature library count is up from **99** inline tests and **zero**
+property tests before this work.
 
 Each property runs many generated cases (`ProptestConfig::with_cases(N)`, with
 `N` tuned to the cost of the property: 256 for cheap structural laws, 128 for
-mid-weight ones, 64 for parser-backed ones, 32 for the heaviest), so the 66
-properties execute on the order of ten thousand distinct inputs per run.
+mid-weight ones, 64 for parser-backed ones, 32 for the heaviest), so the
+property suites execute on the order of ten thousand distinct inputs per run.
 
 ### Not every test compiles under every build
 
@@ -42,10 +43,10 @@ on the features enabled:
 
 | Command | Lib tests | Notes |
 | --- | ---: | --- |
-| `cargo test` | 202 | `default = []`: the feature-free surface only |
-| `cargo test --features "full rholang metta"` | 482 | the maximal matrix, including the Mode-B mappers |
+| `cargo test` | 218 | `default = []`: the feature-free surface only |
+| `cargo test --features "full rholang metta"` | 499 | the maximal matrix, including the Mode-B mappers |
 
-The feature-free 202 exercise the graph model, exact dominator/post-dominator
+The feature-free 218 exercise the graph model, exact dominator/post-dominator
 and CFG/call-graph SCC analyses, the CFG/DFG/PDG extractors, VF2, and similarity by building CPGs
 **by hand** — no grammar required. This is what
 the [`arb_well_formed_cpg`](#the-generators) generator exists for.
@@ -117,6 +118,7 @@ The invariants fall into nine families.
 | **Graph projections** | CSR nodes and adjacency are sorted; parallel-edge weights merge deterministically; transpose is an involution; all overlay constructors equal direct typed-edge traversal and do not mutate the CPG |
 | **Dominance** | CHK immediate dominators equal `petgraph::algo::dominators::simple_fast` under edge permutations; post-dominators and control edges equal the former PDG oracle; `PdgBuilder` emits exactly `PostDominatorTree::control_dependence_edges`; a 25,000-node path is stack-safe |
 | **SCC decomposition** | Every projected node occurs in exactly one component; the partition matches `petgraph::algo::tarjan_scc`; singleton cycles require a self-loop; the condensation graph is acyclic; a 50,000-node path does not overflow the native stack |
+| **Call resolution** | resolution records and call edges are invariant under node/edge insertion permutations; duplicate names add zero call topology and preserve the SCC partition; repeated resolution is idempotent; candidate/call caps preserve the evidence boundary |
 | **Idempotency** | a second `CfgExtractor::extract` / `DfgExtractor::extract` / `PdgBuilder::build` adds no edges |
 | **Slicing** | $`\lvert S\rvert \le \mathit{max\_nodes}`$; the criterion is in its own backward slice; $`\mathit{max\_nodes} = 0 \Rightarrow S = \varnothing`$; $`S`$ is monotone in $`\mathit{max\_nodes}`$; every sliced id is a real node |
 | **Matching & similarity** | VF2 embeddings are injective, kind-consistent, and edge-preserving; relaxed matching $`\supseteq`$ strict; all four metrics land in $`[0,1]`$, are symmetric, and are maximal on self-comparison |
@@ -150,10 +152,11 @@ an analysis may return a meaningless answer, but it must not panic, loop
 forever, or overflow the stack.
 
 `tests/robustness.rs` injects ten distinct corruptions into a plausible function
-graph and drives *every* public analysis over each one, asserting termination
-plus the invariants that must survive (slices stay within budget and contain
-only real nodes; confidences stay finite and in $`[0,1]`$; extraction stays
-idempotent; the graph still serializes). See
+graph and drives *every* public analysis—including symbol construction and call
+resolution—over each one, asserting termination plus the invariants that must
+survive (slices stay within budget and contain only real nodes; confidences stay
+finite and in $`[0,1]`$; extraction and resolution stay idempotent; the graph
+still serializes). See
 [`security/01-input-and-resource-hardening.md`](../security/01-input-and-resource-hardening.md).
 
 ## The mapping tables are executable specifications
@@ -192,7 +195,7 @@ grammars (see [below](#defects-found-by-this-suite)).
 ## Defects found by this suite
 
 Property and robustness tests are worth their cost only if they find real bugs.
-This suite found **fifteen**, each fixed at the source and frozen as a regression
+This suite found **sixteen**, each fixed at the source and frozen as a regression
 test beside the fix:
 
 | # | Defect | Consequence | Found by |
@@ -212,6 +215,7 @@ test beside the fix:
 | 13 | every Rust method call was reported as `is_method: false` | tree-sitter-rust has no `method_call_expression`; `recv.m()` is a `call_expression` over a `field_expression`, so the flag has to be read off the callee | mapping tables |
 | 14 | `async fn` was never detected as async (Rust, and latently Python) | tree-sitter-rust groups `async` under a `function_modifiers` node, so the direct-child check never saw it | mapping tables |
 | 15 | a cyclic `idom` map from malformed serialized data made `dominators_of` unbounded | a consumer collecting the iterator could run indefinitely or exhaust memory | robustness review |
+| 16 | callee-name reconstruction was depth-bounded but had no visited set | a cyclic malformed callee subtree could repeat nodes exponentially before reaching the depth cap | robustness review |
 
 Defects 2, 3 and 7 were found by generated input within seconds of the
 robustness suite first running — none of them is reachable from any
@@ -238,14 +242,16 @@ cargo +nightly cov-branch           # branch coverage needs nightly
 
 | Metric | Coverage | Lowest file |
 | --- | ---: | --- |
-| Lines | **97.73 %** | 91.67 % (`language.rs`) |
-| Regions | **97.67 %** | — |
-| Functions | **97.93 %** | — |
-| Branches | **82.08 %** | see below |
+| Lines | **97.79 %** | 91.67 % (`language.rs`) |
+| Regions | **97.72 %** | — |
+| Functions | **98.03 %** | — |
+| Branches | **82.63 %** | see below |
 
 Every source file is above 90 % line coverage; eleven are at 100 %.
 The new `analysis/dominators.rs` module measures **97.72 %** line and
 **81.58 %** branch coverage, above the epic's 90 % / 80 % thresholds.
+The new `analysis/resolve.rs` module measures **98.99 %** line and
+**87.96 %** branch coverage, above the same thresholds.
 
 **On branch coverage.** `-Z coverage-options=branch` is nightly-only, and it
 counts *condition outcomes* (`if`, `&&`, `||`, `while`) — not `match` arms,

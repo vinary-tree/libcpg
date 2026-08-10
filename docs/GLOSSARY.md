@@ -34,7 +34,13 @@ A maximal straight-line run of statements with a single entry and single exit â€
 
 ### Call graph
 
-The overlay whose edges connect call sites to the functions they invoke: `StaticCall` (resolved statically), `DynamicCall` (virtual/indirect), and `CallSite`. Queried through `call_sites`, `callees`, and `callers`. See [`components/graph/edges.md`](components/graph/edges.md).
+The overlay whose edges connect call sites to the functions they invoke:
+`StaticCall` (resolved statically), `DynamicCall` (method/virtual), and
+`CallSite`. Parsed calls begin with no target unless the source mapper has
+stronger information; `resolve_calls` can materialize definite targets through
+[evidence-bounded call resolution](#confidence-call-resolution). Queried through
+`call_sites`, `callees`, and `callers`. See
+[`components/graph/edges.md`](components/graph/edges.md).
 
 ### Code Property Graph (CPG)
 
@@ -47,6 +53,16 @@ An asymptotic growth category for a function's running time. `libcpg`'s `Complex
 ### Confidence (pattern match)
 
 A score in $`[0, 1]`$ that a detected [design pattern](#design-pattern) attaches to each `PatternMatch`, measuring how completely the candidate subgraph fills the pattern's template. `GofPatternDetector` keeps only matches at or above `min_confidence` (default `0.7`). See [Gang of Four](#gang-of-four-gof).
+
+### Confidence (call resolution)
+
+The evidence tier attached to one `CallResolution`: `ExactInFile`,
+`ExactViaImport`, `ExactViaBinding`, `BareNameUnique`,
+`BareNameAmbiguous`, `External`, or `Unresolved`. Only the first four
+tiers identify one unique in-graph function and therefore create
+[call-graph](#call-graph) topology. The remaining tiers stay in the
+out-of-graph result so ambiguity can never invent recursion or value flow. See
+[`components/graph/call-resolution.md`](components/graph/call-resolution.md).
 
 ### Control dependence
 

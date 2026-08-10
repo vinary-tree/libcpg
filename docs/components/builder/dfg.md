@@ -1,6 +1,6 @@
 # Builder — Data-Flow Graph Extraction
 
-The `DfgExtractor` is construction phase 4 (see [`overview.md`](overview.md)). It overlays
+The `DfgExtractor` is construction phase 5 (see [`overview.md`](overview.md)). It overlays
 a [Data-Flow Graph](../../GLOSSARY.md#data-flow-graph-dfg) onto the shared AST nodes by
 adding `DataFlow(DfgEdgeKind)` edges that connect **definitions** of a variable to the
 **uses** they reach. The engine behind it is an
@@ -39,7 +39,10 @@ let extractor = DfgExtractor::with_config(config);
 ```
 
 `extract(&mut cpg)` iterates `cpg.functions()` and runs `extract_function_dfg` on each. The
-`TreeSitterCpgBuilder` runs it as phase 4 when `build_dfg` is enabled (the default).
+`TreeSitterCpgBuilder` runs it as phase 5 when `build_dfg` is enabled (the
+default). When `with_import_resolution(true)` is selected, the resolver runs
+immediately beforehand so the parameter and return-value helpers can observe
+definite callers.
 
 ### `DfgExtractorConfig`
 
@@ -273,6 +276,13 @@ Beyond the `DefUse` edges from the sweep, `extract_function_dfg` overlays four m
 `build_parameter_edges` also adds a supplementary `DefUse` edge from a directly-declared
 parameter to each of its uses, deduplicated against the sweep's edges so it never
 double-links.
+
+Parameter and return edges are necessarily interprocedural. Parsed calls carry
+`target: None` by default, so those two builders remain conservative until
+the caller either supplies bindings or enables
+[`with_import_resolution(true)`](../graph/call-resolution.md#builder-integration).
+Ambiguous and external calls still create no parameter/return flow because the
+resolver deliberately leaves their targets empty.
 
 ---
 

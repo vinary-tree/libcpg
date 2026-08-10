@@ -5,6 +5,7 @@
 
 mod dominators;
 mod projection;
+mod resolve;
 mod scc;
 
 use crate::NodeId;
@@ -17,6 +18,12 @@ pub use projection::{
 
 pub use dominators::{dominator_tree, post_dominator_tree, DominatorTree, PostDominatorTree};
 
+pub use resolve::{
+    build_symbol_table, resolve_calls, CallGraphResolution, CallResolution, Confidence,
+    ResolveConfig, SymbolCandidates, SymbolTable,
+};
+
+pub(crate) use scc::function_scope_nodes;
 pub use scc::{
     call_graph_sccs, control_flow_sccs, SccAnalysisError, SccComponent, SccCondensationEdge,
     SccDecomposition, SccProjection,

@@ -200,6 +200,33 @@ where $`E`$ is the number of CFG edges and $`N`$ the number of CFG
 nodes (`cfg_nodes().count()`); when there are no CFG nodes it returns $`1`$.
 The implementation uses a saturating subtraction, so it never underflows.
 
+### Evidence-bounded call resolution
+
+The feature-free resolver turns parsed call syntax into definite call topology
+only when one target is uniquely supported. It is exported from the crate root
+and `libcpg::analysis`:
+
+| Function | Signature | Result |
+|---|---|---|
+| `build_symbol_table` | `fn(&mut CodePropertyGraph, &ResolveConfig) -> SymbolTable` | Deterministic lexical function/import index; idempotently emits `EnclosingScope` and `ContainedIn`. |
+| `resolve_calls` | `fn(&mut CodePropertyGraph, &ResolveConfig) -> CallGraphResolution` | Per-call evidence records plus uniquely supported `Reference`, `StaticCall`/`DynamicCall`, and `CallSite` edges. |
+
+`ResolveConfig` exposes `max_scope_depth`,
+`max_candidates_per_name`, `max_calls`, and `resolve_methods`.
+`Confidence` has seven stable tiers: `ExactInFile`,
+`ExactViaImport`, `ExactViaBinding`, `BareNameUnique`,
+`BareNameAmbiguous`, `External`, and `Unresolved`. Only the first four
+return `true` from `creates_topology()`.
+
+`CallResolution` records `callee_name`, `scope`, `confidence`,
+`target`, retained `candidates`, the full `candidate_count`, and
+`candidates_truncated`. `CallGraphResolution` stores those records in a
+`BTreeMap<NodeId, CallResolution>` and counts newly emitted topology edges,
+ambiguous calls, external calls, and unresolved calls. See the complete
+[call-resolution component guide](../components/graph/call-resolution.md) for
+the evidence matrix, ordering and cap contracts, pseudocode, complexity,
+examples, and validation.
+
 ### Deterministic graph projections
 
 `GraphProjection` is the feature-free, payload-free compressed-sparse-row view

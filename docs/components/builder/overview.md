@@ -9,11 +9,12 @@ implementation, and explains the two ways a CPG is born: the internal-parse path
 (`build`) and the caller-supplied-tree path ([Mode B](../../GLOSSARY.md#mode-b--build_from_tree),
 `build_from_tree`).
 
-The four sibling pages drill into each construction stage:
+The related component pages drill into each construction stage:
 
 | Stage | Page | What it adds |
 |-------|------|--------------|
 | Control flow | [`cfg.md`](cfg.md) | `ControlFlow(CfgEdgeKind)` edges |
+| Call resolution | [`../graph/call-resolution.md`](../graph/call-resolution.md) | scoped symbols plus uniquely supported reference/call edges |
 | Data flow | [`dfg.md`](dfg.md) | `DataFlow(DfgEdgeKind)` edges (AST-ordered reaching defs) |
 | Program dependence & slicing | [`pdg-and-slicing.md`](pdg-and-slicing.md) | `ControlDependence` / `DataDependence` edges, backward/forward slices |
 | Language front-ends | [`node-mapper.md`](node-mapper.md) | tree-sitter node kinds → `CpgNodeKind` |
@@ -41,9 +42,11 @@ every supported language.
 
 ## The construction pipeline
 
-![Construction pipeline: source text is parsed to a tree-sitter tree, converted to AST nodes with AstChild edges, then the CFG and DFG extractors overlay control- and data-flow edges onto the same nodes.](../../diagrams/construction-pipeline.svg)
+![Construction pipeline: source text becomes AST nodes, then CFG, optional evidence-bounded call resolution, and DFG stages enrich the same graph.](../../diagrams/construction-pipeline.svg)
 
-*Figure — the four construction phases: parse, AST construction, CFG extraction, DFG extraction. Source: [`diagrams/construction-pipeline.puml`](../../diagrams/construction-pipeline.puml).*
+*Figure — the five construction phases: parse, AST construction, CFG
+extraction, optional call resolution, and DFG extraction. Source:
+[`diagrams/construction-pipeline.puml`](../../diagrams/construction-pipeline.puml).*
 
 Construction runs in ordered phases; each later phase reads the graph the earlier phases
 built:
@@ -57,7 +60,11 @@ built:
    nodes are registered as CFG entry points here.
 3. **CFG extraction** (config-gated by `build_cfg`). [`CfgExtractor`](cfg.md) overlays
    `ControlFlow` edges onto the AST nodes.
-4. **DFG extraction** (config-gated by `build_dfg`). [`DfgExtractor`](dfg.md) overlays
+4. **Call resolution** (config-gated by `resolve_imports`).
+   [`resolve_calls`](../graph/call-resolution.md) builds scoped symbols and
+   materializes only uniquely supported call targets. It deliberately runs
+   before the DFG so parameter/return edges can consume resolved callers.
+5. **DFG extraction** (config-gated by `build_dfg`). [`DfgExtractor`](dfg.md) overlays
    `DataFlow` edges using an [AST-ordered reaching-definitions](../../GLOSSARY.md#ast-ordered-reaching-definitions)
    sweep.
 
@@ -123,7 +130,8 @@ let config = CpgBuilderConfig::new()
     .with_source(true)   // retain the source text on the graph
     .with_cfg(true)      // run the CFG extractor
     .with_dfg(true)      // run the DFG extractor
-    .with_comments(false); // drop comment nodes
+    .with_comments(false) // drop comment nodes
+    .with_import_resolution(true); // resolve unique calls before the DFG
 let builder = TreeSitterCpgBuilder::with_config(config);
 ```
 
@@ -133,10 +141,10 @@ let builder = TreeSitterCpgBuilder::with_config(config);
 |-------|---------|--------|
 | `retain_source` | `false` | Keep the source text on the CPG (`cpg.source_code()`). |
 | `build_cfg` | `true` | Run [`CfgExtractor`](cfg.md) as phase 3. |
-| `build_dfg` | `true` | Run [`DfgExtractor`](dfg.md) as phase 4. |
+| `build_dfg` | `true` | Run [`DfgExtractor`](dfg.md) as phase 5. |
 | `include_comments` | `false` | Emit `Comment` nodes instead of dropping them. |
 | `max_file_size` | `10 * 1024 * 1024` (10 MB) | Reject larger sources in `build` (see the security note). |
-| `resolve_imports` | `false` | Reserved for cross-file reference resolution. |
+| `resolve_imports` | `false` | Run evidence-bounded in-file/import call resolution as phase 4. |
 
 The builder API for the config is fluent: `CpgBuilderConfig::new()` then any of
 `with_source`, `with_cfg`, `with_dfg`, `with_comments`, `with_max_file_size`,
@@ -276,8 +284,9 @@ Three details are worth emphasising:
   means the CFG and DFG extractors can find the functions to process by walking
   `cpg.functions()`.
 
-After the walk, phases 3 and 4 run (if enabled), each iterating `cpg.functions()` and
-overlaying its edge kind onto the shared nodes.
+After the walk, phases 3 through 5 run when enabled. Resolution is positioned
+between CFG and DFG so the DFG's interprocedural parameter and return helpers
+observe established callers without changing the default opt-out shape.
 
 ---
 
@@ -286,7 +295,10 @@ overlaying its edge kind onto the shared nodes.
 - It does **not** build the [PDG](pdg-and-slicing.md); control- and data-dependence edges
   are added later, per function, by `PdgBuilder::build`.
 - It does **not** run pattern, algorithm, or GNN analyses; those consume the finished CPG.
-- It does **not** resolve cross-file imports (the `resolve_imports` flag is reserved).
+- It does **not** load a package index or merge another file's declarations.
+  The `resolve_imports` flag resolves only evidence represented by the current
+  graph; absent imported declarations are reported as `External` without
+  creating topology.
 
 ---
 
@@ -294,6 +306,8 @@ overlaying its edge kind onto the shared nodes.
 
 - [`cfg.md`](cfg.md) — control-flow extraction and cyclomatic complexity.
 - [`dfg.md`](dfg.md) — AST-ordered reaching definitions and def-use chains.
+- [`../graph/call-resolution.md`](../graph/call-resolution.md) — evidence
+  tiers, scope symbols, topology boundary, and resource caps.
 - [`pdg-and-slicing.md`](pdg-and-slicing.md) — program dependence and slicing.
 - [`node-mapper.md`](node-mapper.md) — per-language node mapping, incl. Rholang/MeTTa.
 - [`../../api/builder-reference.md`](../../api/builder-reference.md) — exhaustive method

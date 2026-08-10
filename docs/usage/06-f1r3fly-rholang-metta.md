@@ -6,7 +6,7 @@ The one structural fact to internalise:
 
 > Rholang and MeTTa have **no grammar registered** in libcpg's [`ParserRegistry`](../architecture/language-frontends.md). `TreeSitterCpgBuilder::build(source, Language::Rholang)` will therefore always fail with `UnsupportedLanguage`. The **only** construction path is [Mode B](../GLOSSARY.md#mode-b--build_from_tree): you parse with a grammar you own and call `build_from_tree`.
 
-![Sequence: a Mode-B caller parses Rholang/MeTTa with its own grammar and hands the tree to build_from_tree, which runs the same AST/CFG/DFG pipeline.](../diagrams/mode-b-sequence.svg)
+![Sequence: a Mode-B caller parses Rholang/MeTTa with its own grammar and hands the tree to build_from_tree, which runs the same AST/CFG/optional-call-resolution/DFG pipeline.](../diagrams/mode-b-sequence.svg)
 
 *Figure — the Mode-B call sequence used for Rholang and MeTTa. Source: [`diagrams/mode-b-sequence.puml`](../diagrams/mode-b-sequence.puml).*
 

@@ -285,14 +285,20 @@ fn exercise_every_analysis(cpg: &CodePropertyGraph, func: NodeId) {
     // --- extractors ---
     let mut work = cpg.clone();
     libcpg::CfgExtractor::new().extract(&mut work);
+    let first_resolution = libcpg::resolve_calls(&mut work, &libcpg::ResolveConfig::default());
     libcpg::DfgExtractor::new().extract(&mut work);
     libcpg::PdgBuilder::new().build(&mut work, func);
 
     // Re-running is idempotent even on corrupt input.
     let edges_after_first = work.edge_count();
     libcpg::CfgExtractor::new().extract(&mut work);
+    let second_resolution = libcpg::resolve_calls(&mut work, &libcpg::ResolveConfig::default());
     libcpg::DfgExtractor::new().extract(&mut work);
     libcpg::PdgBuilder::new().build(&mut work, func);
+    assert_eq!(
+        second_resolution.resolutions, first_resolution.resolutions,
+        "call-resolution evidence stays deterministic on malformed input"
+    );
     assert_eq!(
         edges_after_first,
         work.edge_count(),
@@ -432,7 +438,9 @@ fn the_empty_graph_is_analyzable() {
 
     let mut work = cpg.clone();
     libcpg::CfgExtractor::new().extract(&mut work);
+    let resolution = libcpg::resolve_calls(&mut work, &libcpg::ResolveConfig::default());
     libcpg::DfgExtractor::new().extract(&mut work);
+    assert!(resolution.resolutions.is_empty());
     assert_eq!(work.node_count(), 0, "extraction adds no nodes");
 }
 
