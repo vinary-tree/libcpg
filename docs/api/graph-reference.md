@@ -257,7 +257,7 @@ The feature-free dominance API is exported from the crate root and
 | Function | Signature | Result |
 |---|---|---|
 | `dominator_tree` | `fn(&GraphProjection, NodeId) -> Result<DominatorTree, AnalysisError>` | Dominators of projection nodes reachable from the selected root. |
-| `post_dominator_tree` | `fn(&CodePropertyGraph, NodeId) -> Result<PostDominatorTree, AnalysisError>` | Post-dominators and reverse dominance frontier for one function CFG. |
+| `post_dominator_tree` | `fn(&CodePropertyGraph, NodeId) -> Result<PostDominatorTree, AnalysisError>` | Post-dominators and reverse dominance frontier for the shared reachable function CFG; returns `UnknownNode` / `NotAFunction` for invalid selectors. |
 
 `DominatorTree` exposes deterministic `idom`, `children`, and `frontier` maps,
 plus `immediate_dominator`, constant-time `dominates`, and the

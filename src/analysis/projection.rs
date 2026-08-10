@@ -336,18 +336,6 @@ impl UndirectedProjection {
     }
 }
 
-/// Shared function-scoped CFG view used by dominance and reachability passes.
-#[derive(Debug, Clone, PartialEq)]
-#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
-pub struct FunctionCfgView {
-    /// Intraprocedural control-flow projection.
-    pub projection: GraphProjection,
-    /// Dense identifier of the function entry node.
-    pub entry: u32,
-    /// Sorted dense identifiers of structural or explicit exit-like nodes.
-    pub exit_like: Vec<u32>,
-}
-
 /// Errors caused by selecting an invalid CPG projection scope.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, thiserror::Error)]
 pub enum ProjectionError {

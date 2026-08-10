@@ -3,6 +3,7 @@
 //! Unlike the feature-gated algorithm-family detector, analyses in this module
 //! compute graph properties exactly. They are available with `default = []`.
 
+pub(crate) mod cfg_scope;
 mod dominators;
 mod projection;
 mod resolve;
@@ -12,8 +13,7 @@ use crate::NodeId;
 
 pub use projection::{
     call_graph_projection, cfg_projection, dfg_projection, module_graph_projection, pdg_projection,
-    projection_of, FunctionCfgView, GraphProjection, ProjectionError, ProjectionKind,
-    UndirectedProjection,
+    projection_of, GraphProjection, ProjectionError, ProjectionKind, UndirectedProjection,
 };
 
 pub use dominators::{dominator_tree, post_dominator_tree, DominatorTree, PostDominatorTree};

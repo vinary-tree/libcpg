@@ -6,11 +6,9 @@
 
 use std::collections::{BTreeMap, BTreeSet};
 
-use rustc_hash::FxHashSet;
+use crate::{CodePropertyGraph, NodeId};
 
-use crate::{CfgEdgeKind, CodePropertyGraph, CpgEdgeKind, CpgNodeKind, NodeId};
-
-use super::{cfg_projection, AnalysisError, FunctionCfgView, GraphProjection};
+use super::{cfg_scope::function_cfg_view, AnalysisError, GraphProjection};
 
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
@@ -271,75 +269,6 @@ pub fn post_dominator_tree(
     })
 }
 
-fn function_cfg_view(
-    cpg: &CodePropertyGraph,
-    function: NodeId,
-) -> Result<FunctionCfgView, AnalysisError> {
-    // Reuse the public constructor for scope validation and the projection kind.
-    // The PDG compatibility view below deliberately retains the legacy
-    // reachable-over-CFG rule even for malformed cross-scope edges.
-    let base = cfg_projection(cpg, function)?;
-    let mut reachable = FxHashSet::default();
-    let mut stack = vec![function];
-    while let Some(node) = stack.pop() {
-        if !reachable.insert(node) {
-            continue;
-        }
-        let mut successors: Vec<_> = cpg
-            .cfg_successors(node)
-            .into_iter()
-            .filter(|(_, kind)| !matches!(kind, CfgEdgeKind::Call))
-            .map(|(successor, _)| successor)
-            .collect();
-        successors.sort_unstable();
-        successors.dedup();
-        successors.reverse();
-        stack.extend(successors);
-    }
-
-    let mut edges = Vec::new();
-    for edge in cpg.edges() {
-        if edge.kind.is_cfg()
-            && !matches!(edge.kind, CpgEdgeKind::ControlFlow(CfgEdgeKind::Call))
-            && reachable.contains(&edge.source)
-            && reachable.contains(&edge.target)
-        {
-            edges.push((edge.source, edge.target, 1.0));
-        }
-    }
-    let projection = GraphProjection::from_edges(base.kind, reachable.iter().copied(), edges);
-    let entry = projection
-        .dense_index(function)
-        .expect("the function entry is retained in its CFG projection");
-
-    let recorded_exits: FxHashSet<NodeId> = cpg
-        .cfg_exits()
-        .iter()
-        .copied()
-        .filter(|node| projection.dense_index(*node).is_some())
-        .collect();
-    let mut exit_like = Vec::new();
-    for dense in 0..projection.node_count() as u32 {
-        let node_id = projection.node_id(dense);
-        let explicit_exit = matches!(
-            cpg.node(node_id).map(|node| &node.kind),
-            Some(CpgNodeKind::Return) | Some(CpgNodeKind::Throw)
-        );
-        if projection.successors(dense).is_empty()
-            || explicit_exit
-            || recorded_exits.contains(&node_id)
-        {
-            exit_like.push(dense);
-        }
-    }
-
-    Ok(FunctionCfgView {
-        projection,
-        entry,
-        exit_like,
-    })
-}
-
 fn empty_post_dominator_tree(exits: Vec<NodeId>) -> PostDominatorTree {
     PostDominatorTree {
         exits,
@@ -586,8 +515,8 @@ mod tests {
 
     use super::*;
     use crate::{
-        CfgEdgeKind, CpgNode, Language, MethodSignature, PdgBuilder, ProjectionKind, ScopeId,
-        SourceRange, Visibility,
+        CfgEdgeKind, CpgEdgeKind, CpgNode, CpgNodeKind, Language, MethodSignature, PdgBuilder,
+        ProjectionKind, ScopeId, SourceRange, Visibility,
     };
 
     const LEGACY_VIRTUAL_EXIT: u32 = u32::MAX;
@@ -798,15 +727,11 @@ mod tests {
         }));
         assert_eq!(
             post_dominator_tree(&cpg, NodeId::new(99)),
-            Err(AnalysisError::Projection(
-                super::super::ProjectionError::UnknownNode(NodeId::new(99))
-            ))
+            Err(AnalysisError::UnknownNode(NodeId::new(99)))
         );
         assert_eq!(
             post_dominator_tree(&cpg, block),
-            Err(AnalysisError::Projection(
-                super::super::ProjectionError::NotAFunction(block)
-            ))
+            Err(AnalysisError::NotAFunction(block))
         );
     }
 

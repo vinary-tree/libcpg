@@ -67,6 +67,45 @@ when `f` is absent and `ProjectionError::NotAFunction` when it is not a
 function. `dfg_projection` deliberately accepts any AST scope root; an absent
 root yields an empty view instead of inventing a vertex.
 
+### The shared function CFG view
+
+Exact intraprocedural analyses need one additional contract beyond the public
+overlay constructor. The crate-private `analysis::cfg_scope` module builds a
+`FunctionCfgView` with three fields:
+
+| Field | Meaning |
+|---|---|
+| `projection` | CFG nodes reachable from the selected function through every `ControlFlow` edge except `Call`, encoded as canonical CSR. |
+| `entry` | The dense identifier that maps back to the selected function node. |
+| `exit_like` | Sorted dense identifiers for recorded CFG exits, structural sinks, and explicit `Return`/`Throw` nodes. |
+
+This internal view and `cfg_projection` intentionally answer related but
+different questions. `cfg_projection` selects CFG endpoints inside the
+function's AST scope, so it is suitable as a public overlay projection. The
+shared analysis view follows actual CFG reachability from the entry. That
+reachable rule preserves connective `Block` nodes and the historical
+`PdgBuilder` semantics even for a hand-built graph whose AST metadata is
+incomplete. Both exclude interprocedural `Call` edges.
+
+The construction is read-only and deterministic:
+
+```text
+FUNCTION_CFG_VIEW(cpg, function):
+    validate that function exists and has Function kind
+    reachable = iterative DFS from function over non-Call CFG successors
+    projection = induced non-Call CFG over reachable, normalized as CSR
+    entry = projection.dense_index(function)
+    recorded = cpg.cfg_exits intersect reachable
+    exit_like = sorted {d | d is a sink, recorded exit, Return, or Throw}
+    return (projection, entry, exit_like)
+```
+
+The view is crate-private because it is a coordination contract among
+post-dominance and the reachability/basic-block analyses, not a second public
+projection API. Invalid selectors become the shared
+`AnalysisError::UnknownNode` or `AnalysisError::NotAFunction` variants at this
+boundary.
+
 ### Traversal example
 
 The example below prints stable identifiers while traversing the compact dense

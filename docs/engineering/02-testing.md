@@ -22,11 +22,11 @@ think to write down.
 
 | Kind | Count | Where |
 | --- | ---: | --- |
-| All-feature library tests | 499 | inline `#[cfg(test)] mod …` next to the code; includes examples and properties |
+| All-feature library tests | 503 | inline `#[cfg(test)] mod …` next to the code; includes examples and properties |
 | Public-API integration tests | 12 | `tests/integration.rs` |
 | Malformed-input robustness tests | 5 | `tests/robustness.rs` |
-| **Executable test cases** | **516** | excludes three ignored rustdoc examples |
-| `proptest!` blocks (subset of the library/robustness rows) | 31 | inline property and regression modules |
+| **Executable test cases** | **520** | excludes three ignored rustdoc examples |
+| `proptest!` blocks (subset of the library/robustness rows) | 32 | inline property and regression modules |
 
 The all-feature library count is up from **99** inline tests and **zero**
 property tests before this work.
@@ -43,10 +43,10 @@ on the features enabled:
 
 | Command | Lib tests | Notes |
 | --- | ---: | --- |
-| `cargo test` | 218 | `default = []`: the feature-free surface only |
-| `cargo test --features "full rholang metta"` | 499 | the maximal matrix, including the Mode-B mappers |
+| `cargo test` | 221 | `default = []`: the feature-free surface only |
+| `cargo test --features "full rholang metta"` | 503 | the maximal matrix, including the Mode-B mappers |
 
-The feature-free 218 exercise the graph model, exact dominator/post-dominator
+The feature-free 221 exercise the graph model, exact dominator/post-dominator
 and CFG/call-graph SCC analyses, the CFG/DFG/PDG extractors, VF2, and similarity by building CPGs
 **by hand** — no grammar required. This is what
 the [`arb_well_formed_cpg`](#the-generators) generator exists for.
@@ -109,13 +109,14 @@ return.
 
 ## What the properties assert
 
-The invariants fall into nine families.
+The invariants fall into eleven families.
 
 | Family | Representative laws |
 | --- | --- |
 | **Round-trip / identity** | $`\mathit{deserialize} \circ \mathit{serialize} = \mathrm{id}`$ over the whole serializable surface; `NodeId`/`EdgeId`/`SourceRange` conversions; `Language` extension round-trip; $`\mathit{from\_kind} \circ \mathit{to\_cpg\_node\_kind} = \mathrm{id}`$ |
 | **Structural** | `add_node` yields sequential ids; `connect` is defined iff both endpoints exist; `ast_children` preserves insertion order; $`M = E - N + 2`$ (`cyclomatic_complexity`); `ast_depth` is bounded by the node count |
 | **Graph projections** | CSR nodes and adjacency are sorted; parallel-edge weights merge deterministically; transpose is an involution; all overlay constructors equal direct typed-edge traversal and do not mutate the CPG |
+| **Function CFG scope** | the reachable CFG view is invariant under node, edge, and recorded-exit insertion permutations; call edges never enter the view; dense entry/exit identifiers map back to the same stable nodes |
 | **Dominance** | CHK immediate dominators equal `petgraph::algo::dominators::simple_fast` under edge permutations; post-dominators and control edges equal the former PDG oracle; `PdgBuilder` emits exactly `PostDominatorTree::control_dependence_edges`; a 25,000-node path is stack-safe |
 | **SCC decomposition** | Every projected node occurs in exactly one component; the partition matches `petgraph::algo::tarjan_scc`; singleton cycles require a self-loop; the condensation graph is acyclic; a 50,000-node path does not overflow the native stack |
 | **Call resolution** | resolution records and call edges are invariant under node/edge insertion permutations; duplicate names add zero call topology and preserve the SCC partition; repeated resolution is idempotent; candidate/call caps preserve the evidence boundary |
@@ -242,16 +243,18 @@ cargo +nightly cov-branch           # branch coverage needs nightly
 
 | Metric | Coverage | Lowest file |
 | --- | ---: | --- |
-| Lines | **97.79 %** | 91.67 % (`language.rs`) |
-| Regions | **97.72 %** | — |
-| Functions | **98.03 %** | — |
-| Branches | **82.63 %** | see below |
+| Lines | **97.82 %** | 91.67 % (`language.rs`) |
+| Regions | **97.74 %** | — |
+| Functions | **98.05 %** | — |
+| Branches | **82.84 %** | see below |
 
 Every source file is above 90 % line coverage; eleven are at 100 %.
-The new `analysis/dominators.rs` module measures **97.72 %** line and
-**81.58 %** branch coverage, above the epic's 90 % / 80 % thresholds.
+The `analysis/dominators.rs` module measures **97.50 %** line and
+**80.21 %** branch coverage, above the epic's 90 % / 80 % thresholds.
 The new `analysis/resolve.rs` module measures **98.99 %** line and
 **87.96 %** branch coverage, above the same thresholds.
+The new `analysis/cfg_scope.rs` module measures **100 %** line and
+**92.86 %** branch coverage, above the same thresholds.
 
 **On branch coverage.** `-Z coverage-options=branch` is nightly-only, and it
 counts *condition outcomes* (`if`, `&&`, `||`, `while`) — not `match` arms,

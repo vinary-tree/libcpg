@@ -91,7 +91,7 @@ libcpg is a small set of modules; four are always compiled, the rest are feature
 | Module | Gate | Responsibility |
 |--------|------|----------------|
 | `graph` | always | `CodePropertyGraph` and the graph vocabulary: `CpgNode`/`CpgNodeKind`, `CpgEdge`/`CpgEdgeKind`/`CfgEdgeKind`/`DfgEdgeKind`, `NodeId`/`EdgeId`, `SourceRange`, `Language`/`Paradigm`, `CpgStats`. |
-| `analysis` | always | Deterministic projections; dominator/post-dominator trees and frontiers; per-function CFG and whole-CPG call-graph SCC decomposition, cycle classification, membership lookup, and condensation DAGs. |
+| `analysis` | always | Deterministic projections; a shared reachable per-function CFG scope; dominator/post-dominator trees and frontiers; per-function CFG and whole-CPG call-graph SCC decomposition, cycle classification, membership lookup, and condensation DAGs. |
 | `builder` | always | Construction: the `CpgBuilder` trait, `TreeSitterCpgBuilder`, `CfgExtractor`, `DfgExtractor`, `PdgBuilder`, `backward_slice`/`forward_slice`, def-use chains, plus `NodeMapper` and `ParserRegistry`. |
 | `pattern` | always | Generic subgraph matching and similarity: `Vf2Matcher`/`Vf2State` ([VF2](../GLOSSARY.md#vf2)), `GraphSimilarity`/`SimilarityMetric`, `PatternMatch`, the `SubgraphMatcher` trait, and pattern templates. |
 | `patterns` | `design-patterns` | [Gang-of-Four](../GLOSSARY.md#gang-of-four-gof) detection: `GofPatternDetector`, the 23 `GofPattern` templates, [DPML](../GLOSSARY.md#dpml-design-pattern-markup-language), classification, and `PatternMetrics`. |

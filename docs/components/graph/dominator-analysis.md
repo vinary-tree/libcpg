@@ -113,8 +113,10 @@ assert!(tree.dominates(entry, join));
 ## `PostDominatorTree` contract
 
 `post_dominator_tree` validates that `function` exists and is a function, then
-selects its CFG reachable from the function node. Interprocedural
-`CfgEdgeKind::Call` edges are excluded. Its modeled exit set is the sorted union
+uses the shared crate-private `FunctionCfgView` to select its CFG reachable from
+the function node. Interprocedural `CfgEdgeKind::Call` edges are excluded. An
+absent selector returns `AnalysisError::UnknownNode`; a non-function selector
+returns `AnalysisError::NotAFunction`. Its modeled exit set is the sorted union
 of:
 
 - exits recorded by the CFG extractor;
@@ -170,8 +172,9 @@ CHK(graph, root):
     intervals = iterative_euler_tour(children)
 ```
 
-`dominator_tree` applies CHK directly. `post_dominator_tree` reverses the
-intraprocedural CFG, adds the synthetic exit root, and invokes the same engine.
+`dominator_tree` applies CHK directly. `post_dominator_tree` obtains the
+canonical reachable CFG and exit-like set from `analysis::cfg_scope`, reverses
+that projection, adds the synthetic exit root, and invokes the same engine.
 An iterative DFS computes reverse postorder, and an iterative Euler tour assigns
 private entry/exit timestamps. Therefore deep paths do not consume the native
 call stack, while interval containment implements `dominates` and
@@ -197,8 +200,10 @@ time dominance queries as well as visible maps.
 
 Validation includes exact diamond and conditional examples, unknown and
 non-function errors, singleton and exit-free CFGs, mixed finite/infinite
-regions, a 25,000-node path, serde round-tripping, and two 256-case
-property-based suites. Forward immediate dominators are checked against
+regions, a 25,000-node path, serde round-tripping, and three 256-case
+property-based suites. The shared CFG view is invariant under node, edge, and
+exit insertion permutations and is checked against the former PDG scope rules
+over a parsed Rust corpus. Forward immediate dominators are checked against
 `petgraph::algo::dominators::simple_fast`; post-dominators and control
 dependence are checked against the former production PDG algorithm. Parsed-Rust
 integration tests also prove that `PdgBuilder` emits exactly the public tree's

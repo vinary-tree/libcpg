@@ -2,7 +2,9 @@
 !include _libcpg-theme.iuml
 title Dominator analysis — one deterministic engine, two directions
 
+rectangle "CodePropertyGraph\ntyped CFG overlay" as CPG #F1F3F5
 rectangle "GraphProjection\nforward + reverse CSR" as PROJECTION #DBE4FF
+rectangle "FunctionCfgView\nreachable CFG · entry · exit_like" as SCOPE #D8F5A2
 rectangle "iterative reverse postorder\nsorted adjacency" as RPO #FFE8CC
 rectangle "Cooper–Harvey–Kennedy\nbounded idom fixed point" as CHK #FFF3BF
 rectangle "tree + Cytron frontier\niterative Euler intervals" as RESULTS #D3F9D8
@@ -16,7 +18,8 @@ RPO --> CHK
 CHK --> RESULTS
 RESULTS --> DOM
 
-PROJECTION --> REVERSE : post_dominator_tree(function)
+CPG --> SCOPE : post_dominator_tree(function)
+SCOPE --> REVERSE : projection + exits
 REVERSE --> RPO
 RESULTS --> POSTDOM
 POSTDOM --> PDG : sorted controller → dependent
@@ -29,7 +32,9 @@ end note
 
 legend right
   |= colour |= role |
+  |<#F1F3F5>| source CPG |
   |<#DBE4FF>| deterministic graph substrate |
+  |<#D8F5A2>| shared function scope |
   |<#FFE8CC>| traversal order |
   |<#FFF3BF>| bounded fixed point |
   |<#D3F9D8>| shared derived relations |
