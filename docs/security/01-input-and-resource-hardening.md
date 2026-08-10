@@ -26,6 +26,7 @@ Source: [`diagrams/resource-bounds.puml`](../diagrams/resource-bounds.puml).*
 | DFG structural guards | always on | `DfgExtractor` | loop bodies receive exactly two passes; an AST path set cuts malformed cycles |
 | `backward_slice` / `forward_slice` `max_nodes` | *(caller-supplied argument)* | crate-root slice fns | BFS returns as soon as the slice reaches `max_nodes` |
 | AST traversal guards | *(always on)* | `ast_descendants` / `ast_ancestors` / `ast_depth`, SCC scope discovery, `CfgExtractor`, DFG reaching-defs | a cyclic `AstChild` graph terminates instead of looping or overflowing the stack |
+| CFG reachability guard | *(always on)* | `unreachable_code` | iterative DFS expands each function-scoped CFG node at most once; `Call` edges and nested functions are excluded |
 
 All of these are on the **feature-free surface** — you can configure and use them
 with `default = []`.
@@ -241,6 +242,7 @@ correctness**: an analysis may return a meaningless answer, but it must
 | `ast_ancestors` | additionally stops at a parent pointer that names a node not in the graph, rather than returning an id `node()` cannot resolve |
 | `control_flow_sccs` / `call_graph_sccs` | a visited set guards AST scope discovery; dense discovery/low-link arrays and explicit DFS/component stacks make iterative Tarjan visit every projected vertex and normalized edge without consuming native stack per path element |
 | `loop_forest` | the shared visited function scope, iterative dominator/SCC/DFS walks, iterative reverse-body closure, and iterative nesting walk avoid recursion; a 25,000-node natural loop is regression-tested |
+| `unreachable_code` | visited function-scope and dense CFG sets bound discovery; iterative DFS is stack-safe on a 25,000-node reachable/disconnected graph |
 | `build_symbol_table` / `resolve_calls` | visited sets cut parent and callee-subtree cycles; deterministic scope-depth, candidate-retention, and call-count caps bound configured work |
 | `CfgExtractor::process_node` (and every `process_*` handler) | a **path set** on `CfgContext` — a node already on the current recursion path becomes its own exit instead of being re-entered |
 | DFG reaching definitions (`visit_reaching`) | a **path set** — same rule |

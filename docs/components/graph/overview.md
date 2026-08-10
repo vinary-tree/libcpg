@@ -276,6 +276,9 @@ So the safe pattern is: build (single-threaded, `&mut`), then analyse
 - [Natural loops and nesting](loop-analysis.md) — dominator-qualified headers,
   shared latches, conservative irreducible regions, strict nesting, and loop
   exits.
+- [CFG reachability and dead branches](reachability-analysis.md) — deterministic
+  reachable/unreachable partitions, post-terminator islands, and read-only
+  structural branch evidence.
 - [Evidence-bounded call resolution](call-resolution.md) — deterministic
   lexical symbols, confidence tiers, and the conservative boundary between
   recorded evidence and definite call topology.

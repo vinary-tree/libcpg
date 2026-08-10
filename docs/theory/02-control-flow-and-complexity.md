@@ -102,6 +102,25 @@ composes from:
 
 *Figure — the canonical CFG shapes for `if`, `while`, and `try` constructs. Source: [`diagrams/cfg-control-constructs.dot`](../diagrams/cfg-control-constructs.dot).*
 
+### Reachability and preserved dead source
+
+For entry $`r`$, CFG reachability is the least set $`R`$ containing $`r`$ and
+closed under the successor relation:
+
+```math
+r \in R
+\quad\land\quad
+(u \in R \land (u,v) \in E_{\mathrm{CFG}}) \Longrightarrow v \in R
+```
+
+The feature-free [`unreachable_code`](../components/graph/reachability-analysis.md)
+analysis computes that closure iteratively and partitions the function-scoped
+CFG universe into $`R`$ and $`U \setminus R`$. The latter nodes are preserved
+source, not deleted graph elements. This lets a consumer diagnose statements
+after a terminator while retaining their AST parents, ranges, and data-flow
+evidence. `Call` edges and nested functions are outside this intraprocedural
+universe.
+
 ## 4. Cyclomatic complexity
 
 McCabe [[1]](#references) proposed measuring a procedure's structural complexity by
@@ -205,7 +224,9 @@ the effort of testing a routine.
   *asymptotic* notion — not to be confused with McCabe's structural $`M`$).
 - Construction details: [`components/builder/cfg.md`](../components/builder/cfg.md);
   the edge catalogue: [`components/graph/edges.md`](../components/graph/edges.md);
-  traversal recipes: [`components/graph/traversal.md`](../components/graph/traversal.md).
+  traversal recipes: [`components/graph/traversal.md`](../components/graph/traversal.md);
+  reachable/unreachable partitioning:
+  [`components/graph/reachability-analysis.md`](../components/graph/reachability-analysis.md).
 
 ## References
 

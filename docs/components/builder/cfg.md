@@ -148,6 +148,15 @@ site, so retyping does not add an edge or alter cyclomatic complexity. A **termi
 the block records its exits and stops threading (subsequent statements are still processed
 for completeness but are unreachable).
 
+Termination also propagates through transparent parser wrappers and compound
+children whose nonempty exit set consists entirely of `Return`/`Throw` nodes.
+This covers Rust's `expression_statement → Return` shape and branches whose
+every arm returns. `Break`/`Continue` exits exposed by a loop are not promoted:
+they are ordinary continuations of the enclosing loop. The resulting
+post-terminator CFG islands are classified by
+[`unreachable_code`](../graph/reachability-analysis.md) without deleting their
+source nodes.
+
 ---
 
 ## Loop and exception context: `CfgContext`

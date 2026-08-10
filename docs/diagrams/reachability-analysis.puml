@@ -1,0 +1,64 @@
+@startuml
+!include _libcpg-theme.iuml
+title CFG reachability — scope, partition, and read-only evidence
+
+rectangle "CodePropertyGraph\nAST + typed CFG overlay" as CPG #F1F3F5
+rectangle "function AST scope\nstop before nested functions" as SCOPE #FFE8CC
+rectangle "CFG universe U\nview nodes + scoped non-Call endpoints" as UNIVERSE #DBE4FF
+rectangle "FunctionCfgView\nentry-reachable non-Call edges" as VIEW #D8F5A2
+rectangle "iterative DFS\nvisited dense identifiers" as DFS #C3FAE8
+rectangle "partition decision\n<latex>r \leadsto v</latex>?" as DECIDE #FFF3BF
+rectangle "reachable R\nsorted NodeId vector" as REACHABLE #D3F9D8
+rectangle "unreachable D\nsorted NodeId vector" as UNREACHABLE #FFC9C9
+rectangle "conditional-edge scan\nguard · kind · target" as BRANCH_SCAN #FFE8CC
+rectangle "DeadBranch records\ncanonical structural evidence" as DEAD #FFD8A8
+rectangle "ReachabilityReport\nout-of-graph · deterministic" as REPORT #E5DBFF
+
+rectangle "CfgExtractor block" as BUILDER #F1F3F5
+rectangle "Return / Break / Continue / Throw\nor terminal wrapper/branch" as TERMINATOR #FFF3BF
+rectangle "clear fallthrough exits\npreserve later AST siblings" as DISCONNECT #FFC9C9
+
+CPG --> SCOPE
+SCOPE --> UNIVERSE : induced CFG endpoints
+SCOPE --> VIEW : constrain traversal
+VIEW --> UNIVERSE : retain CFG-only fallback
+UNIVERSE --> DECIDE
+VIEW --> DFS
+DFS --> DECIDE : visited set
+DECIDE --> REACHABLE : yes
+DECIDE --> UNREACHABLE : no
+UNREACHABLE --> BRANCH_SCAN
+CPG --> BRANCH_SCAN : typed conditional edges
+BRANCH_SCAN --> DEAD
+REACHABLE --> REPORT
+UNREACHABLE --> REPORT
+DEAD --> REPORT
+
+BUILDER --> TERMINATOR : process child
+TERMINATOR --> DISCONNECT : termination propagates
+DISCONNECT ..> CPG : disconnected CFG island
+
+note bottom of REPORT
+  No node or edge is added, removed, or retyped.
+  is_reachable uses the sorted reachable partition.
+end note
+
+note bottom of DECIDE
+  <latex>R \cap D = \varnothing</latex>
+  <latex>R \cup D = U</latex>
+end note
+
+legend right
+  |= colour |= role |
+  |<#F1F3F5>| source graph or builder |
+  |<#FFE8CC>| AST scope / edge evidence scan |
+  |<#DBE4FF>| complete CFG universe |
+  |<#D8F5A2>| reachable function view |
+  |<#C3FAE8>| iterative traversal |
+  |<#FFF3BF>| reachability / termination decision |
+  |<#D3F9D8>| reachable partition |
+  |<#FFC9C9>| unreachable island |
+  |<#FFD8A8>| structural dead-branch evidence |
+  |<#E5DBFF>| public immutable report |
+endlegend
+@enduml

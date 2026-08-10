@@ -25,6 +25,7 @@ Combining these views enables, for example: **taint / vulnerability queries**
 (subgraph matching), **exact dominance analysis** (dominators, post-dominators,
 and control frontiers), **exact SCC decomposition** (cycles and recursion),
 **natural-loop forests** (headers, latches, nesting, and irreducibility),
+**CFG reachability reports** (unreachable nodes and structural dead branches),
 **algorithm detection** (from control-flow structure),
 **code-clone detection** (graph similarity), and **complexity analysis**.
 
@@ -94,7 +95,7 @@ let slice = backward_slice(&cpg, func, 256);         // bounded backward slice
 ### Components
 
 #### Graph core
-[Overview](components/graph/overview.md) · [Nodes](components/graph/nodes.md) · [Edges](components/graph/edges.md) · [Traversal](components/graph/traversal.md) · [Deterministic projections](components/graph/projections.md) · [Dominators and post-dominators](components/graph/dominator-analysis.md) · [Strongly-connected components](components/graph/scc-analysis.md) · [Natural loops and nesting](components/graph/loop-analysis.md) · [Evidence-bounded call resolution](components/graph/call-resolution.md)
+[Overview](components/graph/overview.md) · [Nodes](components/graph/nodes.md) · [Edges](components/graph/edges.md) · [Traversal](components/graph/traversal.md) · [Deterministic projections](components/graph/projections.md) · [Dominators and post-dominators](components/graph/dominator-analysis.md) · [Strongly-connected components](components/graph/scc-analysis.md) · [Natural loops and nesting](components/graph/loop-analysis.md) · [CFG reachability and dead branches](components/graph/reachability-analysis.md) · [Evidence-bounded call resolution](components/graph/call-resolution.md)
 
 #### Builder
 [Overview](components/builder/overview.md) · [CFG extraction](components/builder/cfg.md) · [DFG extraction](components/builder/dfg.md) · [PDG & slicing](components/builder/pdg-and-slicing.md) · [Node mapper](components/builder/node-mapper.md)

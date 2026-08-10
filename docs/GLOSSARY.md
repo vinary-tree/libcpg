@@ -119,6 +119,15 @@ A reusable solution to a recurring design problem. `libcpg` detects the 23 [Gang
 
 Node $`d`$ **dominates** node $`n`$ if every path from entry to $`n`$ passes through $`d`$; $`p`$ **post-dominates** $`n`$ if every modeled path from $`n`$ to exit passes through $`p`$. Post-dominators are dominators computed on the *reversed* CFG. `libcpg` exposes deterministic `DominatorTree` and `PostDominatorTree` results from one feature-free Cooper–Harvey–Kennedy engine. Prerequisite for [control dependence](#control-dependence). See [`components/graph/dominator-analysis.md`](components/graph/dominator-analysis.md).
 
+### Dead branch / Unreachable code
+
+A CFG node is **unreachable** when no directed path reaches it from its function
+entry. A plain `ReachabilityReport` calls a conditional CFG edge a **dead
+branch** when its target lies in an unreachable CFG island; value-sensitive
+refinement can additionally prove a branch dead from a reachable constant
+guard. `libcpg` preserves the nodes and reports this evidence out of graph. See
+[`components/graph/reachability-analysis.md`](components/graph/reachability-analysis.md).
+
 ### Dominance frontier / Reverse dominance frontier
 
 The **dominance frontier** of node $`d`$ is the set of nodes where $`d`$'s dominance "stops" — the join points just beyond $`d`$'s dominated region (Cytron et al. [[3]](#references)). Computing it on the *reversed* CFG (the **reverse dominance frontier**) yields exactly the [control-dependence](#control-dependence) relation. See [`components/graph/dominator-analysis.md`](components/graph/dominator-analysis.md) and [`theory/04-program-dependence-and-slicing.md`](theory/04-program-dependence-and-slicing.md).

@@ -7,6 +7,7 @@ pub(crate) mod cfg_scope;
 mod dominators;
 mod loops;
 mod projection;
+mod reachability;
 mod resolve;
 mod scc;
 
@@ -20,6 +21,8 @@ pub use projection::{
 pub use dominators::{dominator_tree, post_dominator_tree, DominatorTree, PostDominatorTree};
 
 pub use loops::{loop_forest, LoopExitEdge, LoopForest, NaturalLoop};
+
+pub use reachability::{unreachable_code, DeadBranch, ReachabilityReport};
 
 pub use resolve::{
     build_symbol_table, resolve_calls, CallGraphResolution, CallResolution, Confidence,

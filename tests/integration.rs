@@ -98,14 +98,72 @@ mod dominator_analysis {
     }
 }
 
+mod reachability_analysis {
+    use libcpg::{
+        unreachable_code, CfgEdgeKind, CodePropertyGraph, CpgEdgeKind, CpgNode, CpgNodeKind,
+        Language, MethodSignature, NodeId, ScopeId, SourceRange, Visibility,
+    };
+
+    fn node(id: u32, kind: CpgNodeKind) -> CpgNode {
+        CpgNode::new(NodeId::new(id), kind, SourceRange::default())
+    }
+
+    #[test]
+    fn root_api_partitions_cfg_nodes_without_mutating_the_graph() {
+        let mut cpg = CodePropertyGraph::new(Language::Rust);
+        let function = cpg.add_node_with_id(node(
+            10,
+            CpgNodeKind::Function {
+                signature: MethodSignature {
+                    name: "f".into(),
+                    params: Default::default(),
+                    return_type: None,
+                    is_static: false,
+                    is_async: false,
+                    visibility: Visibility::Private,
+                },
+            },
+        ));
+        let live = cpg.add_node_with_id(node(
+            20,
+            CpgNodeKind::Block {
+                scope: ScopeId::GLOBAL,
+            },
+        ));
+        let dead = cpg.add_node_with_id(node(30, CpgNodeKind::If));
+        let dead_target = cpg.add_node_with_id(node(40, CpgNodeKind::Return));
+        for child in [live, dead, dead_target] {
+            cpg.connect(function, child, CpgEdgeKind::AstChild);
+        }
+        cpg.connect(
+            function,
+            live,
+            CpgEdgeKind::ControlFlow(CfgEdgeKind::Sequential),
+        );
+        cpg.connect(
+            dead,
+            dead_target,
+            CpgEdgeKind::ControlFlow(CfgEdgeKind::ConditionalTrue),
+        );
+
+        let before = (cpg.node_count(), cpg.edge_count());
+        let report = unreachable_code(&cpg, function).expect("function reachability");
+        assert_eq!(report.reachable, vec![function, live]);
+        assert_eq!(report.unreachable, vec![dead, dead_target]);
+        assert_eq!(report.dead_branches.len(), 1);
+        assert_eq!((cpg.node_count(), cpg.edge_count()), before);
+    }
+}
+
 #[cfg(feature = "lang-rust")]
 mod rust_pipeline {
     use std::collections::BTreeSet;
 
     use libcpg::{
         backward_slice, call_graph_projection, cfg_projection, dominator_tree, forward_slice,
-        loop_forest, post_dominator_tree, CpgBuilder, CpgBuilderConfig, CpgEdgeKind, CpgNodeKind,
-        DfgEdgeKind, Language, LiteralKind, PdgBuilder, TreeSitterCpgBuilder,
+        loop_forest, post_dominator_tree, unreachable_code, CpgBuilder, CpgBuilderConfig,
+        CpgEdgeKind, CpgNodeKind, DfgEdgeKind, Language, LiteralKind, PdgBuilder,
+        TreeSitterCpgBuilder,
     };
 
     const SRC: &str = "fn f(x: i32) -> i32 { let y = x + 1; if y > 0 { y } else { 0 } }";
@@ -208,6 +266,34 @@ mod rust_pipeline {
                 CpgEdgeKind::ControlFlow(libcpg::CfgEdgeKind::LoopExit)
             )
         }));
+    }
+
+    #[test]
+    fn parsed_statements_after_return_are_reported_unreachable() {
+        const DEAD_SRC: &str = r#"
+            fn dead_tail() {
+                return;
+                let first = 1;
+                let second = first + 1;
+            }
+        "#;
+        let cpg = TreeSitterCpgBuilder::new()
+            .build(DEAD_SRC, Language::Rust)
+            .expect("build function with a dead tail");
+        let function = cpg.functions().next().expect("dead_tail function").id;
+        let report = unreachable_code(&cpg, function).expect("reachability report");
+        let dead_declarations: Vec<_> = cpg
+            .variables()
+            .filter(|node| matches!(node.name(), Some("first" | "second")))
+            .map(|node| node.id)
+            .collect();
+        assert_eq!(dead_declarations.len(), 2);
+        assert!(
+            dead_declarations
+                .iter()
+                .all(|node| report.unreachable.binary_search(node).is_ok()),
+            "dead declarations {dead_declarations:?} were not all in {report:?}"
+        );
     }
 
     #[test]

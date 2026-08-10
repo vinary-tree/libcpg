@@ -285,6 +285,16 @@ fn exercise_every_analysis(cpg: &CodePropertyGraph, func: NodeId) {
     // --- extractors ---
     let mut work = cpg.clone();
     libcpg::CfgExtractor::new().extract(&mut work);
+    let reachability = libcpg::unreachable_code(&work, func).expect("func remains a function");
+    assert!(reachability
+        .reachable
+        .iter()
+        .chain(&reachability.unreachable)
+        .all(|node| work.node(*node).is_some()));
+    assert!(reachability
+        .reachable
+        .iter()
+        .all(|node| reachability.unreachable.binary_search(node).is_err()));
     let loops = libcpg::loop_forest(&work, func).expect("func remains a function");
     assert!(loops.max_depth() <= loops.loops.len());
     for natural_loop in &loops.loops {
@@ -430,6 +440,10 @@ fn an_absent_node_id_is_inert_everywhere() {
     );
     assert_eq!(
         libcpg::loop_forest(&cpg, dangling()),
+        Err(libcpg::AnalysisError::UnknownNode(dangling()))
+    );
+    assert_eq!(
+        libcpg::unreachable_code(&cpg, dangling()),
         Err(libcpg::AnalysisError::UnknownNode(dangling()))
     );
 

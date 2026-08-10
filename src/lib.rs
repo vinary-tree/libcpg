@@ -8,6 +8,7 @@
 //!
 //! - **Graph Construction**: Build CPGs from source code via tree-sitter ASTs
 //! - **SCC Analysis**: Decompose per-function CFGs and resolved call graphs
+//! - **CFG Reachability**: Report unreachable nodes and structural dead branches
 //! - **Graph Projections**: Build deterministic forward/reverse CSR views
 //! - **Pattern Detection**: Detect design patterns using subgraph isomorphism (VF2/VF3)
 //! - **Algorithm Analysis**: Extract algorithm signatures and estimate complexity
@@ -68,11 +69,11 @@ pub use graph::{
 pub use analysis::{
     build_symbol_table, call_graph_projection, call_graph_sccs, cfg_projection, control_flow_sccs,
     dfg_projection, dominator_tree, loop_forest, module_graph_projection, pdg_projection,
-    post_dominator_tree, projection_of, resolve_calls, AnalysisError, CallGraphResolution,
-    CallResolution, Confidence, DominatorTree, GraphProjection, LoopExitEdge, LoopForest,
-    NaturalLoop, PostDominatorTree, ProjectionError, ProjectionKind, ResolveConfig,
-    SccAnalysisError, SccComponent, SccCondensationEdge, SccDecomposition, SccProjection,
-    SymbolCandidates, SymbolTable, UndirectedProjection,
+    post_dominator_tree, projection_of, resolve_calls, unreachable_code, AnalysisError,
+    CallGraphResolution, CallResolution, Confidence, DeadBranch, DominatorTree, GraphProjection,
+    LoopExitEdge, LoopForest, NaturalLoop, PostDominatorTree, ProjectionError, ProjectionKind,
+    ReachabilityReport, ResolveConfig, SccAnalysisError, SccComponent, SccCondensationEdge,
+    SccDecomposition, SccProjection, SymbolCandidates, SymbolTable, UndirectedProjection,
 };
 
 pub use builder::{

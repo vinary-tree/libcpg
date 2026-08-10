@@ -181,13 +181,28 @@ impl CfgExtractor {
 
             // Check if this child terminates (return, break, continue, throw)
             let child_kind = cpg.node(child_id).map(|n| n.kind.clone());
-            let is_terminator = matches!(
+            let is_direct_terminator = matches!(
                 child_kind.as_ref(),
                 Some(CpgNodeKind::Return)
                     | Some(CpgNodeKind::Break)
                     | Some(CpgNodeKind::Continue)
                     | Some(CpgNodeKind::Throw)
             );
+            // Several grammars retain a transparent statement wrapper around
+            // `return` (Rust's `expression_statement` is one example). Branch
+            // constructs can likewise expose only terminal exits when every
+            // arm returns. Propagate that fact instead of wiring the terminal
+            // node into the following statement. Break/continue exits are not
+            // included here: loop handlers deliberately promote those nodes
+            // to ordinary exits of the enclosing loop.
+            let has_only_function_terminal_exits = !child_exits.is_empty()
+                && child_exits.iter().all(|&exit| {
+                    matches!(
+                        cpg.node(exit).map(|node| &node.kind),
+                        Some(CpgNodeKind::Return) | Some(CpgNodeKind::Throw)
+                    )
+                });
+            let is_terminator = is_direct_terminator || has_only_function_terminal_exits;
 
             if is_terminator {
                 // Terminator doesn't pass control to next statement
@@ -1581,6 +1596,69 @@ mod tests {
         assert!(
             cpg.cfg_exits().contains(&ret),
             "`return` exits the function"
+        );
+    }
+
+    /// A transparent parser wrapper around `return` preserves termination.
+    #[test]
+    fn wrapped_return_does_not_fall_through_to_the_next_statement() {
+        let mut cpg = CodePropertyGraph::new(Language::Rust);
+        let (func, body) = shell(&mut cpg);
+        let wrapper = ast_child(
+            &mut cpg,
+            body,
+            CpgNodeKind::Unknown {
+                kind: "expression_statement".into(),
+            },
+        );
+        let ret = ast_child(&mut cpg, wrapper, CpgNodeKind::Return);
+        let after = ast_child(&mut cpg, body, ident("dead"));
+
+        CfgExtractor::new().extract_function_cfg(&mut cpg, func);
+
+        assert!(has_cfg(&cpg, wrapper, ret, CfgEdgeKind::Sequential));
+        assert!(
+            !cpg.cfg_predecessors(after)
+                .iter()
+                .any(|(source, _)| *source == ret),
+            "a terminal exit exposed by a wrapper must not reach its sibling"
+        );
+    }
+
+    /// An `if` whose every branch returns terminates the enclosing block.
+    #[test]
+    fn all_returning_branches_do_not_fall_through() {
+        let mut cpg = CodePropertyGraph::new(Language::Rust);
+        let (func, body) = shell(&mut cpg);
+        let branch = ast_child(&mut cpg, body, CpgNodeKind::If);
+        let condition = ast_child(&mut cpg, branch, ident("condition"));
+        let then_block = ast_child(&mut cpg, branch, block());
+        let then_return = ast_child(&mut cpg, then_block, CpgNodeKind::Return);
+        let else_block = ast_child(&mut cpg, branch, block());
+        let else_return = ast_child(&mut cpg, else_block, CpgNodeKind::Return);
+        let after = ast_child(&mut cpg, body, ident("dead"));
+
+        CfgExtractor::new().extract_function_cfg(&mut cpg, func);
+
+        assert!(has_cfg(
+            &cpg,
+            condition,
+            then_block,
+            CfgEdgeKind::ConditionalTrue
+        ));
+        assert!(has_cfg(
+            &cpg,
+            condition,
+            else_block,
+            CfgEdgeKind::ConditionalFalse
+        ));
+        assert!(
+            [then_return, else_return].iter().all(|terminal| {
+                !cpg.cfg_predecessors(after)
+                    .iter()
+                    .any(|(source, _)| source == terminal)
+            }),
+            "no all-return branch may be threaded into the next statement"
         );
     }
 

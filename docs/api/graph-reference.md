@@ -307,6 +307,27 @@ See the [natural-loop component guide](../components/graph/loop-analysis.md)
 for definitions, natural and irreducible pseudocode, builder `LoopExit`
 semantics, nesting invariants, complexity, citations, and validation oracles.
 
+### CFG reachability and dead branches
+
+The feature-free reachability API partitions the complete function-scoped CFG
+universe without mutating the CPG:
+
+| Function | Signature | Result |
+|---|---|---|
+| `unreachable_code` | `fn unreachable_code(&CodePropertyGraph, NodeId) -> Result<ReachabilityReport, AnalysisError>` | Sorted reachable and unreachable CFG nodes plus conditional edges in unreachable islands. |
+
+`ReachabilityReport` exposes `function`, `reachable`, `unreachable`, and
+`dead_branches`; `is_reachable(NodeId)` performs a binary search over the sorted
+reachable partition. Each `DeadBranch` records `guard`, `edge_kind`, and
+`target`. The universe unions the entry-reachable projection with scoped
+non-`Call` CFG endpoints, excludes nested functions when AST scope evidence
+exists, and preserves every CPG node and edge.
+Invalid selectors return `UnknownNode` or `NotAFunction`.
+
+See the [reachability component guide](../components/graph/reachability-analysis.md)
+for partition laws, builder termination semantics, pseudocode, complexity,
+examples, security boundaries, and independent property-test oracles.
+
 ### Subgraph extraction
 
 | Method | Signature | Notes |

@@ -40,6 +40,12 @@ pub(crate) fn function_cfg_view(
 
     let mut reachable = FxHashSet::default();
     let mut stack = vec![function];
+    // Parser-built and well-formed hand-built CPGs provide an AST scope, which
+    // is the authoritative intraprocedural boundary. Legacy CFG-only fixtures
+    // have no AST children at all; retain their established behavior by using
+    // CFG reachability as the fallback scope rather than collapsing the view to
+    // an isolated function node.
+    let has_ast_scope = !cpg.ast_children(function).is_empty();
     while let Some(node) = stack.pop() {
         if !reachable.insert(node) {
             continue;
@@ -47,7 +53,10 @@ pub(crate) fn function_cfg_view(
         let mut successors: Vec<_> = cpg
             .cfg_successors(node)
             .into_iter()
-            .filter(|(_, kind)| !matches!(kind, CfgEdgeKind::Call))
+            .filter(|(successor, kind)| {
+                !matches!(kind, CfgEdgeKind::Call)
+                    && (!has_ast_scope || base.dense_index(*successor).is_some())
+            })
             .map(|(successor, _)| successor)
             .collect();
         successors.sort_unstable();

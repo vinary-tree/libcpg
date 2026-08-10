@@ -142,6 +142,9 @@ function's control-flow overlay — McCabe's metric, surfaced as
   with petgraph's independent implementations.
 - **Stable ids survive mutation.** The `NodeId → NodeIndex` map means public ids
   are not perturbed by internal graph operations; callers can cache them.
+- **Dead source remains analyzable.** `unreachable_code` returns an out-of-graph
+  partition and branch records rather than removing post-terminator nodes, so
+  AST identity, source locations, and every other overlay remain intact.
 - **One serialization boundary.** With the `serde` feature the entire graph —
   all overlays at once — round-trips through `serde_json` via a derive
   (`petgraph/serde-1`); there is no per-overlay export format to keep in sync.
