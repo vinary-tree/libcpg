@@ -8,10 +8,10 @@
 
 use std::collections::{BTreeMap, BTreeSet};
 
-use crate::{CfgEdgeKind, CodePropertyGraph, CpgEdgeKind, NodeId};
+use crate::{CfgEdgeKind, CodePropertyGraph, NodeId};
 
 use super::{
-    cfg_scope::function_cfg_view,
+    cfg_scope::{function_cfg_edges, function_cfg_view},
     dominator_tree,
     scc::{decompose, SccProjection},
     AnalysisError, DominatorTree, GraphProjection,
@@ -122,7 +122,7 @@ pub fn loop_forest(cpg: &CodePropertyGraph, function: NodeId) -> Result<LoopFore
     let projection = &view.projection;
     let entry = projection.node_id(view.entry);
     let dominators = dominator_tree(projection, entry)?;
-    let cfg_edges = intraprocedural_cfg_edges(cpg, projection);
+    let cfg_edges = function_cfg_edges(cpg, projection);
 
     let mut latches_by_header: BTreeMap<NodeId, BTreeSet<NodeId>> = BTreeMap::new();
     for (tail, header, _) in &cfg_edges {
@@ -285,28 +285,6 @@ fn is_dfs_ancestor(ancestor: u32, node: u32, entry: &[Option<u64>], exit: &[Opti
     }
 }
 
-fn intraprocedural_cfg_edges(
-    cpg: &CodePropertyGraph,
-    projection: &GraphProjection,
-) -> Vec<(NodeId, NodeId, CfgEdgeKind)> {
-    let mut edges = Vec::new();
-    for edge in cpg.edges() {
-        let CpgEdgeKind::ControlFlow(kind) = &edge.kind else {
-            continue;
-        };
-        if matches!(kind, CfgEdgeKind::Call)
-            || projection.dense_index(edge.source).is_none()
-            || projection.dense_index(edge.target).is_none()
-        {
-            continue;
-        }
-        edges.push((edge.source, edge.target, *kind));
-    }
-    edges.sort_unstable_by_key(|(source, target, kind)| (*source, *target, cfg_kind_rank(*kind)));
-    edges.dedup();
-    edges
-}
-
 fn region_entries(
     cfg_edges: &[(NodeId, NodeId, CfgEdgeKind)],
     body: &BTreeSet<NodeId>,
@@ -417,25 +395,6 @@ fn build_forest(
     }
 }
 
-const fn cfg_kind_rank(kind: CfgEdgeKind) -> u8 {
-    match kind {
-        CfgEdgeKind::Sequential => 0,
-        CfgEdgeKind::ConditionalTrue => 1,
-        CfgEdgeKind::ConditionalFalse => 2,
-        CfgEdgeKind::LoopBack => 3,
-        CfgEdgeKind::LoopExit => 4,
-        CfgEdgeKind::Break => 5,
-        CfgEdgeKind::Continue => 6,
-        CfgEdgeKind::Return => 7,
-        CfgEdgeKind::Throw => 8,
-        CfgEdgeKind::Catch => 9,
-        CfgEdgeKind::Call => 10,
-        CfgEdgeKind::CallReturn => 11,
-        CfgEdgeKind::Case => 12,
-        CfgEdgeKind::DefaultCase => 13,
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use std::collections::{BTreeMap, BTreeSet};
@@ -444,8 +403,8 @@ mod tests {
 
     use super::*;
     use crate::{
-        control_flow_sccs, CpgNode, CpgNodeKind, Language, MethodSignature, ScopeId, SourceRange,
-        Visibility,
+        control_flow_sccs, CpgEdgeKind, CpgNode, CpgNodeKind, Language, MethodSignature, ScopeId,
+        SourceRange, Visibility,
     };
 
     fn node_with_id(id: u32, kind: CpgNodeKind) -> CpgNode {

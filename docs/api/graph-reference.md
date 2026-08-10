@@ -328,6 +328,27 @@ See the [reachability component guide](../components/graph/reachability-analysis
 for partition laws, builder termination semantics, pseudocode, complexity,
 examples, security boundaries, and independent property-test oracles.
 
+### Basic-block CFGs
+
+The feature-free block API groups the shared reachable function CFG without
+changing CPG nodes or edges:
+
+| Function | Signature | Result |
+|---|---|---|
+| `block_cfg` | `fn block_cfg(&CodePropertyGraph, NodeId) -> Result<BlockCfg, AnalysisError>` | Deterministic id-preserving blocks, typed block edges, node membership, entry/exits, and traversal orders. |
+
+`BlockCfg::blocks` is sorted by leader and each `BlockId` equals its vector
+index. `block_of_node` is a complete `BTreeMap` partition. `edges` is a sorted,
+deduplicated `Vec<BlockEdge>` that retains the original `CfgEdgeKind` for every
+transition except adjacent internal `Sequential` steps. Accessors include
+`block`, `successors`, `predecessors`, `nodes_in(petgraph::Direction)`,
+`reverse_post_order`, and `post_order`. Invalid selectors return `UnknownNode`
+or `NotAFunction`.
+
+See the [basic-block component guide](../components/graph/basic-block-cfg.md)
+for leader rules, field invariants, pseudocode, complexity, traversal semantics,
+the compatibility API, citations, and property-test oracles.
+
 ### Subgraph extraction
 
 | Method | Signature | Notes |

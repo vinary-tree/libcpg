@@ -985,6 +985,12 @@ struct TryContext {
 
 /// Identifies basic blocks in a CFG.
 ///
+/// This compatibility surface includes CFG fragments emitted for unreachable
+/// AST descendants. New code should call the deterministic, typed
+/// [`crate::analysis::block_cfg`] view directly to retain block identifiers,
+/// typed edges, exit blocks, and traversal orders over the canonical reachable
+/// function projection.
+///
 /// A basic block is a sequence of statements where:
 /// - The first statement is the only entry point
 /// - The last statement is the only exit point
@@ -1010,68 +1016,56 @@ impl BasicBlockIdentifier {
         let mut leaders: FxHashSet<NodeId> = FxHashSet::default();
         let mut blocks: FxHashMap<NodeId, Vec<NodeId>> = FxHashMap::default();
 
-        // Find leaders:
-        // 1. First statement in function
-        // 2. Target of any branch (conditional, loop, etc.)
-        // 3. Statement immediately after a branch
-
-        // The function itself is a leader
         leaders.insert(function);
-
         for &node_id in &descendants {
-            // Check if this node is a branch target
-            let predecessors = cpg.cfg_predecessors(node_id);
-            for (_, edge_kind) in &predecessors {
-                if edge_kind.is_conditional() || edge_kind.is_loop() {
-                    leaders.insert(node_id);
-                    break;
-                }
+            if cpg
+                .cfg_predecessors(node_id)
+                .iter()
+                .any(|(_, kind)| kind.is_conditional() || kind.is_loop())
+            {
+                leaders.insert(node_id);
             }
 
-            // Check if this node is a branching instruction
-            let node_kind = cpg.node(node_id).map(|n| n.kind.clone());
+            let node_kind = cpg.node(node_id).map(|node| &node.kind);
             if matches!(
-                node_kind.as_ref(),
-                Some(CpgNodeKind::If)
-                    | Some(CpgNodeKind::While)
-                    | Some(CpgNodeKind::For)
-                    | Some(CpgNodeKind::Loop)
-                    | Some(CpgNodeKind::Match)
-                    | Some(CpgNodeKind::Return)
-                    | Some(CpgNodeKind::Break)
-                    | Some(CpgNodeKind::Continue)
+                node_kind,
+                Some(
+                    CpgNodeKind::If
+                        | CpgNodeKind::While
+                        | CpgNodeKind::For
+                        | CpgNodeKind::Loop
+                        | CpgNodeKind::Match
+                        | CpgNodeKind::Return
+                        | CpgNodeKind::Break
+                        | CpgNodeKind::Continue
+                )
             ) {
-                // Mark successors as leaders
-                for (succ, _) in cpg.cfg_successors(node_id) {
-                    leaders.insert(succ);
-                }
+                leaders.extend(
+                    cpg.cfg_successors(node_id)
+                        .into_iter()
+                        .map(|(successor, _)| successor),
+                );
             }
         }
 
-        // Build blocks starting from each leader
-        for &leader in &leaders {
+        let mut ordered_leaders: Vec<_> = leaders.iter().copied().collect();
+        ordered_leaders.sort_unstable();
+        for leader in ordered_leaders {
             let mut block = vec![leader];
             let mut current = leader;
-
             loop {
                 let successors = cpg.cfg_successors(current);
-
-                // Continue if exactly one sequential successor that's not a leader
-                if successors.len() == 1 {
-                    let (succ, kind) = &successors[0];
-                    if matches!(kind, CfgEdgeKind::Sequential) && !leaders.contains(succ) {
-                        block.push(*succ);
-                        current = *succ;
-                        continue;
-                    }
+                let [(successor, CfgEdgeKind::Sequential)] = successors.as_slice() else {
+                    break;
+                };
+                if leaders.contains(successor) {
+                    break;
                 }
-
-                break;
+                block.push(*successor);
+                current = *successor;
             }
-
             blocks.insert(leader, block);
         }
-
         blocks
     }
 }
@@ -1288,6 +1282,36 @@ mod tests {
         assert!(
             blocks.contains_key(&then_b),
             "a conditional branch target must be a basic-block leader"
+        );
+    }
+
+    /// The legacy leader map includes AST-scoped CFG fragments after a
+    /// terminator, even though the canonical `BlockCfg` intentionally contains
+    /// only the entry-reachable `FunctionCfgView`.
+    #[test]
+    fn basic_block_compatibility_retains_unreachable_loop_exit_targets() {
+        let mut cpg = CodePropertyGraph::new(Language::Rust);
+        let func = create_test_function(&mut cpg);
+        let body = cpg.ast_children(func)[0];
+        let _returned = ast_child(&mut cpg, body, CpgNodeKind::Return);
+        let loop_node = ast_child(&mut cpg, body, CpgNodeKind::While);
+        let _guard = ast_child(&mut cpg, loop_node, ident("condition"));
+        let _loop_body = ast_child(&mut cpg, loop_node, block());
+        let after = ast_child(&mut cpg, body, ident("after"));
+
+        CfgExtractor::new().extract(&mut cpg);
+        assert!(cpg.edges().any(|edge| {
+            edge.target == after && edge.kind == CpgEdgeKind::ControlFlow(CfgEdgeKind::LoopExit)
+        }));
+
+        let blocks = BasicBlockIdentifier::new().identify(&cpg, func);
+        assert!(blocks.contains_key(&after));
+        assert!(
+            !crate::analysis::block_cfg(&cpg, func)
+                .expect("reachable block CFG")
+                .block_of_node
+                .contains_key(&after),
+            "typed BlockCfg retains the canonical reachable scope"
         );
     }
 

@@ -41,9 +41,11 @@ instructions with a single entry and single exit: control enters only at the top
 and leaves only at the bottom, with no branch in between. Basic blocks are the
 classical unit of control-flow analysis because within one, execution is
 unconditional — analysis facts can be summarised per block rather than per
-instruction. `libcpg` keeps analysis at AST-node granularity (finer than blocks) but
-can recover **block leaders** — the nodes that begin a basic block — through
-`BasicBlockIdentifier`, described in [`components/builder/cfg.md`](../components/builder/cfg.md).
+instruction. `libcpg` keeps the CPG at AST-node granularity (finer than blocks)
+but recovers a complete id-preserving block graph through `block_cfg`: blocks,
+typed inter-block edges, entry/exits, membership, and traversal orders are
+described in the [basic-block component guide](../components/graph/basic-block-cfg.md).
+`BasicBlockIdentifier` remains a leader-map compatibility adapter.
 Cyclomatic complexity (§4) is invariant to whether it is computed over blocks or over
 the finer per-node CFG, because collapsing a straight-line chain removes equal
 numbers of nodes and edges and leaves $`E - N`$ unchanged.

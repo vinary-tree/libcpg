@@ -167,9 +167,17 @@ Public helpers expose the same information as [def-use chains](../GLOSSARY.md#de
 
 A constructed CPG is the substrate for several independent analyses. Each consumes the overlays built above; none of them run during construction.
 
-![Activity diagram fanning a CPG out to dominance, loop/SCC, PDG/slice, VF2/GoF, algorithm, and GNN analyses](../diagrams/analysis-pipeline.svg)
+![Activity diagram fanning a CPG out to block, dominance, loop/SCC, PDG/slice, VF2/GoF, algorithm, and GNN analyses](../diagrams/analysis-pipeline.svg)
 
 *Figure — a constructed CPG fans out to exact structural analysis, the on-demand PDG/slicer, the VF2 and GoF pattern detectors, the algorithm/complexity heuristics, and the GNN. Source: [`diagrams/analysis-pipeline.puml`](../diagrams/analysis-pipeline.puml).*
+
+### Basic-block CFGs (feature-free)
+
+Before cyclic analysis, `block_cfg(&cpg, function)` can project the reachable
+function CFG into deterministic maximal sequential blocks. It retains original
+node ids and typed inter-block edges, then precomputes post-order and reverse
+post-order without mutating the CPG. See the
+[basic-block component guide](../components/graph/basic-block-cfg.md).
 
 ### Strongly-connected components (feature-free)
 

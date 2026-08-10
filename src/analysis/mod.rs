@@ -3,6 +3,7 @@
 //! Unlike the feature-gated algorithm-family detector, analyses in this module
 //! compute graph properties exactly. They are available with `default = []`.
 
+mod basic_blocks;
 pub(crate) mod cfg_scope;
 mod dominators;
 mod loops;
@@ -12,6 +13,8 @@ mod resolve;
 mod scc;
 
 use crate::NodeId;
+
+pub use basic_blocks::{block_cfg, BasicBlock, BlockCfg, BlockEdge, BlockId};
 
 pub use projection::{
     call_graph_projection, cfg_projection, dfg_projection, module_graph_projection, pdg_projection,

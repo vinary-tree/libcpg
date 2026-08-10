@@ -302,16 +302,20 @@ CfgExtractor::new().extract(&mut cpg);
 
 ### `BasicBlockIdentifier`
 
-Groups CFG nodes into [basic blocks](../GLOSSARY.md#basic-block).
+Legacy leader-map API retained for compatibility. Its documentation points new
+callers to the feature-free, typed
+[`block_cfg`](graph-reference.md#basic-block-cfgs) analysis.
 
 | Method | Signature | Notes |
 |--------|-----------|-------|
 | `new` | `fn new() -> Self` | Constructor (unit struct). |
-| `identify` | `fn identify(&self, cpg: &CodePropertyGraph, function: NodeId) -> FxHashMap<NodeId, Vec<NodeId>>` | Maps each block **leader** to the node ids in its block. |
+| `identify` | `fn identify(&self, cpg: &CodePropertyGraph, function: NodeId) -> FxHashMap<NodeId, Vec<NodeId>>` | Maps each legacy block **leader** to its original node ids, including emitted CFG fragments among AST descendants after a terminator. |
 
-Leaders are the function itself, any branch/loop target, and the successors of a
-branching instruction; a block extends along single `Sequential` successors that
-are not themselves leaders. Once the CFG exists,
+New callers should prefer `block_cfg`, which additionally retains deterministic
+`BlockId` values, typed block edges, node membership, entry/exit blocks, errors,
+and post-order/RPO traversal. Leaders are the entry, every non-`Sequential`
+target, all successors of a multi-successor node, and every merge point; a block
+extends only along a unique `Sequential` relation. Once the CFG exists,
 [`cyclomatic_complexity()`](graph-reference.md#graph-metrics) reads it directly.
 
 ---

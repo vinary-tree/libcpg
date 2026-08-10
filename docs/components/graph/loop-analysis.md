@@ -202,10 +202,10 @@ CONTINUATION-KIND(source, target):
 
 This is a **retyping**, not an added edge: the old `Sequential` continuation
 becomes `LoopExit`. CFG edge count and cyclomatic complexity are unchanged for
-the same AST. `CfgEdgeKind::is_loop()` already includes `LoopExit`, so its target
-is a `BasicBlockIdentifier` leader and the source/target cannot be fused into
-one basic block. Normal `while` guard fallthrough, `for` header fallthrough,
-and `break` continuation all use this one rule.
+the same AST. Because [`block_cfg`](basic-block-cfg.md) makes every
+non-`Sequential` target a leader, a `LoopExit` source and target cannot be fused
+into one basic block. Normal `while` guard fallthrough, `for` header
+fallthrough, and `break` continuation all use this one rule.
 
 Parser ASTs may retain keyword and delimiter children. The loop handlers select
 the semantic condition and final block rather than treating a `while` token as

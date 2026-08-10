@@ -27,6 +27,7 @@ Source: [`diagrams/resource-bounds.puml`](../diagrams/resource-bounds.puml).*
 | `backward_slice` / `forward_slice` `max_nodes` | *(caller-supplied argument)* | crate-root slice fns | BFS returns as soon as the slice reaches `max_nodes` |
 | AST traversal guards | *(always on)* | `ast_descendants` / `ast_ancestors` / `ast_depth`, SCC scope discovery, `CfgExtractor`, DFG reaching-defs | a cyclic `AstChild` graph terminates instead of looping or overflowing the stack |
 | CFG reachability guard | *(always on)* | `unreachable_code` | iterative DFS expands each function-scoped CFG node at most once; `Call` edges and nested functions are excluded |
+| Basic-block traversal guard | *(always on)* | `block_cfg` | every scoped node is assigned once; iterative DFS avoids native-stack growth; `Call` edges and nested functions are excluded |
 
 All of these are on the **feature-free surface** — you can configure and use them
 with `default = []`.

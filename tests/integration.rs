@@ -155,14 +155,66 @@ mod reachability_analysis {
     }
 }
 
+mod basic_block_analysis {
+    use libcpg::{
+        block_cfg, CfgEdgeKind, CodePropertyGraph, CpgEdgeKind, CpgNode, CpgNodeKind, Language,
+        MethodSignature, NodeId, SourceRange, Visibility,
+    };
+
+    fn node(id: u32, kind: CpgNodeKind) -> CpgNode {
+        CpgNode::new(NodeId::new(id), kind, SourceRange::default())
+    }
+
+    #[test]
+    fn root_api_preserves_ids_and_projects_typed_block_edges() {
+        let mut cpg = CodePropertyGraph::new(Language::Rust);
+        let function = cpg.add_node_with_id(node(
+            10,
+            CpgNodeKind::Function {
+                signature: MethodSignature {
+                    name: "blocks".into(),
+                    params: Default::default(),
+                    return_type: None,
+                    is_static: false,
+                    is_async: false,
+                    visibility: Visibility::Private,
+                },
+            },
+        ));
+        let guard = cpg.add_node_with_id(node(20, CpgNodeKind::If));
+        let yes = cpg.add_node_with_id(node(30, CpgNodeKind::Return));
+        let no = cpg.add_node_with_id(node(40, CpgNodeKind::Return));
+        for child in [guard, yes, no] {
+            cpg.connect(function, child, CpgEdgeKind::AstChild);
+        }
+        for (source, target, kind) in [
+            (function, guard, CfgEdgeKind::Sequential),
+            (guard, yes, CfgEdgeKind::ConditionalTrue),
+            (guard, no, CfgEdgeKind::ConditionalFalse),
+        ] {
+            cpg.connect(source, target, CpgEdgeKind::ControlFlow(kind));
+        }
+
+        let before = (cpg.node_count(), cpg.edge_count());
+        let cfg = block_cfg(&cpg, function).expect("public block CFG");
+        assert_eq!(cfg.blocks[0].nodes, vec![function, guard]);
+        assert_eq!(cfg.blocks[1].leader, yes);
+        assert_eq!(cfg.blocks[2].leader, no);
+        assert_eq!(cfg.successors(cfg.entry).count(), 2);
+        assert_eq!(cfg.exit_blocks.len(), 2);
+        assert_eq!(cfg.reverse_post_order().len(), cfg.blocks.len());
+        assert_eq!((cpg.node_count(), cpg.edge_count()), before);
+    }
+}
+
 #[cfg(feature = "lang-rust")]
 mod rust_pipeline {
     use std::collections::BTreeSet;
 
     use libcpg::{
-        backward_slice, call_graph_projection, cfg_projection, dominator_tree, forward_slice,
-        loop_forest, post_dominator_tree, unreachable_code, CpgBuilder, CpgBuilderConfig,
-        CpgEdgeKind, CpgNodeKind, DfgEdgeKind, Language, LiteralKind, PdgBuilder,
+        backward_slice, block_cfg, call_graph_projection, cfg_projection, dominator_tree,
+        forward_slice, loop_forest, post_dominator_tree, unreachable_code, CpgBuilder,
+        CpgBuilderConfig, CpgEdgeKind, CpgNodeKind, DfgEdgeKind, Language, LiteralKind, PdgBuilder,
         TreeSitterCpgBuilder,
     };
 
@@ -266,6 +318,25 @@ mod rust_pipeline {
                 CpgEdgeKind::ControlFlow(libcpg::CfgEdgeKind::LoopExit)
             )
         }));
+    }
+
+    #[test]
+    fn parsed_branch_cfg_has_complete_basic_block_membership() {
+        let cpg = build();
+        let function = cpg.functions().next().expect("function").id;
+        let cfg = block_cfg(&cpg, function).expect("parsed basic blocks");
+        let projection = cfg_projection(&cpg, function).expect("parsed CFG projection");
+
+        assert_eq!(cfg.block_of_node.len(), projection.node_count());
+        assert!(projection
+            .nodes
+            .iter()
+            .all(|node| cfg.block_of_node.contains_key(node)));
+        assert!(cfg
+            .blocks
+            .iter()
+            .all(|block| block.nodes.first() == Some(&block.leader)));
+        assert_eq!(cfg.reverse_post_order().len(), cfg.blocks.len());
     }
 
     #[test]

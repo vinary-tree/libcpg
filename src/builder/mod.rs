@@ -8,7 +8,8 @@
 //! - [`TreeSitterCpgBuilder`]: Builds CPGs from source code using tree-sitter parsing
 //! - [`CfgExtractor`]: Extracts control flow graph edges from AST
 //! - [`DfgExtractor`]: Extracts data flow graph edges using reaching definitions analysis
-//! - [`BasicBlockIdentifier`]: Identifies basic blocks in the CFG
+//! - [`BasicBlockIdentifier`]: Compatibility adapter for
+//!   [`crate::analysis::block_cfg`]
 //!
 //! ## Usage
 //!

@@ -37,7 +37,7 @@ therefore one natural loop. See [Natural loop / Loop forest](#natural-loop--loop
 
 ### Basic block
 
-A maximal straight-line run of statements with a single entry and single exit — no branches in except at the top, none out except at the bottom. `BasicBlockIdentifier` groups CFG nodes into basic blocks. Basic blocks are the classic unit of control-flow analysis; `libcpg` operates at AST-node granularity but can identify block leaders. See [`components/builder/cfg.md`](components/builder/cfg.md).
+A maximal straight-line run of statements with a single entry and single exit — no branches in except at the top, none out except at the bottom. `block_cfg` returns an immutable, id-preserving partition with typed block edges and traversal orders; `BasicBlockIdentifier` is its leader-map compatibility adapter. Basic blocks are the classic unit of control-flow analysis while the CPG itself remains at AST-node granularity. See [`components/graph/basic-block-cfg.md`](components/graph/basic-block-cfg.md).
 
 ### Call graph
 

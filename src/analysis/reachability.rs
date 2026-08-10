@@ -8,7 +8,11 @@ use rustc_hash::FxHashSet;
 
 use crate::{CfgEdgeKind, CodePropertyGraph, CpgEdgeKind, NodeId};
 
-use super::{cfg_projection, cfg_scope::function_cfg_view, AnalysisError};
+use super::{
+    cfg_projection,
+    cfg_scope::{cfg_kind_rank, function_cfg_view},
+    AnalysisError,
+};
 
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
@@ -104,7 +108,7 @@ pub fn unreachable_code(
         })
         .collect();
     dead_branches.sort_unstable_by_key(|branch| {
-        (branch.guard, cfg_edge_rank(branch.edge_kind), branch.target)
+        (branch.guard, cfg_kind_rank(branch.edge_kind), branch.target)
     });
     dead_branches.dedup();
 
@@ -114,25 +118,6 @@ pub fn unreachable_code(
         unreachable,
         dead_branches,
     })
-}
-
-fn cfg_edge_rank(kind: CfgEdgeKind) -> u8 {
-    match kind {
-        CfgEdgeKind::Sequential => 0,
-        CfgEdgeKind::ConditionalTrue => 1,
-        CfgEdgeKind::ConditionalFalse => 2,
-        CfgEdgeKind::LoopBack => 3,
-        CfgEdgeKind::LoopExit => 4,
-        CfgEdgeKind::Break => 5,
-        CfgEdgeKind::Continue => 6,
-        CfgEdgeKind::Return => 7,
-        CfgEdgeKind::Throw => 8,
-        CfgEdgeKind::Catch => 9,
-        CfgEdgeKind::Call => 10,
-        CfgEdgeKind::CallReturn => 11,
-        CfgEdgeKind::Case => 12,
-        CfgEdgeKind::DefaultCase => 13,
-    }
 }
 
 #[cfg(test)]

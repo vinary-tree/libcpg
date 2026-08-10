@@ -120,6 +120,7 @@ The invariants fall into twelve families.
 | **Dominance** | CHK immediate dominators equal `petgraph::algo::dominators::simple_fast` under edge permutations; post-dominators and control edges equal the former PDG oracle; `PdgBuilder` emits exactly `PostDominatorTree::control_dependence_edges`; a 25,000-node path is stack-safe |
 | **Natural loops** | insertion permutations preserve the forest; dominator-qualified back edges and reverse-closure bodies equal independent brute-force oracles through 24 nodes; every body lies in a cyclic SCC; child bodies are strict parent subsets; `LoopExit` exactly crosses AST loop scope and starts a basic block; a 25,000-node loop is stack-safe |
 | **CFG reachability** | iterative DFS equals `petgraph::visit::Bfs`; reachable and unreachable sets form a disjoint, exhaustive partition; insertion permutations preserve reports; adding an edge never shrinks reachability; generated post-terminator tails remain unreachable; parser wrappers and all-return branches preserve termination; a 25,000-node graph is stack-safe |
+| **Basic-block CFGs** | insertion permutations preserve blocks, membership, typed edges, exits, and traversal orders; the blocks form a disjoint exhaustive projection partition; intra-block pairs have the required unique `Sequential` relation; every typed CFG edge is either an internal chain step or a block edge; parser, CFG-only, serde, invalid-selector, and non-mutation examples pass; a 25,000-block graph is stack-safe |
 | **SCC decomposition** | Every projected node occurs in exactly one component; the partition matches `petgraph::algo::tarjan_scc`; singleton cycles require a self-loop; the condensation graph is acyclic; a 50,000-node path does not overflow the native stack |
 | **Call resolution** | resolution records and call edges are invariant under node/edge insertion permutations; duplicate names add zero call topology and preserve the SCC partition; repeated resolution is idempotent; candidate/call caps preserve the evidence boundary |
 | **Idempotency** | a second `CfgExtractor::extract` / `DfgExtractor::extract` / `PdgBuilder::build` adds no edges |
@@ -246,22 +247,26 @@ cargo +nightly cov-branch           # branch coverage needs nightly
 
 | Metric | Coverage | Lowest file |
 | --- | ---: | --- |
-| Lines | **97.78 %** | 91.67 % (`language.rs`) |
-| Regions | **97.74 %** | — |
-| Functions | **97.95 %** | — |
-| Branches | **83.57 %** | see below |
+| Lines | **97.80 %** | 91.67 % (`language.rs`) |
+| Regions | **97.78 %** | — |
+| Functions | **97.80 %** | — |
+| Branches | **83.74 %** | see below |
 
 Every source file is above 90 % line coverage; eighteen are at 100 %.
 The `analysis/dominators.rs` module measures **97.50 %** line and
-**80.21 %** branch coverage, above the epic's 90 % / 80 % thresholds.
+**81.25 %** branch coverage, above the epic's 90 % / 80 % thresholds.
 The new `analysis/resolve.rs` module measures **98.99 %** line and
 **87.96 %** branch coverage, above the same thresholds.
-The new `analysis/cfg_scope.rs` module measures **100 %** line and
-**93.48 %** branch coverage, above the same thresholds.
-The new `analysis/loops.rs` module measures **97.88 %** line and
-**92.55 %** branch coverage, above the same thresholds.
-The new `analysis/reachability.rs` module measures **96.01 %** line and
+The new `analysis/cfg_scope.rs` module measures **97.31 %** line and
+**92.31 %** branch coverage, above the same thresholds.
+The new `analysis/loops.rs` module measures **99.04 %** line and
+**93.18 %** branch coverage, above the same thresholds.
+The new `analysis/reachability.rs` module measures **100 %** line and
 **91.67 %** branch coverage, above the same thresholds.
+The new `analysis/basic_blocks.rs` module measures **96.15 %** line and
+**82.76 %** branch coverage, above the same thresholds. All figures come from
+the same clean all-feature coverage run; no focused-test figure is substituted
+for the repository gate.
 
 **On branch coverage.** `-Z coverage-options=branch` is nightly-only, and it
 counts *condition outcomes* (`if`, `&&`, `||`, `while`) — not `match` arms,

@@ -32,6 +32,8 @@ PDG). A query can therefore mix syntax, control flow, and data flow freely.
   loop/recursion classification and the condensation DAG.
 - **CFG reachability** — feature-free, deterministic reachable/unreachable
   partitions and structural dead-branch evidence without graph mutation.
+- **Basic-block CFGs** — deterministic, id-preserving block partitions, typed
+  block edges, entry/exits, and iterative post-order/RPO traversal views.
 - **DFG extraction** — intraprocedural, AST-ordered reaching definitions
   (Kildall 1973) and def-use chains (13 `DfgEdgeKind` variants).
 - **PDG + program slicing** — control-dependence edges via the reverse dominance
@@ -103,9 +105,9 @@ Comprehensive documentation lives under [`docs/`](docs/README.md):
 
 - **[Theory](docs/theory/00-overview.md)** — the CPG model, control/data flow, program dependence & slicing, subgraph isomorphism, similarity, pattern detection, complexity, and GNNs, with proofs, math, and citations.
 - **[Architecture](docs/architecture/overview.md)** — module map, the graph data model, construction & analysis pipelines, and language frontends.
-- **[Design decisions](docs/design/00-overview.md)** — ADR-style records (unified overlay, Mode B, AST-ordered reaching defs, relaxed VF2, feature taxonomy).
-- **[API reference](docs/api/graph-reference.md)** — graph/projection/SCC/reachability, builder, and pattern/algorithm/GNN reference.
-- **[Components](docs/README.md#components)** — graph projections, dominator, SCC, reachability, builders, patterns, algorithms, and GNN internals.
+- **[Design decisions](docs/design/00-overview.md)** — ADR-style records for load-bearing graph, construction, analysis, and feature choices.
+- **[API reference](docs/api/graph-reference.md)** — graph/projection/block-CFG/SCC/reachability, builder, and pattern/algorithm/GNN reference.
+- **[Components](docs/README.md#components)** — graph projections, basic blocks, dominators, SCCs, reachability, builders, patterns, algorithms, and GNN internals.
 - **[Usage guides](docs/usage/00-getting-started.md)** — task-oriented how-tos.
 - **[Engineering](docs/engineering/00-overview.md)** · **[Scientific validation](docs/scientific/00-overview.md)** · **[Security](docs/security/00-threat-model.md)**.
 - **[Glossary](docs/GLOSSARY.md)** and the **[diagram catalog](docs/diagrams/README.md)**.

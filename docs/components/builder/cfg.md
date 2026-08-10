@@ -7,10 +7,11 @@ possible execution order between constructs. Because the edges share the AST's n
 the resulting CFG is one of the four overlays of the unified CPG rather than a separate
 graph.
 
-This page covers the extractor's API and configuration, the per-construct handlers, the
-loop/try context stacks, the 14 `CfgEdgeKind` variants, `BasicBlockIdentifier`, and the
-[cyclomatic complexity](../../GLOSSARY.md#cyclomatic-complexity) metric the CFG makes
-computable.
+This page covers the extractor's API and configuration, the per-construct
+handlers, the loop/try context stacks, the 14 `CfgEdgeKind` variants, the
+`block_cfg` view and its `BasicBlockIdentifier` compatibility adapter, and the
+[cyclomatic complexity](../../GLOSSARY.md#cyclomatic-complexity) metric the CFG
+makes computable.
 
 ---
 
@@ -214,7 +215,8 @@ tools. Being explicit about which are emitted keeps the documentation honest.
 The classifier helpers `CfgEdgeKind::is_conditional()`
 (`ConditionalTrue`/`ConditionalFalse`/`Case`/`DefaultCase`), `is_loop()`
 (`LoopBack`/`LoopExit`/`Break`/`Continue`), and `is_exception()` (`Throw`/`Catch`) let
-consumers filter edges by role; `BasicBlockIdentifier` uses the first two.
+consumers filter edges by role. `block_cfg` retains every classification on
+inter-block edges and treats all non-`Sequential` targets as leaders.
 
 ---
 
@@ -248,25 +250,34 @@ the incoming counterpart, so the overlay is navigable in both directions. See
 
 ## Basic blocks
 
-A [basic block](../../GLOSSARY.md#basic-block) is a maximal straight-line run of statements
-with a single entry and single exit. `BasicBlockIdentifier` groups a function's CFG nodes
-into blocks keyed by their **leader** (the first node of each block):
+A [basic block](../../GLOSSARY.md#basic-block) is a maximal straight-line CFG run
+with a single entry. The primary API is the feature-free, immutable `block_cfg`
+analysis:
 
 ```rust
-use libcpg::BasicBlockIdentifier;
+use libcpg::{block_cfg, CodePropertyGraph, NodeId};
 
-// Given a `cpg` whose CFG has been extracted and a `function: NodeId`:
-// let blocks = BasicBlockIdentifier::new().identify(&cpg, function);
-// `blocks` maps each leader NodeId to the Vec<NodeId> of nodes in its block.
+# fn inspect(cpg: &CodePropertyGraph, function: NodeId) -> Result<(), libcpg::AnalysisError> {
+let blocks = block_cfg(cpg, function)?;
+for block in &blocks.blocks {
+    assert_eq!(block.nodes.first(), Some(&block.leader));
+}
+# Ok(())
+# }
 ```
 
-`identify(&cpg, function) -> FxHashMap<NodeId, Vec<NodeId>>` computes leaders as: the
-function entry; any node reached by a conditional or loop edge
-(`edge_kind.is_conditional() || edge_kind.is_loop()`); and every successor of a branching
-node (`If`/`While`/`For`/`Loop`/`Match`/`Return`/`Break`/`Continue`). It then extends each
-leader forward while there is exactly one `Sequential` successor that is not itself a
-leader. libcpg operates at AST-node granularity rather than compacting blocks into single
-nodes, so this identifier is a *view* over the CFG, not a rewrite of it.
+Leaders are the function entry, every non-`Sequential` edge target, all
+successors of a multi-successor node, and every merge point. Blocks extend only
+along unique `Sequential` predecessor/successor relations. `BlockCfg` retains
+typed inter-block edges, deterministic ids, membership, entry/exits, and
+post-order/RPO without compacting or mutating the CPG.
+
+`BasicBlockIdentifier::identify` remains as a compatibility API returning only
+`FxHashMap<NodeId, Vec<NodeId>>` keyed by leader. Its AST-descendant scope also
+retains emitted unreachable fragments after a terminator; the typed view uses
+the canonical reachable function scope. See the
+[basic-block component guide](../graph/basic-block-cfg.md) for the full contract,
+pseudocode, complexity, and validation.
 
 ---
 

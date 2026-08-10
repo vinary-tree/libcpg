@@ -105,6 +105,49 @@ pub(crate) fn function_cfg_view(
     })
 }
 
+/// Returns canonical typed intraprocedural edges in `projection`.
+pub(crate) fn function_cfg_edges(
+    cpg: &CodePropertyGraph,
+    projection: &GraphProjection,
+) -> Vec<(NodeId, NodeId, CfgEdgeKind)> {
+    let mut edges = Vec::new();
+    for edge in cpg.edges() {
+        let CpgEdgeKind::ControlFlow(kind) = edge.kind else {
+            continue;
+        };
+        if matches!(kind, CfgEdgeKind::Call)
+            || projection.dense_index(edge.source).is_none()
+            || projection.dense_index(edge.target).is_none()
+        {
+            continue;
+        }
+        edges.push((edge.source, edge.target, kind));
+    }
+    edges.sort_unstable_by_key(|(source, target, kind)| (*source, *target, cfg_kind_rank(*kind)));
+    edges.dedup();
+    edges
+}
+
+/// Canonical ordering of the closed `CfgEdgeKind` vocabulary.
+pub(crate) const fn cfg_kind_rank(kind: CfgEdgeKind) -> u8 {
+    match kind {
+        CfgEdgeKind::Sequential => 0,
+        CfgEdgeKind::ConditionalTrue => 1,
+        CfgEdgeKind::ConditionalFalse => 2,
+        CfgEdgeKind::LoopBack => 3,
+        CfgEdgeKind::LoopExit => 4,
+        CfgEdgeKind::Break => 5,
+        CfgEdgeKind::Continue => 6,
+        CfgEdgeKind::Return => 7,
+        CfgEdgeKind::Throw => 8,
+        CfgEdgeKind::Catch => 9,
+        CfgEdgeKind::Call => 10,
+        CfgEdgeKind::CallReturn => 11,
+        CfgEdgeKind::Case => 12,
+        CfgEdgeKind::DefaultCase => 13,
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use std::collections::BTreeSet;

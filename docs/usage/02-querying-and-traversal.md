@@ -96,7 +96,11 @@ fn branches_of(cpg: &CodePropertyGraph, node: NodeId) {
 }
 ```
 
-To iterate only the nodes that participate in control flow, use `cfg_nodes()` (an iterator over `&CpgNode`). The [`basic block`](../GLOSSARY.md#basic-block) grouping and the per-construct edge semantics are covered in [CFG construction](../components/builder/cfg.md).
+To iterate only the nodes that participate in control flow, use `cfg_nodes()`
+(an iterator over `&CpgNode`). For deterministic block membership, typed block
+edges, and traversal orders, use the feature-free
+[`block_cfg`](../components/graph/basic-block-cfg.md) view. Per-construct edge
+semantics are covered in [CFG construction](../components/builder/cfg.md).
 
 ---
 

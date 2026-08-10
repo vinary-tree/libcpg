@@ -1,0 +1,62 @@
+@startuml
+!include _libcpg-theme.iuml
+title Basic-block CFG — deterministic, id-preserving projection
+
+rectangle "CodePropertyGraph\nAST + typed CFG overlay" as CPG #F1F3F5
+rectangle "FunctionCfgView\nreachable · intraprocedural · non-Call" as SCOPE #D8F5A2
+rectangle "canonical typed CFG edges\noriginal NodeId + CfgEdgeKind" as TYPED #DBE4FF
+rectangle "leader discovery" as LEADERS #FFF3BF
+rectangle "entry" as ENTRY #FFE8CC
+rectangle "non-Sequential targets\n(including LoopExit)" as TARGETS #D3F9D8
+rectangle "branch successors\nand merge points" as JOINS #C3FAE8
+rectangle "grow unique Sequential chains\niterative · assigned once" as GROW #FFD8A8
+rectangle "sort leaders\nBlockId = vector index" as IDS #FCC2D7
+rectangle "project typed block edges\nremove only internal chain steps" as EDGES #E5DBFF
+rectangle "iterative sorted DFS\npost-order + reverse post-order" as ORDERS #D0BFFF
+rectangle "BlockCfg\nblocks · membership · edges\nentry · exits · traversal orders" as RESULT #C3FAE8
+rectangle "BasicBlockIdentifier\nleader-map compatibility adapter" as COMPAT #F1F3F5
+
+CPG --> SCOPE : block_cfg(function)
+SCOPE --> TYPED
+SCOPE --> LEADERS : distinct adjacency
+TYPED --> LEADERS : edge classifications
+ENTRY --> LEADERS
+TARGETS --> LEADERS
+JOINS --> LEADERS
+LEADERS --> GROW
+TYPED --> GROW : only Sequential may fuse
+GROW --> IDS
+IDS --> EDGES : node-to-block membership
+TYPED --> EDGES
+EDGES --> ORDERS
+IDS --> RESULT
+EDGES --> RESULT
+ORDERS --> RESULT
+RESULT ..> COMPAT : discard typed metadata
+
+note bottom of GROW
+  A successor joins the current block only when
+  it has one predecessor, is not a leader, and
+  the unique relation is entirely Sequential.
+end note
+
+note bottom of RESULT
+  Original CPG nodes, edges, ids, and payloads
+  are never added, removed, retyped, or cloned.
+end note
+
+legend right
+  |= colour |= role |
+  |<#F1F3F5>| source graph / compatibility surface |
+  |<#D8F5A2>| shared reachable function scope |
+  |<#DBE4FF>| typed CFG evidence |
+  |<#FFF3BF>| leader decision |
+  |<#FFE8CC>| entry leader evidence |
+  |<#D3F9D8>| typed target evidence |
+  |<#C3FAE8>| topology evidence / public result |
+  |<#FFD8A8>| sequential-chain construction |
+  |<#FCC2D7>| deterministic dense identifiers |
+  |<#E5DBFF>| block-edge projection |
+  |<#D0BFFF>| traversal order |
+endlegend
+@enduml
