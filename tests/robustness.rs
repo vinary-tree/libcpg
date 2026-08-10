@@ -363,6 +363,14 @@ fn exercise_every_analysis(cpg: &CodePropertyGraph, func: NodeId) {
     assert_eq!(solution.before.len(), blocks.blocks.len());
     assert_eq!(solution.after.len(), blocks.blocks.len());
     assert_eq!(solution.visits.len(), blocks.blocks.len());
+    let liveness = libcpg::liveness(&work, func).expect("liveness remains total");
+    let dead_stores = libcpg::dead_stores(&work, func).expect("dead stores remain total");
+    assert!(liveness.live_in.len() <= work.node_count());
+    assert!(liveness.live_out.len() <= work.node_count());
+    assert!(dead_stores
+        .dead
+        .iter()
+        .all(|store| work.node(store.node).is_some()));
     let first_resolution = libcpg::resolve_calls(&mut work, &libcpg::ResolveConfig::default());
     libcpg::DfgExtractor::new().extract(&mut work);
     libcpg::PdgBuilder::new().build(&mut work, func);

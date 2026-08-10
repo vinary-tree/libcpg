@@ -209,9 +209,10 @@ mod basic_block_analysis {
 
 mod dataflow_framework {
     use libcpg::{
-        block_cfg, solve, BitSetDomain, BlockCfg, BlockId, CfgEdgeKind, CodePropertyGraph,
-        Confluence, CpgEdgeKind, CpgNode, CpgNodeKind, DataflowAnalysis, Direction, Language,
-        MethodSignature, NodeId, SolverConfig, SourceRange, Visibility,
+        block_cfg, dead_stores, liveness, solve, BitSetDomain, BlockCfg, BlockId, CfgEdgeKind,
+        CodePropertyGraph, Confluence, CpgEdgeKind, CpgNode, CpgNodeKind, DataflowAnalysis,
+        DefinitionKind, Direction, Language, MethodSignature, NodeId, ScopeId, SolverConfig,
+        SourceRange, Visibility,
     };
 
     struct ReachableBlocks;
@@ -285,6 +286,87 @@ mod dataflow_framework {
             assert!(solution.after[exit.as_u32() as usize].contains(cfg.entry.as_u32()));
             assert!(solution.after[exit.as_u32() as usize].contains(exit.as_u32()));
         }
+        assert_eq!((cpg.node_count(), cpg.edge_count()), graph_size);
+    }
+
+    #[test]
+    fn public_liveness_reports_only_the_unused_value_as_dead() {
+        let mut cpg = CodePropertyGraph::new(Language::Rust);
+        let function = cpg.add_node_with_id(node(
+            10,
+            CpgNodeKind::Function {
+                signature: MethodSignature {
+                    name: "stores".into(),
+                    params: Default::default(),
+                    return_type: None,
+                    is_static: false,
+                    is_async: false,
+                    visibility: Visibility::Private,
+                },
+            },
+        ));
+        let parameter = cpg.add_node_with_id(node(
+            20,
+            CpgNodeKind::Parameter {
+                name: "unused_parameter".into(),
+                param_type: None,
+                is_variadic: false,
+            },
+        ));
+        let dead = cpg.add_node_with_id(node(
+            30,
+            CpgNodeKind::Variable {
+                name: "dead".into(),
+                var_type: None,
+                is_mutable: true,
+                scope: ScopeId::GLOBAL,
+            },
+        ));
+        let live = cpg.add_node_with_id(node(
+            40,
+            CpgNodeKind::Variable {
+                name: "live".into(),
+                var_type: None,
+                is_mutable: true,
+                scope: ScopeId::GLOBAL,
+            },
+        ));
+        let live_use = cpg.add_node_with_id(node(
+            50,
+            CpgNodeKind::Identifier {
+                name: "live".into(),
+                definition: None,
+            },
+        ));
+        for child in [parameter, dead, live, live_use] {
+            cpg.connect(function, child, CpgEdgeKind::AstChild);
+            cpg.node_mut(function)
+                .expect("function node")
+                .children
+                .push(child);
+            cpg.node_mut(child).expect("child node").parent = Some(function);
+        }
+        for (source, target) in [
+            (function, parameter),
+            (parameter, dead),
+            (dead, live),
+            (live, live_use),
+        ] {
+            cpg.connect(
+                source,
+                target,
+                CpgEdgeKind::ControlFlow(CfgEdgeKind::Sequential),
+            );
+        }
+
+        let graph_size = (cpg.node_count(), cpg.edge_count());
+        let live_result = liveness(&cpg, function).expect("public liveness");
+        let dead_report = dead_stores(&cpg, function).expect("public dead stores");
+        assert_eq!(dead_report.dead.len(), 1);
+        assert_eq!(dead_report.dead[0].node, dead);
+        assert_eq!(&*dead_report.dead[0].variable, "dead");
+        assert_eq!(dead_report.dead[0].kind, DefinitionKind::Declaration);
+        assert!(live_result.live_out[&live].contains(&"live".into()));
         assert_eq!((cpg.node_count(), cpg.edge_count()), graph_size);
     }
 }

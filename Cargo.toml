@@ -209,3 +209,7 @@ harness = false
 [[bench]]
 name = "pattern_matching"
 harness = false
+
+[[bench]]
+name = "dataflow_liveness"
+harness = false

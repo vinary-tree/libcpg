@@ -53,6 +53,9 @@ oracles are in the [component guide](../components/graph/dataflow-framework.md).
   a fixed budget.
 - **Reusable fact classification.** Variable binding/use and structural
   expression rules cannot silently diverge across later analyses.
+- **A production backward analysis.** Variable liveness uses the generic
+  solver and canonical facts directly; dead stores are derived by one linear
+  reverse replay per block rather than a private fixed-point implementation.
 
 ### Negative
 

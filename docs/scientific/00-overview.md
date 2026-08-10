@@ -14,7 +14,12 @@ A CPG library makes three kinds of assertion, and each demands a different stand
 | **Semantic correctness** | "A use resolves to its latest reaching definition, not a killed one." | Matches the textbook data-flow answer on a corpus of hand-audited scenarios. | [02 — Reaching-defs validation](02-reaching-defs-validation.md) |
 | **Algorithmic completeness** | "The subgraph matcher finds *all* embeddings, no more and no fewer." | An exact count on a *discriminating* input that would expose a partial or over-eager search. | [03 — VF2 completeness](03-vf2-completeness.md) |
 
-These are distinct from *performance* claims ("construction is fast", "VF2 prunes well"), which require measurement rather than assertion. `libcpg` does **not** yet ship runnable benchmarks, so those claims are currently unproven; the rigorous method to establish them once benches are added is specified separately in [04 — Measurement methodology](04-measurement-methodology.md).
+These are distinct from *performance* claims ("construction is fast", "VF2
+prunes well"), which require controlled measurement rather than assertion.
+`libcpg` ships four oracle-guarded Criterion targets, but their evidence is
+limited to the named graph families, sizes, environment, and operation. The
+protocol and remaining gaps are specified in [04 — Measurement
+methodology](04-measurement-methodology.md).
 
 ## 2. Tests as experiments: the scientific method applied
 
@@ -44,7 +49,14 @@ Two properties of the suite make this rigorous rather than merely suggestive:
 
 ## 3. The evidence base
 
-All correctness evidence is **inline**: `libcpg` ships **99** `#[cfg(test)]` tests compiled into the crate under `#[cfg(test)]` modules across the `src/` tree. There are *no* separate integration tests and *no* example programs — the `tests/` and `examples/` directories exist but are empty, and the `[[bench]]` targets in `Cargo.toml` are commented out. This is a deliberate, honestly-documented shape: the correctness contract is fully specified by the inline suite, while the performance contract is a known gap ([04](04-measurement-methodology.md)).
+The maximal matrix contains **567 library tests**, **20 public-API integration
+tests**, and **5 malformed-input robustness tests**. These 592 executable cases
+combine fixed examples, differential oracles, and 39 `proptest!` blocks. The
+feature-free matrix remains independently runnable and exercises the exact
+graph/data-flow substrate without compiling any grammar. Four active Criterion
+targets supplement correctness with scoped performance evidence; see
+[Testing](../engineering/02-testing.md) for the census and [04](04-measurement-methodology.md)
+for the measurement contract.
 
 Because `default = []`, many tests are **feature-gated**. The end-to-end reaching-defs and PDG scenarios that parse real Rust are annotated `#[cfg(feature = "lang-rust")]`; the graph-algebra and VF2 tests are feature-free (they build CPGs by hand). The map below notes which gate each grounding test sits behind.
 
@@ -55,23 +67,26 @@ Because `default = []`, many tests are **feature-gated**. The end-to-end reachin
 | [01 — Invariants & equivalence](01-cpg-invariants-and-equivalence.md) | Single shared node set; graph-assigned unique IDs; AST child/parent consistency; idempotent extractors; `build` ≡ `build_from_tree` (identical node/edge counts + language) | `test_build_from_tree_matches_build`, `parsed_shadowing_and_idempotent`, `def_use_backward_slice`, `parsed_nested_use_resolves_and_chains` | `lang-rust` (equivalence, DFG) / feature-free (slice) |
 | [02 — Reaching-defs validation](02-reaching-defs-validation.md) | Nested-expression use resolution; latest-definition (strong update); non-flow of unrelated variables; shadowing scope; idempotency | `parsed_nested_use_resolves_and_chains`, `parsed_reassignment_uses_latest_definition`, `parsed_unrelated_variable_does_not_flow`, `parsed_shadowing_and_idempotent` | `lang-rust` |
 | [03 — VF2 completeness](03-vf2-completeness.md) | Soundness floor (empty pattern → no match); kind-feasibility pruning; **all** embeddings found (diamond → exactly 2) with exact backtracking | `test_empty_pattern`, `test_single_node_match`, `test_multi_embedding_backtracking` | feature-free |
-| [04 — Measurement methodology](04-measurement-methodology.md) | *(none yet — documented gap)* the rigorous protocol to establish performance claims when benchmarks are added | — | — |
+| [04 — Measurement methodology](04-measurement-methodology.md) | Environment control and exact-oracle timing for SCC, arena construction, bounded VF2, and liveness | four `benches/*.rs` Criterion targets | feature-free |
 
 ## 5. What is proven, and what is advisory
 
 Scientific honesty requires separating the two:
 
-- **Proven (guarded by the tests above).** The CPG's structural invariants; deterministic graph projection; immediate dominance (differentially checked against `petgraph`); post-dominance and control-dependence equivalence with the former production oracle; natural back edges and loop bodies (checked against independent brute-force dominance and closure oracles); exact SCC partitioning and condensation acyclicity (differentially checked against `petgraph`'s Tarjan implementation); the reaching-definition semantics on the audited corpus; and VF2's completeness on the discriminating diamond. These are deterministic and regression-locked.
+- **Proven (guarded by the tests above).** The CPG's structural invariants; deterministic graph projection; immediate dominance (differentially checked against `petgraph`); post-dominance and control-dependence equivalence with the former production oracle; natural back edges and loop bodies (checked against independent brute-force dominance and closure oracles); exact SCC partitioning and condensation acyclicity (differentially checked against `petgraph`'s Tarjan implementation); liveness fixed points (checked against an independent Gauss–Seidel solver); the reaching-definition semantics on the audited corpus; and VF2's completeness on the discriminating diamond. These are deterministic and regression-locked.
 - **Advisory (heuristic by design).** [Design-pattern detection](../GLOSSARY.md#design-pattern), [algorithm-family](../GLOSSARY.md#algorithm-family) recognition, and [GNN](../GLOSSARY.md#graph-neural-network-gnn) embeddings are *heuristics*: they score likelihood, they do not prove identity. Their tests check that the machinery runs and returns well-formed, plausibly-ranked results — not that a classification is correct in the sense a theorem is correct. Treat their output as evidence to be reviewed, never as ground truth.
-- **Unproven (a gap, not a defect).** Performance. No timing is asserted anywhere in the crate today; any speed claim must be earned by the protocol in [04](04-measurement-methodology.md).
+- **Empirically bounded.** Performance results apply only to a target's named
+  fixture, size, and controlled environment. DFG/PDG construction,
+  whole-corpus analysis, and GNN propagation remain measurement gaps; no result
+  from the four active targets may be generalized to them.
 
 ## 6. Reproducing the experiments
 
 The suite is the executable form of this documentation. To re-run every corroborating experiment:
 
 ```text
-# All correctness tests, every analysis compiled in:
-cargo test --all-features
+# Maximal supported correctness matrix:
+cargo test --features "full rholang metta"
 
 # The reaching-defs and PDG end-to-end corpus (needs the Rust grammar):
 cargo test --features lang-rust reaching       # dfg.rs scenarios
@@ -80,6 +95,9 @@ cargo test --features lang-rust                 # + pdg.rs parsed tests
 # The feature-free graph-algebra and VF2 evidence (no grammar needed):
 cargo test vf2
 cargo test def_use_backward_slice
+
+# One oracle-guarded controlled benchmark:
+./scripts/bench.sh dataflow_liveness
 ```
 
 Each subsequent page names its tests, quotes the exact assertions that decide the hypothesis, and cross-links the theory (`../theory/`) and builder-component (`../components/builder/`) pages that explain the mechanism under test.

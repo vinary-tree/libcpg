@@ -273,6 +273,8 @@ So the safe pattern is: build (single-threaded, `&mut`), then analyse
   runs, typed block edges, entry/exits, and deterministic traversal orders.
 - [Monotone data flow](dataflow-framework.md) — forward/backward fixed points,
   lattice domains, canonical facts, widening/narrowing, and bounded worklists.
+- [Variable liveness and dead stores](liveness-analysis.md) — backward-May
+  variable states and conservative advisory evidence for unused writes.
 - [Dominators and post-dominators](dominator-analysis.md) — immediate
   dominators, frontiers, constant-time ancestry, and PDG control dependence.
 - [Strongly-connected components](scc-analysis.md) — exact CFG loops and

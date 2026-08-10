@@ -1,0 +1,42 @@
+@startuml
+!include _libcpg-theme.iuml
+title Variable liveness and advisory dead-store analysis
+
+rectangle "CodePropertyGraph\nimmutable AST + CFG" as CPG #F1F3F5
+rectangle "BlockCfg\nreachable blocks + typed edges" as CFG #D3F9D8
+rectangle "VarFacts\ncanonical DEF / USE\ndense variable ids" as FACTS #FFF3BF
+rectangle "Backward-May solver\n<latex>\mathrm{OUT}[n]=\bigcup_{s\in\mathrm{succ}(n)}\mathrm{IN}[s]</latex>\n<latex>\mathrm{IN}[n]=\mathrm{USE}[n]\cup(\mathrm{OUT}[n]\setminus\mathrm{DEF}[n])</latex>" as SOLVER #FCC2D7
+rectangle "one reverse replay per block\nlive_in + live_out by NodeId" as REPLAY #DBE4FF
+rectangle "LivenessResult\nsorted BTreeMap reports" as LIVE #C3FAE8
+rectangle "dead-store filter\nvariable absent from live_out\nparameters excluded" as FILTER #FFE8CC
+rectangle "DeadStoreReport\nadvisory evidence" as DEAD #FFE3E3
+
+CPG --> CFG : block_cfg(function)
+CPG --> FACTS : variable_facts(function)
+CFG --> SOLVER
+FACTS --> SOLVER : BitSetDomain width
+SOLVER --> REPLAY : block boundary states
+FACTS --> REPLAY : kill / gen
+REPLAY --> LIVE
+LIVE --> FILTER
+FACTS --> FILTER : definition kind
+FILTER --> DEAD
+
+note bottom of DEAD
+  Results stay out of graph.
+  No CPG node or edge is mutated.
+  Volatile / atomic / reflective effects require caller policy.
+end note
+
+legend right
+  |= colour |= role |
+  |<#F1F3F5>| immutable source graph |
+  |<#D3F9D8>| control-flow substrate |
+  |<#FFF3BF>| canonical variable facts |
+  |<#FCC2D7>| monotone fixed point |
+  |<#DBE4FF>| linear node-state replay |
+  |<#C3FAE8>| exact liveness result |
+  |<#FFE8CC>| advisory classification |
+  |<#FFE3E3>| dead-store evidence |
+endlegend
+@enduml

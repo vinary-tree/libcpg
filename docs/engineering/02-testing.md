@@ -22,11 +22,11 @@ think to write down.
 
 | Kind | Count | Where |
 | --- | ---: | --- |
-| Maximal-matrix library tests | 560 | inline `#[cfg(test)] mod …` next to the code; includes examples and properties |
-| Public-API integration tests | 19 | `tests/integration.rs` |
+| Maximal-matrix library tests | 567 | inline `#[cfg(test)] mod …` next to the code; includes examples and properties |
+| Public-API integration tests | 20 | `tests/integration.rs` |
 | Malformed-input robustness tests | 5 | `tests/robustness.rs` |
-| **Executable test cases** | **584** | excludes three ignored rustdoc examples |
-| `proptest!` blocks (subset of the library/robustness rows) | 38 | inline property and regression modules |
+| **Executable test cases** | **592** | excludes three ignored rustdoc examples |
+| `proptest!` blocks (subset of the library/robustness rows) | 39 | inline property and regression modules |
 
 The maximal-matrix library count is up from **99** inline tests and **zero**
 property tests before this work.
@@ -43,11 +43,11 @@ on the features enabled:
 
 | Command | Lib tests | Notes |
 | --- | ---: | --- |
-| `cargo test` | 273 | `default = []`: the feature-free surface only |
-| `cargo test --features "full rholang metta"` | 560 | the maximal matrix, including the Mode-B mappers |
+| `cargo test` | 279 | `default = []`: the feature-free surface only |
+| `cargo test --features "full rholang metta"` | 567 | the maximal matrix, including the Mode-B mappers |
 
-The feature-free 273 exercise the graph model, exact dominator/post-dominator,
-natural-loop, monotone data-flow, and CFG/call-graph SCC analyses, the
+The feature-free 279 exercise the graph model, exact dominator/post-dominator,
+natural-loop, monotone data-flow, variable-liveness/dead-store, and CFG/call-graph SCC analyses, the
 CFG/DFG/PDG extractors, VF2, and similarity by building CPGs
 **by hand** — no grammar required. This is what
 the [`arb_well_formed_cpg`](#the-generators) generator exists for.
@@ -110,7 +110,7 @@ return.
 
 ## What the properties assert
 
-The invariants fall into twelve families.
+The invariants fall into complementary families.
 
 | Family | Representative laws |
 | --- | --- |
@@ -123,6 +123,7 @@ The invariants fall into twelve families.
 | **CFG reachability** | iterative DFS equals `petgraph::visit::Bfs`; reachable and unreachable sets form a disjoint, exhaustive partition; insertion permutations preserve reports; adding an edge never shrinks reachability; generated post-terminator tails remain unreachable; parser wrappers and all-return branches preserve termination; a 25,000-node graph is stack-safe |
 | **Basic-block CFGs** | insertion permutations preserve blocks, membership, typed edges, exits, and traversal orders; the blocks form a disjoint exhaustive projection partition; intra-block pairs have the required unique `Sequential` relation; every typed CFG edge is either an internal chain step or a block edge; parser, CFG-only, serde, invalid-selector, and non-mutation examples pass; a 25,000-block graph is stack-safe |
 | **Monotone data flow** | union and intersection joins are idempotent, commutative, and associative; priority/RPO, FIFO, and LIFO worklists reach identical states over generated CFGs; forward/backward boundaries, typed edge transfer, header-only widening, visit-cap failure, narrowing/non-ascent, malformed public views, node replay, serde, and non-mutation examples pass; a private reaching-definitions instance equals the retired acyclic CFG fixpoint and covers core AST-ordered def-use edges on a cycle; public integration tests implement the traits downstream and extract canonical facts from parsed code; the malformed-graph property harness invokes both fact extraction and solving |
+| **Variable liveness / dead stores** | production block states exactly equal an independent naive round-robin oracle on a diamond with a loop; node/edge insertion permutations and repeated runs produce identical reports; every reported definition is reachable, is not a parameter, and is absent from its node's `live_out`; examples cover assignment kinds, unused parameters, unreachable definitions, bodyless functions, invalid selectors, serde, and graph non-mutation |
 | **SCC decomposition** | Every projected node occurs in exactly one component; the partition matches `petgraph::algo::tarjan_scc`; singleton cycles require a self-loop; the condensation graph is acyclic; a 50,000-node path does not overflow the native stack |
 | **Call resolution** | resolution records and call edges are invariant under node/edge insertion permutations; duplicate names add zero call topology and preserve the SCC partition; repeated resolution is idempotent; candidate/call caps preserve the evidence boundary |
 | **Idempotency** | a second `CfgExtractor::extract` / `DfgExtractor::extract` / `PdgBuilder::build` adds no edges |
@@ -249,10 +250,10 @@ cargo +nightly cov-branch           # branch coverage needs nightly
 
 | Metric | Coverage | Lowest file |
 | --- | ---: | --- |
-| Lines | **97.79 %** | 91.67 % (`language.rs`) |
-| Regions | **97.70 %** | — |
-| Functions | **97.94 %** | — |
-| Branches | **83.44 %** | see below |
+| Lines | **97.83 %** | 91.67 % (`language.rs`) |
+| Regions | **97.74 %** | — |
+| Functions | **97.97 %** | — |
+| Branches | **83.72 %** | see below |
 
 Every source file is above 90 % line coverage; eighteen are at 100 %.
 The `analysis/dominators.rs` module measures **97.50 %** line and
@@ -269,8 +270,10 @@ The new `analysis/basic_blocks.rs` module measures **97.30 %** line and
 **82.76 %** branch coverage, above the same thresholds.
 The new `analysis/dataflow/facts.rs` module measures **99.41 %** line and
 **80.56 %** branch coverage; `analysis/dataflow/mod.rs` measures **96.75 %**
-line and **80.77 %** branch coverage. Both clear the same thresholds. All
-figures come from clean maximal-matrix coverage runs; no focused-test
+line and **80.77 %** branch coverage. Both clear the same thresholds.
+The new `analysis/dataflow/liveness.rs` module measures **99.26 %** line and
+**100 %** branch coverage, above the same thresholds.
+All figures come from clean maximal-matrix coverage runs; no focused-test
 figure is substituted for the repository gate.
 
 **On branch coverage.** `-Z coverage-options=branch` is nightly-only, and it
@@ -304,7 +307,7 @@ dependencies and are not part of the `full` feature set.
 | --- | --- |
 | `examples/` directory | present but **empty** — no runnable `cargo run --example …` programs. |
 | Doctests | none run — every code fence in a doc comment is marked `ignore` / `rust,ignore`, so `cargo test --doc` executes nothing. Feature-gating individual doctests in a `default = []` crate is awkward; the snippets are instead validated by the documentation snippet-check harness. |
-| Benchmarks | `benches/scc_analysis.rs` is an active Criterion target covering 1,000- and 10,000-function paths, rings, and cyclic clusters. Other performance surfaces remain unbenchmarked; see [performance](03-performance.md). |
+| Benchmarks | Four active feature-free Criterion targets cover SCC paths/rings/clusters, graph-arena paths, bounded VF2 paths, and liveness chains/diamond ladders/nested loops. Each asserts an exact deterministic oracle before timing; see [performance](03-performance.md). |
 | `ml-linfa`, `gpu` | not exercised: optional heavy dependencies outside the `full` feature set. |
 
 ## Related pages

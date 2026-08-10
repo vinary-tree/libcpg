@@ -1,8 +1,8 @@
 # Performance
 
 This page explains the data-structure choices behind `libcpg`, the asymptotic
-cost of its core operations, and — honestly — the current state of benchmarking,
-which is a documented gap. It draws a firm line between dependencies that are
+cost of its core operations, and the current state of benchmarking. It draws a
+firm line between dependencies that are
 **actually wired into `src/`** and dependencies that are **declared in
 `Cargo.toml` but not yet used**, so you can reason about real behaviour rather
 than aspiration.
@@ -37,8 +37,8 @@ They are documented here so the performance story is not oversold:
 
 Wiring rayon into the naturally-parallel passes (per-function CFG/DFG extraction,
 independent VF2 searches) is a clear future optimization; per the project's
-data-driven-optimization discipline it should be **measured before and after**,
-which today is blocked on the benchmarking gap below.
+data-driven-optimization discipline it should be **measured before and after**
+in an analysis-specific harness.
 
 ## Preallocation
 
@@ -65,6 +65,7 @@ dimension, $`k`$ = Weisfeiler-Lehman iterations (3).
 | Dominator/post-dominator tree | worst case $`O(VE)`$ time, $`O(V + E)`$ auxiliary space | Deterministic CHK fixed point with a $`V + 2`$ pass cap, Cytron frontier, and iterative Euler intervals; ancestry queries are $`O(1)`$. |
 | PDG construction (per function) | worst case $`O(VE)`$ for control dependence, plus a DFG scan | Reuses the public post-dominator tree's reverse frontier, then emits deduplicated control and data dependence edges. |
 | CFG/call-graph SCC decomposition | $`O(V + E)`$ after adjacency normalization | Iterative Tarjan plus condensation construction; dense indices avoid traversal hash lookups, and explicit stacks avoid native-stack growth with path depth. |
+| Variable liveness | conventional $`O(H(B + E_b)W)`$ solve plus $`O(NW)`$ report replay | $`B`$ blocks, $`E_b`$ block edges, $`N`$ reachable CFG nodes, lattice height $`H \le F`$ for $`F`$ variables, and $`W = \lceil F/64 \rceil`$ machine words per state. |
 | [`backward_slice`](../GLOSSARY.md#backward-slice--forward-slice) / `forward_slice` | $`O(V + E)`$, capped at `max_nodes` | Breadth-first over PDG edges; returns as soon as the slice reaches `max_nodes`. |
 | [VF2](../GLOSSARY.md#vf2) `find_matches` | worst case $`O(N!\,N)`$; pruned in practice | Feasibility rules and `max_matches` cut the state space dramatically; see [`theory/05-subgraph-isomorphism-vf2.md`](../theory/05-subgraph-isomorphism-vf2.md). |
 | [Jaccard](../GLOSSARY.md#jaccard-similarity) similarity | $`O(V_1 + V_2)`$ | Over the two graphs' node-kind multisets. |
@@ -79,7 +80,7 @@ monotone convergence, so it is bounded even on pathological control flow.
 
 ## Benchmark coverage and remaining gaps
 
-Three feature-free Criterion targets are active. Every target constructs and
+Four feature-free Criterion targets are active. Every target constructs and
 checks a deterministic oracle before Criterion enters the timed loop:
 
 - `scc_analysis` measures public call-graph decomposition over 1,000- and
@@ -87,7 +88,10 @@ checks a deterministic oracle before Criterion enters the timed loop:
 - `cpg_construction` measures deterministic graph-arena construction over
   1,000- and 10,000-node paths;
 - `pattern_matching` measures bounded VF2 matching over 256- and 4,096-node
-  paths.
+  paths;
+- `dataflow_liveness` measures backward-May liveness over 512- and 4,096-node
+  chains, 64- and 512-rung diamond ladders, and 128- and 1,024-node nested-loop
+  families.
 
 ```toml
 [[bench]]
@@ -101,6 +105,10 @@ harness = false
 [[bench]]
 name = "pattern_matching"
 harness = false
+
+[[bench]]
+name = "dataflow_liveness"
+harness = false
 ```
 
 Run it directly, or save and compare named baselines:
@@ -111,11 +119,23 @@ cargo bench --bench scc_analysis --no-default-features -- --save-baseline before
 cargo bench --bench scc_analysis --no-default-features -- --baseline before
 ./scripts/bench.sh cpg_construction --save-baseline before
 ./scripts/bench.sh pattern_matching --save-baseline before
+./scripts/bench.sh dataflow_liveness --save-baseline before
 ```
 
-DFG/PDG analysis, whole-corpus analysis, and GNN propagation still lack runnable
+DFG/PDG construction, whole-corpus analysis, and GNN propagation still lack runnable
 benchmarks. Their owning analysis tasks add focused targets and establish
 correctness oracles before optimization.
+
+### Liveness replay finding
+
+A controlled diagnostic run on 2026-08-10 pinned Criterion to CPU 2 under the
+`performance` governor. The first implementation replayed every node from its
+block boundary independently and measured about 445 ms for the 4,096-node
+chain. The profile implied repeated prefix work, matching a quadratic
+$`O(N^2W)`$ replay. Replacing it with one reverse replay per block measured
+about 4.80 ms in the same harness and environment: approximately 92.6 times the
+throughput. The measurement supports the algorithmic diagnosis for this named
+shape and machine; it is not generalized to other inputs or hardware.
 
 ### How to add a benchmark
 

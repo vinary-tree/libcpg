@@ -1,112 +1,33 @@
 # Measurement methodology
 
-**Honest headline: `libcpg` ships one runnable benchmark today.** The active
-`scc_analysis` Criterion target measures exact call-graph SCC decomposition over
-three synthetic graph families at two sizes. Other major performance surfaces —
-construction, DFG/PDG analysis, VF2, and GNN propagation — still lack timing
-evidence. The correctness suite and current counts are documented in
-[engineering/02 — Testing](../engineering/02-testing.md).
+`libcpg` ships four runnable, feature-free Criterion benchmarks. Each harness
+asserts a deterministic correctness oracle **before** entering the timed loop.
+Timing therefore measures an already-validated operation; a faster but
+incorrect implementation fails before it can produce a result.
 
-This page documents both the shipped SCC harness and the **rigorous protocol**
-for extending that evidence so measurements remain reproducible, controlled,
-and auditable rather than reported ad hoc.
+This page states the experimental protocol, the exact benchmark inventory, and
+the scope of the evidence. It follows the central lesson of rigorous
+benchmarking: environmental and layout effects can change a result even when
+the source transformation under study does not [[1]](#references).
 
-## 1. The current state
+![The measurement pipeline: control, validate, measure once, then analyze](../diagrams/measurement-methodology.svg)
 
-`criterion` is wired as a dev-dependency and the SCC benchmark is active. The
-two older candidate targets remain commented out:
+*Figure — the end-to-end measurement pipeline. Source:
+[`diagrams/measurement-methodology.puml`](../diagrams/measurement-methodology.puml).*
+
+## 1. Current evidence
+
+All four targets use `harness = false`, which hands execution to Criterion
+rather than Rust's test harness:
 
 ```toml
 [dev-dependencies]
 criterion = "0.5"
-proptest = "1.5"
 
 [[bench]]
 name = "scc_analysis"
 harness = false
 
-# [[bench]]
-# name = "cpg_construction"
-# harness = false
-
-# [[bench]]
-# name = "pattern_matching"
-# harness = false
-```
-
-Concretely, the gap is:
-
-- **`benches/scc_analysis.rs` is active.** It measures 1,000- and
-  10,000-function paths, rings, and cyclic clusters through the public
-  `call_graph_sccs` entry point.
-- **Construction, DFG/PDG, VF2, and GNN have no benchmark targets.** Their
-  expected costs remain analytical rather than empirical.
-- **Automated tests remain correctness tests.** They intentionally do not
-  assert wall-clock durations, which would be unstable across machines.
-- **`examples/` remains empty.** There are no runnable example programs to use
-  as end-to-end workloads.
-
-Timing evidence from the SCC target applies only to its named graph families and
-sizes; it must not be generalized to the unbenchmarked surfaces.
-
-![The measurement pipeline: control → measure → profile → analyze](../diagrams/measurement-methodology.svg)
-
-*Figure — the end-to-end measurement pipeline: pin the environment, run a criterion harness once, tee the output, and profile/analyze in parallel. Source: [`diagrams/measurement-methodology.puml`](../diagrams/measurement-methodology.puml).*
-
-## 2. Principle: measure before you optimize
-
-The governing discipline is the scientific method applied to performance, and it forbids speculative optimization:
-
-```text
-1. Benchmark + profile FIRST — establish a reproducible baseline.
-2. Analyze the profile — identify the actual bottleneck (not the guessed one).
-3. Hypothesize a fix — a specific algorithmic or data-structure change.
-4. Implement and re-measure under identical conditions.
-5. Compare to the hypothesis: confirmed → keep; refuted → revert, re-hypothesize.
-6. Record every step (input, environment, numbers) in the ledger for audit.
-```
-
-An "optimization" that is not preceded by a measured baseline and followed by a measured comparison is not an optimization; it is an untested change. The remainder of this page makes steps 1 and 4 rigorous.
-
-## 3. Control the environment
-
-Uncontrolled measurement is noise. Before any number is recorded, remove the two largest sources of variance — frequency scaling and scheduler migration:
-
-```text
-# 1. Hold every core at its maximum frequency (defeat DVFS / turbo variance):
-sudo cpupower frequency-set -g performance
-
-# 2. Build optimized, then PIN the bench to a specific core so the scheduler
-#    cannot migrate it mid-run (CPU affinity):
-cargo build --release --features lang-rust
-taskset -c 3 cargo bench --features lang-rust --bench cpg_construction \
-    | tee bench-construction.out
-```
-
-Additional controls, in order of impact: reserve the pinned core (`isolcpus`/`nohz_full` at boot, or at least a quiet machine), disable simultaneous multithreading on the measured core, and record the exact CPU model, microcode, kernel, and toolchain version alongside every result so a number can be reproduced. Record hardware specifications with the results — a throughput figure without its machine is not reproducible.
-
-## 4. The Criterion harness
-
-`criterion` supplies warm-up, statistical sampling, outlier detection, and
-regression comparison across runs. The shipped SCC target can be run directly
-or used for named before/after baselines:
-
-```sh
-cargo bench --bench scc_analysis --no-default-features
-cargo bench --bench scc_analysis --no-default-features -- --save-baseline before
-cargo bench --bench scc_analysis --no-default-features -- --baseline before
-```
-
-The benchmark constructs each CPG outside the timed loop and passes it through
-`black_box`; the measured operation is the complete public SCC projection,
-decomposition, cycle classification, and condensation construction.
-
-Wiring the next performance surface is two steps.
-
-**Step 1 — add or uncomment its bench stanza** in `Cargo.toml` (`harness =
-false` hands timing to criterion rather than libtest):
-
-```toml
 [[bench]]
 name = "cpg_construction"
 harness = false
@@ -114,141 +35,205 @@ harness = false
 [[bench]]
 name = "pattern_matching"
 harness = false
+
+[[bench]]
+name = "dataflow_liveness"
+harness = false
 ```
 
-**Step 2 — add the bench file.** A construction benchmark over Mode A needs the
-grammar. This remains a proposed file, not a shipped target:
+| Target | Public operation | Families and sizes | Pre-timing oracle |
+|---|---|---|---|
+| `scc_analysis` | `call_graph_sccs` | function paths, rings, and cyclic clusters at 1,000 and 10,000 nodes | exact component partition, cycle flags, and condensation edges |
+| `cpg_construction` | graph-arena construction | paths at 1,000 and 10,000 nodes | exact node/edge counts and identifiers |
+| `pattern_matching` | bounded `Vf2Matcher::find_matches` | paths at 256 and 4,096 nodes | exact bounded embedding set |
+| `dataflow_liveness` | `liveness` | chains at 512/4,096 nodes, diamond ladders at 64/512 rungs, nested loops at 128/1,024 nodes | exact per-node equality with an independent round-robin solver |
 
-```rust
-// PROPOSED benches/cpg_construction.rs — NOT shipped (see §1). Requires the
-// [[bench]] stanza above and dev-dependency criterion = "0.5".
-// requires: features = ["lang-rust"]
-use criterion::{black_box, criterion_group, criterion_main, Criterion};
-use libcpg::{CpgBuilder, Language, TreeSitterCpgBuilder};
+The evidence is deliberately local: a result for one named family, size,
+machine, toolchain, and environment is not a universal speed claim. DFG/PDG
+construction, whole-corpus analysis, and GNN propagation remain unbenchmarked.
+Automated correctness tests do not assert elapsed time because wall-clock
+thresholds are unstable across hosts.
 
-fn bench_construction(c: &mut Criterion) {
-    let source = "fn main() { let x = 1; let y = x; }";
-    let builder = TreeSitterCpgBuilder::new();
-    c.bench_function("build_rust_small", |b| {
-        b.iter(|| {
-            let cpg = builder
-                .build(black_box(source), Language::Rust)
-                .expect("build should succeed");
-            black_box(cpg.node_count())
-        });
-    });
-}
+## 2. Falsifiable optimization loop
 
-criterion_group!(benches, bench_construction);
-criterion_main!(benches);
-```
-
-A pattern-matching benchmark can be **feature-free** — it builds the graphs by hand, so it needs no grammar and times the [VF2](../GLOSSARY.md#vf2) search in isolation (reusing the discriminating diamond from [03](03-vf2-completeness.md#3-experiment-e2--completeness-with-exact-backtracking-the-diamond)):
-
-```rust
-// PROPOSED benches/pattern_matching.rs — NOT shipped; feature-free.
-use criterion::{black_box, criterion_group, criterion_main, Criterion};
-use libcpg::{
-    CodePropertyGraph, CpgEdgeKind, CpgNode, CpgNodeKind, Language, NodeId, SourceRange,
-};
-// `find_matches` is a method of the `SubgraphMatcher` trait, so the trait must
-// be in scope; `Vf2Matcher` is the concrete implementation.
-use libcpg::pattern::{SubgraphMatcher, Vf2Matcher};
-
-fn if_node(g: &mut CodePropertyGraph) -> NodeId {
-    g.add_node(CpgNode::new(NodeId::new(0), CpgNodeKind::If, SourceRange::default()))
-}
-
-fn bench_vf2(c: &mut Criterion) {
-    let mut pattern = CodePropertyGraph::new(Language::Rust);
-    let p: Vec<NodeId> = (0..3).map(|_| if_node(&mut pattern)).collect();
-    pattern.connect(p[0], p[1], CpgEdgeKind::AstChild);
-    pattern.connect(p[1], p[2], CpgEdgeKind::AstChild);
-
-    let mut target = CodePropertyGraph::new(Language::Rust);
-    let t: Vec<NodeId> = (0..4).map(|_| if_node(&mut target)).collect();
-    target.connect(t[0], t[1], CpgEdgeKind::AstChild);
-    target.connect(t[0], t[2], CpgEdgeKind::AstChild);
-    target.connect(t[1], t[3], CpgEdgeKind::AstChild);
-    target.connect(t[2], t[3], CpgEdgeKind::AstChild);
-
-    let matcher = Vf2Matcher::new();
-    c.bench_function("vf2_diamond", |b| {
-        b.iter(|| {
-            let m = matcher.find_matches(black_box(&pattern), black_box(&target));
-            black_box(m.len())
-        });
-    });
-}
-
-criterion_group!(benches, bench_vf2);
-criterion_main!(benches);
-```
-
-`black_box` prevents the optimizer from hoisting or eliding the work being timed — without it, a pure function whose result is discarded can be optimized away, and the benchmark measures nothing.
-
-## 5. Profiling: find the bottleneck, don't guess it
-
-Once a baseline exists, profile the hot path rather than reasoning about it. Record with Last-Branch-Record call graphs — cheap and accurate on modern hardware — and, crucially, **generate and analyze the report in parallel** with the next measurement so profiling does not serialize the workflow:
+Every optimization follows this literate procedure:
 
 ```text
-# Record LBR call graphs of the optimized bench binary, pinned to the core:
-taskset -c 3 perf record --call-graph lbr -- \
-    target/release/deps/cpg_construction-<hash> --bench --profile-time 10
+control_environment()
+fixture := build_outside_timed_loop()
+expected := independent_oracle(fixture)
+assert public_operation(fixture) = expected
 
-# Generate the report AND analyze it in the background (parallel), so the next
-# run can proceed while this one is being read:
-perf report -i perf.data > perf-construction.txt &
+baseline := measure_once_and_capture(fixture)
+profile  := analyze_captured_baseline(baseline)
+hypothesis := name_bottleneck_and_expected_complexity_change(profile)
+candidate := implement_one_change(hypothesis)
+assert public_operation(fixture) = expected
+result := measure_once_and_capture(candidate)
+
+keep candidate only if result supports hypothesis and all correctness gates pass
 ```
 
-Complementary tools, matched to the question:
+This separates four claims that are easy to conflate:
 
-- **Memory profile** — `valgrind --tool=massif` for heap growth over time (relevant to the preallocation strategy documented in [`engineering/03-performance.md`](../engineering/03-performance.md)).
-- **Deeper CPU attribution** — the Intel VTune profiler for microarchitectural detail when `perf` is not enough.
-- **Blocking / on-CPU stacks** — the `bcc` / `bcc-libbpf-tools` eBPF tools to see where threads sleep or spend wall-time, useful if [rayon](../GLOSSARY.md#petgraph)-parallel passes are added.
+1. the fixture represents the named workload;
+2. the implementation returns the correct result;
+3. the measurement environment is controlled; and
+4. the candidate changes the predicted cost.
 
-## 6. Discipline: run once, tee, analyze from the file
+## 3. Control the environment
 
-Two rules keep a measurement campaign honest and cheap:
+Frequency scaling, scheduler migration, competing work, toolchain drift, and
+thermal state all confound comparisons. `scripts/bench.sh` checks or records
+the CPU governor, pins one CPU with `taskset`, runs the selected target, and
+tees Criterion output to one timestamped log:
 
-- **Tee once, analyze many.** Pipe each bench/profile run to a file (`| tee bench.out`) and extract every metric from that file. Never re-run a benchmark to read a different column of its output — re-running under even slightly different conditions invalidates the comparison and wastes the controlled window.
-- **Parallelize the analysis, not the measurement.** Report generation, plotting, and reading happen in the background *while the measured core stays dedicated* to the next run. The measurement itself is always single-pinned-core and serialized; only the post-processing is parallel.
+```sh
+./scripts/bench.sh dataflow_liveness
+./scripts/bench.sh dataflow_liveness --save-baseline before
+./scripts/bench.sh dataflow_liveness --baseline before
+```
 
-Preallocation is treated as a *best practice, not a premature optimization*: where the size of a collection is known (node/edge counts during construction), reserving capacity up front avoids reallocation churn and is applied by default rather than deferred to a profiling result.
+For a reportable campaign, record:
 
-## 7. What to measure, and the expected cost of each operation
+- exact commit and dirty-tree state;
+- `rustc --version --verbose` and Criterion version;
+- CPU model, microcode, kernel, governor, pinned CPU, and simultaneous
+  multithreading state;
+- fixture family, size, seed, sample count, warm-up, and measurement duration;
+- the single captured log and any profile derived from it.
 
-The candidate benchmarks below are ordered by measurement priority. The "expected cost" column is the *analytical* complexity to test the empirical numbers against — a benchmark whose scaling departs from the expected class is itself a finding.
+Use a quiet or isolated core where practical. Keep the governor, affinity,
+fixture, toolchain, and Criterion configuration identical across the
+before/after pair. Georges, Buytaert, and Eeckhout explain why repeated
+measurements and statistically principled summaries are necessary for managed
+and noisy systems [[2]](#references); Criterion supplies warm-up, sampling,
+outlier reporting, and baseline comparison for this Rust implementation.
 
-| Operation | Entry point | Expected cost | Why it needs measuring |
-|---|---|---|---|
-| **SCC decomposition (active)** | `call_graph_sccs` | $`O(V + E)`$ after normalization | The shipped path/ring/cluster benchmark checks scaling across many singleton SCCs, one large SCC, and a condensation DAG of small SCCs. |
-| CPG construction | `build` / `build_from_tree` | $`O(n)`$ in tree size | Baseline for every downstream analysis; dominated by the tree-walk. |
-| Reaching-defs sweep | `DfgExtractor::extract` | ~$`O(n)`$ per function (loop bodies swept twice) | The P7c sweep is the DFG's hot path; see [02](02-reaching-defs-validation.md). |
-| PDG + slicing | `PdgBuilder::build`, `backward_slice` | dominator computation + bounded BFS | On-demand and per-function; slice bounds cap the traversal. |
-| **VF2 matching** | `pattern::Vf2Matcher::find_matches` | worst case $`O(N!\,N)`$ (Cordella et al. [[4]](#references)) | **Highest variance** — the factorial worst case makes this the operation whose real-world cost is least predictable from the input size, and therefore the one most in need of empirical bounds and pruning-effectiveness data. |
-| GNN propagation | `gnn::CpgGnn::propagate` | $`O(\text{layers} \cdot |E| \cdot d)`$ | Mean aggregation over three overlays; scales with edges and embedding dim. |
+## 4. Harness anatomy
 
-VF2's factorial worst case is exactly why the pattern-matching bench in §4 is feature-free and reuses a fixed, discriminating graph: it isolates the search cost from parsing and lets the pruning effectiveness be measured directly.
+The measured closure contains only the public operation. Fixture construction
+and the oracle remain outside it, while `black_box` prevents the compiler from
+eliding the result:
 
-## 8. Deterministic oracles you can already assert
+```rust
+use criterion::{black_box, Criterion};
+use libcpg::{liveness, CodePropertyGraph, LivenessResult, NodeId};
 
-Several outputs are exactly reproducible and make excellent regression oracles
-to pair with benchmarks — they let a performance change be validated for
-*correctness* at the same time it is measured for *speed*:
+fn register(
+    c: &mut Criterion,
+    cpg: &CodePropertyGraph,
+    function: NodeId,
+    expected: &LivenessResult,
+) {
+    assert_eq!(&liveness(cpg, function).expect("liveness"), expected);
 
-- **SCC partition** — every projected node occurs in exactly one component,
-  components and members retain stable node-id ordering, and the condensation
-  graph is acyclic. The SCC property suite compares the partition with
-  `petgraph`'s independent Tarjan implementation.
-- **Shape equivalence** — `node_count()` / `edge_count()` agreement between `build` and `build_from_tree` (proved in [01](01-cpg-invariants-and-equivalence.md#4-the-equivalence-theorem-build--build_from_tree)); a construction optimization that changes a count has changed the graph and is wrong.
-- **[Cyclomatic complexity](../GLOSSARY.md#cyclomatic-complexity)** — `cyclomatic_complexity()` computes $`M = E - N + 2`$ over the CFG (McCabe [[6]](#references)); it is a closed-form integer, ideal as a fast, exact correctness check embedded in a construction benchmark.
+    c.bench_function("shape/size", |b| {
+        b.iter(|| {
+            black_box(
+                liveness(black_box(cpg), black_box(function))
+                    .expect("liveness during benchmark"),
+            )
+        });
+    });
+}
+```
 
-Pairing an exact oracle with each timing run means a faster build that silently corrupts the CPG cannot masquerade as a win.
+The caller supplies `expected` from a separate node-level Gauss–Seidel
+round-robin implementation. Its scheduling and state representation differ
+from the production block worklist, so exact agreement is meaningful
+differential evidence.
 
-See also [`engineering/03-performance.md`](../engineering/03-performance.md) for the data-structure rationale ([petgraph](../GLOSSARY.md#petgraph), `rustc-hash`, `smallvec`, `Arc<str>`) that these benchmarks would exercise, and [`engineering/02-testing.md`](../engineering/02-testing.md) for how the inline correctness suite is run.
+## 5. Controlled liveness finding
+
+On 2026-08-10, a diagnostic run pinned the liveness target to CPU 2 under the
+`performance` governor. The initial node-state materializer invoked a
+boundary-to-node replay independently for every node in a long basic block.
+For the 4,096-node chain, Criterion measured about 445 ms.
+
+If a block contains $`N`$ nodes and a state occupies $`W`$ machine words,
+replaying prefixes separately performs
+
+```math
+W \sum_{i=1}^{N} i = W\frac{N(N+1)}{2} = O(N^2W)
+```
+
+state work. The profile and scaling therefore supported the hypothesis that
+replay, not fixed-point convergence, was the bottleneck. One reverse pass per
+block reduced the materialization term to $`O(NW)`$. In the same harness and
+environment, the 4,096-node chain measured about 4.80 ms—approximately 92.6
+times the throughput.
+
+This is evidence for the stated algorithmic diagnosis on that controlled
+fixture. It is not a claim that every program, graph shape, or machine improves
+by the same factor.
+
+## 6. Profile and analyze without re-measuring
+
+Capture once and derive multiple views from the capture. Re-running to read a
+different column creates a new experiment with new confounders.
+
+```sh
+taskset -c 2 perf record --call-graph lbr -- \
+  target/release/deps/dataflow_liveness-<hash> --bench --profile-time 10
+perf report --stdio
+```
+
+Choose the profiler by question:
+
+- `perf record --call-graph lbr` attributes CPU samples to call paths;
+- `valgrind --tool=massif` measures heap growth;
+- an allocation profiler tests cloning or reservation hypotheses; and
+- eBPF on/off-CPU tools distinguish computation from blocking when parallel
+  execution is introduced.
+
+Report generation and reading may proceed in parallel with unrelated work, but
+measurements sharing the controlled core remain serialized.
+
+## 7. Expected scaling and next measurements
+
+Symbols are defined before use: $`V`$ is graph vertices, $`E`$ is graph edges,
+$`N`$ is reachable CFG nodes, $`B`$ is basic blocks, $`E_b`$ is block edges,
+$`F`$ is variable facts, $`W = \lceil F/64 \rceil`$ is words per bit state,
+$`H \le F`$ is lattice height, and $`d`$ is embedding dimension.
+
+| Operation | Analytical expectation | Evidence state |
+|---|---|---|
+| SCC decomposition | $`O(V + E)`$ after normalization | active path/ring/cluster target |
+| CPG arena construction | $`O(V + E)`$ insertion work | active path target |
+| bounded VF2 | factorial worst case; pruning-dependent [[3]](#references) | active bounded path target |
+| variable liveness | $`O(H(B + E_b)W + NW)`$ conventional bound | active chain/diamond/nested-loop target |
+| DFG/PDG construction | analysis-specific; must separate extraction from slicing | benchmark gap |
+| GNN propagation | $`O(\text{layers}\cdot(V+E)\cdot d)`$ | benchmark gap |
+
+Scaling that departs materially from the expected class is itself a finding and
+must be investigated before reporting a constant-factor comparison.
+
+## 8. Reproduction gate
+
+Before accepting a performance change:
+
+1. run the target's independent oracle;
+2. capture a same-environment before/after Criterion pair;
+3. run the complete example, property, integration, and robustness suites;
+4. run strict formatting, lint, rustdoc, documentation-link, and diagram gates;
+5. retain the experimental record while reviewing it, then remove disposable
+   temporary logs when the work item is complete.
+
+See [Engineering performance](../engineering/03-performance.md) for data
+structures and active commands, [Testing](../engineering/02-testing.md) for the
+correctness matrix, and [Variable liveness and dead
+stores](../components/graph/liveness-analysis.md) for the analyzed transfer
+function and oracle.
 
 ## References
 
-4. Cordella, L. P., Foggia, P., Sansone, C., Vento, M. (2004). *A (Sub)graph Isomorphism Algorithm for Matching Large Graphs.* IEEE TPAMI 26(10). DOI: [10.1109/TPAMI.2004.75](https://doi.org/10.1109/TPAMI.2004.75)
-6. McCabe, T. J. (1976). *A Complexity Measure.* IEEE Transactions on Software Engineering SE-2(4). DOI: [10.1109/TSE.1976.233837](https://doi.org/10.1109/TSE.1976.233837)
+1. Mytkowicz, T., Diwan, A., Hauswirth, M., Sweeney, P. F. (2009). *Producing
+   Wrong Data Without Doing Anything Obviously Wrong!* ASPLOS. DOI:
+   [10.1145/1508244.1508275](https://doi.org/10.1145/1508244.1508275)
+2. Georges, A., Buytaert, D., Eeckhout, L. (2007). *Statistically Rigorous Java
+   Performance Evaluation.* OOPSLA. DOI:
+   [10.1145/1297027.1297033](https://doi.org/10.1145/1297027.1297033)
+3. Cordella, L. P., Foggia, P., Sansone, C., Vento, M. (2004). *A (Sub)graph
+   Isomorphism Algorithm for Matching Large Graphs.* IEEE TPAMI 26(10). DOI:
+   [10.1109/TPAMI.2004.75](https://doi.org/10.1109/TPAMI.2004.75)

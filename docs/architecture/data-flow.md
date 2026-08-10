@@ -3,7 +3,7 @@
 This page traces how information moves through libcpg in two phases:
 
 1. the **construction pipeline** — source text becomes a [Code Property Graph](../GLOSSARY.md#code-property-graph-cpg) (Yamaguchi et al. [[1]](#references)) with AST, [CFG](../GLOSSARY.md#control-flow-graph-cfg), and [DFG](../GLOSSARY.md#data-flow-graph-dfg) overlays; and
-2. the **analysis pipeline** — a constructed CPG is queried by exact [dominator/post-dominator](../components/graph/dominator-analysis.md), [natural-loop](../components/graph/loop-analysis.md), and [SCC](../GLOSSARY.md#strongly-connected-component-scc) analyses, the [PDG](../GLOSSARY.md#program-dependence-graph-pdg)/slicer, the [VF2](../GLOSSARY.md#vf2) and [GoF](../GLOSSARY.md#gang-of-four-gof) detectors, the algorithm/complexity heuristics, and the [GNN](../GLOSSARY.md#graph-neural-network-gnn).
+2. the **analysis pipeline** — a constructed CPG is queried by exact [dominator/post-dominator](../components/graph/dominator-analysis.md), [natural-loop](../components/graph/loop-analysis.md), [liveness](../components/graph/liveness-analysis.md), and [SCC](../GLOSSARY.md#strongly-connected-component-scc) analyses, the [PDG](../GLOSSARY.md#program-dependence-graph-pdg)/slicer, the [VF2](../GLOSSARY.md#vf2) and [GoF](../GLOSSARY.md#gang-of-four-gof) detectors, the algorithm/complexity heuristics, and the [GNN](../GLOSSARY.md#graph-neural-network-gnn).
 
 "Data flow" here means both the program's own data-flow overlay *and* the flow of data through libcpg's stages. This is a rewrite of an earlier draft that invented `BranchTrue`/`UseUse`/`Phi` edge kinds, an SSA-based DFG, a parse/embedding cache, and a bincode format — none of which exist. The real edge model is [`CpgEdgeKind::ControlFlow(CfgEdgeKind)`](../GLOSSARY.md#control-flow-graph-cfg) / [`DataFlow(DfgEdgeKind)`](../GLOSSARY.md#data-flow-graph-dfg), the DFG is [AST-ordered reaching definitions](../GLOSSARY.md#ast-ordered-reaching-definitions), and persistence is plain derive-based serde.
 
@@ -167,9 +167,9 @@ Public helpers expose the same information as [def-use chains](../GLOSSARY.md#de
 
 A constructed CPG is the substrate for several independent analyses. Each consumes the overlays built above; none of them run during construction.
 
-![Activity diagram fanning a CPG out to block, dominance, loop/SCC, PDG/slice, VF2/GoF, algorithm, and GNN analyses](../diagrams/analysis-pipeline.svg)
+![Activity diagram fanning a CPG out to block, data-flow, liveness, dominance, loop/SCC, PDG/slice, VF2/GoF, algorithm, and GNN analyses](../diagrams/analysis-pipeline.svg)
 
-*Figure — a constructed CPG fans out to exact structural analysis, the on-demand PDG/slicer, the VF2 and GoF pattern detectors, the algorithm/complexity heuristics, and the GNN. Source: [`diagrams/analysis-pipeline.puml`](../diagrams/analysis-pipeline.puml).*
+*Figure — a constructed CPG fans out to exact structural and data-flow analysis, the on-demand PDG/slicer, the VF2 and GoF pattern detectors, the algorithm/complexity heuristics, and the GNN. Source: [`diagrams/analysis-pipeline.puml`](../diagrams/analysis-pipeline.puml).*
 
 ### Basic-block CFGs (feature-free)
 
@@ -188,6 +188,13 @@ widening to loop headers, `SolverConfig` bounds visits and narrowing passes,
 and `DataflowSolution::state_at` replays transfers inside a block. The engine
 reads the CPG but never materializes edges or mutates payloads. See the
 [monotone data-flow component guide](../components/graph/dataflow-framework.md).
+
+The built-in `liveness(&cpg, function)` instance propagates canonical variable
+facts backward with union and returns sorted per-node `live_in` / `live_out`
+states. `dead_stores` then reports reachable non-parameter definitions whose
+value is not live after the write. It is read-only and advisory because generic
+syntax does not model volatile, atomic, reflective, foreign, or setter effects.
+See [variable liveness and dead stores](../components/graph/liveness-analysis.md).
 
 ### Strongly-connected components (feature-free)
 

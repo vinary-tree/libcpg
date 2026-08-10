@@ -37,6 +37,8 @@ PDG). A query can therefore mix syntax, control flow, and data flow freely.
 - **Monotone data-flow framework** — feature-free forward/backward Kildall
   solving over basic blocks, canonical fact universes, may/must bit domains,
   loop-header widening, bounded narrowing, and per-node state replay.
+- **Variable liveness and dead stores** — deterministic backward-May liveness
+  with sorted per-node states and conservative, advisory dead-write evidence.
 - **DFG extraction** — intraprocedural, AST-ordered reaching definitions
   (Kildall 1973) and def-use chains (13 `DfgEdgeKind` variants).
 - **PDG + program slicing** — control-dependence edges via the reverse dominance

@@ -66,6 +66,29 @@ nested below expression nodes are often absent from the CFG. Consumers can
 therefore choose the appropriate product: exact block fixed points from
 `solve`, or persisted nested-use evidence from `DfgExtractor`.
 
+### Liveness as the canonical backward-May instance
+
+[Variable liveness](../GLOSSARY.md#liveness) instantiates the same framework in
+the reverse direction. For a reachable node $`n`$, $`\operatorname{USE}[n]`$
+is the set of variables read at $`n`$, $`\operatorname{DEF}[n]`$ is the set
+defined there, and $`\operatorname{succ}(n)`$ is the set of CFG successors:
+
+```math
+\operatorname{OUT}[n]
+  = \bigcup_{s \in \operatorname{succ}(n)} \operatorname{IN}[s],
+\qquad
+\operatorname{IN}[n]
+  = \operatorname{USE}[n]
+    \cup \left(\operatorname{OUT}[n] \setminus \operatorname{DEF}[n]\right).
+```
+
+It is a **may** analysis because a read on any successor path keeps the value
+live. A definition absent from $`\operatorname{OUT}[n]`$ is a candidate
+[dead store](../GLOSSARY.md#dead-store), subject to language-specific side
+effects. The implementation, replay algorithm, API, example, complexity, and
+independent oracle are documented in [Variable liveness and dead
+stores](../components/graph/liveness-analysis.md).
+
 ## 2. Reaching definitions
 
 A [definition](../GLOSSARY.md#def-use-chain--definition--use) is a program point that

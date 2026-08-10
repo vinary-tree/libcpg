@@ -373,6 +373,26 @@ See the [data-flow component guide](../components/graph/dataflow-framework.md)
 for equations, trait laws, exact fact classification, pseudocode, complexity,
 security controls, citations, and validation oracles.
 
+### Variable liveness and dead stores
+
+The first built-in feature-free solver instance computes backward-May variable
+liveness and derives read-only dead-store evidence:
+
+| API | Signature | Result |
+|---|---|---|
+| `liveness` | `fn(&CodePropertyGraph, NodeId) -> Result<LivenessResult, AnalysisError>` | Sorted `live_in` and `live_out` variable names for every reachable CFG node. |
+| `dead_stores` | `fn(&CodePropertyGraph, NodeId) -> Result<DeadStoreReport, AnalysisError>` | Reachable non-parameter definitions whose variable is absent from node `live_out`. |
+
+`LivenessResult` exposes `function`, `live_in`, and `live_out` as
+`BTreeMap<NodeId, Vec<Arc<str>>>`. Each `DeadStore` exposes its `node`,
+`variable`, and original `DefinitionKind`. The report is advisory: volatile,
+atomic, reflective, foreign, and language-specific setter effects require
+caller policy before any source transformation.
+
+See [Variable liveness and dead stores](../components/graph/liveness-analysis.md)
+for equations, the batched node-state replay, example code, complexity,
+limitations, benchmark oracle, and citations.
+
 ### Subgraph extraction
 
 | Method | Signature | Notes |

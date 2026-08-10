@@ -136,6 +136,16 @@ refinement can additionally prove a branch dead from a reachable constant
 guard. `libcpg` preserves the nodes and reports this evidence out of graph. See
 [`components/graph/reachability-analysis.md`](components/graph/reachability-analysis.md).
 
+### Dead store
+
+A **dead store** is a reachable, non-parameter definition of a variable whose
+current value cannot be read on any modeled future CFG path before another
+definition replaces it. `libcpg::dead_stores` derives conservative advisory
+evidence from [liveness](#liveness); callers must account for volatile, atomic,
+reflective, foreign, and language-specific setter effects before deleting a
+write. See
+[`components/graph/liveness-analysis.md`](components/graph/liveness-analysis.md).
+
 ### Dominance frontier / Reverse dominance frontier
 
 The **dominance frontier** of node $`d`$ is the set of nodes where $`d`$'s dominance "stops" — the join points just beyond $`d`$'s dominated region (Cytron et al. [[3]](#references)). Computing it on the *reversed* CFG (the **reverse dominance frontier**) yields exactly the [control-dependence](#control-dependence) relation. See [`components/graph/dominator-analysis.md`](components/graph/dominator-analysis.md) and [`theory/04-program-dependence-and-slicing.md`](theory/04-program-dependence-and-slicing.md).
@@ -212,6 +222,15 @@ classical data-flow analyses iterate to a fixed point, formalised by Kildall
 requires `join` and `leq`; built-in may and must bit domains use union/subset and
 intersection/reverse-subset respectively. See
 [`theory/03-data-flow-and-reaching-definitions.md`](theory/03-data-flow-and-reaching-definitions.md).
+
+### Liveness
+
+A variable is **live** at a program point when some future control-flow path
+may read its current value before another definition replaces it. Liveness is a
+backward may analysis: successor inputs meet by union, and a node removes its
+definitions before adding its uses. `libcpg::liveness` returns deterministic
+per-node `live_in` and `live_out` sets. See
+[`components/graph/liveness-analysis.md`](components/graph/liveness-analysis.md).
 
 ### May analysis / Must analysis
 
@@ -357,7 +376,7 @@ used by the complexity analyzer to classify recursive functions (e.g. $`a = b = 
 11. Gamma, E., Helm, R., Johnson, R., Vlissides, J. (1994). *Design Patterns: Elements of Reusable Object-Oriented Software.* Addison-Wesley. ISBN 978-0201633610 (no DOI).
 12. Zhou, Y., Liu, S., Siow, J., Du, X., Liu, Y. (2019). *Devign: Effective Vulnerability Identification by Learning Comprehensive Program Semantics via Graph Neural Networks.* NeurIPS 2019. arXiv:[1909.03496](https://arxiv.org/abs/1909.03496) (no DOI).
 13. Cormen, T. H., Leiserson, C. E., Rivest, R. L., Stein, C. (2009). *Introduction to Algorithms* (3rd ed.). MIT Press. ISBN 978-0262033848 (no DOI). *(Master Theorem.)*
-14. Aho, A. V., Lam, M. S., Sethi, R., Ullman, J. D. (2006). *Compilers: Principles, Techniques, and Tools* (2nd ed.). Addison-Wesley. ISBN 978-0321486813 (no DOI). *(Reaching definitions, data-flow analysis.)*
+14. Aho, A. V., Lam, M. S., Sethi, R., Ullman, J. D. (2006). *Compilers: Principles, Techniques, and Tools* (2nd ed.). Addison-Wesley. ISBN 978-0321486813 (no DOI). *(Reaching definitions, liveness, data-flow analysis.)*
 15. Chidamber, S. R., Kemerer, C. F. (1994). *A Metrics Suite for Object Oriented Design.* IEEE Transactions on Software Engineering 20(6). DOI: [10.1109/32.295895](https://doi.org/10.1109/32.295895) *(LCOM/CBO, used by `PatternMetrics`.)*
 16. Aho, A. V., Sethi, R., Ullman, J. D. (1986). *Compilers: Principles, Techniques, and Tools.* Addison-Wesley. ISBN 0-201-10088-6 (no DOI). *(Natural loops.)*
 17. Havlak, P. (1997). *Nesting of Reducible and Irreducible Loops.* ACM TOPLAS 19(4), 557–567. DOI: [10.1145/258005.258029](https://doi.org/10.1145/258005.258029)

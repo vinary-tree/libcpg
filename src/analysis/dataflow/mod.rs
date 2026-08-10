@@ -5,6 +5,7 @@
 //! insertion-order permutations.
 
 mod facts;
+mod liveness;
 
 use std::{cmp::Reverse, collections::BinaryHeap, fmt::Debug};
 
@@ -19,6 +20,7 @@ pub use facts::{
     expression_facts, variable_facts, ExprFacts, ExprKey, ExprOperand, FactUniverse, VarFacts,
     VariableDefinition,
 };
+pub use liveness::{dead_stores, liveness, DeadStore, DeadStoreReport, LivenessResult};
 
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
