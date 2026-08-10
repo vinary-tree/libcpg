@@ -5,6 +5,7 @@
 
 mod basic_blocks;
 pub(crate) mod cfg_scope;
+pub mod dataflow;
 mod dominators;
 mod loops;
 mod projection;
@@ -15,6 +16,12 @@ mod scc;
 use crate::NodeId;
 
 pub use basic_blocks::{block_cfg, BasicBlock, BlockCfg, BlockEdge, BlockId};
+
+pub use dataflow::{
+    expression_facts, solve, variable_facts, BitSetDomain, Confluence, DataflowAnalysis,
+    DataflowSolution, Direction, ExprFacts, ExprKey, ExprOperand, FactUniverse, Lattice, MustBits,
+    SolverConfig, VarFacts, VariableDefinition,
+};
 
 pub use projection::{
     call_graph_projection, cfg_projection, dfg_projection, module_graph_projection, pdg_projection,

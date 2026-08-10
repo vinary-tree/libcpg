@@ -10,7 +10,7 @@ timeout).
 ![Resource bounds that keep libcpg finite on large or untrusted input](../diagrams/resource-bounds.svg)
 
 *Figure — finite-work safeguards for construction, call resolution, VF2
-matching, the structural DFG sweep, and slicing.
+matching, monotone solving, the structural DFG sweep, and slicing.
 Source: [`diagrams/resource-bounds.puml`](../diagrams/resource-bounds.puml).*
 
 ## The bounds at a glance
@@ -28,6 +28,8 @@ Source: [`diagrams/resource-bounds.puml`](../diagrams/resource-bounds.puml).*
 | AST traversal guards | *(always on)* | `ast_descendants` / `ast_ancestors` / `ast_depth`, SCC scope discovery, `CfgExtractor`, DFG reaching-defs | a cyclic `AstChild` graph terminates instead of looping or overflowing the stack |
 | CFG reachability guard | *(always on)* | `unreachable_code` | iterative DFS expands each function-scoped CFG node at most once; `Call` edges and nested functions are excluded |
 | Basic-block traversal guard | *(always on)* | `block_cfg` | every scoped node is assigned once; iterative DFS avoids native-stack growth; `Call` edges and nested functions are excluded |
+| `SolverConfig::max_visits_per_block` | `256` | `solve` | returns `AnalysisError::IterationLimitExceeded` before another extraction of that block |
+| `SolverConfig::narrow_passes` | `0` | `solve` | performs exactly the configured number of post-widening deterministic sweeps |
 
 All of these are on the **feature-free surface** — you can configure and use them
 with `default = []`.
@@ -135,6 +137,21 @@ finite graph and explicit structural bounds.
 `DfgExtractorConfig::max_iterations` is retained for source compatibility with
 the retired CFG fixed-point implementation and is not consulted by the live
 AST-ordered sweep. It must not be relied upon as a live security control.
+
+## Monotone solving: visit and narrowing bounds
+
+The separate [`solve`](../components/graph/dataflow-framework.md) framework
+uses an explicit worklist over `BlockCfg`; it does not recurse through the CFG.
+Every extraction increments `DataflowSolution::visits[block]`. When that count
+would exceed `SolverConfig::max_visits_per_block` (default `256`), solving
+returns `AnalysisError::IterationLimitExceeded` with the analysis name and cap.
+
+`widen_after` is disabled by default. When enabled, widening is eligible only
+at headers identified by the supplied `LoopForest`; it does not weaken the hard
+visit cap. `narrow_passes` runs exactly the requested number of bounded sweeps.
+For hostile or client-constructed domains, lower the visit cap. The library
+cannot prove a client's lattice laws, monotonicity, or transfer cost, so the cap
+is the termination boundary rather than a correctness certificate.
 
 ## Dominance: structural convergence cap
 
@@ -244,6 +261,7 @@ correctness**: an analysis may return a meaningless answer, but it must
 | `control_flow_sccs` / `call_graph_sccs` | a visited set guards AST scope discovery; dense discovery/low-link arrays and explicit DFS/component stacks make iterative Tarjan visit every projected vertex and normalized edge without consuming native stack per path element |
 | `loop_forest` | the shared visited function scope, iterative dominator/SCC/DFS walks, iterative reverse-body closure, and iterative nesting walk avoid recursion; a 25,000-node natural loop is regression-tested |
 | `unreachable_code` | visited function-scope and dense CFG sets bound discovery; iterative DFS is stack-safe on a 25,000-node reachable/disconnected graph |
+| `block_cfg` / `solve` | iterative CFG traversal and work queues avoid native-stack growth; `solve` also caps extractions per block and ignores inconsistent public loop-header mappings |
 | `build_symbol_table` / `resolve_calls` | visited sets cut parent and callee-subtree cycles; deterministic scope-depth, candidate-retention, and call-count caps bound configured work |
 | `CfgExtractor::process_node` (and every `process_*` handler) | a **path set** on `CfgContext` — a node already on the current recursion path becomes its own exit instead of being re-entered |
 | DFG reaching definitions (`visit_reaching`) | a **path set** — same rule |
@@ -268,10 +286,13 @@ over each one — see
 4. **Tighten all three `ResolveConfig` caps** for direct resolution of hostile
    hand-built or deserialized graphs.
 5. **Pass a sensible `max_nodes`** to every slice call.
-6. **Deserialize only trusted graphs** (see the [threat model](00-threat-model.md)
+6. **Lower `SolverConfig::max_visits_per_block`** for untrusted graphs or
+   third-party analysis domains, and enable widening only with a matching loop
+   forest.
+7. **Deserialize only trusted graphs** (see the [threat model](00-threat-model.md)
    and [`usage/05-serialization.md`](../usage/05-serialization.md)).
-7. **Treat detection output as advisory**, never as a security gate.
-8. **Validate graphs you did not build yourself** (deserialized or caller-assembled) if you need *meaningful* results — the traversal guards guarantee termination, not that the answer means anything.
+8. **Treat detection output as advisory**, never as a security gate.
+9. **Validate graphs you did not build yourself** (deserialized or caller-assembled) if you need *meaningful* results — the traversal guards guarantee termination, not that the answer means anything.
 
 ## Related pages
 

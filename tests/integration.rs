@@ -207,15 +207,97 @@ mod basic_block_analysis {
     }
 }
 
+mod dataflow_framework {
+    use libcpg::{
+        block_cfg, solve, BitSetDomain, BlockCfg, BlockId, CfgEdgeKind, CodePropertyGraph,
+        Confluence, CpgEdgeKind, CpgNode, CpgNodeKind, DataflowAnalysis, Direction, Language,
+        MethodSignature, NodeId, SolverConfig, SourceRange, Visibility,
+    };
+
+    struct ReachableBlocks;
+
+    impl DataflowAnalysis for ReachableBlocks {
+        type Domain = BitSetDomain;
+
+        const NAME: &'static str = "integration-reachable-blocks";
+        const DIRECTION: Direction = Direction::Forward;
+        const CONFLUENCE: Confluence = Confluence::May;
+
+        fn bottom(&self, cfg: &BlockCfg) -> Self::Domain {
+            BitSetDomain::new(cfg.blocks.len())
+        }
+
+        fn boundary(&self, cfg: &BlockCfg) -> Self::Domain {
+            BitSetDomain::new(cfg.blocks.len())
+        }
+
+        fn transfer_block(
+            &self,
+            _cpg: &CodePropertyGraph,
+            _cfg: &BlockCfg,
+            block: BlockId,
+            state: &mut Self::Domain,
+        ) {
+            state.insert(block.as_u32());
+        }
+    }
+
+    fn node(id: u32, kind: CpgNodeKind) -> CpgNode {
+        CpgNode::new(NodeId::new(id), kind, SourceRange::default())
+    }
+
+    #[test]
+    fn downstream_analysis_reaches_a_deterministic_fixpoint_without_graph_mutation() {
+        let mut cpg = CodePropertyGraph::new(Language::Rust);
+        let function = cpg.add_node_with_id(node(
+            10,
+            CpgNodeKind::Function {
+                signature: MethodSignature {
+                    name: "flow".into(),
+                    params: Default::default(),
+                    return_type: None,
+                    is_static: false,
+                    is_async: false,
+                    visibility: Visibility::Private,
+                },
+            },
+        ));
+        let branch = cpg.add_node_with_id(node(20, CpgNodeKind::If));
+        let left = cpg.add_node_with_id(node(30, CpgNodeKind::Return));
+        let right = cpg.add_node_with_id(node(40, CpgNodeKind::Return));
+        for child in [branch, left, right] {
+            cpg.connect(function, child, CpgEdgeKind::AstChild);
+        }
+        for (source, target, kind) in [
+            (function, branch, CfgEdgeKind::Sequential),
+            (branch, left, CfgEdgeKind::ConditionalTrue),
+            (branch, right, CfgEdgeKind::ConditionalFalse),
+        ] {
+            cpg.connect(source, target, CpgEdgeKind::ControlFlow(kind));
+        }
+
+        let graph_size = (cpg.node_count(), cpg.edge_count());
+        let cfg = block_cfg(&cpg, function).expect("block CFG");
+        let solution = solve(&cpg, &cfg, &ReachableBlocks, &SolverConfig::default(), None)
+            .expect("fixed point");
+
+        for exit in &cfg.exit_blocks {
+            assert!(solution.after[exit.as_u32() as usize].contains(cfg.entry.as_u32()));
+            assert!(solution.after[exit.as_u32() as usize].contains(exit.as_u32()));
+        }
+        assert_eq!((cpg.node_count(), cpg.edge_count()), graph_size);
+    }
+}
+
 #[cfg(feature = "lang-rust")]
 mod rust_pipeline {
     use std::collections::BTreeSet;
 
     use libcpg::{
         backward_slice, block_cfg, call_graph_projection, cfg_projection, dominator_tree,
-        forward_slice, loop_forest, post_dominator_tree, unreachable_code, CpgBuilder,
-        CpgBuilderConfig, CpgEdgeKind, CpgNodeKind, DfgEdgeKind, Language, LiteralKind, PdgBuilder,
-        TreeSitterCpgBuilder,
+        expression_facts, forward_slice, loop_forest, post_dominator_tree, unreachable_code,
+        variable_facts, CpgBuilder, CpgBuilderConfig, CpgEdgeKind, CpgNodeKind, DfgEdgeKind,
+        Language, LiteralKind, PdgBuilder, TreeSitterCpgBuilder,
     };
 
     const SRC: &str = "fn f(x: i32) -> i32 { let y = x + 1; if y > 0 { y } else { 0 } }";
@@ -236,6 +318,24 @@ mod rust_pipeline {
         let stats = cpg.stats();
         assert_eq!(stats.node_count, cpg.node_count());
         assert!(stats.cyclomatic_complexity >= 1);
+    }
+
+    #[test]
+    fn parsed_function_builds_canonical_variable_and_expression_facts() {
+        let cpg = build();
+        let function = cpg.functions().next().expect("function").id;
+        let variables = variable_facts(&cpg, function);
+        let expressions = expression_facts(&cpg, function);
+
+        assert!(variables.universe.id_of(&"x".into()).is_some());
+        assert!(variables.universe.id_of(&"y".into()).is_some());
+        assert!(!variables.definitions.is_empty());
+        assert!(!variables.uses.is_empty());
+        assert!(!expressions.universe.is_empty());
+        assert!(expressions
+            .occurrences
+            .iter()
+            .all(|occurrences| !occurrences.is_empty()));
     }
 
     #[test]

@@ -21,8 +21,9 @@
 //! cyclic `AstChild` edge sent every ancestor walk into an infinite loop.
 
 use libcpg::{
-    CodePropertyGraph, CpgEdgeKind, CpgNode, CpgNodeKind, Language, MethodSignature, NodeId,
-    ScopeId, SourceRange, Visibility,
+    BitSetDomain, BlockCfg, BlockId, CodePropertyGraph, Confluence, CpgEdgeKind, CpgNode,
+    CpgNodeKind, DataflowAnalysis, Direction, Language, MethodSignature, NodeId, ScopeId,
+    SourceRange, Visibility,
 };
 use proptest::prelude::*;
 
@@ -58,6 +59,34 @@ fn child(cpg: &mut CodePropertyGraph, parent: NodeId, kind: CpgNodeKind) -> Node
         p.children.push(id);
     }
     id
+}
+
+struct RobustBlockReach;
+
+impl DataflowAnalysis for RobustBlockReach {
+    type Domain = BitSetDomain;
+
+    const NAME: &'static str = "robust-block-reach";
+    const DIRECTION: Direction = Direction::Forward;
+    const CONFLUENCE: Confluence = Confluence::May;
+
+    fn bottom(&self, cfg: &BlockCfg) -> Self::Domain {
+        BitSetDomain::new(cfg.blocks.len())
+    }
+
+    fn boundary(&self, cfg: &BlockCfg) -> Self::Domain {
+        BitSetDomain::new(cfg.blocks.len())
+    }
+
+    fn transfer_block(
+        &self,
+        _cpg: &CodePropertyGraph,
+        _cfg: &BlockCfg,
+        block: BlockId,
+        state: &mut Self::Domain,
+    ) {
+        state.insert(block.as_u32());
+    }
 }
 
 /// The ways a CPG can be structurally corrupt.
@@ -319,6 +348,21 @@ fn exercise_every_analysis(cpg: &CodePropertyGraph, func: NodeId) {
             assert!(natural_loop.body.len() < loops.loops[parent].body.len());
         }
     }
+    let variables = libcpg::variable_facts(&work, func);
+    let expressions = libcpg::expression_facts(&work, func);
+    assert!(variables.universe.len() <= work.node_count());
+    assert!(expressions.universe.len() <= work.node_count());
+    let solution = libcpg::solve(
+        &work,
+        &blocks,
+        &RobustBlockReach,
+        &libcpg::SolverConfig::default(),
+        Some(&loops),
+    )
+    .expect("finite bit-set dataflow terminates on corrupt input");
+    assert_eq!(solution.before.len(), blocks.blocks.len());
+    assert_eq!(solution.after.len(), blocks.blocks.len());
+    assert_eq!(solution.visits.len(), blocks.blocks.len());
     let first_resolution = libcpg::resolve_calls(&mut work, &libcpg::ResolveConfig::default());
     libcpg::DfgExtractor::new().extract(&mut work);
     libcpg::PdgBuilder::new().build(&mut work, func);

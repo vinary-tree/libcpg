@@ -271,6 +271,8 @@ So the safe pattern is: build (single-threaded, `&mut`), then analyse
   CSR views used by exact analyses.
 - [Basic-block CFGs](basic-block-cfg.md) — id-preserving maximal sequential
   runs, typed block edges, entry/exits, and deterministic traversal orders.
+- [Monotone data flow](dataflow-framework.md) — forward/backward fixed points,
+  lattice domains, canonical facts, widening/narrowing, and bounded worklists.
 - [Dominators and post-dominators](dominator-analysis.md) — immediate
   dominators, frontiers, constant-time ancestry, and PDG control dependence.
 - [Strongly-connected components](scc-analysis.md) — exact CFG loops and

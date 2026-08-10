@@ -5,12 +5,12 @@ start
 :CodePropertyGraph
 (AST + CFG + DFG over one shared node set);
 fork
-  :dominator_tree / post_dominator_tree
-  + block_cfg
+  :block_cfg → solve(DataflowAnalysis)
+  + dominator_tree / post_dominator_tree
   + loop_forest
   + unreachable_code
   + control_flow_sccs / call_graph_sccs
-  → exact structural relations;<<#C3FAE8>>
+  → exact structural relations + fixed points;<<#C3FAE8>>
 fork again
   :PdgBuilder.build
   → backward_slice / forward_slice;<<#E5DBFF>>
@@ -28,7 +28,7 @@ end fork
 stop
 legend right
   |= colour |= analysis (module) |
-  |<#C3FAE8>| structural — blocks / reachability / dominance / loops / SCCs |
+  |<#C3FAE8>| structural — blocks / data flow / reachability / dominance / loops / SCCs |
   |<#E5DBFF>| PDG — program slicing |
   |<#FFE3E3>| VF2 — subgraph iso / GoF |
   |<#FFF3BF>| algorithm + complexity |

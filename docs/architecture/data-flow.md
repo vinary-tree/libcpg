@@ -179,6 +179,16 @@ node ids and typed inter-block edges, then precomputes post-order and reverse
 post-order without mutating the CPG. See the
 [basic-block component guide](../components/graph/basic-block-cfg.md).
 
+### Monotone data-flow analyses (feature-free)
+
+`solve` combines a `BlockCfg`, a caller-defined `Lattice` domain, and a
+`DataflowAnalysis` transfer contract. Forward analyses use deterministic RPO;
+backward analyses use post-order. Optional `LoopForest` evidence restricts
+widening to loop headers, `SolverConfig` bounds visits and narrowing passes,
+and `DataflowSolution::state_at` replays transfers inside a block. The engine
+reads the CPG but never materializes edges or mutates payloads. See the
+[monotone data-flow component guide](../components/graph/dataflow-framework.md).
+
 ### Strongly-connected components (feature-free)
 
 `control_flow_sccs(&cpg, function)` partitions one function's intraprocedural

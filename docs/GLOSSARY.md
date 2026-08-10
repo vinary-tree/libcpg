@@ -103,6 +103,14 @@ where $`E`$ is the number of CFG edges and $`N`$ the number of CFG nodes (for a 
 
 A [PDG](#program-dependence-graph-pdg) edge kind (`DataDependence`): node $`u`$ (a use) is data-dependent on node $`d`$ (a definition) when $`d`$ defines a value that $`u`$ reads and the definition can reach the use. `libcpg` derives these by re-projecting DFG `DefUse`/`ReachingDef` edges within a function. See [`theory/04-program-dependence-and-slicing.md`](theory/04-program-dependence-and-slicing.md).
 
+### Data-flow analysis
+
+A monotone fixed-point computation that propagates abstract facts along a CFG.
+Forward analyses meet predecessor output at block input; backward analyses meet
+successor input at block output. `libcpg::solve` runs either direction over a
+`BlockCfg` with a caller-defined `Lattice` and `DataflowAnalysis`. See the
+[data-flow framework guide](components/graph/dataflow-framework.md).
+
 ### Data Flow Graph (DFG)
 
 The overlay whose edges track how values move from definitions to uses, typed by `DfgEdgeKind` (13 variants: `DefUse`, `UseDef`, `ReachingDef`, `DataDependency`, `Parameter`, `ReturnValue`, `FieldRead`, `FieldWrite`, `IndexRead`, `IndexWrite`, `Alias`, `Dereference`, `AddressOf`). Wrapped as `CpgEdgeKind::DataFlow(DfgEdgeKind)`. Built by `DfgExtractor` using [AST-ordered reaching definitions](#ast-ordered-reaching-definitions). See [`components/builder/dfg.md`](components/builder/dfg.md).
@@ -139,6 +147,13 @@ The **dominance frontier** of node $`d`$ is the set of nodes where $`d`$'s domin
 ### Embedding
 
 A dense real-valued vector that summarises a node (`NodeEmbedding`) or a subgraph (`SubgraphEmbedding`) so that structurally/semantically similar code lands nearby in vector space. Produced by the [GNN](#graph-neural-network-gnn) and compared with [cosine similarity](#cosine-similarity). See [`components/gnn/embeddings.md`](components/gnn/embeddings.md).
+
+### Fact universe
+
+A sorted, deduplicated collection of analysis facts with stable dense `u32`
+identifiers. `FactUniverse<T>` makes bit-domain states and serialized solutions
+independent of source graph insertion order. See the
+[data-flow framework guide](components/graph/dataflow-framework.md#built-in-domains-and-fact-universes).
 
 ### Feature flag (cargo)
 
@@ -191,7 +206,19 @@ In [reaching-definitions](#reaching-definition) analysis, processing a definitio
 
 ### Lattice (data-flow)
 
-The algebraic structure — a partially ordered set with meet/join — over which classical data-flow analyses iterate to a fixed point, formalised by Kildall [[6]](#references). `libcpg`'s reaching-definitions environment is a map into the powerset lattice of definitions; the theory page frames the AST-ordered sweep against this backdrop. See [`theory/03-data-flow-and-reaching-definitions.md`](theory/03-data-flow-and-reaching-definitions.md).
+The algebraic structure — a partially ordered set with meet/join — over which
+classical data-flow analyses iterate to a fixed point, formalised by Kildall
+[[6]](#references) and Kam–Ullman [[19]](#references). `libcpg::Lattice`
+requires `join` and `leq`; built-in may and must bit domains use union/subset and
+intersection/reverse-subset respectively. See
+[`theory/03-data-flow-and-reaching-definitions.md`](theory/03-data-flow-and-reaching-definitions.md).
+
+### May analysis / Must analysis
+
+A **may** fact is true when it holds on at least one control-flow path, usually
+using union at confluence. A **must** fact is true only when it holds on every
+path, usually using intersection. `Confluence` records this intent; the domain's
+`Lattice::join` supplies the actual operation.
 
 ### Message passing
 
@@ -295,6 +322,14 @@ The subgraph-isomorphism algorithm of Cordella, Foggia, Sansone, and Vento [[4]]
 
 A graph-similarity method (Weisfeiler & Leman [[10a]](#references); graph kernels by Shervashidze et al. [[10b]](#references)) that iteratively refines each node's label to a hash of its own label plus the sorted multiset of neighbour labels; the histogram of labels after $`k`$ iterations becomes a feature vector for comparison. `libcpg` uses 3 iterations in the `WeisfeilerLehman` [similarity metric](#similarity-metric). See [`theory/06-graph-similarity.md`](theory/06-graph-similarity.md).
 
+### Widening / Narrowing
+
+Abstract-interpretation convergence operators introduced by Cousot and Cousot
+[[20]](#references). **Widening** accelerates an ascending chain to a safe
+post-fixpoint; **narrowing** descends from it toward a more precise state.
+`solve` widens only at `LoopForest` headers and bounds narrowing by configured
+passes. See the [data-flow framework guide](components/graph/dataflow-framework.md#solver-and-convergence).
+
 ### Master Theorem
 
 A closed-form for divide-and-conquer recurrences of the shape
@@ -327,3 +362,5 @@ used by the complexity analyzer to classify recursive functions (e.g. $`a = b = 
 16. Aho, A. V., Sethi, R., Ullman, J. D. (1986). *Compilers: Principles, Techniques, and Tools.* Addison-Wesley. ISBN 0-201-10088-6 (no DOI). *(Natural loops.)*
 17. Havlak, P. (1997). *Nesting of Reducible and Irreducible Loops.* ACM TOPLAS 19(4), 557–567. DOI: [10.1145/258005.258029](https://doi.org/10.1145/258005.258029)
 18. Ramalingam, G. (1999). *Identifying Loops in Almost Linear Time.* ACM TOPLAS 21(2), 175–188. DOI: [10.1145/316686.316687](https://doi.org/10.1145/316686.316687)
+19. Kam, J. B., Ullman, J. D. (1977). *Monotone Data Flow Analysis Frameworks.* Acta Informatica 7, 305–317. DOI: [10.1007/BF00290339](https://doi.org/10.1007/BF00290339)
+20. Cousot, P., Cousot, R. (1977). *Abstract Interpretation: A Unified Lattice Model for Static Analysis of Programs by Construction or Approximation of Fixpoints.* POPL '77, 238–252. DOI: [10.1145/512950.512973](https://doi.org/10.1145/512950.512973)

@@ -34,6 +34,9 @@ PDG). A query can therefore mix syntax, control flow, and data flow freely.
   partitions and structural dead-branch evidence without graph mutation.
 - **Basic-block CFGs** — deterministic, id-preserving block partitions, typed
   block edges, entry/exits, and iterative post-order/RPO traversal views.
+- **Monotone data-flow framework** — feature-free forward/backward Kildall
+  solving over basic blocks, canonical fact universes, may/must bit domains,
+  loop-header widening, bounded narrowing, and per-node state replay.
 - **DFG extraction** — intraprocedural, AST-ordered reaching definitions
   (Kildall 1973) and def-use chains (13 `DfgEdgeKind` variants).
 - **PDG + program slicing** — control-dependence edges via the reverse dominance

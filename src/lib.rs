@@ -10,6 +10,7 @@
 //! - **SCC Analysis**: Decompose per-function CFGs and resolved call graphs
 //! - **CFG Reachability**: Report unreachable nodes and structural dead branches
 //! - **Basic-block CFGs**: Group reachable CFG nodes without losing CPG ids
+//! - **Monotone Data Flow**: Solve forward/backward analyses over block CFGs
 //! - **Graph Projections**: Build deterministic forward/reverse CSR views
 //! - **Pattern Detection**: Detect design patterns using subgraph isomorphism (VF2/VF3)
 //! - **Algorithm Analysis**: Extract algorithm signatures and estimate complexity
@@ -69,13 +70,16 @@ pub use graph::{
 
 pub use analysis::{
     block_cfg, build_symbol_table, call_graph_projection, call_graph_sccs, cfg_projection,
-    control_flow_sccs, dfg_projection, dominator_tree, loop_forest, module_graph_projection,
-    pdg_projection, post_dominator_tree, projection_of, resolve_calls, unreachable_code,
-    AnalysisError, BasicBlock, BlockCfg, BlockEdge, BlockId, CallGraphResolution, CallResolution,
-    Confidence, DeadBranch, DominatorTree, GraphProjection, LoopExitEdge, LoopForest, NaturalLoop,
-    PostDominatorTree, ProjectionError, ProjectionKind, ReachabilityReport, ResolveConfig,
-    SccAnalysisError, SccComponent, SccCondensationEdge, SccDecomposition, SccProjection,
-    SymbolCandidates, SymbolTable, UndirectedProjection,
+    control_flow_sccs, dfg_projection, dominator_tree, expression_facts, loop_forest,
+    module_graph_projection, pdg_projection, post_dominator_tree, projection_of, resolve_calls,
+    solve, unreachable_code, variable_facts, AnalysisError, BasicBlock, BitSetDomain, BlockCfg,
+    BlockEdge, BlockId, CallGraphResolution, CallResolution, Confidence, Confluence,
+    DataflowAnalysis, DataflowSolution, DeadBranch, Direction, DominatorTree, ExprFacts, ExprKey,
+    ExprOperand, FactUniverse, GraphProjection, Lattice, LoopExitEdge, LoopForest, MustBits,
+    NaturalLoop, PostDominatorTree, ProjectionError, ProjectionKind, ReachabilityReport,
+    ResolveConfig, SccAnalysisError, SccComponent, SccCondensationEdge, SccDecomposition,
+    SccProjection, SolverConfig, SymbolCandidates, SymbolTable, UndirectedProjection, VarFacts,
+    VariableDefinition,
 };
 
 pub use builder::{

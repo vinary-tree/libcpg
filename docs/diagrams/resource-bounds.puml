@@ -29,6 +29,13 @@ infeasible branches earlier.;
 ***[#F1F3F5]:structural AST sweep
 one ordinary pass, exactly two loop-body passes,
 and a path set that cuts malformed cycles.;
+**[#FFE3E3] Monotone solver
+***[#F1F3F5]:max_visits_per_block = 256 default
+returns IterationLimitExceeded when a block
+would be extracted beyond the hard cap.;
+***[#F1F3F5]:widen_after + narrow_passes
+widening is confined to LoopForest headers,
+narrowing runs exactly the bounded pass count.;
 **[#FFE3E3] Slicing
 ***[#F1F3F5]:max_nodes on backward_slice / forward_slice
 bounds the PDG reverse/forward BFS —

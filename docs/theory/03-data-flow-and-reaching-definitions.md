@@ -8,9 +8,10 @@
 > specialises it to [reaching definitions](../GLOSSARY.md#reaching-definition) with
 > [gen/kill](../GLOSSARY.md#kill--gen-data-flow) sets and
 > [strong/weak update](../GLOSSARY.md#strong-update--weak-update), and then explains
-> **why `libcpg` computes reaching definitions with an
+> **why `libcpg` materializes its DFG with an
 > [AST-ordered flow-sensitive sweep](../GLOSSARY.md#ast-ordered-reaching-definitions)**
-> rather than [SSA](../GLOSSARY.md#static-single-assignment-ssa) or a CFG fixed point.
+> while exposing a separate classical CFG fixed-point framework for reusable
+> analyses. It does not use [SSA](../GLOSSARY.md#static-single-assignment-ssa).
 > Notation follows the [Glossary conventions](../GLOSSARY.md#notation-conventions).
 
 ## 1. Data-flow analysis as a lattice fixed point
@@ -32,11 +33,38 @@ its predecessors' exit facts, and the exit facts are the transfer of the entry:
 ```
 
 Because every $`f_b`$ is monotone and the lattice has finite height, iterating
-these equations from $`\bot`$ reaches a least fixed point — the
-**maximum-fixed-point (MFP)** solution — in finitely many rounds. When the transfer
-functions are *distributive* (as they are for reaching definitions), the MFP
+these equations from $`\bot`$ reaches the least solution under the lattice order
+used here, in finitely many rounds. Compiler texts often call the corresponding
+safe solution the **maximal fixed-point (MFP)** solution because they use the
+reverse information order. When the transfer functions are *distributive* (as
+they are for reaching definitions), the MFP
 coincides with the ideal **meet-over-all-paths (MOP)** solution, so the fixed point
 loses no precision relative to enumerating paths [[2]](#references).
+
+### The production fixed-point framework
+
+`libcpg::solve` implements these equations directly over deterministic
+[`BlockCfg`](../components/graph/basic-block-cfg.md) values. A caller supplies a
+`Lattice` and a monotone `DataflowAnalysis`; `Direction` selects forward RPO or
+backward post-order propagation, while `Confluence` records may/must intent.
+`BitSetDomain` supplies union under subset ordering and `MustBits` supplies
+intersection under reverse-subset ordering. The solver follows Kildall
+[[1]](#references) and the monotone framework formalized by Kam and Ullman
+[[3]](#references).
+
+Finite-height domains converge without acceleration. For infinite-height
+domains, a **widening** replaces an ascending sequence with a safe post-fixpoint;
+a bounded **narrowing** can then descend toward precision. `solve` restricts
+widening to headers supplied by `LoopForest` and imposes a hard per-block visit
+cap. These abstract-interpretation operations follow Cousot and Cousot
+[[4]](#references). The full API and algorithms are in the
+[monotone data-flow component guide](../components/graph/dataflow-framework.md).
+
+This generic solver is read-only and returns facts; it does not add DFG edges.
+The AST-ordered sweep below remains the DFG *materializer* because identifiers
+nested below expression nodes are often absent from the CFG. Consumers can
+therefore choose the appropriate product: exact block fixed points from
+`solve`, or persisted nested-use evidence from `DfgExtractor`.
 
 ## 2. Reaching definitions
 
@@ -81,13 +109,14 @@ incident edges rather than re-running the analysis (`reaching_definitions`,
 
 *Figure — reaching-definition / def-use edges connecting each definition to the uses it reaches. Source: [`diagrams/def-use-example.dot`](../diagrams/def-use-example.dot).*
 
-## 3. Why an AST-ordered sweep instead of SSA or a CFG fixed point
+## 3. Why DFG materialization uses an AST-ordered sweep
 
-The classical algorithm iterates the equations of §1 over the CFG until a fixed
-point; [SSA](../GLOSSARY.md#static-single-assignment-ssa) instead rewrites the program
+The generic framework above iterates the equations of §1 over the CFG until a
+fixed point; [SSA](../GLOSSARY.md#static-single-assignment-ssa) instead rewrites the program
 so each variable is assigned once, inserting $`\phi`$-functions at joins
-(Cytron et al., see [Theory 04](04-program-dependence-and-slicing.md)). `libcpg`
-deliberately uses **neither**. Its `DfgExtractor` performs a single
+(Cytron et al., see [Theory 04](04-program-dependence-and-slicing.md)). For edge
+materialization, `libcpg` deliberately uses **neither**. Its `DfgExtractor`
+performs a single
 **[AST-ordered, flow-sensitive sweep](../GLOSSARY.md#ast-ordered-reaching-definitions)**:
 it abstract-interprets the function body in *source order* over the AST, threading an
 environment
@@ -227,6 +256,9 @@ off by default) is set through `DfgExtractorConfig` — see
   [Theory 04](04-program-dependence-and-slicing.md).
 - The design rationale and the retired approaches:
   [`design/0003-ast-ordered-reaching-defs.md`](../design/0003-ast-ordered-reaching-defs.md).
+- The reusable block fixed-point engine:
+  [`components/graph/dataflow-framework.md`](../components/graph/dataflow-framework.md)
+  and [`design/0009-deterministic-monotone-dataflow.md`](../design/0009-deterministic-monotone-dataflow.md).
 - Validation of the sweep against a real test corpus (nested use, latest-def,
   non-flow, shadowing, idempotency): [`scientific/02-reaching-defs-validation.md`](../scientific/02-reaching-defs-validation.md).
 
@@ -234,3 +266,5 @@ off by default) is set through `DfgExtractorConfig` — see
 
 1. Kildall, G. A. (1973). *A Unified Approach to Global Program Optimization.* POPL '73. DOI: [10.1145/512927.512945](https://doi.org/10.1145/512927.512945)
 2. Aho, Lam, Sethi, Ullman (2006). *Compilers: Principles, Techniques, and Tools* (2nd ed.). ISBN 978-0321486813 (no DOI). *(Data-flow analysis.)*
+3. Kam, J. B., Ullman, J. D. (1977). *Monotone Data Flow Analysis Frameworks.* Acta Informatica 7, 305–317. DOI: [10.1007/BF00290339](https://doi.org/10.1007/BF00290339)
+4. Cousot, P., Cousot, R. (1977). *Abstract Interpretation: A Unified Lattice Model for Static Analysis of Programs by Construction or Approximation of Fixpoints.* POPL '77, 238–252. DOI: [10.1145/512950.512973](https://doi.org/10.1145/512950.512973)

@@ -1,0 +1,45 @@
+@startuml
+!include _libcpg-theme.iuml
+title Monotone data-flow framework — deterministic convergence over BlockCfg
+
+rectangle "CodePropertyGraph\nimmutable node payloads" as CPG #F1F3F5
+rectangle "BlockCfg\nblocks · typed edges\nRPO · post-order" as CFG #D3F9D8
+rectangle "FactUniverse<T>\nsorted · deduplicated\ndense u32 ids" as FACTS #FFF3BF
+rectangle "Lattice\nbottom · join · leq" as LATTICE #E5DBFF
+rectangle "DataflowAnalysis\ndirection · confluence\nboundary · block/edge transfer" as ANALYSIS #DBE4FF
+rectangle "LoopForest\nheader evidence" as LOOPS #C3FAE8
+rectangle "SolverConfig\nvisit cap · widening threshold\nnarrowing passes" as CONFIG #FFE8CC
+rectangle "deterministic worklist\nRPO forward · PO backward\nmin-priority BlockId tie-break" as SOLVER #FCC2D7
+rectangle "DataflowSolution\nbefore · after · visits\nstate_at replay" as RESULT #C3FAE8
+rectangle "AnalysisError::\nIterationLimitExceeded" as ERROR #FFE3E3
+
+CPG --> CFG : block_cfg(function)
+CPG --> ANALYSIS : read-only transfer context
+FACTS --> LATTICE : domain width / identity
+CFG --> SOLVER
+LATTICE --> ANALYSIS : Domain
+ANALYSIS --> SOLVER
+LOOPS --> SOLVER : widening only at headers
+CONFIG --> SOLVER
+SOLVER --> RESULT : fixed point
+SOLVER --> ERROR : next extraction would exceed cap
+
+note bottom of RESULT
+  Forward state_at returns before(node).
+  Backward state_at returns after(node).
+  Solving never mutates the CPG.
+end note
+
+legend right
+  |= colour |= role |
+  |<#F1F3F5>| immutable source graph |
+  |<#D3F9D8>| block control-flow substrate |
+  |<#FFF3BF>| canonical fact identity |
+  |<#E5DBFF>| abstract domain algebra |
+  |<#DBE4FF>| client transfer semantics |
+  |<#C3FAE8>| loop evidence / public result |
+  |<#FFE8CC>| resource and convergence policy |
+  |<#FCC2D7>| deterministic solver |
+  |<#FFE3E3>| bounded failure |
+endlegend
+@enduml

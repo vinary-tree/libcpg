@@ -349,6 +349,30 @@ See the [basic-block component guide](../components/graph/basic-block-cfg.md)
 for leader rules, field invariants, pseudocode, complexity, traversal semantics,
 the compatibility API, citations, and property-test oracles.
 
+### Monotone data-flow framework
+
+The feature-free framework solves caller-defined analyses over `BlockCfg`:
+
+| API | Signature or role |
+|---|---|
+| `solve` | `fn(&CodePropertyGraph, &BlockCfg, &A, &SolverConfig, Option<&LoopForest>) -> Result<DataflowSolution<A::Domain>, AnalysisError>` |
+| `Lattice` | `Clone + PartialEq + Debug` domain with `join` and `leq` |
+| `DataflowAnalysis` | direction, confluence, bottom/boundary, block transfer, optional edge transfer and widening |
+| `SolverConfig` | per-block visit cap, loop-header widening threshold, bounded narrowing passes |
+| `DataflowSolution<D>` | `before`, `after`, `visits`, and node-level `state_at` replay |
+| `FactUniverse<T>` | sorted, deduplicated facts with stable dense `u32` ids |
+| `BitSetDomain` / `MustBits` | union/subset may domain and intersection/reverse-subset must domain |
+| `variable_facts` / `expression_facts` | canonical variable definition/use and structural expression universes |
+
+`Direction::{Forward, Backward}` selects RPO or post-order propagation.
+`Confluence::{May, Must}` documents path semantics; `Lattice::join` implements
+the meet-over-predecessor/successor algebra. Exceeding
+`max_visits_per_block` returns `AnalysisError::IterationLimitExceeded`.
+
+See the [data-flow component guide](../components/graph/dataflow-framework.md)
+for equations, trait laws, exact fact classification, pseudocode, complexity,
+security controls, citations, and validation oracles.
+
 ### Subgraph extraction
 
 | Method | Signature | Notes |
