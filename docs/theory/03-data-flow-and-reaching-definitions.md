@@ -89,6 +89,31 @@ effects. The implementation, replay algorithm, API, example, complexity, and
 independent oracle are documented in [Variable liveness and dead
 stores](../components/graph/liveness-analysis.md).
 
+### Available and very-busy expressions as dual Must instances
+
+[Available expressions](../GLOSSARY.md#available-expression) propagate
+forward; an expression survives a join only when every predecessor path has
+computed it since the last definition of any operand. [Very-busy
+expressions](../GLOSSARY.md#very-busy-expression--anticipability) propagate
+backward; a fact survives only when every successor path computes it before an
+operand definition. For structural expression facts $`E`$, both share:
+
+```math
+f_n(S) = GEN[n] \cup (S \setminus KILL[n]),
+\qquad
+KILL[n] = \{e \in E \mid operands(e) \cap DEF[n] \ne \varnothing\}.
+```
+
+The two boundary sets are empty and confluence is intersection. Availability
+supports [CSE](../GLOSSARY.md#common-subexpression-elimination-cse);
+anticipability combined with dominance supports
+[PRE](../GLOSSARY.md#partial-redundancy-elimination-pre), following the
+classical formulation of Morel and Renvoise [[5]](#references). `libcpg` returns
+candidate evidence rather than rewriting source because structural equivalence
+alone cannot prove that moving or removing an evaluation preserves
+language-specific effects. See [Available and very-busy
+expressions](../components/graph/expression-analysis.md).
+
 ## 2. Reaching definitions
 
 A [definition](../GLOSSARY.md#def-use-chain--definition--use) is a program point that
@@ -291,3 +316,4 @@ off by default) is set through `DfgExtractorConfig` — see
 2. Aho, Lam, Sethi, Ullman (2006). *Compilers: Principles, Techniques, and Tools* (2nd ed.). ISBN 978-0321486813 (no DOI). *(Data-flow analysis.)*
 3. Kam, J. B., Ullman, J. D. (1977). *Monotone Data Flow Analysis Frameworks.* Acta Informatica 7, 305–317. DOI: [10.1007/BF00290339](https://doi.org/10.1007/BF00290339)
 4. Cousot, P., Cousot, R. (1977). *Abstract Interpretation: A Unified Lattice Model for Static Analysis of Programs by Construction or Approximation of Fixpoints.* POPL '77, 238–252. DOI: [10.1145/512950.512973](https://doi.org/10.1145/512950.512973)
+5. Morel, E., Renvoise, C. (1979). *Global Optimization by Suppression of Partial Redundancies.* Communications of the ACM 22(2), 96–103. DOI: [10.1145/359060.359069](https://doi.org/10.1145/359060.359069)

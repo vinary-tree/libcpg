@@ -49,9 +49,9 @@ Two properties of the suite make this rigorous rather than merely suggestive:
 
 ## 3. The evidence base
 
-The maximal matrix contains **567 library tests**, **20 public-API integration
-tests**, and **5 malformed-input robustness tests**. These 592 executable cases
-combine fixed examples, differential oracles, and 39 `proptest!` blocks. The
+The maximal matrix contains **574 library tests**, **21 public-API integration
+tests**, and **5 malformed-input robustness tests**. These 600 executable cases
+combine fixed examples, differential oracles, and 40 `proptest!` blocks. The
 feature-free matrix remains independently runnable and exercises the exact
 graph/data-flow substrate without compiling any grammar. Four active Criterion
 targets supplement correctness with scoped performance evidence; see
@@ -73,8 +73,15 @@ Because `default = []`, many tests are **feature-gated**. The end-to-end reachin
 
 Scientific honesty requires separating the two:
 
-- **Proven (guarded by the tests above).** The CPG's structural invariants; deterministic graph projection; immediate dominance (differentially checked against `petgraph`); post-dominance and control-dependence equivalence with the former production oracle; natural back edges and loop bodies (checked against independent brute-force dominance and closure oracles); exact SCC partitioning and condensation acyclicity (differentially checked against `petgraph`'s Tarjan implementation); liveness fixed points (checked against an independent Gauss–Seidel solver); the reaching-definition semantics on the audited corpus; and VF2's completeness on the discriminating diamond. These are deterministic and regression-locked.
-- **Advisory (heuristic by design).** [Design-pattern detection](../GLOSSARY.md#design-pattern), [algorithm-family](../GLOSSARY.md#algorithm-family) recognition, and [GNN](../GLOSSARY.md#graph-neural-network-gnn) embeddings are *heuristics*: they score likelihood, they do not prove identity. Their tests check that the machinery runs and returns well-formed, plausibly-ranked results — not that a classification is correct in the sense a theorem is correct. Treat their output as evidence to be reviewed, never as ground truth.
+- **Proven (guarded by the tests above).** The CPG's structural invariants; deterministic graph projection; immediate dominance (differentially checked against `petgraph`); post-dominance and control-dependence equivalence with the former production oracle; natural back edges and loop bodies (checked against independent brute-force dominance and closure oracles); exact SCC partitioning and condensation acyclicity (differentially checked against `petgraph`'s Tarjan implementation); liveness fixed points (checked against an independent Gauss–Seidel solver); available/very-busy Must states (checked by exhaustive entry/exit path enumeration on generated acyclic CFGs); the reaching-definition semantics on the audited corpus; and VF2's completeness on the discriminating diamond. These are deterministic and regression-locked.
+- **Advisory (policy-sensitive by design).** The available/very-busy states are
+  exact for the modeled structural expressions and CFG, while their CSE/PRE
+  transformation candidates still require language side-effect policy.
+  [Design-pattern detection](../GLOSSARY.md#design-pattern),
+  [algorithm-family](../GLOSSARY.md#algorithm-family) recognition, and
+  [GNN](../GLOSSARY.md#graph-neural-network-gnn) embeddings are heuristics: they
+  score likelihood, they do not prove identity. Treat all such evidence at its
+  documented boundary rather than as ground truth.
 - **Empirically bounded.** Performance results apply only to a target's named
   fixture, size, and controlled environment. DFG/PDG construction,
   whole-corpus analysis, and GNN propagation remain measurement gaps; no result

@@ -643,6 +643,94 @@ mod rust_pipeline {
     }
 }
 
+mod expression_dataflow_analysis {
+    use libcpg::{
+        available_expressions, very_busy_expressions, AvailableExpressions, CfgEdgeKind,
+        CodePropertyGraph, CpgEdgeKind, CpgNode, CpgNodeKind, ExprKey, ExprOperand, Language,
+        LiteralKind, MethodSignature, NodeId, SourceRange, VeryBusyExpressions, Visibility,
+    };
+
+    fn node(id: u32, kind: CpgNodeKind) -> CpgNode {
+        CpgNode::new(NodeId::new(id), kind, SourceRange::default())
+    }
+
+    fn child(cpg: &mut CodePropertyGraph, parent: NodeId, child: NodeId) {
+        cpg.connect(parent, child, CpgEdgeKind::AstChild);
+        cpg.node_mut(parent).expect("parent").children.push(child);
+        cpg.node_mut(child).expect("child").parent = Some(parent);
+    }
+
+    #[test]
+    fn root_api_exposes_feature_free_cse_and_pre_evidence() {
+        let mut cpg = CodePropertyGraph::new(Language::Rust);
+        let function = cpg.add_node_with_id(node(
+            0,
+            CpgNodeKind::Function {
+                signature: MethodSignature {
+                    name: "expressions".into(),
+                    params: Default::default(),
+                    return_type: None,
+                    is_static: false,
+                    is_async: false,
+                    visibility: Visibility::Private,
+                },
+            },
+        ));
+        let first = cpg.add_node_with_id(node(
+            1,
+            CpgNodeKind::BinaryOp {
+                operator: "+".into(),
+            },
+        ));
+        let second = cpg.add_node_with_id(node(
+            2,
+            CpgNodeKind::BinaryOp {
+                operator: "+".into(),
+            },
+        ));
+        let exit = cpg.add_node_with_id(node(3, CpgNodeKind::Return));
+        for expression in [first, second] {
+            child(&mut cpg, function, expression);
+            let variable = cpg.add_node(node(
+                0,
+                CpgNodeKind::Identifier {
+                    name: "x".into(),
+                    definition: None,
+                },
+            ));
+            let literal = cpg.add_node(node(
+                0,
+                CpgNodeKind::Literal {
+                    kind: LiteralKind::Integer(1),
+                },
+            ));
+            child(&mut cpg, expression, variable);
+            child(&mut cpg, expression, literal);
+        }
+        child(&mut cpg, function, exit);
+        for (source, target) in [(function, first), (first, second), (second, exit)] {
+            cpg.connect(
+                source,
+                target,
+                CpgEdgeKind::ControlFlow(CfgEdgeKind::Sequential),
+            );
+        }
+
+        let available: AvailableExpressions =
+            available_expressions(&cpg, function).expect("availability");
+        let busy: VeryBusyExpressions =
+            very_busy_expressions(&cpg, function).expect("anticipability");
+        let key = ExprKey {
+            operator: "+".into(),
+            operands: vec![ExprOperand::Variable("x".into()), ExprOperand::Integer(1)],
+        };
+        assert!(available.available_in[&second].contains(&key));
+        assert_eq!(available.redundant, vec![(first, second)]);
+        assert!(busy.busy_out[&first].contains(&key));
+        assert_eq!(busy.hoistable, vec![(key, first)]);
+    }
+}
+
 #[cfg(feature = "lang-rust")]
 mod graph_projections {
     use std::collections::BTreeSet;

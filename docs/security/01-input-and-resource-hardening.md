@@ -153,6 +153,15 @@ For hostile or client-constructed domains, lower the visit cap. The library
 cannot prove a client's lattice laws, monotonicity, or transfer cost, so the cap
 is the termination boundary rather than a correctness certificate.
 
+The built-in liveness, available-expression, and very-busy-expression analyses
+use finite dense bit domains and the default visit cap. Expression reports can
+still be large: each reachable node may contain every structural expression, so
+the worst-case output is $`O(NF)`$ facts for $`N`$ nodes and $`F`$ expressions.
+Bound source/CPG size before analysis when accepting hostile input. Treat CSE
+and PRE candidates as advisory; applying them without language-aware checks for
+volatile access, traps, floating-point state, or concurrency can compromise the
+semantic integrity of transformed code.
+
 ## Dominance: structural convergence cap
 
 [`dominator_tree`](../components/graph/dominator-analysis.md) and

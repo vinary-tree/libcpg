@@ -31,6 +31,8 @@ and control frontiers), **exact SCC decomposition** (cycles and recursion),
 widening/narrowing, and bounded convergence),
 **variable liveness and dead-store reports** (backward-May facts and advisory
 unused-write evidence),
+**available and very-busy expressions** (dual Must analyses with conservative
+CSE/PRE evidence),
 **algorithm detection** (from control-flow structure),
 **code-clone detection** (graph similarity), and **complexity analysis**.
 
@@ -100,7 +102,7 @@ let slice = backward_slice(&cpg, func, 256);         // bounded backward slice
 ### Components
 
 #### Graph core
-[Overview](components/graph/overview.md) · [Nodes](components/graph/nodes.md) · [Edges](components/graph/edges.md) · [Traversal](components/graph/traversal.md) · [Deterministic projections](components/graph/projections.md) · [Basic-block CFGs](components/graph/basic-block-cfg.md) · [Monotone data-flow framework](components/graph/dataflow-framework.md) · [Variable liveness and dead stores](components/graph/liveness-analysis.md) · [Dominators and post-dominators](components/graph/dominator-analysis.md) · [Strongly-connected components](components/graph/scc-analysis.md) · [Natural loops and nesting](components/graph/loop-analysis.md) · [CFG reachability and dead branches](components/graph/reachability-analysis.md) · [Evidence-bounded call resolution](components/graph/call-resolution.md)
+[Overview](components/graph/overview.md) · [Nodes](components/graph/nodes.md) · [Edges](components/graph/edges.md) · [Traversal](components/graph/traversal.md) · [Deterministic projections](components/graph/projections.md) · [Basic-block CFGs](components/graph/basic-block-cfg.md) · [Monotone data-flow framework](components/graph/dataflow-framework.md) · [Variable liveness and dead stores](components/graph/liveness-analysis.md) · [Available and very-busy expressions](components/graph/expression-analysis.md) · [Dominators and post-dominators](components/graph/dominator-analysis.md) · [Strongly-connected components](components/graph/scc-analysis.md) · [Natural loops and nesting](components/graph/loop-analysis.md) · [CFG reachability and dead branches](components/graph/reachability-analysis.md) · [Evidence-bounded call resolution](components/graph/call-resolution.md)
 
 #### Builder
 [Overview](components/builder/overview.md) · [CFG extraction](components/builder/cfg.md) · [DFG extraction](components/builder/dfg.md) · [PDG & slicing](components/builder/pdg-and-slicing.md) · [Node mapper](components/builder/node-mapper.md)

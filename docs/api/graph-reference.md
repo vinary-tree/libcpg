@@ -393,6 +393,27 @@ See [Variable liveness and dead stores](../components/graph/liveness-analysis.md
 for equations, the batched node-state replay, example code, complexity,
 limitations, benchmark oracle, and citations.
 
+### Available and very-busy expressions
+
+Two feature-free Must analyses derive read-only expression-optimization
+evidence from canonical `ExprKey` facts:
+
+| API | Signature | Result |
+|---|---|---|
+| `available_expressions` | `fn(&CodePropertyGraph, NodeId) -> Result<AvailableExpressions, AnalysisError>` | `available_in` structural keys for every reachable node plus dominating `redundant` CSE pairs. |
+| `very_busy_expressions` | `fn(&CodePropertyGraph, NodeId) -> Result<VeryBusyExpressions, AnalysisError>` | `busy_out` structural keys for every reachable node plus dominance-backed `hoistable` PRE placements. |
+
+Forward availability intersects predecessor outputs; backward anticipability
+intersects successor inputs. Defining any operand kills its expression. Reports
+are deterministic and advisory: callers must validate language-specific side
+effects, traps, floating-point behavior, and concurrency before transforming
+source.
+
+See [Available and very-busy
+expressions](../components/graph/expression-analysis.md) for equations,
+candidate invariants, example code, complexity, independent path-enumeration
+oracles, limitations, and citations.
+
 ### Subgraph extraction
 
 | Method | Signature | Notes |

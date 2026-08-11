@@ -1,0 +1,49 @@
+@startuml
+!include _libcpg-theme.iuml
+title Available and very-busy expression analysis
+
+rectangle "CodePropertyGraph\nimmutable AST + CFG" as CPG #F1F3F5
+rectangle "BlockCfg\nreachable nodes + typed edges" as CFG #D3F9D8
+rectangle "ExprFacts + VarFacts\ncanonical expressions\nGEN / KILL by operand definitions" as FACTS #FFF3BF
+rectangle "Forward-Must availability\n<latex>A_{in}[n]=\bigcap_{p\in pred(n)}A_{out}[p]</latex>\n<latex>A_{out}[n]=GEN[n]\cup(A_{in}[n]\setminus KILL[n])</latex>" as AVAILABLE #DBE4FF
+rectangle "Backward-Must anticipability\n<latex>B_{out}[n]=\bigcap_{s\in succ(n)}B_{in}[s]</latex>\n<latex>B_{in}[n]=GEN[n]\cup(B_{out}[n]\setminus KILL[n])</latex>" as BUSY #E5DBFF
+rectangle "DominatorTree\nnearest dominating occurrence\nnearest common dominator" as DOM #C3FAE8
+rectangle "AvailableExpressions\navailable_in + redundant pairs" as CSE #FFE8CC
+rectangle "VeryBusyExpressions\nbusy_out + hoistable placements" as PRE #FFE3E3
+
+CPG --> CFG : block_cfg(function)
+CPG --> FACTS : structural syntax facts
+CFG --> AVAILABLE : forward block order
+CFG --> BUSY : reverse block order
+FACTS --> AVAILABLE : MustBits transfer
+FACTS --> BUSY : MustBits transfer
+CPG --> DOM : cfg_projection(function)
+AVAILABLE --> CSE : per-node replay
+DOM --> CSE : first dominates second
+BUSY --> PRE : per-node replay
+DOM --> PRE : placement dominates evaluations
+
+note bottom of CSE
+  Candidate evidence is conservative.
+  Separate branch computations may establish availability
+  without yielding a single dominating redundant pair.
+end note
+
+note bottom of PRE
+  Reports stay out of graph.
+  Language-aware clients must validate side effects,
+  traps, floating-point policy, and concurrency.
+end note
+
+legend right
+  |= colour |= role |
+  |<#F1F3F5>| immutable source graph |
+  |<#D3F9D8>| control-flow substrate |
+  |<#FFF3BF>| canonical expression facts |
+  |<#DBE4FF>| forward-Must availability |
+  |<#E5DBFF>| backward-Must anticipability |
+  |<#C3FAE8>| dominance evidence |
+  |<#FFE8CC>| advisory CSE evidence |
+  |<#FFE3E3>| advisory PRE evidence |
+endlegend
+@enduml

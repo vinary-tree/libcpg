@@ -39,6 +39,8 @@ PDG). A query can therefore mix syntax, control flow, and data flow freely.
   loop-header widening, bounded narrowing, and per-node state replay.
 - **Variable liveness and dead stores** — deterministic backward-May liveness
   with sorted per-node states and conservative, advisory dead-write evidence.
+- **Expression optimization evidence** — forward-Must available expressions,
+  backward-Must anticipability, and dominance-backed advisory CSE/PRE candidates.
 - **DFG extraction** — intraprocedural, AST-ordered reaching definitions
   (Kildall 1973) and def-use chains (13 `DfgEdgeKind` variants).
 - **PDG + program slicing** — control-dependence edges via the reverse dominance

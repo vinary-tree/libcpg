@@ -3,7 +3,7 @@
 This page traces how information moves through libcpg in two phases:
 
 1. the **construction pipeline** — source text becomes a [Code Property Graph](../GLOSSARY.md#code-property-graph-cpg) (Yamaguchi et al. [[1]](#references)) with AST, [CFG](../GLOSSARY.md#control-flow-graph-cfg), and [DFG](../GLOSSARY.md#data-flow-graph-dfg) overlays; and
-2. the **analysis pipeline** — a constructed CPG is queried by exact [dominator/post-dominator](../components/graph/dominator-analysis.md), [natural-loop](../components/graph/loop-analysis.md), [liveness](../components/graph/liveness-analysis.md), and [SCC](../GLOSSARY.md#strongly-connected-component-scc) analyses, the [PDG](../GLOSSARY.md#program-dependence-graph-pdg)/slicer, the [VF2](../GLOSSARY.md#vf2) and [GoF](../GLOSSARY.md#gang-of-four-gof) detectors, the algorithm/complexity heuristics, and the [GNN](../GLOSSARY.md#graph-neural-network-gnn).
+2. the **analysis pipeline** — a constructed CPG is queried by exact [dominator/post-dominator](../components/graph/dominator-analysis.md), [natural-loop](../components/graph/loop-analysis.md), [liveness](../components/graph/liveness-analysis.md), [available/very-busy expression](../components/graph/expression-analysis.md), and [SCC](../GLOSSARY.md#strongly-connected-component-scc) analyses, the [PDG](../GLOSSARY.md#program-dependence-graph-pdg)/slicer, the [VF2](../GLOSSARY.md#vf2) and [GoF](../GLOSSARY.md#gang-of-four-gof) detectors, the algorithm/complexity heuristics, and the [GNN](../GLOSSARY.md#graph-neural-network-gnn).
 
 "Data flow" here means both the program's own data-flow overlay *and* the flow of data through libcpg's stages. This is a rewrite of an earlier draft that invented `BranchTrue`/`UseUse`/`Phi` edge kinds, an SSA-based DFG, a parse/embedding cache, and a bincode format — none of which exist. The real edge model is [`CpgEdgeKind::ControlFlow(CfgEdgeKind)`](../GLOSSARY.md#control-flow-graph-cfg) / [`DataFlow(DfgEdgeKind)`](../GLOSSARY.md#data-flow-graph-dfg), the DFG is [AST-ordered reaching definitions](../GLOSSARY.md#ast-ordered-reaching-definitions), and persistence is plain derive-based serde.
 
@@ -195,6 +195,13 @@ states. `dead_stores` then reports reachable non-parameter definitions whose
 value is not live after the write. It is read-only and advisory because generic
 syntax does not model volatile, atomic, reflective, foreign, or setter effects.
 See [variable liveness and dead stores](../components/graph/liveness-analysis.md).
+
+The dual built-ins `available_expressions(&cpg, function)` and
+`very_busy_expressions(&cpg, function)` intersect paths in forward and backward
+directions. Canonical structural expressions are killed by definitions of any
+operand. The reports expose per-node states plus conservative,
+dominance-qualified CSE/PRE candidates without rewriting the CPG. See
+[available and very-busy expressions](../components/graph/expression-analysis.md).
 
 ### Strongly-connected components (feature-free)
 

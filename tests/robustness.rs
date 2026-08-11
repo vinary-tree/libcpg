@@ -365,8 +365,13 @@ fn exercise_every_analysis(cpg: &CodePropertyGraph, func: NodeId) {
     assert_eq!(solution.visits.len(), blocks.blocks.len());
     let liveness = libcpg::liveness(&work, func).expect("liveness remains total");
     let dead_stores = libcpg::dead_stores(&work, func).expect("dead stores remain total");
+    let available = libcpg::available_expressions(&work, func).expect("availability remains total");
+    let very_busy =
+        libcpg::very_busy_expressions(&work, func).expect("anticipability remains total");
     assert!(liveness.live_in.len() <= work.node_count());
     assert!(liveness.live_out.len() <= work.node_count());
+    assert!(available.available_in.len() <= work.node_count());
+    assert!(very_busy.busy_out.len() <= work.node_count());
     assert!(dead_stores
         .dead
         .iter()
@@ -510,6 +515,14 @@ fn an_absent_node_id_is_inert_everywhere() {
     );
     assert_eq!(
         libcpg::block_cfg(&cpg, dangling()),
+        Err(libcpg::AnalysisError::UnknownNode(dangling()))
+    );
+    assert_eq!(
+        libcpg::available_expressions(&cpg, dangling()),
+        Err(libcpg::AnalysisError::UnknownNode(dangling()))
+    );
+    assert_eq!(
+        libcpg::very_busy_expressions(&cpg, dangling()),
         Err(libcpg::AnalysisError::UnknownNode(dangling()))
     );
 

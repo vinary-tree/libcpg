@@ -22,11 +22,11 @@ think to write down.
 
 | Kind | Count | Where |
 | --- | ---: | --- |
-| Maximal-matrix library tests | 567 | inline `#[cfg(test)] mod …` next to the code; includes examples and properties |
-| Public-API integration tests | 20 | `tests/integration.rs` |
+| Maximal-matrix library tests | 574 | inline `#[cfg(test)] mod …` next to the code; includes examples and properties |
+| Public-API integration tests | 21 | `tests/integration.rs` |
 | Malformed-input robustness tests | 5 | `tests/robustness.rs` |
-| **Executable test cases** | **592** | excludes three ignored rustdoc examples |
-| `proptest!` blocks (subset of the library/robustness rows) | 39 | inline property and regression modules |
+| **Executable test cases** | **600** | excludes three ignored rustdoc examples |
+| `proptest!` blocks (subset of the library/robustness rows) | 40 | inline property and regression modules |
 
 The maximal-matrix library count is up from **99** inline tests and **zero**
 property tests before this work.
@@ -43,11 +43,12 @@ on the features enabled:
 
 | Command | Lib tests | Notes |
 | --- | ---: | --- |
-| `cargo test` | 279 | `default = []`: the feature-free surface only |
-| `cargo test --features "full rholang metta"` | 567 | the maximal matrix, including the Mode-B mappers |
+| `cargo test` | 285 | `default = []`: the feature-free surface only |
+| `cargo test --features "full rholang metta"` | 574 | the maximal matrix, including the Mode-B mappers |
 
-The feature-free 279 exercise the graph model, exact dominator/post-dominator,
-natural-loop, monotone data-flow, variable-liveness/dead-store, and CFG/call-graph SCC analyses, the
+The feature-free 285 exercise the graph model, exact dominator/post-dominator,
+natural-loop, monotone data-flow, variable-liveness/dead-store,
+available/very-busy-expression, and CFG/call-graph SCC analyses, the
 CFG/DFG/PDG extractors, VF2, and similarity by building CPGs
 **by hand** — no grammar required. This is what
 the [`arb_well_formed_cpg`](#the-generators) generator exists for.
@@ -124,6 +125,7 @@ The invariants fall into complementary families.
 | **Basic-block CFGs** | insertion permutations preserve blocks, membership, typed edges, exits, and traversal orders; the blocks form a disjoint exhaustive projection partition; intra-block pairs have the required unique `Sequential` relation; every typed CFG edge is either an internal chain step or a block edge; parser, CFG-only, serde, invalid-selector, and non-mutation examples pass; a 25,000-block graph is stack-safe |
 | **Monotone data flow** | union and intersection joins are idempotent, commutative, and associative; priority/RPO, FIFO, and LIFO worklists reach identical states over generated CFGs; forward/backward boundaries, typed edge transfer, header-only widening, visit-cap failure, narrowing/non-ascent, malformed public views, node replay, serde, and non-mutation examples pass; a private reaching-definitions instance equals the retired acyclic CFG fixpoint and covers core AST-ordered def-use edges on a cycle; public integration tests implement the traits downstream and extract canonical facts from parsed code; the malformed-graph property harness invokes both fact extraction and solving |
 | **Variable liveness / dead stores** | production block states exactly equal an independent naive round-robin oracle on a diamond with a loop; node/edge insertion permutations and repeated runs produce identical reports; every reported definition is reachable, is not a parameter, and is absent from its node's `live_out`; examples cover assignment kinds, unused parameters, unreachable definitions, bodyless functions, invalid selectors, serde, and graph non-mutation |
+| **Available / very-busy expressions** | exhaustive path enumeration over generated acyclic CFGs of up to 12 nodes exactly matches forward/backward Must maps; 96-case node/edge insertion permutations preserve reports; every redundant pair is available, dominating, and kill-free from first to second; every PRE placement dominates all evaluations; examples cover operand kills, branch recomputation after a killed dominating value, diamonds, loops, unreachable/nested occurrences, bodyless functions, invalid selectors, serde, and graph non-mutation; public and malformed-graph harnesses exercise both APIs |
 | **SCC decomposition** | Every projected node occurs in exactly one component; the partition matches `petgraph::algo::tarjan_scc`; singleton cycles require a self-loop; the condensation graph is acyclic; a 50,000-node path does not overflow the native stack |
 | **Call resolution** | resolution records and call edges are invariant under node/edge insertion permutations; duplicate names add zero call topology and preserve the SCC partition; repeated resolution is idempotent; candidate/call caps preserve the evidence boundary |
 | **Idempotency** | a second `CfgExtractor::extract` / `DfgExtractor::extract` / `PdgBuilder::build` adds no edges |
@@ -250,10 +252,10 @@ cargo +nightly cov-branch           # branch coverage needs nightly
 
 | Metric | Coverage | Lowest file |
 | --- | ---: | --- |
-| Lines | **97.83 %** | 91.67 % (`language.rs`) |
-| Regions | **97.74 %** | — |
-| Functions | **97.97 %** | — |
-| Branches | **83.72 %** | see below |
+| Lines | **97.88 %** | 91.67 % (`language.rs`) |
+| Regions | **97.80 %** | — |
+| Functions | **97.98 %** | — |
+| Branches | **83.87 %** | see below |
 
 Every source file is above 90 % line coverage; eighteen are at 100 %.
 The `analysis/dominators.rs` module measures **97.50 %** line and
@@ -268,11 +270,13 @@ The new `analysis/reachability.rs` module measures **100 %** line and
 **91.67 %** branch coverage, above the same thresholds.
 The new `analysis/basic_blocks.rs` module measures **97.30 %** line and
 **82.76 %** branch coverage, above the same thresholds.
-The new `analysis/dataflow/facts.rs` module measures **99.41 %** line and
-**80.56 %** branch coverage; `analysis/dataflow/mod.rs` measures **96.75 %**
+The new `analysis/dataflow/facts.rs` module measures **99.61 %** line and
+**83.33 %** branch coverage; `analysis/dataflow/mod.rs` measures **96.83 %**
 line and **80.77 %** branch coverage. Both clear the same thresholds.
 The new `analysis/dataflow/liveness.rs` module measures **99.26 %** line and
 **100 %** branch coverage, above the same thresholds.
+The new `analysis/dataflow/expressions.rs` module measures **99.45 %** line and
+**91.67 %** branch coverage, above the same thresholds.
 All figures come from clean maximal-matrix coverage runs; no focused-test
 figure is substituted for the repository gate.
 

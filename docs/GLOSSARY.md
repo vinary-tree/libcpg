@@ -24,6 +24,15 @@ A structural category of algorithm (sorting, searching, graph traversal, dynamic
 
 `libcpg`'s [data-flow](#data-flow-graph-dfg) analysis strategy: a single **flow-sensitive** sweep over AST nodes *in source order*, maintaining an environment `ReachingEnv` mapping each variable name to the set of definitions currently reaching it. It applies a [strong update](#strong-update--weak-update) in straight-line context and a weak update inside conditional regions, and sweeps loop bodies twice for loop-carried dependencies. It is **not** [SSA](#static-single-assignment-ssa) and **not** classic CFG-fixed-point propagation; it is chosen for simplicity and for threading definitions into deeply nested expression uses. See [`theory/03-data-flow-and-reaching-definitions.md`](theory/03-data-flow-and-reaching-definitions.md) and [`design/0003-ast-ordered-reaching-defs.md`](design/0003-ast-ordered-reaching-defs.md).
 
+### Available expression
+
+An expression is **available** before a program point when every path from the
+function entry has evaluated the same structural expression and no later node
+on any path has defined one of its operands. Availability is a forward
+[Must analysis](#may-analysis--must-analysis) with intersection at joins and
+supports conservative [CSE](#common-subexpression-elimination-cse) evidence.
+See [`components/graph/expression-analysis.md`](components/graph/expression-analysis.md).
+
 ### Backward slice / Forward slice
 
 A [program slice](#program-slicing). The **backward** slice of a node $`s`$ is the set of nodes that can affect $`s`$ (its transitive [PDG](#program-dependence-graph-pdg) predecessors); the **forward** slice is the set of nodes that $`s`$ can affect (its transitive successors). `libcpg` computes them as bounded breadth-first traversals — `backward_slice(&cpg, s, max_nodes)` and `forward_slice(&cpg, s, max_nodes)` — after [`ControlDependence`](#control-dependence) and [`DataDependence`](#data-dependence) edges have been added. The `max_nodes` argument caps the result. Introduced by Weiser [[8]](#references). See [`usage/04-program-slicing.md`](usage/04-program-slicing.md).
@@ -52,6 +61,14 @@ stronger information; `resolve_calls` can materialize definite targets through
 ### Code Property Graph (CPG)
 
 A single directed graph that merges several program views onto **one shared node set**: the [AST](#abstract-syntax-tree-ast), the [CFG](#control-flow-graph-cfg), the [DFG](#data-flow-graph-dfg), and — on demand — the [PDG](#program-dependence-graph-pdg). Introduced by Yamaguchi et al. [[1]](#references) to express vulnerability queries that need syntax, control, and data flow simultaneously. In `libcpg` the CPG is the type `CodePropertyGraph`, backed by a [petgraph](#petgraph) `DiGraph<CpgNode, CpgEdge>`. See [`theory/01-code-property-graphs.md`](theory/01-code-property-graphs.md).
+
+### Common-subexpression elimination (CSE)
+
+An optimization that reuses a prior evaluation when the same expression is
+already [available](#available-expression). `libcpg` reports a conservative
+`(first, second)` pair only when the first structural occurrence dominates the
+available second occurrence; it does not perform the rewrite. See
+[`components/graph/expression-analysis.md`](components/graph/expression-analysis.md).
 
 ### Complexity class / Big-O
 
@@ -269,6 +286,15 @@ strict set containment and records each node's innermost loop. `libcpg` exposes
 
 The type tag on a CPG node (`CpgNodeKind`, 45 variants — a mix of unit variants such as `Root`, `If`, `Return` and data-carrying variants such as `Function { signature }`, `Call { target, is_method }`) or edge (`CpgEdgeKind`). Kinds drive every query and every pattern/complexity heuristic. See [`components/graph/nodes.md`](components/graph/nodes.md) and [`components/graph/edges.md`](components/graph/edges.md).
 
+### Partial-redundancy elimination (PRE)
+
+An optimization that makes an expression fully redundant by placing a
+computation where it is [very busy](#very-busy-expression--anticipability),
+then removes redundant evaluations. Morel and Renvoise [[21]](#references)
+introduced the classical global formulation. `libcpg` reports advisory
+structural-expression/common-dominator placements; it does not rewrite source.
+See [`components/graph/expression-analysis.md`](components/graph/expression-analysis.md).
+
 ### Pattern template
 
 A declarative description of a pattern as node constraints (`NodeConstraint`) and edge constraints (`EdgeConstraint`) that `.to_pattern_graph()` compiles into a target graph for [VF2](#vf2) matching. `PatternTemplate` lives in the `pattern::` module; the [DPML](#dpml-design-pattern-markup-language) loader compiles YAML/TOML into one. See [`components/patterns/vf2-matching.md`](components/patterns/vf2-matching.md).
@@ -333,6 +359,14 @@ In [VF2](#vf2), the sets of candidate nodes adjacent to the current partial mapp
 
 The incremental parser generator `libcpg` uses to turn source text into a concrete syntax tree. `ParserRegistry` holds the feature-gated grammars for the 16 built-in languages; [Mode B](#mode-b--build_from_tree) accepts a tree the caller parsed with its own grammar. See [`architecture/language-frontends.md`](architecture/language-frontends.md).
 
+### Very-busy expression / Anticipability
+
+An expression is **very busy**, or **anticipable**, after a program point when
+every path to a modeled exit evaluates it before defining one of its operands.
+It is a backward [Must analysis](#may-analysis--must-analysis) with intersection
+at branches and supplies evidence for [PRE](#partial-redundancy-elimination-pre).
+See [`components/graph/expression-analysis.md`](components/graph/expression-analysis.md).
+
 ### VF2
 
 The subgraph-isomorphism algorithm of Cordella, Foggia, Sansone, and Vento [[4]](#references): a depth-first state-space search that grows a partial node mapping, pruning with feasibility rules over node kinds and incident edges, and backtracking when stuck. `libcpg`'s `Vf2Matcher` implements it with an explicit push-order stack so backtracking restores the mapping and [terminal sets](#terminal-set-vf2) exactly. Worst-case cost is $`O(N!\,N)`$ but pruning makes it practical. See [`theory/05-subgraph-isomorphism-vf2.md`](theory/05-subgraph-isomorphism-vf2.md).
@@ -383,3 +417,4 @@ used by the complexity analyzer to classify recursive functions (e.g. $`a = b = 
 18. Ramalingam, G. (1999). *Identifying Loops in Almost Linear Time.* ACM TOPLAS 21(2), 175–188. DOI: [10.1145/316686.316687](https://doi.org/10.1145/316686.316687)
 19. Kam, J. B., Ullman, J. D. (1977). *Monotone Data Flow Analysis Frameworks.* Acta Informatica 7, 305–317. DOI: [10.1007/BF00290339](https://doi.org/10.1007/BF00290339)
 20. Cousot, P., Cousot, R. (1977). *Abstract Interpretation: A Unified Lattice Model for Static Analysis of Programs by Construction or Approximation of Fixpoints.* POPL '77, 238–252. DOI: [10.1145/512950.512973](https://doi.org/10.1145/512950.512973)
+21. Morel, E., Renvoise, C. (1979). *Global Optimization by Suppression of Partial Redundancies.* Communications of the ACM 22(2), 96–103. DOI: [10.1145/359060.359069](https://doi.org/10.1145/359060.359069)

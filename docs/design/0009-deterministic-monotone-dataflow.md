@@ -56,6 +56,10 @@ oracles are in the [component guide](../components/graph/dataflow-framework.md).
 - **A production backward analysis.** Variable liveness uses the generic
   solver and canonical facts directly; dead stores are derived by one linear
   reverse replay per block rather than a private fixed-point implementation.
+- **Dual production Must analyses.** Available expressions and very-busy
+  expressions reuse `MustBits`, canonical expression/variable facts, and one
+  linear replay per block; dominance filters turn the states into conservative
+  CSE/PRE evidence without mutating the CPG.
 
 ### Negative
 

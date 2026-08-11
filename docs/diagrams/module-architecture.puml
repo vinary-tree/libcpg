@@ -4,7 +4,7 @@ title libcpg crate module architecture — always-on core vs. feature-gated anal
 
 package "always compiled  (default = [])" as core #F8F9FA {
   component "graph\ngraph::CodePropertyGraph\nDiGraph<CpgNode, CpgEdge>" <<always-on>> as G #F1F3F5
-  component "analysis\nprojections + block CFGs + monotone data flow\nliveness + reachability + dominators + loop forests + SCCs" <<always-on>> as SCC #C3FAE8
+  component "analysis\nprojections + block CFGs + monotone data flow\nliveness + expressions + reachability + dominators + loop forests + SCCs" <<always-on>> as SCC #C3FAE8
   component "builder\nTreeSitterCpgBuilder\nCfg / Dfg / Pdg extractors" <<always-on>> as B #DBE4FF
   component "pattern\nVf2Matcher + GraphSimilarity" <<always-on>> as P #FFE3E3
 }
@@ -32,7 +32,7 @@ end note
 legend right
   |= colour |= module (role) |
   |<#F1F3F5>| graph — CPG store |
-  |<#C3FAE8>| analysis — projections + blocks + data flow + liveness + reachability + dominance + loops + SCCs |
+  |<#C3FAE8>| analysis — projections + blocks + data flow + liveness + expressions + reachability + dominance + loops + SCCs |
   |<#DBE4FF>| builder — AST / CFG / DFG construction |
   |<#FFE3E3>| pattern · patterns — VF2 / GoF matching |
   |<#FFF3BF>| algorithms — complexity |
