@@ -188,7 +188,7 @@ those named shapes and sizes; it is not a latency guarantee at the hard cap.
 A clean maximal-matrix `cargo cov-text` run measured `analysis/dsm.rs` at
 **99.77% line**, **99.42% region**, and **97.62% function** coverage. A clean
 nightly `cargo +nightly cov-branch` run measured **90.38% branch** coverage.
-Both runs executed all **665 library tests** and the **43 public integration and
+Both runs executed all **679 library tests** and the **45 public integration and
 robustness tests**, including both DSM integration cases; these are not
 focused-test extrapolations. The module therefore clears the epic's 90% line
 and 80% branch thresholds.

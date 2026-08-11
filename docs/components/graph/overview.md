@@ -3,7 +3,7 @@
 The `graph` module holds the data structures at the heart of `libcpg`: the
 [Code Property Graph](../../GLOSSARY.md#code-property-graph-cpg) (CPG) and the
 node, edge, and identifier types it is built from. Everything else in the crate
-— the builders, graph projections, dominator, SCC, condensation, and DSM
+— the builders, graph projections, centrality, dominator, SCC, condensation, and DSM
 analyses, the pattern matchers, the slicer, the GNN — reads
 from or writes to this one structure. This page explains what a CPG is, why `libcpg` merges
 several program views into a single graph, how that graph is stored, and how you
@@ -103,6 +103,11 @@ uses petgraph only as an independent test oracle. The
 serialisation-friendly [`NodeId`](nodes.md#nodeid) / `EdgeId` handles while the
 graph internally uses petgraph indices — so an id survives being written to disk
 and read back, which a raw `NodeIndex` would not.
+
+The [centrality family](centrality-analysis.md) consumes those same projection
+views. It never replaces `CodePropertyGraph` storage with a parallel graph;
+dense CSR is a normalized read model whose results map back to stable `NodeId`
+values.
 
 ### Creating a CPG
 

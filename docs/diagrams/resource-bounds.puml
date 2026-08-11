@@ -57,6 +57,15 @@ including a request of the machine maximum.;
 ***[#F1F3F5]:shared public projection validation
 rejects malformed node, CSR, weight, or reverse state
 before indexed traversal and returns empty output.;
+**[#FFE3E3] Centrality
+***[#F1F3F5]:MAX_CENTRALITY_ITERATIONS = 10,000
+clamps PageRank, eigenvector, Katz, and HITS;
+***[#F1F3F5]:explicit work budgets
+preflight Brandes, distance, edge-betweenness,
+and Burt neighborhood operations before traversal.;
+***[#F1F3F5]:projection + numeric validation
+rejects malformed CSR, non-finite options,
+and unsafe Katz attenuation without partial rankings.;
 **[#FFE3E3] Slicing
 ***[#F1F3F5]:max_nodes on backward_slice / forward_slice
 bounds the PDG reverse/forward BFS —

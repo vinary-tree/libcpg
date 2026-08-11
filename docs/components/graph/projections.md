@@ -73,8 +73,12 @@ Any constructor-valid directed projection can be decomposed through
 visibility, propagation cost, median roles, and largest cyclic-group evidence.
 It can also feed [`wl_labels`](wl-analysis.md) and
 `structural_clone_classes` for bounded neighborhood refinement and stable-id
-clone candidates. These consumers read only CSR topology; DSM and WL treat
-weights as binary adjacency.
+clone candidates. The same validated view feeds the
+[`centrality family`](centrality-analysis.md): directed PageRank, Brandes and
+HITS kernels use its forward/reverse CSR directly, while spectral, distance,
+edge-betweenness, and structural-hole measures request its canonical
+undirected view. These consumers are read-only. DSM and WL treat weights as
+binary adjacency; centrality documents weight semantics per measure.
 
 ### The shared function CFG view
 

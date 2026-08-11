@@ -56,7 +56,8 @@ The table gives *expected* costs. Symbols: $`n`$ = number of tree-sitter /
 AST nodes, $`V`$ and $`E`$ = node and edge counts of the (sub)graph an
 operation touches, $`L`$ = GNN layers (`num_layers`), $`d`$ = embedding
 dimension, $`k`$ = whole-graph similarity WL iterations (3), and
-$`q=\min(\mathtt{iterations},16)`$ = projection-WL rounds.
+$`q=\min(\mathtt{iterations},16)`$ = projection-WL rounds, and
+$`c=\min(\mathtt{max\_iterations},10{,}000)`$ = centrality rounds.
 
 | Operation | Expected cost | Notes |
 | --- | --- | --- |
@@ -77,6 +78,11 @@ $`q=\min(\mathtt{iterations},16)`$ = projection-WL rounds.
 | [Jaccard](../GLOSSARY.md#jaccard-similarity) similarity | $`O(V_1 + V_2)`$ | Over the two graphs' node-kind multisets. |
 | Weisfeiler-Lehman similarity | $`O(k(V + E))`$ | $`k = 3`$ label-refinement rounds. |
 | Projection WL labels / clone classes | $`O(q(V\log V+E+\sum_v d(v)\log d(v)))`$ time, $`O(V+d_{max})`$ temporary space | Directed-degree seeds; sorted incident-label multisets; sorted raw-label ranks each round; clone grouping adds $`O(V\log V)`$ time and $`O(V)`$ space. |
+| PageRank / reverse / personalized | $`O(c(V+E))`$ time, $`O(V)`$ working space | Dense forward/reverse CSR and stable floating reduction; hard 10,000-round ceiling. |
+| Vertex/edge betweenness | $`O(V(V+E))`$ time, $`O(V+E)`$ working space | Directed vertex Brandes or undirected canonical edge Brandes; preflight work budgets; serial source partitions are public. |
+| Eigenvector / Katz / HITS | $`O(c(V+E))`$ time, $`O(V+E)`$ working space | Shifted spectral iteration, sufficient Katz row-sum bound, and paired HITS vectors. |
+| Closeness / harmonic | $`O(V(V+E))`$ time, $`O(V+E)`$ working space | One undirected BFS per vertex with an explicit adjacency-visit budget. |
+| Burt constraint | $`O(E+\sum_v d(v)^2)`$ time, $`O(V+E)`$ working space | Nonnegative weighted undirected adjacency; exact modeled-neighborhood budget. |
 | GNN `propagate` | $`O(L \cdot (V + E) \cdot d)`$ | Each layer means neighbour vectors over the AST/CFG/DFG overlays, then ReLU. |
 
 Two of these deserve emphasis. VF2 is worst-case super-exponential, which is why
@@ -87,8 +93,8 @@ once, loop bodies twice, and a path set cuts malformed AST cycles.
 
 ## Benchmark coverage and remaining gaps
 
-Eight Criterion targets are active. Their eleven baseline operation groups are
-feature-free; `induction_analysis` also registers a twelfth,
+Nine Criterion targets are active. Their thirteen baseline operation groups are
+feature-free; `induction_analysis` also registers a fourteenth,
 `algorithm-detection`-gated operation. Every active group constructs and checks a deterministic oracle
 before Criterion enters the timed loop:
 
@@ -116,6 +122,11 @@ before Criterion enters the timed loop:
 - `wl` measures four-round labels and clone grouping over 1,024- and
   8,192-vertex rings and outward stars, with exact symmetry, distinction,
   membership, and ordering oracles.
+- `centrality` measures PageRank and shifted eigenvector iteration over 256-
+  and 1,024-vertex paths, rings, and clustered graphs, plus directed Brandes
+  and undirected closeness over the same shapes at 128 and 256 vertices. Its
+  pre-timing oracles also exercise HITS, edge betweenness, harmonic centrality,
+  and Burt constraint.
 
 ```toml
 [[bench]]
@@ -149,6 +160,10 @@ harness = false
 [[bench]]
 name = "wl"
 harness = false
+
+[[bench]]
+name = "centrality"
+harness = false
 ```
 
 Run it directly, or save and compare named baselines:
@@ -164,6 +179,7 @@ cargo bench --bench scc_analysis --no-default-features -- --baseline before
 ./scripts/bench.sh induction_analysis --save-baseline before
 cargo bench --bench dsm --no-default-features
 cargo bench --bench wl --no-default-features
+cargo bench --bench centrality --no-default-features
 cargo bench --no-default-features --features algorithm-detection \
   --bench induction_analysis -- --test
 ```

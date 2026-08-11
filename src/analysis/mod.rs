@@ -4,6 +4,7 @@
 //! compute graph properties exactly. They are available with `default = []`.
 
 mod basic_blocks;
+mod centrality;
 pub(crate) mod cfg_scope;
 mod condensation;
 pub mod dataflow;
@@ -20,6 +21,14 @@ pub(crate) mod wl;
 use crate::NodeId;
 
 pub use basic_blocks::{block_cfg, BasicBlock, BlockCfg, BlockEdge, BlockId};
+
+pub use centrality::{
+    accumulate_for_sources, betweenness_centrality, burt_constraint, closeness_centrality,
+    edge_betweenness, eigenvector_centrality, harmonic_centrality, hits, katz_centrality, pagerank,
+    personalized_pagerank, reverse_pagerank, BetweennessOptions, CentralityBudget, CentralityKind,
+    CentralityScores, EdgeCentralityScores, HitsScores, IterationOptions, KatzOptions,
+    PageRankOptions, DEFAULT_CENTRALITY_WORK_LIMIT, MAX_CENTRALITY_ITERATIONS,
+};
 
 pub use condensation::{
     coffman_graham, condensation_metrics, CgLayering, CondensationMetrics, CondensationOptions,

@@ -1,0 +1,34 @@
+@startuml
+!include _libcpg-theme.iuml
+title Deterministic centrality analysis over a GraphProjection
+
+rectangle "GraphProjection\nforward + reverse CSR\nsorted stable NodeIds" as input #DBE4FF
+rectangle "Projection validation\nwell formed?" as valid #FFF3BF
+rectangle "Directed kernels\nPageRank / reverse / personalized\nBrandes / HITS / dominators" as directed #D3F9D8
+rectangle "Undirected kernels\nedge betweenness / distance\neigenvector / Katz / Burt" as undirected #C3FAE8
+rectangle "Convergence controls\niteration ceiling = 10,000\ntolerance + damping / alpha" as iteration #FFE8CC
+rectangle "Traversal controls\nexplicit edge-visit budget\nBrandes source partitions" as budget #FFE8CC
+rectangle "Canonical results\nNodeId-aligned score vectors\nordered canonical edges\niterations + converged" as output #E5DBFF
+rectangle "Safe failure\nempty unaligned result or\nAnalysisError before traversal" as failure #FFE3E3
+
+input --> valid
+valid --> directed : yes
+valid --> undirected : yes
+valid --> failure : no
+iteration --> directed
+iteration --> undirected
+budget --> directed
+budget --> undirected
+directed --> output
+undirected --> output
+
+legend right
+  |= Color |= Meaning |
+  |<#DBE4FF>| immutable projection input |
+  |<#D3F9D8>| directed topology |
+  |<#C3FAE8>| undirected topology |
+  |<#FFE8CC>| explicit resource control |
+  |<#E5DBFF>| deterministic public result |
+  |<#FFE3E3>| rejected malformed input |
+endlegend
+@enduml

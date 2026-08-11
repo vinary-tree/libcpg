@@ -22,7 +22,7 @@ think to write down.
 
 | Kind | Count | Where |
 | --- | ---: | --- |
-| Maximal-matrix library tests | 665 | inline `#[cfg(test)] mod …` next to the code; includes examples and properties |
+| Maximal-matrix library tests | 679 | inline `#[cfg(test)] mod …` next to the code; includes examples and properties |
 | Public-API integration tests | 21 | `tests/integration.rs` |
 | Malformed-input robustness tests | 5 | `tests/robustness.rs` |
 | SCCP public/parser integration tests | 3 | `tests/sccp_integration.rs` |
@@ -32,8 +32,9 @@ think to write down.
 | Condensation public/parser integration tests | 2 | `tests/condensation_integration.rs` |
 | DSM public/parser integration tests | 2 | `tests/dsm_integration.rs` |
 | WL public integration tests | 1 | `tests/wl_integration.rs` |
-| **Executable test cases** | **708** | excludes three ignored rustdoc examples |
-| `proptest!` blocks (subset of the library/robustness rows) | 47 | exact source-level macro count in `src/` and `tests/` |
+| Centrality public integration tests | 2 | `tests/centrality_integration.rs` |
+| **Executable test cases** | **724** | excludes three ignored rustdoc examples |
+| `proptest!` blocks (subset of the library/robustness rows) | 48 | exact source-level macro count in `src/` and `tests/` |
 
 The maximal-matrix library count is up from **99** inline tests and **zero**
 property tests before this work.
@@ -51,14 +52,14 @@ on the features enabled:
 
 | Command | Lib tests | Notes |
 | --- | ---: | --- |
-| `cargo test` | 363 | `default = []`: the feature-free surface only |
-| `cargo test --features "full rholang metta"` | 665 | the maximal matrix, including the Mode-B mappers and evidence-aware complexity |
+| `cargo test` | 377 | `default = []`: the feature-free surface only |
+| `cargo test --features "full rholang metta"` | 679 | the maximal matrix, including the Mode-B mappers and evidence-aware complexity |
 
-The feature-free 363 exercise the graph model, exact dominator/post-dominator,
+The feature-free 377 exercise the graph model, exact dominator/post-dominator,
 natural-loop, monotone data-flow, variable-liveness/dead-store,
 available/very-busy-expression, SCCP, interval value-range, CFG/call-graph
-SCC analyses, condensation-DAG analytics, DSM visibility/core–periphery, and
-WL structural-clone
+SCC analyses, condensation-DAG analytics, DSM visibility/core–periphery, WL
+structural-clone, and centrality
 classification, the
 CFG/DFG/PDG extractors, VF2, and similarity by building CPGs
 **by hand** — no grammar required. This is what
@@ -153,6 +154,7 @@ The invariants fall into complementary families.
 | **Complexity evidence** | fully counted reducible depth maps to the exact polynomial degree; opposite storage orders produce identical class/confidence/justification; every generated CFG-free function returns the exact legacy estimate; fixed examples decide unknown-trip and irreducible confidence precedence, provenance, recursion composition, public parsing, and graph non-mutation |
 | **DSM visibility / architecture roles** | repeated-BFS VFO/VFI vectors and propagation cost equal an independent Floyd–Warshall closure; the largest multi-vertex SCC equals an independent mutual-reachability partition; reversed enumeration and duplicate edges preserve reports; examples cover chain/cycle/hub/isolates, equal-core ties, caps, malformed CSR/reverse data, cross-projection provenance, serde, public construction, parser integration, and graph non-mutation |
 | **WL labels / structural clones** | 256 isomorphic stable-id relabelings preserve final label multisets and logical clone partitions under reversed and duplicate edge input; exact examples pin triangle/star behavior, mixer vectors, direction/weight semantics, the 16-round cap, malformed handling, class thresholds/order, public composition, and graph non-mutation |
+| **Projection centrality** | 128 generated topologies check exact repeat and input-permutation equality plus stable-id reversal equivalence for PageRank, personalized/reverse PageRank, eigenvector, Katz, distance, HITS, Burt, vertex Brandes, and edge Brandes; fixed ring/path/star/triangle/disconnected examples pin closed forms; petgraph PageRank and dominator differentials, naive simple-path Brandes, source-partition composition, malformed/budget/invalid-option behavior, public feature-free composition, and graph non-mutation cover independent boundaries |
 
 ### Two invariants worth singling out
 
@@ -274,10 +276,10 @@ cargo +nightly cov-branch           # branch coverage needs nightly
 
 | Metric | Coverage | Lowest file |
 | --- | ---: | --- |
-| Lines | **97.97 %** | 91.67 % (`language.rs`) |
-| Regions | **97.92 %** | — |
-| Functions | **98.11 %** | — |
-| Branches | **84.80 %** | see below |
+| Lines | **97.98 %** | 91.67 % (`language.rs`) |
+| Regions | **97.90 %** | — |
+| Functions | **98.18 %** | — |
+| Branches | **85.15 %** | see below |
 
 Every source file is above 90 % line coverage; seventeen are at 100 %.
 The `analysis/dominators.rs` module measures **97.50 %** line and
@@ -339,6 +341,12 @@ and branch coverage, clearing the same thresholds. Its relabeling property,
 fixed mixer vectors, malformed-input matrix, public integration, and benchmark
 oracles are catalogued in
 [`scientific/11-wl-validation.md`](../scientific/11-wl-validation.md).
+The new `analysis/centrality.rs` module measures **98.32 %** line,
+**97.47 %** region, **100.00 %** function, and **88.95 %** branch coverage,
+clearing the same thresholds. Its analytic fixtures, independent PageRank and
+Brandes oracles, input-permutation/relabeling campaign, public integration,
+corruption matrix, and benchmark oracles are catalogued in
+[`scientific/12-centrality-validation.md`](../scientific/12-centrality-validation.md).
 All figures come from clean maximal-matrix coverage runs; no focused-test
 figure is substituted for the repository gate.
 
@@ -373,7 +381,7 @@ dependencies and are not part of the `full` feature set.
 | --- | --- |
 | `examples/` directory | present but **empty** — no runnable `cargo run --example …` programs. |
 | Doctests | none run — every code fence in a doc comment is marked `ignore` / `rust,ignore`, so `cargo test --doc` executes nothing. Feature-gating individual doctests in a `default = []` crate is awkward; the snippets are instead validated by the documentation snippet-check harness. |
-| Benchmarks | Eight active Criterion targets cover SCC paths/rings/clusters, condensation paths/independent chains with and without CG layering, graph-arena paths, bounded VF2 paths, liveness chains/diamond ladders/nested loops, counted-loop induction regions, DSM paths/rings, WL rings/stars, and—under `algorithm-detection`—complexity evidence on the counted-loop fixtures. Each active group asserts an exact deterministic oracle before timing; see [performance](03-performance.md). |
+| Benchmarks | Nine active Criterion targets cover SCC paths/rings/clusters, condensation paths/independent chains with and without CG layering, graph-arena paths, bounded VF2 paths, liveness chains/diamond ladders/nested loops, counted-loop induction regions, DSM paths/rings, WL rings/stars, centrality paths/rings/clusters, and—under `algorithm-detection`—complexity evidence on the counted-loop fixtures. Each active group asserts a deterministic oracle before timing; see [performance](03-performance.md). |
 | `ml-linfa`, `gpu` | not exercised: optional heavy dependencies outside the `full` feature set. |
 
 ## Related pages

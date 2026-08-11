@@ -365,10 +365,49 @@ For flows that must respect **both** control and data dependence (a stronger, de
 
 ---
 
+## Ranking a projection by centrality
+
+When the question is comparative rather than reachability-based, project the
+relevant relation and select a centrality definition. The following
+feature-free example ranks resolved functions by directed PageRank:
+
+```rust
+use libcpg::{
+    call_graph_projection, pagerank, CodePropertyGraph, PageRankOptions,
+};
+
+fn ranked_functions(cpg: &CodePropertyGraph) -> Vec<(libcpg::NodeId, f64)> {
+    let graph = call_graph_projection(cpg);
+    let result = pagerank(&graph, PageRankOptions::default());
+    assert_eq!(result.nodes, graph.nodes);
+
+    let mut ranked = result
+        .nodes
+        .into_iter()
+        .zip(result.scores)
+        .collect::<Vec<_>>();
+    ranked.sort_by(|left, right| {
+        right
+            .1
+            .total_cmp(&left.1)
+            .then_with(|| left.0.cmp(&right.0))
+    });
+    ranked
+}
+```
+
+Keep `CentralityKind`, options, projection provenance, and `converged` with any
+persisted ranking. Do not compare PageRank to closeness as though their scales
+had the same meaning. See [projection centrality](../components/graph/centrality-analysis.md)
+for the measure-selection table, formulas, budgets, and examples.
+
+---
+
 ## Next steps
 
 - Detect design patterns over the graph you just queried: [Pattern Detection](03-pattern-detection.md).
 - Turn "affects" into a precise slice: [Program Slicing](04-program-slicing.md).
+- Rank a projected relation: [Projection Centrality](../components/graph/centrality-analysis.md).
 - The complete method tables (construction, AST, CFG, DFG, call, query, metrics, subgraph) are in the [graph reference](../api/graph-reference.md); traversal internals are in [Graph Traversal](../components/graph/traversal.md).
 
 ---

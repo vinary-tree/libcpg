@@ -91,7 +91,9 @@ detection ([Theory 05](05-subgraph-isomorphism-vf2.md)),
 visibility/core analysis ([Theory 10](10-design-structure-matrix-analysis.md)), and
 [Weisfeiler–Lehman](../GLOSSARY.md#weisfeilerleman-wl-refinement)
 structural-clone refinement
-([Theory 11](11-weisfeiler-lehman-structural-clones.md)). Each consumes the same
+([Theory 11](11-weisfeiler-lehman-structural-clones.md)), and deterministic
+[centrality](../GLOSSARY.md#centrality) over projection topology
+([Theory 12](12-centrality-and-structural-importance.md)). Each consumes the same
 `CodePropertyGraph`; none needs its own bespoke intermediate representation.
 
 ## 4. The four overlays at a glance

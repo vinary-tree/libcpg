@@ -125,7 +125,7 @@ representativeness of a particular application corpus.
 A clean maximal-matrix `cargo cov-text` run measured `analysis/wl.rs` at
 **100.00% line**, **100.00% region**, and **100.00% function** coverage. A
 clean nightly `cargo +nightly cov-branch` run measured **100.00% branch**
-coverage. Both runs executed all **665 library tests** and the **43 public
+coverage. Both runs executed all **679 library tests** and the **45 public
 integration and robustness tests**, including the WL public integration case;
 these are not focused-test extrapolations. The module therefore clears the
 epic's 90% line and 80% branch thresholds.

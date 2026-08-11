@@ -356,6 +356,50 @@ isomorphism or behavioral equivalence. See the complete [WL component
 guide](../components/graph/wl-analysis.md) for formulas, pseudocode, examples,
 collision limits, properties, and benchmark evidence.
 
+### Projection centrality
+
+The feature-free centrality family returns stable node-aligned vectors or
+canonical stable edge pairs. Every function is exported from the crate root and
+`libcpg::analysis`.
+
+| Function | Signature | Topology |
+|---|---|---|
+| `pagerank` | `fn(&GraphProjection, PageRankOptions) -> CentralityScores` | directed |
+| `reverse_pagerank` | `fn(&GraphProjection, PageRankOptions) -> CentralityScores` | directed transpose |
+| `personalized_pagerank` | `fn(&GraphProjection, &[(NodeId, f64)], PageRankOptions) -> Result<CentralityScores, AnalysisError>` | directed with seed restart |
+| `betweenness_centrality` | `fn(&GraphProjection, BetweennessOptions) -> Result<CentralityScores, AnalysisError>` | directed shortest paths |
+| `accumulate_for_sources` | `fn(&GraphProjection, &[NodeId], BetweennessOptions) -> Result<CentralityScores, AnalysisError>` | directed source partition |
+| `edge_betweenness` | `fn(&GraphProjection, CentralityBudget) -> Result<EdgeCentralityScores, AnalysisError>` | undirected shortest paths |
+| `eigenvector_centrality` | `fn(&GraphProjection, IterationOptions) -> CentralityScores` | weighted undirected |
+| `katz_centrality` | `fn(&GraphProjection, KatzOptions) -> CentralityScores` | weighted undirected |
+| `closeness_centrality` | `fn(&GraphProjection, CentralityBudget) -> Result<CentralityScores, AnalysisError>` | unweighted undirected |
+| `harmonic_centrality` | `fn(&GraphProjection, CentralityBudget) -> Result<CentralityScores, AnalysisError>` | unweighted undirected |
+| `hits` | `fn(&GraphProjection, IterationOptions) -> HitsScores` | directed hub/authority |
+| `burt_constraint` | `fn(&GraphProjection, CentralityBudget) -> Result<CentralityScores, AnalysisError>` | weighted undirected |
+
+`CentralityScores` exposes `kind`, aligned `nodes` and `scores`, `iterations`,
+and `converged`. `HitsScores` exposes `hubs` and `authorities` in that format.
+`EdgeCentralityScores` exposes sorted canonical `edges`, aligned `scores`,
+source `iterations`, and `converged`.
+
+`PageRankOptions`, `IterationOptions`, and `KatzOptions` carry numerical
+convergence controls. `BetweennessOptions` carries directed normalization and
+a work cap; `CentralityBudget` carries the corresponding cap for undirected
+all-sources and local-neighborhood kernels. Iteration requests are clamped to
+`MAX_CENTRALITY_ITERATIONS = 10_000`; the default traversal ceiling is
+`DEFAULT_CENTRALITY_WORK_LIMIT = 2_000_000_000` modeled operations.
+
+Unknown personalized or Brandes source ids return `UnknownNode`. Malformed
+public projections, overflowing restart mass, non-finite weighted-matrix
+input, and over-budget traversals are rejected before indexed work where the
+signature is fallible. Total scalar APIs return a non-converged aligned result
+for invalid numerical options or non-finite weights. Brandes rescales path
+weights per breadth-first layer, preserving predecessor ratios while
+preventing path-count overflow.
+See the complete [centrality component guide](../components/graph/centrality-analysis.md)
+for formulas, direction and weight policy, literate pseudocode, examples,
+complexity, validation, and interpretation limits.
+
 ### Natural loops and nesting
 
 The feature-free loop API uses the shared reachable function CFG and dominator

@@ -10,7 +10,7 @@ timeout).
 ![Resource bounds that keep libcpg finite on large or untrusted input](../diagrams/resource-bounds.svg)
 
 *Figure — finite-work safeguards for construction, call resolution, VF2
-matching, monotone solving, condensation/DSM analytics, the structural DFG
+matching, monotone solving, condensation/DSM/centrality analytics, the structural DFG
 sweep, and slicing.
 Source: [`diagrams/resource-bounds.puml`](../diagrams/resource-bounds.puml).*
 
@@ -35,6 +35,9 @@ Source: [`diagrams/resource-bounds.puml`](../diagrams/resource-bounds.puml).*
 | `CondensationOptions::max_components` | `1_000_000` hard maximum | `condensation_metrics`; `coffman_graham` always uses the hard maximum | the total metrics API returns an incomplete capped report; the direct CG API returns `AnalysisError::BudgetExceeded` |
 | `MAX_DSM_NODES` | `50_000` hard maximum | `analyze_dsm`; independently rechecked by `classify_core_periphery` | returns an incomplete capped result with the stable node universe and no partial visibility/class vectors |
 | `MAX_WL_ITERATIONS` | `16` hard maximum | `wl_labels`; inherited by `structural_clone_classes` | clamps the request before refinement; malformed projections return empty vectors before indexed traversal |
+| `MAX_CENTRALITY_ITERATIONS` | `10_000` hard maximum | PageRank, eigenvector, Katz, and HITS | clamps every requested round count; invalid numerical options return a non-converged result without iteration |
+| `CentralityBudget::max_work` | `2_000_000_000` default | edge betweenness, closeness, harmonic, and Burt constraint | rejects before all-sources/neighborhood traversal with `AnalysisError::BudgetExceeded` |
+| `BetweennessOptions::max_work` | `2_000_000_000` default | directed vertex betweenness and `accumulate_for_sources` | rejects before Brandes traversal when `source_count * edge_count` exceeds the cap |
 | Loop-induction structural bounds | at most `candidate_count + 1` invariant rounds per loop; affine depth `3` | `loop_induction` | reaches a finite fixed point; malformed AST cycles are cut by visited sets and arithmetic overflow becomes unknown evidence |
 | Complexity-evidence bounds | validated finite function scope plus loop/induction provider bounds | `estimate_time_complexity_with_evidence` (feature `algorithm-detection`) | provider failure or absent CFG evidence returns the exact legacy total estimate; justification grows with loop count |
 
@@ -270,6 +273,41 @@ and edge counts before projection construction. Equal 64-bit labels are
 candidate evidence and must not authorize security-sensitive equivalence or
 code transformation without exact semantic validation.
 
+## Centrality: iteration ceilings, traversal budgets, and safe numerics
+
+[Projection centrality](../components/graph/centrality-analysis.md) validates
+the same complete `GraphProjection` contract before indexed work. Fallible
+kernels return `AnalysisError::InvalidInput` for malformed CSR. Total scalar
+kernels return an empty, non-converged result, which cannot be mistaken for a
+valid nonempty aligned vector.
+
+PageRank, eigenvector, Katz, and HITS clamp requests to
+`MAX_CENTRALITY_ITERATIONS = 10_000`. Damping and tolerance must be finite and
+inside their documented ranges. Katz additionally requires finite attenuation
+and baseline plus the sufficient row-sum convergence bound; an invalid option
+returns without iterating. These controls prevent NaN-driven non-convergence or
+hostile machine-maximum round counts.
+
+Personalized PageRank rejects finite seed weights when their grouped or total
+mass overflows. Weighted spectral/Burt kernels reject non-finite edge weights;
+negative finite weights are clamped to zero by their documented nonnegative
+matrix policy. Brandes rescales each breadth-first layer by one common positive
+factor, preserving dependency ratios while preventing exponentially many
+shortest paths from becoming `inf/inf`.
+
+Directed Brandes checks `source_count * edge_count`. Edge betweenness,
+closeness, and harmonic centrality check `node_count *
+undirected_adjacency_entries`. Burt constraint checks the exact modeled
+$`\sum_i d(i)^2`$ neighborhood comparisons. All use caller-visible budgets and
+fail before a partial ranking can escape. The two-billion default is a hard
+finite ceiling, not an interactive-latency promise; applications should choose
+substantially lower limits for hostile workloads.
+
+Centrality remains advisory. A high score must not authorize code execution,
+access control, deletion, or automated refactoring. Call-graph results inherit
+the call resolver's evidence boundary, and every ranking inherits the selected
+projection's semantic completeness.
+
 ## Loop induction: finite structural bounds
 
 [`loop_induction`](../components/graph/induction-analysis.md) computes each
@@ -460,6 +498,9 @@ over each one — see
 11. **Preflight DSM latency below its hard cap** for interactive or hostile
     workloads; 50,000 prevents unbounded input but does not make
     $`O(n(n+m))`$ work inexpensive.
+12. **Tighten centrality budgets and iteration requests** for interactive or
+    hostile graphs, and require `converged` before presenting an iterative
+    ranking as complete.
 
 ## Related pages
 

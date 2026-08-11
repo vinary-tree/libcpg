@@ -67,6 +67,23 @@ stronger information; `resolve_calls` can materialize definite targets through
 `call_sites`, `callees`, and `callers`. See
 [`components/graph/edges.md`](components/graph/edges.md).
 
+### Centrality
+
+A family of graph measures that assigns structural importance to vertices or
+edges. **PageRank** propagates probability through directed links;
+**personalized PageRank** replaces uniform teleportation with a seed restart
+vector; **reverse PageRank** applies PageRank to the transpose. **Betweenness**
+counts fractions of shortest paths through a vertex or edge. **Eigenvector**
+centrality rewards connections to highly scored neighbors; **Katz** centrality
+adds an attenuated contribution from walks of every length. **Closeness** uses
+inverse mean distance; **harmonic** centrality sums reciprocal distances.
+**Hyperlink-Induced Topic Search (HITS)** separates hub and authority vectors.
+**Burt constraint** measures local neighborhood redundancy and structural-hole
+brokerage. Each definition has different direction and weight semantics
+[[28]](#references). See
+[`theory/12-centrality-and-structural-importance.md`](theory/12-centrality-and-structural-importance.md)
+and [`components/graph/centrality-analysis.md`](components/graph/centrality-analysis.md).
+
 ### Code Property Graph (CPG)
 
 A single directed graph that merges several program views onto **one shared node set**: the [AST](#abstract-syntax-tree-ast), the [CFG](#control-flow-graph-cfg), the [DFG](#data-flow-graph-dfg), and — on demand — the [PDG](#program-dependence-graph-pdg). Introduced by Yamaguchi et al. [[1]](#references) to express vulnerability queries that need syntax, control, and data flow simultaneously. In `libcpg` the CPG is the type `CodePropertyGraph`, backed by a [petgraph](#petgraph) `DiGraph<CpgNode, CpgEdge>`. See [`theory/01-code-property-graphs.md`](theory/01-code-property-graphs.md).
@@ -617,3 +634,4 @@ used by the complexity analyzer to classify recursive functions (e.g. $`a = b = 
 25. Coffman, E. G., Jr., Graham, R. L. (1972). *Optimal Scheduling for Two-Processor Systems.* Acta Informatica 1, 200–213. DOI: [10.1007/BF00288685](https://doi.org/10.1007/BF00288685)
 26. MacCormack, A., Rusnak, J., Baldwin, C. Y. (2006). *Exploring the Structure of Complex Software Designs: An Empirical Study of Open Source and Proprietary Code.* Management Science 52(7), 1015–1030. DOI: [10.1287/mnsc.1060.0552](https://doi.org/10.1287/mnsc.1060.0552)
 27. Baldwin, C. Y., MacCormack, A., Rusnak, J. (2014). *Hidden Structure: Using Network Methods to Map System Architecture.* Research Policy 43(8), 1381–1397. DOI: [10.1016/j.respol.2014.05.004](https://doi.org/10.1016/j.respol.2014.05.004)
+28. Centrality foundations: (**28a**) Brin, S., Page, L. (1998). *The Anatomy of a Large-Scale Hypertextual Web Search Engine.* DOI: [10.1016/S0169-7552(98)00110-X](https://doi.org/10.1016/S0169-7552(98)00110-X). (**28b**) Brandes, U. (2001). *A Faster Algorithm for Betweenness Centrality.* DOI: [10.1080/0022250X.2001.9990249](https://doi.org/10.1080/0022250X.2001.9990249). (**28c**) Bonacich, P. (1987). *Power and Centrality: A Family of Measures.* DOI: [10.1086/228631](https://doi.org/10.1086/228631). (**28d**) Katz, L. (1953). *A New Status Index Derived from Sociometric Analysis.* DOI: [10.1007/BF02289026](https://doi.org/10.1007/BF02289026). (**28e**) Sabidussi, G. (1966). *The Centrality Index of a Graph.* DOI: [10.1007/BF02289527](https://doi.org/10.1007/BF02289527). (**28f**) Kleinberg, J. M. (1999). *Authoritative Sources in a Hyperlinked Environment.* DOI: [10.1145/324133.324140](https://doi.org/10.1145/324133.324140). (**28g**) Burt, R. S. (1992). *Structural Holes: The Social Structure of Competition.* Harvard University Press. ISBN 978-0-674-84371-4.

@@ -60,8 +60,9 @@ alternatives is folklore, and a decision without its costs is marketing.
 | [0014 — Deterministic condensation-DAG analytics](0014-deterministic-condensation-analytics.md) | Compute canonical SCC-weighted critical paths and source levels, plus sink-first width-bounded Coffman–Graham layers, without rebuilding graph identity. | Accepted |
 | [0015 — Bounded DSM visibility analysis](0015-bounded-dsm-visibility-analysis.md) | Compute transitive visibility and median roles over validated projections, reuse the shared SCC engine for cyclic core, and expose cap/malformed states explicitly. | Accepted |
 | [0016 — Stable WL projection labels](0016-stable-wl-projection-labels.md) | Refine directed-degree labels with a fixed mixer, sorted round canonicalization, a hard iteration ceiling, and deterministic stable-id clone classes. | Accepted |
+| [0017 — Deterministic bounded centrality](0017-deterministic-bounded-centrality.md) | Port centrality onto dense projections with aligned results, explicit numerical/traversal bounds, stable reductions, and a serial source-partition seam. | Accepted |
 
-These sixteen are not independent. ADR-0001 fixes the substrate that all analyses
+These seventeen are not independent. ADR-0001 fixes the substrate that all analyses
 write onto; ADR-0002 and ADR-0005 together explain how a language reaches that
 substrate and what you must switch on to get there; ADR-0003 and ADR-0004 are
 two analyses *over* the substrate (one always-on, one feature-gated) that each
@@ -88,6 +89,9 @@ SCC engine, then fixes visibility direction, median thresholds, stable
 provenance, malformed-CSR behavior, and the quadratic-work cap.
 ADR-0016 consumes that projection discipline, centralizes complete CSR
 validation for DSM and WL, and adds a separately bounded structural-clone view.
+ADR-0017 consumes the same validated forward/reverse CSR, fixes direction and
+weight semantics for the centrality family, and exposes ordered source
+partitions rather than introducing a core-owned thread pool.
 
 ![Module architecture of libcpg, showing the graph core and the analysis modules layered over it](../diagrams/module-architecture.svg)
 
@@ -99,7 +103,7 @@ validation for DSM and WL, and adds a separately bounded structural-clone view.
   (`0001`…). Numbers are never reused; a reversed decision is marked
   *Superseded* and a new record supersedes it, so history stays legible.
 - **Status lifecycle.** `Proposed → Accepted → (Superseded by NNNN | Deprecated)`.
-  All fifteen current records are **Accepted** and reflect the shipped `v0.1.1`
+  All seventeen current records are **Accepted** and reflect the shipped `v0.1.1`
   code.
 - **Grounding.** Every claim here is traceable to source: the
   [`Cargo.toml`](../engineering/01-build-and-features.md) feature block, the

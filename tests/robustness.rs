@@ -346,6 +346,39 @@ fn exercise_every_analysis(cpg: &CodePropertyGraph, func: NodeId) {
                 .iter()
                 .all(|&node| call_projection.dense_index(node).is_some())
     }));
+    let page_options = libcpg::PageRankOptions::default();
+    let iteration_options = libcpg::IterationOptions::default();
+    let budget = libcpg::CentralityBudget::default();
+    let mut centralities = vec![
+        libcpg::pagerank(&call_projection, page_options),
+        libcpg::reverse_pagerank(&call_projection, page_options),
+        libcpg::betweenness_centrality(&call_projection, libcpg::BetweennessOptions::default())
+            .expect("call projection fits the default betweenness budget"),
+        libcpg::eigenvector_centrality(&call_projection, iteration_options),
+        libcpg::katz_centrality(&call_projection, libcpg::KatzOptions::default()),
+        libcpg::closeness_centrality(&call_projection, budget)
+            .expect("call projection fits the default closeness budget"),
+        libcpg::harmonic_centrality(&call_projection, budget)
+            .expect("call projection fits the default harmonic budget"),
+        libcpg::burt_constraint(&call_projection, budget)
+            .expect("call projection fits the default constraint budget"),
+    ];
+    if let Some(&seed) = call_projection.nodes.first() {
+        centralities.push(
+            libcpg::personalized_pagerank(&call_projection, &[(seed, 1.0)], page_options)
+                .expect("the seed comes from the projection"),
+        );
+    }
+    let hits = libcpg::hits(&call_projection, iteration_options);
+    centralities.extend([hits.hubs, hits.authorities]);
+    for centrality in centralities {
+        assert_eq!(centrality.nodes, call_projection.nodes);
+        assert_eq!(centrality.scores.len(), call_projection.node_count());
+        assert!(centrality.scores.iter().all(|score| score.is_finite()));
+    }
+    let edge_centrality = libcpg::edge_betweenness(&call_projection, budget)
+        .expect("call projection fits the default edge-betweenness budget");
+    assert_eq!(edge_centrality.edges.len(), edge_centrality.scores.len());
 
     // --- extractors ---
     let mut work = cpg.clone();
