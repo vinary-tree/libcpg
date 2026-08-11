@@ -5,7 +5,12 @@
 
 use super::super::signatures::{ComplexityClass, ComplexityEstimate};
 use super::control_flow::{ControlFlowAnalyzer, RecursionKind};
-use crate::{CodePropertyGraph, CpgNodeKind, NodeId};
+use crate::{
+    loop_forest, loop_induction, CodePropertyGraph, CpgNodeKind, InductionAnalysis, LoopForest,
+    NodeId, TripEvidence,
+};
+
+const IRREDUCIBLE_CONFIDENCE: f64 = 0.3;
 
 /// Analyzes code complexity.
 #[derive(Debug, Default)]
@@ -73,6 +78,56 @@ impl ComplexityAnalyzer {
                 }
             }
         }
+    }
+
+    /// Estimates time complexity from validated CFG, loop, and induction evidence.
+    ///
+    /// This evidence-aware path keeps [`Self::estimate_time_complexity`] as the
+    /// total fallback. A function with no intraprocedural CFG edges, an invalid
+    /// selector, a malformed CFG, or an inconsistent downstream analysis
+    /// therefore receives the exact legacy AST-heuristic result. When evidence
+    /// is available, reducible counted loops contribute one polynomial degree
+    /// per nesting level. Unknown trip evidence retains the corresponding
+    /// heuristic confidence ceiling, while an irreducible cyclic region is
+    /// represented as one linear factor at a conservative confidence.
+    ///
+    /// The returned estimate is advisory and out-of-graph. Its justification
+    /// names every loop header, induction variable, comparison, and bound node
+    /// used (or records that trip evidence remained unknown).
+    pub fn estimate_time_complexity_with_evidence(
+        &self,
+        cpg: &CodePropertyGraph,
+        function: NodeId,
+    ) -> ComplexityEstimate {
+        let fallback = self.estimate_time_complexity(cpg, function);
+        let Ok(view) = crate::analysis::cfg_scope::function_cfg_view(cpg, function) else {
+            return fallback;
+        };
+        if view.projection.edge_count() == 0 {
+            return fallback;
+        }
+
+        let Ok(forest) = loop_forest(cpg, function) else {
+            return fallback;
+        };
+        if forest.loops.is_empty() {
+            return fallback;
+        }
+        let Ok(induction) = loop_induction(cpg, function, &forest) else {
+            return fallback;
+        };
+
+        let heuristic_loop_confidence = self
+            .analyze_loop_complexity(&self.control_flow.detect_loops(cpg, function))
+            .map_or(0.4, |estimate| estimate.confidence);
+        let loop_estimate =
+            self.evidence_loop_complexity(&forest, &induction, heuristic_loop_confidence);
+        let recursion = self.control_flow.detect_recursion(cpg, function);
+        let recursion_estimate = recursion
+            .as_ref()
+            .map(|pattern| self.analyze_recursion_complexity(cpg, function, pattern));
+
+        combine_evidence_with_recursion(loop_estimate, recursion_estimate)
     }
 
     /// Estimates space complexity of a function.
@@ -192,6 +247,99 @@ impl ComplexityAnalyzer {
             confidence,
             justification,
         })
+    }
+
+    fn evidence_loop_complexity(
+        &self,
+        forest: &LoopForest,
+        induction: &InductionAnalysis,
+        heuristic_confidence: f64,
+    ) -> ComplexityEstimate {
+        let reducible_depth = forest
+            .loops
+            .iter()
+            .filter(|natural_loop| !natural_loop.irreducible)
+            .map(|natural_loop| natural_loop.depth)
+            .max()
+            .unwrap_or(1);
+        let class = complexity_for_polynomial_degree(reducible_depth);
+        let has_irreducible = forest
+            .loops
+            .iter()
+            .any(|natural_loop| natural_loop.irreducible);
+        let has_unknown_trip = forest.loops.iter().any(|natural_loop| {
+            induction
+                .bounds
+                .iter()
+                .find(|bound| bound.loop_id == natural_loop.id)
+                .is_none_or(|bound| matches!(bound.trip, TripEvidence::Unknown))
+        });
+        let confidence = if has_irreducible {
+            IRREDUCIBLE_CONFIDENCE
+        } else if has_unknown_trip {
+            heuristic_confidence.clamp(0.0, 1.0)
+        } else {
+            1.0
+        };
+
+        let loop_details = forest
+            .loops
+            .iter()
+            .map(|natural_loop| {
+                let variables = induction
+                    .ivs
+                    .iter()
+                    .filter(|iv| iv.loop_id == natural_loop.id)
+                    .map(|iv| iv.variable.as_ref())
+                    .collect::<Vec<_>>()
+                    .join(",");
+                let variables = if variables.is_empty() {
+                    "none".to_string()
+                } else {
+                    variables
+                };
+                let prefix = format!(
+                    "loop {} header {:?} depth {} IVs [{}]",
+                    natural_loop.id, natural_loop.header, natural_loop.depth, variables
+                );
+                if natural_loop.irreducible {
+                    return format!("{prefix}: irreducible region, one linear factor");
+                }
+                match induction
+                    .bounds
+                    .iter()
+                    .find(|bound| bound.loop_id == natural_loop.id)
+                    .map(|bound| &bound.trip)
+                {
+                    Some(TripEvidence::Counted {
+                        iv,
+                        comparison,
+                        bound_node,
+                    }) => format!(
+                        "{prefix}: counted IV {iv}, comparison {comparison:?}, bound {bound_node:?}"
+                    ),
+                    Some(TripEvidence::Unknown) | None => {
+                        format!("{prefix}: trip evidence unknown")
+                    }
+                }
+            })
+            .collect::<Vec<_>>()
+            .join("; ");
+        let confidence_basis = if has_irreducible {
+            "irreducible confidence floor"
+        } else if has_unknown_trip {
+            "unknown-trip heuristic confidence ceiling"
+        } else {
+            "all reducible trips counted"
+        };
+
+        ComplexityEstimate {
+            class,
+            confidence,
+            justification: format!(
+                "CFG/DFG loop evidence ({confidence_basis}; max reducible depth {reducible_depth}): {loop_details}"
+            ),
+        }
     }
 
     /// Analyzes recursion pattern to estimate time complexity.
@@ -374,6 +522,42 @@ impl ComplexityAnalyzer {
         }
 
         false
+    }
+}
+
+fn complexity_for_polynomial_degree(degree: usize) -> ComplexityClass {
+    match degree {
+        0 => ComplexityClass::Constant,
+        1 => ComplexityClass::Linear,
+        2 => ComplexityClass::Quadratic,
+        3 => ComplexityClass::Cubic,
+        degree => ComplexityClass::Polynomial(u32::try_from(degree).unwrap_or(u32::MAX)),
+    }
+}
+
+fn combine_evidence_with_recursion(
+    loop_estimate: ComplexityEstimate,
+    recursion_estimate: Option<ComplexityEstimate>,
+) -> ComplexityEstimate {
+    let Some(mut recursion_estimate) = recursion_estimate else {
+        return loop_estimate;
+    };
+    if recursion_estimate
+        .class
+        .is_better_than(&loop_estimate.class)
+    {
+        let mut loop_estimate = loop_estimate;
+        loop_estimate.justification = format!(
+            "{}; subordinate recursion evidence: {}",
+            loop_estimate.justification, recursion_estimate.justification
+        );
+        loop_estimate
+    } else {
+        recursion_estimate.justification = format!(
+            "{}; subordinate loop evidence: {}",
+            recursion_estimate.justification, loop_estimate.justification
+        );
+        recursion_estimate
     }
 }
 
@@ -733,3 +917,6 @@ mod proptests {
         }
     }
 }
+
+#[cfg(test)]
+mod evidence_tests;

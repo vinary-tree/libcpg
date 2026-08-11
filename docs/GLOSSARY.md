@@ -90,7 +90,15 @@ propagation](#sparse-conditional-constant-propagation-sccp).
 
 ### Complexity class / Big-O
 
-An asymptotic growth category for a function's running time. `libcpg`'s `ComplexityClass` ladder is, from cheapest to most expensive, `Constant` $`O(1)`$, `Logarithmic` $`O(\log n)`$, `Linear` $`O(n)`$, `Linearithmic` $`O(n \log n)`$, `Quadratic` $`O(n^2)`$, `Cubic` $`O(n^3)`$, `Polynomial(k)` $`O(n^k)`$, `Exponential` $`O(2^n)`$, `Factorial` $`O(n!)`$, and `Unknown`. See [`components/algorithms/complexity.md`](components/algorithms/complexity.md).
+An asymptotic growth category for a function's running time. `libcpg`'s
+`ComplexityClass` ladder is, from cheapest to most expensive, `Constant`
+$`O(1)`$, `Logarithmic` $`O(\log n)`$, `Linear` $`O(n)`$,
+`Linearithmic` $`O(n \log n)`$, `Quadratic` $`O(n^2)`$, `Cubic`
+$`O(n^3)`$, `Polynomial(k)` $`O(n^k)`$, `Exponential` $`O(2^n)`$,
+`Factorial` $`O(n!)`$, and `Unknown`. `Polynomial(0..=3)` compares equal in
+growth to its named counterpart, and every finite polynomial compares better
+than `Exponential`. See
+[`components/algorithms/complexity.md`](components/algorithms/complexity.md).
 
 ### Confidence (pattern match)
 
@@ -105,6 +113,15 @@ tiers identify one unique in-graph function and therefore create
 [call-graph](#call-graph) topology. The remaining tiers stay in the
 out-of-graph result so ambiguity can never invent recursion or value flow. See
 [`components/graph/call-resolution.md`](components/graph/call-resolution.md).
+
+### Confidence (complexity evidence)
+
+A score in $`[0,1]`$ describing how completely the documented structural model
+supports a `ComplexityEstimate`; it is not the probability that the Big-O class
+is mathematically exact. Fully counted reducible loop nests receive `1.0`, an
+unknown trip is capped at the legacy loop-heuristic confidence, and any
+irreducible cyclic region receives `0.3`. See
+[`components/algorithms/complexity.md`](components/algorithms/complexity.md#confidence-policy).
 
 ### Control dependence
 

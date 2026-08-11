@@ -32,9 +32,11 @@ Source: [`diagrams/resource-bounds.puml`](../diagrams/resource-bounds.puml).*
 | `SolverConfig::narrow_passes` | `0` | `solve` | performs exactly the configured number of post-widening deterministic sweeps |
 | SCCP event cap | `4 * (scope nodes + DefUse edges)` | `sccp` | returns `AnalysisError::IterationLimitExceeded` if malformed dependencies exceed the finite-lattice schedule bound |
 | Loop-induction structural bounds | at most `candidate_count + 1` invariant rounds per loop; affine depth `3` | `loop_induction` | reaches a finite fixed point; malformed AST cycles are cut by visited sets and arithmetic overflow becomes unknown evidence |
+| Complexity-evidence bounds | validated finite function scope plus loop/induction provider bounds | `estimate_time_complexity_with_evidence` (feature `algorithm-detection`) | provider failure or absent CFG evidence returns the exact legacy total estimate; justification grows with loop count |
 
-All of these are on the **feature-free surface** — you can configure and use them
-with `default = []`.
+The underlying bounds are on the **feature-free surface**. The final complexity
+consumer requires `algorithm-detection`, but it reuses those providers and adds
+no parser or unbounded search.
 
 ## Construction: `max_file_size`
 
@@ -219,6 +221,23 @@ Nested loop regions may overlap, worst-case candidate rescanning is polynomial,
 and `hoistable`/`Counted` results remain language-neutral advisory evidence.
 Continue to bound source/CPG size and apply language-specific overflow, trap,
 aliasing, volatile/atomic, and concurrency policy before consuming them.
+
+## Complexity evidence: bounded providers and total fallback
+
+`ComplexityAnalyzer::estimate_time_complexity_with_evidence` computes an exact
+legacy AST estimate first, then accepts only a validated intraprocedural CFG
+scope, loop forest, and induction report. The provider bounds above therefore
+bound the stronger path: iterative graph walks cut cycles, dominance has its
+pass cap, and induction has finite fixed-point and expression-depth limits. If
+scope, loop, or induction validation fails, the method returns the already
+computed fallback rather than retrying, mutating the graph, or parsing source.
+
+The result string lists every loop header, IV, comparison, and bound. Its size
+is therefore $`O(L + I)`$ references for $`L`$ loops and $`I`$ reported IVs;
+source/CPG size remains the caller's memory boundary. A confidence of `1.0`
+means that every reducible trip has evidence under the documented structural
+model. It does not prove termination, language overflow safety, an exact
+symbolic bound, or suitability for a security decision.
 
 ## Dominance: structural convergence cap
 

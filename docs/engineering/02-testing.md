@@ -22,14 +22,15 @@ think to write down.
 
 | Kind | Count | Where |
 | --- | ---: | --- |
-| Maximal-matrix library tests | 627 | inline `#[cfg(test)] mod …` next to the code; includes examples and properties |
+| Maximal-matrix library tests | 634 | inline `#[cfg(test)] mod …` next to the code; includes examples and properties |
 | Public-API integration tests | 21 | `tests/integration.rs` |
 | Malformed-input robustness tests | 5 | `tests/robustness.rs` |
 | SCCP public/parser integration tests | 3 | `tests/sccp_integration.rs` |
 | Interval public/parser integration tests | 3 | `tests/intervals_integration.rs` |
 | Loop-induction public/parser integration tests | 3 | `tests/induction_integration.rs` |
-| **Executable test cases** | **662** | excludes three ignored rustdoc examples |
-| `proptest!` blocks (subset of the library/robustness rows) | 43 | exact source-level macro count in `src/` and `tests/` |
+| Complexity-evidence public/parser integration tests | 3 | `tests/complexity_evidence_integration.rs` |
+| **Executable test cases** | **672** | excludes three ignored rustdoc examples |
+| `proptest!` blocks (subset of the library/robustness rows) | 44 | exact source-level macro count in `src/` and `tests/` |
 
 The maximal-matrix library count is up from **99** inline tests and **zero**
 property tests before this work.
@@ -48,7 +49,7 @@ on the features enabled:
 | Command | Lib tests | Notes |
 | --- | ---: | --- |
 | `cargo test` | 334 | `default = []`: the feature-free surface only |
-| `cargo test --features "full rholang metta"` | 627 | the maximal matrix, including the Mode-B mappers |
+| `cargo test --features "full rholang metta"` | 634 | the maximal matrix, including the Mode-B mappers and evidence-aware complexity |
 
 The feature-free 334 exercise the graph model, exact dominator/post-dominator,
 natural-loop, monotone data-flow, variable-liveness/dead-store,
@@ -69,6 +70,12 @@ cargo test --features "full rholang metta"
 
 # One language plus one analysis.
 cargo test --features "lang-rust,design-patterns"
+
+# Evidence-aware complexity: feature-only and real-parser public cases.
+cargo test --no-default-features --features algorithm-detection \
+  --test complexity_evidence_integration
+cargo test --no-default-features --features "algorithm-detection lang-rust" \
+  --test complexity_evidence_integration
 
 # Scope to one module.
 cargo test --features lang-rust builder::tree_sitter
@@ -138,6 +145,7 @@ The invariants fall into complementary families.
 | **Slicing** | $`\lvert S\rvert \le \mathit{max\_nodes}`$; the criterion is in its own backward slice; $`\mathit{max\_nodes} = 0 \Rightarrow S = \varnothing`$; $`S`$ is monotone in $`\mathit{max\_nodes}`$; every sliced id is a real node |
 | **Matching & similarity** | VF2 embeddings are injective, kind-consistent, and edge-preserving; relaxed matching $`\supseteq`$ strict; all four metrics land in $`[0,1]`$, are symmetric, and are maximal on self-comparison |
 | **Ordering & confidence** | `ComplexityClass::is_better_than` is a strict order (irreflexive, asymmetric, transitive); complexity is monotone in loop nesting; every detector's results are sorted by descending confidence and clear its `min_confidence` |
+| **Complexity evidence** | fully counted reducible depth maps to the exact polynomial degree; opposite storage orders produce identical class/confidence/justification; every generated CFG-free function returns the exact legacy estimate; fixed examples decide unknown-trip and irreducible confidence precedence, provenance, recursion composition, public parsing, and graph non-mutation |
 
 ### Two invariants worth singling out
 
@@ -210,7 +218,7 @@ grammars (see [below](#defects-found-by-this-suite)).
 ## Defects found by this suite
 
 Property and robustness tests are worth their cost only if they find real bugs.
-This suite found **sixteen**, each fixed at the source and frozen as a regression
+This suite found **eighteen**, each fixed at the source and frozen as a regression
 test beside the fix:
 
 | # | Defect | Consequence | Found by |
@@ -220,7 +228,7 @@ test beside the fix:
 | 3 | `visit_reaching` (DFG reaching-defs) recursed with no path guard | same | robustness |
 | 4 | `ast_ancestors` returned ids absent from the graph | callers resolving an "ancestor" got `None` | robustness |
 | 5 | `CfgExtractor` / DFG auxiliary edge builders were not idempotent | re-extraction silently duplicated edges | property |
-| 6 | `ComplexityClass::ordinal` collided (`Cubic == Polynomial(0) == 5`) | `is_better_than` was not a consistent order | property |
+| 6 | the former `ComplexityClass` rank collided (`Cubic == Polynomial(0)`) and placed some polynomials incorrectly | `is_better_than` was not a growth-faithful strict weak order | property |
 | 7 | `Cosine` / `WeisfeilerLehman` similarity could return `1.0000000000000002` | documented $`[0,1]`$ range violated | robustness |
 | 8 | VF2 did not verify pattern self-loops | unsound matches | property |
 | 9 | VF2 relaxed matching was *stricter* than strict matching for several edge kinds | relaxed ⊉ strict | property |
@@ -259,9 +267,9 @@ cargo +nightly cov-branch           # branch coverage needs nightly
 
 | Metric | Coverage | Lowest file |
 | --- | ---: | --- |
-| Lines | **97.95 %** | 91.67 % (`language.rs`) |
-| Regions | **97.88 %** | — |
-| Functions | **98.08 %** | — |
+| Lines | **97.94 %** | 91.67 % (`language.rs`) |
+| Regions | **97.87 %** | — |
+| Functions | **98.09 %** | — |
 | Branches | **84.27 %** | see below |
 
 Every source file is above 90 % line coverage; seventeen are at 100 %.
@@ -300,6 +308,12 @@ clearing the same thresholds. Its DFG invariant contracts, unique/dominating
 recurrence counterexamples, affine/direction oracles, insertion permutations,
 parser experiment, corruption campaign, and stack test are catalogued in
 [`scientific/07-induction-analysis-validation.md`](../scientific/07-induction-analysis-validation.md).
+The extended `algorithms/detection/complexity.rs` module measures **97.36 %**
+line, **97.32 %** region, **100.00 %** function, and **88.46 %** branch
+coverage, clearing the same thresholds. Its counted/unknown/irreducible
+examples, exact-fallback properties, storage permutations, public/parser
+experiments, malformed-consumer path, and benchmark oracle are catalogued in
+[`scientific/08-complexity-evidence-validation.md`](../scientific/08-complexity-evidence-validation.md).
 All figures come from clean maximal-matrix coverage runs; no focused-test
 figure is substituted for the repository gate.
 
@@ -334,7 +348,7 @@ dependencies and are not part of the `full` feature set.
 | --- | --- |
 | `examples/` directory | present but **empty** — no runnable `cargo run --example …` programs. |
 | Doctests | none run — every code fence in a doc comment is marked `ignore` / `rust,ignore`, so `cargo test --doc` executes nothing. Feature-gating individual doctests in a `default = []` crate is awkward; the snippets are instead validated by the documentation snippet-check harness. |
-| Benchmarks | Five active feature-free Criterion targets cover SCC paths/rings/clusters, graph-arena paths, bounded VF2 paths, liveness chains/diamond ladders/nested loops, and counted-loop induction regions. Each asserts an exact deterministic oracle before timing; see [performance](03-performance.md). |
+| Benchmarks | Five active Criterion targets cover SCC paths/rings/clusters, graph-arena paths, bounded VF2 paths, liveness chains/diamond ladders/nested loops, counted-loop induction regions, and—under `algorithm-detection`—complexity evidence on the same counted fixtures. Each active group asserts an exact deterministic oracle before timing; see [performance](03-performance.md). |
 | `ml-linfa`, `gpu` | not exercised: optional heavy dependencies outside the `full` feature set. |
 
 ## Related pages

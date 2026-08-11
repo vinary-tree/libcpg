@@ -16,8 +16,9 @@ A CPG library makes three kinds of assertion, and each demands a different stand
 
 These are distinct from *performance* claims ("construction is fast", "VF2
 prunes well"), which require controlled measurement rather than assertion.
-`libcpg` ships five oracle-guarded Criterion targets, but their evidence is
-limited to the named graph families, sizes, environment, and operation. The
+`libcpg` ships five oracle-guarded Criterion targets (six operations when the
+gated complexity-evidence group is enabled), but their evidence is limited to
+the named graph families, sizes, environment, and operation. The
 protocol and remaining gaps are specified in [04 — Measurement
 methodology](04-measurement-methodology.md).
 
@@ -49,15 +50,16 @@ Two properties of the suite make this rigorous rather than merely suggestive:
 
 ## 3. The evidence base
 
-The maximal matrix contains **627 library tests**, **21 general public-API
+The maximal matrix contains **634 library tests**, **21 general public-API
 integration tests**, **5 malformed-input robustness tests**, **3 SCCP
 public/parser integration tests**, and **3 interval public/parser integration
-tests**, plus **3 loop-induction public/parser integration tests**. These 662
-executable cases combine fixed examples, differential oracles, and 43 exact
-source-level `proptest!` blocks. The
+tests**, plus **3 loop-induction** and **3 complexity-evidence public/parser
+integration tests**. These 672 executable cases combine fixed examples,
+differential oracles, and 44 exact source-level `proptest!` blocks. The
 feature-free matrix remains independently runnable and exercises the exact
 graph/data-flow substrate without compiling any grammar. Five active Criterion
-targets supplement correctness with scoped performance evidence; see
+targets supplement correctness with six scoped operation groups when
+`algorithm-detection` is enabled; see
 [Testing](../engineering/02-testing.md) for the census and [04](04-measurement-methodology.md)
 for the measurement contract.
 
@@ -74,6 +76,7 @@ Because `default = []`, many tests are **feature-gated**. The end-to-end reachin
 | [05 — SCCP validation](05-sccp-validation.md) | Concrete value soundness, lattice laws, conditional-edge partition, refinement monotonicity, determinism, parser integration | `straight_line_literal_programs_match_the_concrete_interpreter`, SCCP unit/property tests, `sccp_integration` | feature-free / `lang-rust` parser case |
 | [06 — Interval validation](06-interval-analysis-validation.md) | Concrete range soundness, hull/widen/narrow laws, loop convergence, narrowing descent, determinism, SCCP cross-check, parser integration | interval unit/property tests, `intervals_integration` | feature-free / `lang-rust` parser case |
 | [07 — Loop-induction validation](07-induction-analysis-validation.md) | DFG invariant contract, unique latch-dominating recurrences, checked affine steps, comparison direction, determinism, parser integration, malformed/stack safety | induction unit/property tests, `induction_integration`, robustness harness | feature-free / `serde` / `lang-rust` parser case |
+| [08 — Complexity-evidence validation](08-complexity-evidence-validation.md) | Counted-loop polynomial degree/provenance, confidence precedence, exact legacy fallback, storage determinism, parser/default-detector integration | complexity unit/property tests, `complexity_evidence_integration`, robustness harness, gated benchmark oracle | `algorithm-detection` / `lang-rust` parser case |
 
 ## 5. What is proven, and what is advisory
 
@@ -85,6 +88,9 @@ Scientific honesty requires separating the two:
   transformation candidates still require language side-effect policy.
   Loop-induction `hoistable` and `Counted` evidence likewise requires
   language-aware transformation and termination policy.
+  Evidence-aware complexity deterministically composes that structural proof
+  material and preserves exact fallback identity; its $`O(n^d)`$ interpretation
+  and confidence remain an advisory cost model rather than a symbolic bound.
   [Design-pattern detection](../GLOSSARY.md#design-pattern),
   [algorithm-family](../GLOSSARY.md#algorithm-family) recognition, and
   [GNN](../GLOSSARY.md#graph-neural-network-gnn) embeddings are heuristics: they
@@ -93,7 +99,8 @@ Scientific honesty requires separating the two:
 - **Empirically bounded.** Performance results apply only to a target's named
   fixture, size, and controlled environment. DFG/PDG construction,
   whole-corpus analysis, and GNN propagation remain measurement gaps; no result
-  from the five active targets may be generalized to them.
+  from the five active targets (or six enabled operation groups) may be
+  generalized to them.
 
 ## 6. Reproducing the experiments
 
@@ -113,6 +120,10 @@ cargo test def_use_backward_slice
 
 # One oracle-guarded controlled benchmark:
 ./scripts/bench.sh dataflow_liveness
+
+# Evidence-aware complexity public/parser acceptance:
+cargo test --no-default-features --features "algorithm-detection lang-rust" \
+  --test complexity_evidence_integration
 ```
 
 Each subsequent page names its tests, quotes the exact assertions that decide the hypothesis, and cross-links the theory (`../theory/`) and builder-component (`../components/builder/`) pages that explain the mechanism under test.

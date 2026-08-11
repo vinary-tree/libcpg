@@ -670,7 +670,9 @@ impl AlgorithmDetector for DefaultAlgorithmDetector {
         let recursion = self.control_flow.detect_recursion(cpg, function);
 
         // Phase 2: Complexity estimation
-        let time_complexity = self.complexity.estimate_time_complexity(cpg, function);
+        let time_complexity = self
+            .complexity
+            .estimate_time_complexity_with_evidence(cpg, function);
 
         // Phase 3: Algorithm family detection
         // Try each detector and collect matches above threshold

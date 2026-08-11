@@ -291,7 +291,15 @@ The distinction between the always-on `pattern` module and the gated `patterns` 
 
 ### Algorithm and complexity detection (feature `algorithm-detection`)
 
-`DefaultAlgorithmDetector::detect(&cpg, function)` is **per-function**: it runs a `ControlFlowAnalyzer` (loop and recursion shape) then a `ComplexityAnalyzer` (a Big-O estimate), then five family routines, returning `Vec<DetectedAlgorithm>` sorted by confidence descending and filtered at `min_confidence` (default `0.5`).
+`DefaultAlgorithmDetector::detect(&cpg, function)` is **per-function**. It
+collects semantic loop/recursion shapes for family signatures, then
+`ComplexityAnalyzer::estimate_time_complexity_with_evidence` validates the
+centralized intraprocedural CFG scope, `LoopForest`, and DFG-backed
+`InductionAnalysis`. Fully counted reducible depth supplies the polynomial
+degree and provenance; missing or inconsistent evidence returns the exact
+legacy AST heuristic. Five family routines consume the result and return
+`Vec<DetectedAlgorithm>` sorted by confidence descending and filtered at
+`min_confidence` (default `0.5`).
 
 ```rust
 // requires: features = ["algorithm-detection"]
@@ -305,7 +313,9 @@ for function in cpg.functions().map(|n| n.id).collect::<Vec<_>>() {
 }
 ```
 
-These are heuristics, not proofs of identity; see [`../components/algorithms/overview.md`](../components/algorithms/overview.md).
+The complexity evidence and family label are advisory rather than proofs. The
+consumer adds no parser and does not mutate the CPG; see
+[`../components/algorithms/complexity.md`](../components/algorithms/complexity.md).
 
 ### GNN embeddings (feature `gnn`)
 

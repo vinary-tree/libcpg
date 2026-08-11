@@ -472,10 +472,11 @@ control-flow and a complexity analyzer.
 | `with_min_confidence` | `fn with_min_confidence(self, confidence: f64) -> Self` | Threshold. |
 | `detect` | *(via `AlgorithmDetector`)* `fn detect(&self, cpg, function) -> Vec<DetectedAlgorithm>` | Analyze one function. |
 
-`detect` runs loop/recursion analysis, estimates time complexity, then tries five
-family routines (sorting, searching, graph, dynamic-programming,
-divide-and-conquer), returning the survivors sorted by `confidence` **descending**
-and filtered at `min_confidence`.
+`detect` runs loop/recursion shape analysis, obtains a CFG/DFG-backed time
+estimate with exact legacy fallback, then tries five family routines (sorting,
+searching, graph, dynamic-programming, divide-and-conquer). It returns the
+survivors sorted by `confidence` **descending** and filtered at
+`min_confidence`.
 
 > **Honesty.** `supported_families()` lists `Greedy`, but there is no active
 > greedy detector — only the five families above are actually detected. Detection
@@ -529,6 +530,36 @@ pub struct ComplexityEstimate {
 `AlgorithmSignature::new()` plus `with_loop_structure`, `with_recursion`,
 `with_time_complexity`, `with_space_complexity`.
 
+### `ComplexityAnalyzer`
+
+Public path: `libcpg::algorithms::detection::ComplexityAnalyzer`.
+
+| Method | Signature | Semantics |
+|---|---|---|
+| `new` | `fn new() -> Self` | Construct the stateless analyzer. |
+| `estimate_time_complexity` | `fn estimate_time_complexity(&self, cpg: &CodePropertyGraph, function: NodeId) -> ComplexityEstimate` | Original AST loop/recursion heuristic; unchanged and total. |
+| `estimate_time_complexity_with_evidence` | `fn estimate_time_complexity_with_evidence(&self, cpg: &CodePropertyGraph, function: NodeId) -> ComplexityEstimate` | Preferred time path: validated CFG loop depth plus DFG-backed IV/bound evidence; exact original-method fallback. |
+| `estimate_space_complexity` | `fn estimate_space_complexity(&self, cpg: &CodePropertyGraph, function: NodeId) -> ComplexityEstimate` | Recursion/allocation shape heuristic. |
+
+The evidence method maps fully counted reducible depth $`d`$ to $`O(n^d)`$ at
+confidence `1.0`, caps unknown trips at the legacy loop confidence, and maps an
+irreducible cyclic region to one `Linear` factor at confidence `0.3`. Its
+deterministic justification names loop headers, IVs, comparisons, and bounds.
+It borrows the CPG immutably and performs no parsing. `DefaultAlgorithmDetector`
+uses this method.
+
+```rust
+// requires: features = ["algorithm-detection"]
+use libcpg::algorithms::detection::ComplexityAnalyzer;
+
+let estimate = ComplexityAnalyzer::new()
+    .estimate_time_complexity_with_evidence(&cpg, function_id);
+println!("{}: {}", estimate.class, estimate.justification);
+```
+
+See [Complexity analysis](../components/algorithms/complexity.md) for the exact
+fallback and confidence tables.
+
 ### `ComplexityClass`
 
 The [Big-O ladder](../GLOSSARY.md#complexity-class--big-o).
@@ -552,11 +583,15 @@ The [Big-O ladder](../GLOSSARY.md#complexity-class--big-o).
 
 `Unknown` is the `Default`. Methods: `as_str(&self) -> &'static str` (the literal
 strings above — note the source uses unicode superscripts for `Quadratic`/`Cubic`)
-and `is_better_than(&self, other: &Self) -> bool` (a smaller class is "better").
+and `is_better_than(&self, other: &Self) -> bool` (strict asymptotic order).
+Equivalent encodings compare equal: neither `Quadratic` nor `Polynomial(2)` is
+better than the other. Every finite `Polynomial(k)` is better than
+`Exponential`.
 
-> **Honesty.** The shipped complexity analyzer caps non-divide-and-conquer
-> recursion at `Exponential` and in practice **never emits `Factorial`** — the
-> variant exists but is not produced. Treat all estimates as heuristic.
+> **Honesty.** The analyzer caps non-divide-and-conquer recursion at
+> `Exponential` and never emits `Factorial`. Fully counted confidence `1.0`
+> means complete evidence for the documented structural model, not a symbolic
+> recurrence or termination proof.
 
 ### `AlgorithmFamily`
 

@@ -94,11 +94,12 @@ security guarantees:
 - [Design-pattern](../GLOSSARY.md#design-pattern) detection scores structural
   matches by [confidence](../GLOSSARY.md#confidence-pattern-match); a high score is
   evidence, not proof, that a pattern is present.
-- [Algorithm-family](../GLOSSARY.md#algorithm-family) and
-  [complexity-class](../GLOSSARY.md#complexity-class--big-o) detection infer intent
-  from control-flow and recursion shape; they can be wrong, and some declared
-  families/classes have no active detector (documented in
-  [`components/algorithms/families.md`](../components/algorithms/families.md)).
+- [Algorithm-family](../GLOSSARY.md#algorithm-family) detection infers intent
+  from structural signatures and can be wrong. Evidence-aware
+  [complexity-class](../GLOSSARY.md#complexity-class--big-o) estimation cites
+  validated CFG/DFG loop evidence when available, but its $`O(n^d)`$ model is
+  still advisory rather than a symbolic cost or termination proof (see
+  [`components/algorithms/complexity.md`](../components/algorithms/complexity.md)).
 - [GNN](../GLOSSARY.md#graph-neural-network-gnn) embeddings summarise structure;
   similarity is a soft signal.
 

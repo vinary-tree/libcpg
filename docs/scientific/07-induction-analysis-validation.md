@@ -131,8 +131,8 @@ they do not claim a semantically meaningful result for a corrupt graph.
 ## 6. Clean maximal-matrix coverage result
 
 The stable `cargo cov-text` and nightly `cargo +nightly cov-branch` experiments
-both ran the complete `full + rholang + metta` matrix: 627 library tests and all
-35 integration/robustness cases. For `analysis/induction.rs`, they measured:
+both ran the complete `full + rholang + metta` matrix: 634 library tests and all
+38 integration/robustness cases. For `analysis/induction.rs`, they measured:
 
 | Metric | Covered | Epic threshold |
 |---|---:|---:|
@@ -141,7 +141,7 @@ both ran the complete `full + rholang + metta` matrix: 627 library tests and all
 | Functions | **97.26 %** | — |
 | Branches | **84.44 %** | 80 % |
 
-The whole repository measured 97.95 % lines, 97.88 % regions, 98.08 %
+The whole repository measured 97.94 % lines, 97.87 % regions, 98.09 %
 functions, and 84.27 % branches in the same clean runs. Both named epic
 thresholds are therefore decided by maximal-matrix evidence, not the earlier
 focused diagnostic run.

@@ -1,0 +1,51 @@
+@startuml
+!include _libcpg-theme.iuml
+title ComplexityAnalyzer.estimate_time_complexity_with_evidence
+start
+:CodePropertyGraph + function NodeId;<<#F1F3F5>>
+:Compute exact legacy fallback;<<#F1F3F5>>
+:Build validated intraprocedural CFG scope;<<#D3F9D8>>
+if (scope valid and CFG has an edge?) then (yes)
+  :loop_forest — canonical cyclic regions,
+headers, latches, and strict depth;<<#D3F9D8>>
+  if (forest succeeds and is non-empty?) then (yes)
+    :loop_induction — DFG-backed IV,
+comparison, and bound evidence;<<#FFF3BF>>
+    if (induction succeeds?) then (yes)
+      :d = maximum reducible-loop depth
+(or one for only irreducible regions);<<#D3F9D8>>
+      :Map d to Linear / Quadratic /
+Cubic / Polynomial(d);<<#C3FAE8>>
+      if (any irreducible region?) then (yes)
+        :confidence = 0.3;<<#FFE3E3>>
+      elseif (any unknown trip?) then (yes)
+        :confidence = legacy loop confidence;<<#FFE8CC>>
+      else (all reducible trips counted)
+        :confidence = 1.0;<<#C3FAE8>>
+      endif
+      :List every loop id, header, depth,
+IV, comparison, and bound;<<#FFF3BF>>
+      :Combine with recursion; keep the worse
+class and retain subordinate evidence;<<#FFE8CC>>
+      :Return advisory ComplexityEstimate;<<#E5DBFF>>
+      stop
+    else (no)
+    endif
+  else (no)
+  endif
+else (no)
+endif
+:Return exact legacy class, confidence bits,
+and justification string;<<#F1F3F5>>
+stop
+legend right
+  |= colour |= concept |
+  |<#D3F9D8>| CFG / loop-forest evidence |
+  |<#FFF3BF>| DFG-backed induction evidence |
+  |<#C3FAE8>| fully counted result |
+  |<#FFE8CC>| bounded heuristic / recursion |
+  |<#FFE3E3>| irreducible confidence floor |
+  |<#F1F3F5>| total compatibility fallback |
+  |<#E5DBFF>| public advisory estimate |
+endlegend
+@enduml

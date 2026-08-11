@@ -1,52 +1,66 @@
 @startuml
 !include _libcpg-theme.iuml
-title ComplexityAnalyzer — structural heuristics mapping code shape to ComplexityClass
+title ComplexityAnalyzer — preserved legacy time heuristic and total fallback
 start
 :function NodeId
-+ ControlFlowAnalyzer loop / recursion patterns;<<#FFF3BF>>
++ AST loop / recursion patterns;<<#F1F3F5>>
 
-partition "Loop nesting  d = max loop depth  (analyze_loop_complexity)" #FFF3BF {
-  if (maximum loop-nesting depth d?) then (d = 0, no recursion)
-    :Constant  <latex>O(1)</latex>;<<#FFF3BF>>
+partition "Loop shape  (analyze_loop_complexity)" #FFF3BF {
+  if (maximum loop-nesting depth d?) then (no loop)
+    :no loop estimate;<<#F1F3F5>>
   elseif (d = 1) then (single loop)
-    :Linear  <latex>O(n)</latex>;<<#FFF3BF>>
-  elseif (d = 2) then (nested x2)
-    :Quadratic  <latex>O(n^2)</latex>;<<#FFF3BF>>
-  elseif (d = 3) then (nested x3)
-    :Cubic  <latex>O(n^3)</latex>;<<#FFF3BF>>
+    :Linear  <latex>O(n)</latex>
+confidence 0.8 counted / 0.6 unknown;<<#FFF3BF>>
+  elseif (d = 2) then (nested twice)
+    :Quadratic  <latex>O(n^2)</latex>
+confidence 0.8 counted / 0.5 unknown;<<#FFF3BF>>
+  elseif (d = 3) then (nested three times)
+    :Cubic  <latex>O(n^3)</latex>
+confidence 0.7;<<#FFF3BF>>
   else (d >= 4)
-    :Polynomial(d)  <latex>O(n^d)</latex>;<<#FFF3BF>>
+    :Polynomial(d)  <latex>O(n^d)</latex>
+confidence 0.6;<<#FFF3BF>>
   endif
 }
 
-partition "Recursion shape  (analyze_recursion_complexity)" #FFF3BF {
-  if (recursion kind / call shape?) then (tail recursion)
-    :Linear  <latex>O(n)</latex>;<<#FFF3BF>>
-  elseif (1 call, input halved) then (divide & conquer)
-    :Logarithmic  <latex>O(\log n)</latex>;<<#FFF3BF>>
-  elseif (2 calls, input halved) then (divide & conquer)
-    :Linearithmic  <latex>O(n \log n)</latex>;<<#FFF3BF>>
+partition "Recursion shape  (analyze_recursion_complexity)" #FFE8CC {
+  if (recursion kind / call shape?) then (no recursion)
+    :no recursion estimate;<<#F1F3F5>>
+  elseif (tail recursion) then (tail)
+    :Linear  <latex>O(n)</latex>;<<#FFE8CC>>
+  elseif (1 call, input halved) then (divide and conquer)
+    :Logarithmic  <latex>O(\log n)</latex>;<<#FFE8CC>>
+  elseif (2 calls, input halved) then (divide and conquer)
+    :Linearithmic  <latex>O(n \log n)</latex>;<<#FFE8CC>>
     note right: <latex>T(n) = 2\,T(n/2) + O(n)</latex>
-  elseif (2 calls, no halving / no memo) then (binary recursion)
-    :Exponential  <latex>O(2^n)</latex>;<<#FFF3BF>>
-  else (factorial branching)
-    :Factorial  <latex>O(n!)</latex>;<<#FFF3BF>>
+  elseif (at least 3 calls, input halved) then (divide and conquer)
+    :Polynomial(calls)  <latex>O(n^{calls})</latex>;<<#FFE8CC>>
+  elseif (1 call, no halving) then (linear recursion)
+    :Linear  <latex>O(n)</latex>;<<#FFE8CC>>
+  else (at least 2 calls, no halving)
+    :Exponential  <latex>O(2^n)</latex>;<<#FFE8CC>>
   endif
 }
 
-:Combine — keep the dominant (worse) class
-via ComplexityClass::is_better_than;<<#FFF3BF>>
+:Keep the asymptotically worse class
+via ComplexityClass::is_better_than;<<#F1F3F5>>
+if (both estimates absent?) then (yes)
+  :Constant  <latex>O(1)</latex>
+confidence 0.9;<<#F1F3F5>>
+else (no)
+  :return selected loop or recursion estimate;<<#C3FAE8>>
+endif
 note right
-  Master Theorem frames the divide-and-conquer cases:
-  <latex>T(n) = a\,T(n/b) + f(n)</latex>
-  Reality check: the shipped ComplexityAnalyzer emits
-  Exponential for two or more non-D&C recursive calls;
-  Factorial is the ComplexityClass reserved for
-  factorial-growth branching (e.g. enumerating n! permutations).
+  This exact behavior is the fallback for
+  estimate_time_complexity_with_evidence.
+  Neither public estimator emits Factorial.
 end note
 stop
 legend right
   |= colour |= concept |
-  |<#FFF3BF>| complexity heuristic |
+  |<#FFF3BF>| legacy loop heuristic |
+  |<#FFE8CC>| legacy recursion heuristic |
+  |<#F1F3F5>| fallback / combination |
+  |<#C3FAE8>| advisory result |
 endlegend
 @enduml

@@ -1,48 +1,43 @@
 @startuml
 !include _libcpg-theme.iuml
-title DefaultAlgorithmDetector.detect(&cpg, function) — per-function pipeline
+title DefaultAlgorithmDetector.detect(&cpg, function) — per-function evidence pipeline
 start
-:ControlFlowAnalyzer — detect loops
-(nesting depth, counted-ness) and
-recursion (direct / tail, base cases);<<#D3F9D8>>
+:ControlFlowAnalyzer — collect AST loop and
+recursion shapes for family signatures;<<#DBE4FF>>
 note right
-  Phase 1 (detection/control_flow.rs)
-  detect_loops   -> Vec<LoopPattern>   { header, kind, depth, is_counted }
-  detect_recursion -> RecursionPattern { kind, base_cases, recursive_calls }
+  detect_loops -> Vec<LoopPattern>
+  detect_recursion -> Option<RecursionPattern>
+  These shapes remain inputs to family detection.
 end note
-:ComplexityAnalyzer — map loop-nesting +
-recursion shape to ComplexityClass;<<#FFF3BF>>
-note right
-  Phase 2 (detection/complexity.rs)
-  estimate_time_complexity -> ComplexityEstimate
-  { class, confidence, justification }
-  Combine loops vs recursion: keep the worse
-  class via ComplexityClass::is_better_than.
-end note
-:family heuristics — has_midpoint_calculation /
-has_visited_tracking / has_memoization_table
--> AlgorithmFamily;<<#C3FAE8>>
-note right
-  Phase 3 confidence-scored per-family detectors:
-  detect_sorting, detect_searching, detect_graph,
-  detect_dp, detect_divide_conquer
-  (each returns Option<DetectedAlgorithm>).
-end note
-:DetectedAlgorithm { signature :
-AlgorithmSignature { time_complexity } };<<#F1F3F5>>
-note right
-  Returns Vec<DetectedAlgorithm>
-  { family, name, function, key_nodes,
-    signature, confidence }
-  sorted by confidence (descending),
-  filtered by min_confidence (default 0.5).
-end note
+:ComplexityAnalyzer — compute exact legacy
+fallback estimate;<<#F1F3F5>>
+:Validate intraprocedural function CFG scope;<<#D3F9D8>>
+if (CFG edges and valid loop evidence?) then (yes)
+  :loop_forest — headers, strict depth,
+reducible / irreducible regions;<<#D3F9D8>>
+  :loop_induction — IVs and counted
+comparison / bound evidence;<<#FFF3BF>>
+  :Evidence-aware polynomial degree,
+confidence, and justification;<<#C3FAE8>>
+else (no)
+  :Use exact legacy estimate;<<#F1F3F5>>
+endif
+:Combine loop evidence with recursion,
+keep worse class, and retain subordinate evidence;<<#FFE8CC>>
+:Five family heuristics — sorting, searching,
+graph, dynamic programming, divide-and-conquer;<<#FCC2D7>>
+:DetectedAlgorithm records, sorted by
+confidence descending and thresholded;<<#E5DBFF>>
 stop
 legend right
-  |= colour |= pipeline stage |
-  |<#D3F9D8>| Phase 1 — control-flow analysis |
-  |<#FFF3BF>| Phase 2 — complexity estimation |
-  |<#C3FAE8>| Phase 3 — family heuristics |
-  |<#F1F3F5>| result — DetectedAlgorithm |
+  |= colour |= pipeline evidence |
+  |<#DBE4FF>| semantic AST family shape |
+  |<#D3F9D8>| CFG / loop forest |
+  |<#FFF3BF>| DFG-backed induction |
+  |<#F1F3F5>| exact compatibility fallback |
+  |<#C3FAE8>| complexity evidence |
+  |<#FFE8CC>| recursion composition |
+  |<#FCC2D7>| family heuristics |
+  |<#E5DBFF>| public result |
 endlegend
 @enduml

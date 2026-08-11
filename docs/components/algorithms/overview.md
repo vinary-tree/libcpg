@@ -13,7 +13,12 @@
 
 ## Why heuristic detection?
 
-A CPG already exposes a function's loop nesting, recursion structure, and identifier names. Those structural signals correlate strongly with algorithm shape: two nested counted loops with a comparison and a swap *look like* an $`O(n^2)`$ sort; one recursive call after halving the input *looks like* binary search. The detector turns these observations into a ranked list of candidate algorithms, each with a confidence score in $`[0, 1]`$.
+A CPG already exposes semantic loop nesting, CFG cycles, DFG-backed induction
+evidence, recursion structure, and identifier names. Two validated nested
+counted loops support an $`O(n^2)`$ estimate; a comparison and swap make the
+same function look like a sort; one recursive call after halving the input
+looks like binary search. The detector turns these observations into a ranked
+list of candidates, each with a confidence score in $`[0,1]`$.
 
 This is **pattern recognition, not proof**. The detector never executes code and never certifies identity — it reports *evidence*, and much of that evidence is name-based (it inspects identifiers such as `visited`, `memo`, `mid`). Treat every result as advisory.
 
@@ -65,7 +70,9 @@ detect(cpg, function):
   recursion ← detect_recursion(cpg, function)   # Direct | Tail; base cases; calls
 
   # Phase 2 — complexity estimation (ComplexityAnalyzer)
-  time ← estimate_time_complexity(cpg, function)  # a ComplexityClass + confidence
+  fallback ← estimate_time_complexity(cpg, function)
+  time ← estimate_time_complexity_with_evidence(cpg, function)
+          # CFG loop forest + DFG induction when valid; exact fallback otherwise
 
   # Phase 3 — five family detectors, each may return Some(DetectedAlgorithm)
   results ← []
@@ -82,7 +89,11 @@ detect(cpg, function):
 Two subsystems do the structural work and are usable on their own:
 
 - **[`ControlFlowAnalyzer`](../../GLOSSARY.md#control-flow-graph-cfg)** walks the function's AST descendants to find loops (`detect_loops`) and self-recursion (`detect_recursion`). It classifies each loop as `For` / `While` / `DoWhile` / `Infinite` / `Iterator`, computes nesting depth by counting loop ancestors, and marks a loop *counted* when it finds a range or a comparison-plus-increment idiom.
-- **`ComplexityAnalyzer`** maps that loop/recursion shape onto a [`ComplexityClass`](../../GLOSSARY.md#complexity-class--big-o). It is covered in depth in [Complexity analysis](complexity.md).
+- **`ComplexityAnalyzer`** validates the centralized function CFG, loop forest,
+  and induction evidence before mapping loop depth onto a
+  [`ComplexityClass`](../../GLOSSARY.md#complexity-class--big-o). Missing
+  evidence returns its unchanged AST loop/recursion heuristic. It is covered in
+  depth in [Complexity analysis](complexity.md).
 
 ## Result types
 
@@ -159,7 +170,12 @@ fn main() -> libcpg::Result<()> {
 }
 ```
 
-For this input the detector reports one result: family `Sorting`, name `"Bubble Sort"`, confidence `0.70`, with an attached `Quadratic` time estimate — the two counted nested loops give $`O(n^2)`$, the `>` comparison and the `a.swap(j, j + 1)` call supply the swap evidence, and the `j + 1` index reveals the *adjacent* swap that distinguishes bubble sort from selection sort.
+For this input the detector reports one result: family `Sorting`, name
+`"Bubble Sort"`, confidence `0.70`, with an attached `Quadratic` time estimate
+at complexity confidence `1.0`. The validated depth-two range loops and their
+IV/bound evidence give $`O(n^2)`$; the `>` comparison and
+`a.swap(j, j + 1)` supply the family evidence; and the `j + 1` index reveals
+the adjacent swap that distinguishes bubble sort from selection sort.
 
 Note the field access `func.id` (a public field on `CpgNode`) and the method `func.name()` (which returns `Option<&str>`) — `CpgNode` exposes `id`, `kind`, and `range` as fields, not accessor methods.
 

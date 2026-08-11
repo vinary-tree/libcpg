@@ -61,12 +61,13 @@ dimension, $`k`$ = Weisfeiler-Lehman iterations (3).
 | --- | --- | --- |
 | CPG construction (AST walk) | $`O(n)`$ | One depth-first pass over the parse tree, one `CpgNode` per kept tree-sitter node. |
 | CFG extraction (per function) | $`O(n)`$ | A per-construct walk over the function's AST children. |
-| DFG reaching-defs (per function) | $`O(I \cdot n)`$ | An [AST-ordered sweep](../GLOSSARY.md#ast-ordered-reaching-definitions); $`I`$ is bounded by `max_iterations` (default 100), with loop bodies swept twice. |
+| DFG reaching-defs (per function) | $`O(n + \sum_L |L|)`$ structural visits | One [AST-ordered sweep](../GLOSSARY.md#ast-ordered-reaching-definitions), with each loop body revisited once; $`|L|`$ is the size of loop region $`L`$. The retained `max_iterations` config is not used by this live algorithm. |
 | Dominator/post-dominator tree | worst case $`O(VE)`$ time, $`O(V + E)`$ auxiliary space | Deterministic CHK fixed point with a $`V + 2`$ pass cap, Cytron frontier, and iterative Euler intervals; ancestry queries are $`O(1)`$. |
 | PDG construction (per function) | worst case $`O(VE)`$ for control dependence, plus a DFG scan | Reuses the public post-dominator tree's reverse frontier, then emits deduplicated control and data dependence edges. |
 | CFG/call-graph SCC decomposition | $`O(V + E)`$ after adjacency normalization | Iterative Tarjan plus condensation construction; dense indices avoid traversal hash lookups, and explicit stacks avoid native-stack growth with path depth. |
 | Variable liveness | conventional $`O(H(B + E_b)W)`$ solve plus $`O(NW)`$ report replay | $`B`$ blocks, $`E_b`$ block edges, $`N`$ reachable CFG nodes, lattice height $`H \le F`$ for $`F`$ variables, and $`W = \lceil F/64 \rceil`$ machine words per state. |
 | Available / very-busy expressions | each has conventional $`O(H(B + E_b)W)`$ solve plus $`O(NW)`$ report replay; advisory candidate filtering adds dominance and bounded kill-reachability checks | $`F`$ structural expressions, $`H \le F`$, and $`W = \lceil F/64 \rceil`$; kill indexing is linear in operand memberships and definitions. |
+| Evidence-aware complexity | provider cost plus $`O(L + R)`$ composition | Computes the legacy AST fallback, validated function scope, loop forest/dominance, and induction report; then formats $`L`$ loops and combines $`R`$ recursion sites. Provider worst cases are documented with loop and induction analysis. |
 | [`backward_slice`](../GLOSSARY.md#backward-slice--forward-slice) / `forward_slice` | $`O(V + E)`$, capped at `max_nodes` | Breadth-first over PDG edges; returns as soon as the slice reaches `max_nodes`. |
 | [VF2](../GLOSSARY.md#vf2) `find_matches` | worst case $`O(N!\,N)`$; pruned in practice | Feasibility rules and `max_matches` cut the state space dramatically; see [`theory/05-subgraph-isomorphism-vf2.md`](../theory/05-subgraph-isomorphism-vf2.md). |
 | [Jaccard](../GLOSSARY.md#jaccard-similarity) similarity | $`O(V_1 + V_2)`$ | Over the two graphs' node-kind multisets. |
@@ -75,14 +76,16 @@ dimension, $`k`$ = Weisfeiler-Lehman iterations (3).
 
 Two of these deserve emphasis. VF2 is worst-case super-exponential, which is why
 its `max_matches` cap and strict-matching toggles matter for untrusted input
-([`security/01`](../security/01-input-and-resource-hardening.md)). The DFG sweep is
-made to *terminate* by the `max_iterations` fixpoint cap rather than a proof of
-monotone convergence, so it is bounded even on pathological control flow.
+([`security/01`](../security/01-input-and-resource-hardening.md)). The live DFG
+sweep is structural rather than a CFG fixed point: ordinary regions are visited
+once, loop bodies twice, and a path set cuts malformed AST cycles.
 
 ## Benchmark coverage and remaining gaps
 
-Five feature-free Criterion targets are active. Every target constructs and
-checks a deterministic oracle before Criterion enters the timed loop:
+Five Criterion targets are active. Their baseline operations are feature-free;
+`induction_analysis` also registers a sixth, `algorithm-detection`-gated
+operation. Every active group constructs and checks a deterministic oracle
+before Criterion enters the timed loop:
 
 - `scc_analysis` measures public call-graph decomposition over 1,000- and
   10,000-function paths, rings, and cyclic clusters;
@@ -94,7 +97,10 @@ checks a deterministic oracle before Criterion enters the timed loop:
   chains, 64- and 512-rung diamond ladders, and 128- and 1,024-node nested-loop
   families;
 - `induction_analysis` measures DFG-backed invariant and induction analysis on
-  single counted loops with 64, 512, and 2,048 invariant definitions.
+  single counted loops with 64, 512, and 2,048 invariant definitions; with
+  `algorithm-detection`, its `complexity_evidence` group measures the public
+  evidence consumer on the same sizes after checking class, confidence,
+  provenance nodes, and non-mutation.
 
 ```toml
 [[bench]]
@@ -128,6 +134,8 @@ cargo bench --bench scc_analysis --no-default-features -- --baseline before
 ./scripts/bench.sh pattern_matching --save-baseline before
 ./scripts/bench.sh dataflow_liveness --save-baseline before
 ./scripts/bench.sh induction_analysis --save-baseline before
+cargo bench --no-default-features --features algorithm-detection \
+  --bench induction_analysis -- --test
 ```
 
 DFG/PDG construction, whole-corpus analysis, and GNN propagation still lack runnable

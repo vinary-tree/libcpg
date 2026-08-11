@@ -1,6 +1,8 @@
 # Measurement methodology
 
-`libcpg` ships five runnable, feature-free Criterion benchmarks. Each harness
+`libcpg` ships five runnable Criterion targets. Their baseline groups are
+feature-free; the `induction_analysis` target also registers an
+`algorithm-detection`-gated complexity-evidence group. Each active group
 asserts a deterministic correctness oracle **before** entering the timed loop.
 Timing therefore measures an already-validated operation; a faster but
 incorrect implementation fails before it can produce a result.
@@ -52,6 +54,7 @@ harness = false
 | `pattern_matching` | bounded `Vf2Matcher::find_matches` | paths at 256 and 4,096 nodes | exact bounded embedding set |
 | `dataflow_liveness` | `liveness` | chains at 512/4,096 nodes, diamond ladders at 64/512 rungs, nested loops at 128/1,024 nodes | exact per-node equality with an independent round-robin solver |
 | `induction_analysis` | `loop_induction` | single counted loops with 64/512/2,048 invariant definitions | exact IV, bound, intended-invariant, DFG-contract, subset, and non-mutation checks |
+| `induction_analysis` with `algorithm-detection` | `ComplexityAnalyzer::estimate_time_complexity_with_evidence` | the same single counted loops at 64/512/2,048 invariant definitions | exact class/confidence, header/comparison/bound provenance, IV name, and non-mutation checks |
 
 The evidence is deliberately local: a result for one named family, size,
 machine, toolchain, and environment is not a universal speed claim. DFG/PDG
@@ -98,6 +101,8 @@ tees Criterion output to one timestamped log:
 ./scripts/bench.sh dataflow_liveness --save-baseline before
 ./scripts/bench.sh dataflow_liveness --baseline before
 ./scripts/bench.sh induction_analysis --save-baseline before
+cargo bench --no-default-features --features algorithm-detection \
+  --bench induction_analysis -- --test
 ```
 
 For a reportable campaign, record:

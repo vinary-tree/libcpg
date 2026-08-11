@@ -1,101 +1,26 @@
-# Complexity Analysis
+# Complexity analysis
 
-`ComplexityAnalyzer` turns a function's loop-nesting and recursion shape into a **[Big-O complexity class](../../GLOSSARY.md#complexity-class--big-o)** with a confidence score and a human-readable justification. It is the phase-2 engine behind [algorithm detection](overview.md), and it is usable on its own. Like the rest of the module it is **heuristic**: it counts structural features, it does not solve recurrences symbolically.
+`ComplexityAnalyzer` estimates a function's asymptotic running-time or space
+class. A **complexity class** groups functions with the same growth order, such
+as linear $`O(n)`$ or quadratic $`O(n^2)`$. An estimate is advisory: it contains
+a `ComplexityClass`, a confidence in $`[0,1]`$, and a justification that names
+the evidence used.
 
-> **Feature gate.** `ComplexityAnalyzer`, `ComplexityEstimate`, and `ComplexityClass` are part of the `algorithm-detection`-gated `algorithms` module. `libcpg`'s `default = []`, so enable the feature to use them (see [Overview](overview.md)).
->
-> The type is **`ComplexityAnalyzer`** — there is no `ComplexityEstimator`.
+> **Feature gate.** The analyzer and its result types live in the
+> `algorithm-detection`-gated `algorithms` module. `libcpg` has
+> `default = []`; enable this feature explicitly. The feature consumes the
+> feature-free CFG, loop-forest, and induction analyses and adds no parser.
 
-## The `ComplexityClass` ladder
+![CFG and DFG evidence flowing through loop and induction analyses into an advisory complexity estimate, with an exact legacy fallback.](../../diagrams/complexity-evidence.svg)
 
-`ComplexityClass` is a 10-variant enum ordered from cheapest to most expensive. Each variant has an `as_str()` label, and the enum's `Display` impl delegates to it.
+*Figure — evidence-aware complexity estimation. Green is Control Flow Graph
+(CFG) evidence, amber is Data Flow Graph (DFG) evidence, and grey is the total
+fallback. Source:
+[`diagrams/complexity-evidence.puml`](../../diagrams/complexity-evidence.puml).*
 
-```rust
-// requires: features = ["algorithm-detection"]
-pub enum ComplexityClass {
-    Constant,        // O(1)
-    Logarithmic,     // O(log n)
-    Linear,          // O(n)
-    Linearithmic,    // O(n log n)
-    Quadratic,       // O(n^2)
-    Cubic,           // O(n^3)
-    Polynomial(u32), // O(n^k)
-    Exponential,     // O(2^n)
-    Factorial,       // O(n!)
-    Unknown,
-}
-```
+## Public syntax
 
-The `as_str()` labels are fixed strings — note that a few use Unicode superscripts and that `Polynomial` returns a *constant* label rather than interpolating its `k`:
-
-| Variant | `as_str()` returns | Meaning |
-|---|---|---|
-| `Constant` | `"O(1)"` | $`O(1)`$ |
-| `Logarithmic` | `"O(log n)"` | $`O(\log n)`$ |
-| `Linear` | `"O(n)"` | $`O(n)`$ |
-| `Linearithmic` | `"O(n log n)"` | $`O(n \log n)`$ |
-| `Quadratic` | `"O(n²)"` | $`O(n^2)`$ |
-| `Cubic` | `"O(n³)"` | $`O(n^3)`$ |
-| `Polynomial(k)` | `"O(n^k)"` (literal — `k` is **not** substituted) | $`O(n^k)`$ |
-| `Exponential` | `"O(2^n)"` | $`O(2^n)`$ |
-| `Factorial` | `"O(n!)"` | $`O(n!)`$ |
-| `Unknown` | `"Unknown"` | undetermined |
-
-The ladder is, from cheapest to dearest:
-
-```math
-O(1) < O(\log n) < O(n) < O(n \log n) < O(n^2) < O(n^3) < O(n^k) < O(2^n) < O(n!)
-```
-
-![The ComplexityClass ladder ordered from O(1) to O(n!), with each rung's Big-O label.](../../diagrams/complexity-ladder.svg)
-
-*Figure — the `ComplexityClass` ordering. Source: [`diagrams/complexity-ladder.dot`](../../diagrams/complexity-ladder.dot).*
-
-### Comparing classes
-
-`ComplexityClass` does **not** implement `PartialOrd`/`Ord`, so `<`/`>` do not work on it. Ordering is exposed through one public method, `is_better_than`, which compares an internal ordinal:
-
-```rust
-// requires: features = ["algorithm-detection"]
-use libcpg::algorithms::ComplexityClass;
-
-assert!(ComplexityClass::Linear.is_better_than(&ComplexityClass::Quadratic));
-assert!(!ComplexityClass::Exponential.is_better_than(&ComplexityClass::Linear));
-```
-
-The internal ordinal that backs `is_better_than` is:
-
-| Class | Ordinal |
-|---|---|
-| `Constant` | 0 |
-| `Logarithmic` | 1 |
-| `Linear` | 2 |
-| `Linearithmic` | 3 |
-| `Quadratic` | 4 |
-| `Cubic` | 5 |
-| `Polynomial(k)` | $`5 + k`$ |
-| `Exponential` | 100 |
-| `Factorial` | 200 |
-| `Unknown` | 1000 |
-
-One quirk worth knowing: because `Polynomial(k)` scores $`5 + k`$, a `Polynomial(2)` (ordinal 7) is ranked *worse* than the dedicated `Quadratic` (ordinal 4) even though both denote $`O(n^2)`$. In practice the analyzer only ever emits `Polynomial(d)` for loop-nesting depth $`d \ge 4`$, so this rarely bites — but do not treat the two encodings of the same degree as interchangeable.
-
-## `ComplexityEstimate`
-
-Every estimate is a class plus its evidence:
-
-```rust
-// requires: features = ["algorithm-detection"]
-pub struct ComplexityEstimate {
-    pub class: ComplexityClass,
-    pub confidence: f64,       // 0.0 ..= 1.0
-    pub justification: String, // e.g. "Nested loops (depth 2) detected"
-}
-```
-
-## Using the analyzer
-
-The public surface is deliberately tiny — a constructor and two estimators. There are **no** configuration builders (no `with_input_parameter`, no assumption knobs); those never existed.
+The public analyzer has one constructor and three estimators:
 
 ```rust
 // requires: features = ["algorithm-detection"]
@@ -103,123 +28,324 @@ use libcpg::algorithms::detection::ComplexityAnalyzer;
 
 let analyzer = ComplexityAnalyzer::new();
 
-let time  = analyzer.estimate_time_complexity(&cpg, function_id);
+// Original AST-shape heuristic, preserved byte-for-byte in behavior.
+let legacy_time = analyzer.estimate_time_complexity(&cpg, function_id);
+
+// Preferred time estimate: validated CFG/DFG evidence with exact legacy fallback.
+let evidence_time =
+    analyzer.estimate_time_complexity_with_evidence(&cpg, function_id);
+
+// Separate recursion/allocation heuristic.
 let space = analyzer.estimate_space_complexity(&cpg, function_id);
 
-println!("time:  {} ({:.0}% — {})", time.class, time.confidence * 100.0, time.justification);
-println!("space: {} ({:.0}%)",      space.class, space.confidence * 100.0);
+println!(
+    "{} at {:.0}%: {}",
+    evidence_time.class,
+    evidence_time.confidence * 100.0,
+    evidence_time.justification,
+);
 ```
 
-## How the time estimate is derived
+There is no `ComplexityEstimator` type and there are no input-name or
+assumption builders. `DefaultAlgorithmDetector` uses
+`estimate_time_complexity_with_evidence`; direct callers can use either time
+method.
 
-`estimate_time_complexity` computes a loop estimate and a recursion estimate independently, then keeps the **worse** of the two.
+Every method is total over a `CodePropertyGraph`: an absent selector, malformed
+scope, missing CFG, or insufficient downstream evidence returns an estimate
+rather than panicking. All three methods borrow the graph immutably.
+
+## Result types
+
+```rust
+// requires: features = ["algorithm-detection"]
+pub struct ComplexityEstimate {
+    pub class: ComplexityClass,
+    pub confidence: f64,
+    pub justification: String,
+}
+
+pub enum ComplexityClass {
+    Constant,
+    Logarithmic,
+    Linear,
+    Linearithmic,
+    Quadratic,
+    Cubic,
+    Polynomial(u32),
+    Exponential,
+    Factorial,
+    Unknown,
+}
+```
+
+`ComplexityClass::as_str()` supplies a fixed display label:
+
+| Variant | Label | Mathematical meaning |
+|---|---|---|
+| `Constant` | `O(1)` | $`O(1)`$ |
+| `Logarithmic` | `O(log n)` | $`O(\log n)`$ |
+| `Linear` | `O(n)` | $`O(n)`$ |
+| `Linearithmic` | `O(n log n)` | $`O(n\log n)`$ |
+| `Quadratic` | `O(n²)` | $`O(n^2)`$ |
+| `Cubic` | `O(n³)` | $`O(n^3)`$ |
+| `Polynomial(k)` | `O(n^k)` | $`O(n^k)`$ |
+| `Exponential` | `O(2^n)` | $`O(2^n)`$ |
+| `Factorial` | `O(n!)` | $`O(n!)`$ |
+| `Unknown` | `Unknown` | no determined class |
+
+`Polynomial(k)` deliberately returns the literal `O(n^k)`; inspect its payload
+to display the concrete exponent.
+
+### Growth-faithful comparison
+
+`is_better_than` is a strict weak order over asymptotic growth. Equal growth
+rates compare equivalent, so neither side is better:
+
+```rust
+// requires: features = ["algorithm-detection"]
+use libcpg::algorithms::ComplexityClass;
+
+assert!(ComplexityClass::Linear.is_better_than(&ComplexityClass::Quadratic));
+assert!(!ComplexityClass::Quadratic
+    .is_better_than(&ComplexityClass::Polynomial(2)));
+assert!(!ComplexityClass::Polynomial(2)
+    .is_better_than(&ComplexityClass::Quadratic));
+assert!(ComplexityClass::Polynomial(1_000)
+    .is_better_than(&ComplexityClass::Exponential));
+```
+
+The private rank collapses the named polynomial equivalents and keeps every
+finite polynomial below exponential growth:
+
+| Class | Private rank |
+|---|---:|
+| `Constant`, `Polynomial(0)` | $`0`$ |
+| `Logarithmic` | $`1`$ |
+| `Linear`, `Polynomial(1)` | $`2`$ |
+| `Linearithmic` | $`3`$ |
+| `Quadratic`, `Polynomial(2)` | $`4`$ |
+| `Cubic`, `Polynomial(3)` | $`5`$ |
+| `Polynomial(k)`, $`k \ge 4`$ | $`6 - 1/k`$ |
+| `Exponential` | $`10`$ |
+| `Factorial` | $`20`$ |
+| `Unknown` | $`1000`$ |
+
+![The growth-faithful ComplexityClass ladder.](../../diagrams/complexity-ladder.svg)
+
+*Figure — named and general polynomial classes ordered by asymptotic growth.
+Source: [`diagrams/complexity-ladder.dot`](../../diagrams/complexity-ladder.dot).*
+
+## Evidence-aware time semantics
+
+A **reducible loop** has a natural header that dominates its back edge. An
+**irreducible cyclic region** has multiple entries and no single natural-loop
+header. A **loop forest** records these regions and their strict nesting. An
+**induction variable** (IV) changes by a regular additive step, while
+`TripEvidence::Counted` records a direction-compatible comparison against an
+invariant bound. These terms are produced by the feature-free
+[`loop_forest`](../graph/loop-analysis.md) and
+[`loop_induction`](../graph/induction-analysis.md) analyses.
+
+The evidence-aware estimator performs this literate algorithm:
 
 ```text
-estimate_time_complexity(cpg, function):
-  loops     ← detect_loops(cpg, function)
-  recursion ← detect_recursion(cpg, function)          # None if not self-recursive
+EVIDENCE-TIME(cpg, function)
+  fallback := LEGACY-TIME(cpg, function)
 
-  loop_est ← analyze_loop_complexity(loops)            # None if there are no loops
-  rec_est  ← recursion.map(analyze_recursion_complexity)
+  view := validated intraprocedural CFG scope for function
+  if view is invalid or has no CFG edge: return fallback
 
-  match (loop_est, rec_est):
-    (None,  None)  → Constant, confidence 0.9   # "No loops or recursion detected"
-    (Some l, None) → l
-    (None,  Some r) → r
-    (Some l, Some r) → if r.class.is_better_than(l.class) then l else r   # keep the worse
+  forest := LOOP-FOREST(cpg, function)
+  if forest fails or has no cyclic region: return fallback
+
+  induction := LOOP-INDUCTION(cpg, function, forest)
+  if induction fails: return fallback
+
+  d := maximum nesting depth among reducible loops, or 1 if all are irreducible
+  loop.class := POLYNOMIAL-CLASS(d)
+
+  if any region is irreducible:
+      loop.confidence := 0.3
+  else if any trip evidence is Unknown:
+      loop.confidence := confidence of the legacy loop heuristic
+  else:
+      loop.confidence := 1.0
+
+  recursion := legacy recursion estimate, if present
+  return the asymptotically worse of loop and recursion,
+         retaining the subordinate evidence in the justification
 ```
 
-![Activity flow mapping loop nesting and recursion shape to a ComplexityClass, backed conceptually by the Master Theorem.](../../diagrams/complexity-heuristics.svg)
+For reducible counted nests, the degree is
 
-*Figure — structure-to-complexity heuristics. Source: [`diagrams/complexity-heuristics.puml`](../../diagrams/complexity-heuristics.puml).*
+```math
+d = \max_{L \in \mathcal{L}_{r}} \operatorname{depth}(L),
+\qquad
+T(n) \in O(n^d),
+```
 
-### Loop heuristic
+where $`\mathcal{L}_{r}`$ is the set of reducible loops. Degrees one, two, and
+three use `Linear`, `Quadratic`, and `Cubic`; $`d \ge 4`$ uses
+`Polynomial(d)`. This is a structural cost model: a counted nesting level
+contributes one factor of $`n`$; it is not an exact symbolic bound solver.
 
-`analyze_loop_complexity` keys off the maximum loop-nesting depth and whether every loop is *counted* (bounded). A loop is counted when it is a `For` with a range/counting iterator, or a `While`/`DoWhile` with both a comparison and an increment.
+### Confidence policy
 
-| Max nesting depth | All loops counted? | Class | Confidence |
-|---|---|---|---|
-| 0 (no loops) | — | `Constant` | 0.9 |
+The confidence is evidence-bounded rather than averaged:
+
+```math
+c =
+\begin{cases}
+0.3 & \text{if any cyclic region is irreducible},\\
+c_h & \text{if any reducible loop has unknown trip evidence},\\
+1.0 & \text{if every reducible loop has counted trip evidence},
+\end{cases}
+```
+
+where $`c_h`$ is the original loop heuristic's confidence, clamped to
+$`[0,1]`$. Irreducibility wins over the unknown-trip ceiling because one
+linear factor is only a conservative structural representation of that
+region—not a proven iteration bound.
+
+The justification is deterministic and auditable. It lists each stable loop
+id, header `NodeId`, depth, sorted IV names, and either the comparison and bound
+nodes for a counted trip, `trip evidence unknown`, or `irreducible region`.
+When recursion dominates, the same loop details remain as subordinate evidence.
+
+### Exact fallback compatibility
+
+The following cases return the exact `estimate_time_complexity` result—same
+class, same floating-point confidence bits, and same justification string:
+
+- the selector is absent or cannot define a valid function CFG scope;
+- the selected function has no intraprocedural CFG edges;
+- loop-forest construction fails or finds no loop;
+- induction analysis rejects inconsistent evidence; or
+- a parsed function is loop-free.
+
+This boundary preserves callers that construct AST-only CPGs and avoids turning
+missing graph evidence into invented certainty. It also answers the parser
+boundary directly: `ComplexityAnalyzer` never parses text or scans tokens. The
+tree-sitter frontends normalize syntax once; this consumer reads semantic CPG
+nodes and typed CFG/DFG edges.
+
+## Legacy loop and recursion heuristics
+
+`estimate_time_complexity` remains available and unchanged. Its loop half walks
+AST descendants, derives maximum syntactic nesting, and maps it as follows:
+
+| Maximum depth | All loops counted? | Class | Confidence |
+|---:|:---:|---|---:|
 | 1 | yes | `Linear` | 0.8 |
 | 1 | no | `Linear` | 0.6 |
 | 2 | yes | `Quadratic` | 0.8 |
 | 2 | no | `Quadratic` | 0.5 |
-| 3 | — | `Cubic` | 0.7 |
-| $`d \ge 4`$ | — | `Polynomial(d)` | 0.6 |
+| 3 | either | `Cubic` | 0.7 |
+| $`d \ge 4`$ | either | `Polynomial(d)` | 0.6 |
 
-### Recursion heuristic
+Its recursion half looks for tail position, recursive call count, and shallow
+divide-and-conquer cues such as division/right-shift by two or identifiers
+`mid`, `middle`, `pivot`, or containing `half`:
 
-`analyze_recursion_complexity` first asks whether the recursion looks *divide-and-conquer*: the analyzer scans the body for a division or right-shift by an integer literal `2`, or for an identifier named `mid`, `middle`, `pivot`, or containing `half`. It then keys off the recursion kind and the number of recursive call sites.
+| Recursion shape | Class | Confidence |
+|---|---|---:|
+| tail recursion | `Linear` | 0.8 |
+| one halving call | `Logarithmic` | 0.8 |
+| two halving calls | `Linearithmic` | 0.7 |
+| at least three halving calls | `Polynomial(calls)` | 0.5 |
+| one non-halving call, clear base case | `Linear` | 0.7 |
+| one non-halving call, no clear base case | `Linear` | 0.4 |
+| two non-halving calls | `Exponential` | 0.7 |
+| at least three non-halving calls | `Exponential` | 0.6 |
 
-| Recursion kind | Divide-and-conquer cue? | Recursive calls | Class | Confidence |
-|---|---|---|---|---|
-| `Tail` | — | — | `Linear` | 0.8 |
-| `Direct`/`Indirect` | yes | 1 | `Logarithmic` | 0.8 |
-| `Direct`/`Indirect` | yes | 2 | `Linearithmic` | 0.7 |
-| `Direct`/`Indirect` | yes | $`\ge 3`$ | `Polynomial(calls)` | 0.5 |
-| `Direct`/`Indirect` | no | 1, with a base case | `Linear` | 0.7 |
-| `Direct`/`Indirect` | no | 1, no clear base case | `Linear` | 0.4 |
-| `Direct`/`Indirect` | no | 2 | `Exponential` | 0.7 |
-| `Direct`/`Indirect` | no | $`\ge 3`$ | `Exponential` | 0.6 |
+![Legacy loop and recursion heuristics, including their actual exponential ceiling.](../../diagrams/complexity-heuristics.svg)
 
-### The Master Theorem, and what the analyzer really does
+*Figure — the preserved fallback heuristic. `Factorial` is correctly absent
+from every emitted branch. Source:
+[`diagrams/complexity-heuristics.puml`](../../diagrams/complexity-heuristics.puml).*
 
-The divide-and-conquer rows above are a shallow stand-in for the **[Master Theorem](../../GLOSSARY.md#master-theorem)** [[1]](#references), which solves recurrences of the form
+The halving cases approximate the Master Theorem recurrence [[1]](#references)
 
 ```math
-T(n) = a \, T(n/b) + f(n), \qquad a \ge 1,\ b > 1
+T(n) = aT(n/b) + f(n), \qquad a \ge 1,\ b > 1.
 ```
 
-by comparing the per-call work $`f(n)`$ against $`n^{\log_b a}`$. For example $`a = b = 2`$ with $`f(n) = O(n)`$ yields $`T(n) = O(n \log n)`$ — the merge-sort case.
+They do not solve it: call sites approximate $`a`$, a halving cue approximates
+$`b = 2`$, and $`f(n)`$ is not derived. Consequently, the estimate is a
+structural hint rather than a proof.
 
-`ComplexityAnalyzer` does **not** evaluate $`\log_b a`$ numerically. It has no view of $`b`$ beyond "is there a `/2` or a `mid`/`pivot`", and it approximates $`a`$ by counting recursive call sites. So it recognises the *shape* $`a\,T(n/b)+f(n)`$ and maps one call to $`O(\log n)`$ and two to $`O(n \log n)`$, but it cannot classify, say, Karatsuba's three-way split or Strassen's seven-way split correctly — both fall into the $`\ge 3`$ bucket as `Polynomial(calls)`.
+### Worked outcomes
 
-### Honesty: `Factorial` is never emitted
+| Function shape | Evidence-aware result |
+|---|---|
+| two nested semantic ranges with valid CFG/DFG evidence | `Quadratic`, confidence `1.0`, with both headers/IVs/bounds |
+| `while true` natural loop | `Linear`, legacy loop-confidence ceiling, unknown trip named |
+| irreducible cyclic region | `Linear`, confidence `0.3`, irreducibility named |
+| loop-free parsed function | exact legacy `Constant`, confidence `0.9` |
+| one counted loop plus dominant binary recursion | `Exponential`; counted loop retained as subordinate evidence |
 
-The `ComplexityClass::Factorial` variant exists (so callers can pattern-match on it and so it has a Big-O label), but **the shipped `ComplexityAnalyzer` never produces it**. Non-divide-and-conquer recursion tops out at `Exponential`, and loop nesting tops out at `Polynomial(depth)`. If you are checking for pathological cost, match on `Exponential` — a hit on `Factorial` will not occur from this analyzer.
+The mathematical function `factorial(n)` usually has one recursive call and
+therefore receives `Linear`, $`O(n)`$. This is unrelated to the `Factorial`
+class $`O(n!)`$. Neither time estimator emits `Factorial`; non-divide-and-
+conquer recursion is capped at `Exponential`.
 
-## Worked examples
+## Space estimate
 
-The table below shows real functions, the recurrence they embody, and the class the analyzer *actually* assigns.
+`estimate_space_complexity` is independent of the evidence-aware time path:
 
-| Function | Recurrence | Emitted class |
-|---|---|---|
-| `fn factorial(n){ if n<=1 {1} else { n*factorial(n-1) } }` | $`T(n)=T(n-1)+O(1)`$ | `Linear` (0.7) |
-| `fn fib(n){ if n<=1 {n} else { fib(n-1)+fib(n-2) } }` | $`T(n)=2T(n-1)+O(1)`$ | `Exponential` (0.7) |
-| `fn merge_sort(a){ …; merge_sort(l); merge_sort(r); merge(a) }` | $`T(n)=2T(n/2)+O(n)`$ | `Linearithmic` (0.7) |
-| `fn bsearch(a,x){ let mid=(lo+hi)/2; …; bsearch(...) }` | $`T(n)=T(n/2)+O(1)`$ | `Logarithmic` (0.8) |
-| two counted nested `for` loops | $`\sum O(n)\cdot O(n)`$ | `Quadratic` (0.8) |
+- tail recursion becomes `Constant` at confidence `0.6`, assuming frame reuse;
+- direct or indirect recursion becomes `Linear` at confidence `0.6`;
+- an array literal or allocation-like call name (`vec`, `new`, `alloc`,
+  `create`, `clone`, or `collect`) becomes `Linear` at confidence `0.5`; and
+- otherwise the result is `Constant` at confidence `0.7`.
 
-A crucial disambiguation lives in the first row: the function *called* `factorial` runs in $`O(n)`$ time (it performs $`n`$ multiplications), so the analyzer's `Linear` verdict is correct. That is completely unrelated to the `Factorial` complexity **class** $`O(n!)`$, which — as noted above — the analyzer never assigns to anything.
+## Interpretation and security boundary
 
-For `merge_sort`, the merge loop also produces a `Linear` loop estimate; the combine rule keeps the worse of `Linear` and `Linearithmic`, yielding `Linearithmic`.
+Asymptotic time and McCabe's exact cyclomatic complexity are different
+quantities. Cyclomatic complexity counts independent CFG paths [[2]](#references);
+this analyzer estimates input-size growth. Neither result proves termination,
+worst-case input distribution, amortized cost, alias effects, or machine-width
+overflow behavior.
 
-## Space complexity
+The evidence path is read-only, iterative through its providers, and bounded by
+the finite selected graph plus the providers' documented convergence limits.
+Its justification can grow with the number of loops, so callers processing
+hostile graphs must still cap source or CPG size. Never authorize an
+optimization or security decision from a `ComplexityEstimate` alone.
 
-`estimate_space_complexity` is a separate public method (the detection pipeline does not call it, but you can):
+## Validation and measurement
 
-- **Recursive** functions: `Tail` recursion → `Constant` (a compiler could reuse the frame); `Direct`/`Indirect` → `Linear` (stack depth), confidence `0.6`.
-- **Non-recursive** functions: if the body allocates a collection (an array literal, or a call whose callee name contains `vec`, `new`, `alloc`, `create`, `clone`, or `collect`) → `Linear`, confidence `0.5`; otherwise `Constant`, confidence `0.7`.
+The executable validation includes fixed counted, unknown, irreducible,
+fallback, recursion-composition, and parser-backed examples; 128-case storage-
+permutation and generated-CFG-free properties; public integration; malformed-
+graph robustness through `DefaultAlgorithmDetector`; and a Criterion group
+whose correctness oracle runs before timing. See [Complexity-evidence
+validation](../../scientific/08-complexity-evidence-validation.md).
 
-## Limits
+Run the public and parser-backed acceptance cases with:
 
-The analyzer models structure, not semantics. It cannot see:
+```text
+cargo test --no-default-features --features "algorithm-detection lang-rust" \
+  --test complexity_evidence_integration
 
-1. **Input distribution** — average vs worst case are indistinguishable.
-2. **Constant factors** — $`O(100n)`$ and $`O(n)`$ both read as `Linear`.
-3. **Amortised behaviour** — it reasons per-call, not over operation sequences.
-4. **Data-dependent bounds** — a `while` without a clear counter is treated conservatively.
-5. **Genuine $`O(n!)`$ cost** — not represented in output at all.
-
-Treat every `ComplexityEstimate` as a hint whose `confidence` and `justification` fields tell you how much to trust it.
+cargo bench --no-default-features --features algorithm-detection \
+  --bench induction_analysis -- --test
+```
 
 ## Related reading
 
-- [Overview](overview.md) — where the complexity estimate feeds the family detectors.
-- [Algorithm families](families.md) — the family gates that consume these classes.
-- [Cyclomatic complexity](../../GLOSSARY.md#cyclomatic-complexity) — a distinct, exact structural metric (`cyclomatic_complexity()` over the CFG), not to be confused with these Big-O estimates.
-- [Theory: algorithm & complexity analysis](../../theory/08-algorithm-and-complexity-analysis.md) and [API: pattern & analysis reference](../../api/pattern-reference.md).
+- [Algorithm detection overview](overview.md) — the default consumer.
+- [Loop analysis](../graph/loop-analysis.md) and [induction analysis](../graph/induction-analysis.md) — evidence providers.
+- [Theory](../../theory/08-algorithm-and-complexity-analysis.md) — formal interpretation.
+- [API reference](../../api/pattern-reference.md) — exact public signatures.
+- [ADR-0013](../../design/0013-evidence-bounded-complexity-estimates.md) — why the fallback and confidence boundaries were selected.
 
 ## References
 
-1. Cormen, T. H., Leiserson, C. E., Rivest, R. L., Stein, C. (2009). *Introduction to Algorithms* (3rd ed.). MIT Press. ISBN 978-0262033848 (no DOI). *(Master Theorem, Chapter 4.)*
+1. Cormen, T. H., Leiserson, C. E., Rivest, R. L., Stein, C. (2009).
+   *Introduction to Algorithms* (3rd ed.), Chapter 4. MIT Press.
+   ISBN 978-0262033848 (no DOI).
+2. McCabe, T. J. (1976). *A Complexity Measure.* IEEE Transactions on Software
+   Engineering SE-2(4), 308–320. DOI:
+   [10.1109/TSE.1976.233837](https://doi.org/10.1109/TSE.1976.233837)

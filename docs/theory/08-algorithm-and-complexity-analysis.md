@@ -2,7 +2,17 @@
 
 > Theory pillar · file 08. Uses the control‑flow structure of [file 02](02-control-flow-and-complexity.md) and the CPG traversal of [file 01](01-code-property-graphs.md); a heuristic sibling to the pattern work of files [05](05-subgraph-isomorphism-vf2.md)–[07](07-design-pattern-detection.md).
 
-Given a function, two questions recur in code understanding: *what kind of algorithm is this?* (sorting, searching, a graph traversal, dynamic programming…) and *how expensive is it?* ($`O(n)`$? $`O(n^2)`$? $`O(2^n)`$?). `libcpg` answers both **statically and heuristically** from the shape of the [Code Property Graph](../GLOSSARY.md#code-property-graph-cpg): loop‑nesting depth and recursion structure drive a [complexity class](../GLOSSARY.md#complexity-class--big-o) estimate, and a handful of structural signatures name an [algorithm family](../GLOSSARY.md#algorithm-family). This is recognition by *shape*, not proof of *behaviour* — the results are advisory, and this page is candid about where the heuristics stop.
+Given a function, two questions recur in code understanding: *what kind of
+algorithm is this?* (sorting, searching, a graph traversal, dynamic
+programming…) and *how expensive is it?* ($`O(n)`$? $`O(n^2)`$?
+$`O(2^n)`$?). `libcpg` answers both statically from the shape of the
+[Code Property Graph](../GLOSSARY.md#code-property-graph-cpg). Validated
+Control Flow Graph (CFG), natural-loop, and Data Flow Graph (DFG)-backed
+induction evidence drive the default [complexity
+class](../GLOSSARY.md#complexity-class--big-o) estimate; structural signatures
+still name an [algorithm family](../GLOSSARY.md#algorithm-family). This is
+recognition by evidence and shape, not proof of behavior—the results remain
+advisory.
 
 The analysis lives in the `algorithms` module, gated behind the `algorithm-detection` feature. Its entry point is per‑function:
 
@@ -27,9 +37,10 @@ for func in functions {
 }
 ```
 
-![Algorithm‑detection pipeline: control‑flow analysis extracts loops and recursion, complexity estimation classifies them, and family detectors emit ranked DetectedAlgorithm records.](../diagrams/complexity-heuristics.svg)
+![Algorithm-detection pipeline: semantic loop and recursion shapes feed family signatures while CFG/DFG evidence feeds the default complexity estimate.](../diagrams/algorithm-detection-pipeline.svg)
 
-*Figure — the heuristic mapping from control‑flow structure (loop depth, recursion shape) to a `ComplexityClass`. Source: [`diagrams/complexity-heuristics.puml`](../diagrams/complexity-heuristics.puml).*
+*Figure — the per-function evidence pipeline. Source:
+[`diagrams/algorithm-detection-pipeline.puml`](../diagrams/algorithm-detection-pipeline.puml).*
 
 ---
 
@@ -38,22 +49,31 @@ for func in functions {
 `DefaultAlgorithmDetector::detect(&cpg, function)` runs three phases and returns a `Vec<DetectedAlgorithm>` sorted by confidence, descending, filtered at the detector's `min_confidence` (default $`0.5`$ — **not** the $`0.7`$ of the GoF detector in [file 07](07-design-pattern-detection.md)):
 
 1. **Control‑flow analysis** (`ControlFlowAnalyzer`) extracts the function's loops and any recursion.
-2. **Complexity estimation** (`ComplexityAnalyzer::estimate_time_complexity`) turns that structure into a `ComplexityEstimate`.
+2. **Complexity estimation**
+   (`ComplexityAnalyzer::estimate_time_complexity_with_evidence`) validates the
+   function CFG, loop forest, and induction report, then composes that evidence
+   with recursion. It falls back exactly to
+   `estimate_time_complexity` when graph evidence is unavailable.
 3. **Family detection** runs five `detect_*` routines (sorting, searching, graph, dynamic programming, divide‑and‑conquer); each emits a `DetectedAlgorithm` when its structural signature is present and its confidence clears the threshold.
 
 A `DetectedAlgorithm` bundles the `AlgorithmFamily`, an optional specific `name` (e.g. `"Binary Search"`), the containing `function`, key nodes, an `AlgorithmSignature` (loop structure, recursion pattern, time/space `ComplexityEstimate`), and a `confidence`.
 
 ---
 
-## 2. Loop‑nesting structure
+## 2. Legacy loop shape and family signatures
 
-`ControlFlowAnalyzer::detect_loops` walks the function's AST descendants and records a `LoopPattern` for each loop node, capturing its **kind**, its **nesting depth**, and whether it is **counted** (bounded):
+`ControlFlowAnalyzer::detect_loops` walks the function's semantic Abstract
+Syntax Tree (AST) descendants and records a `LoopPattern` for each loop node,
+capturing its **kind**, its **nesting depth**, and whether it appears
+**counted**:
 
 - **Kind** (`LoopKind`): `For`, `While`, `Infinite` (a Rust `loop`), plus `DoWhile` and `Iterator` for the shapes some front‑ends emit.
 - **Depth**: computed by counting loop ancestors — a loop with two enclosing loops has depth $`3`$.
 - **Counted**: a `For` over a range‑like expression, or a `While` carrying both a comparison *and* an increment, is treated as bounded; an `Infinite` or iterator loop is not. Counted‑ness raises the confidence of the resulting estimate but not its class.
 
-Maximum nesting depth is the dominant loop signal. The estimator maps it straight onto the polynomial ladder:
+These patterns remain inputs to the five family signatures and to the exact
+compatibility fallback. The legacy estimator maps maximum syntactic nesting
+straight onto the polynomial ladder:
 
 | Max loop depth | `ComplexityClass` | Big‑O |
 |---|---|---|
@@ -63,11 +83,66 @@ Maximum nesting depth is the dominant loop signal. The estimator maps it straigh
 | 3 | `Cubic` | $`O(n^3)`$ |
 | $`d \ge 4`$ | `Polynomial(d)` | $`O(n^d)`$ |
 
-This is a *structural upper‑bound heuristic*: it assumes each nested counted loop multiplies the iteration count by $`n`$. It cannot see that an inner loop runs a constant number of times, so it may over‑estimate — a limitation stated plainly here and reflected in the estimate's `confidence`.
+This is a structural upper-bound heuristic. It assumes each nested loop
+multiplies the iteration count by $`n`$ and can over-estimate a constant-bound
+inner loop. The default detector now replaces this loop signal with the
+evidence model below whenever the required CFG/DFG relations exist.
 
 ---
 
-## 3. Recursion structure
+## 3. CFG/DFG-backed loop evidence
+
+A **natural loop** is induced by a CFG back edge whose target dominates its
+source. Its header, latches, body, exits, and strict nesting depth form a
+`LoopForest`. A cyclic strongly connected region without one dominating header
+is **irreducible**. An **induction variable** (IV) is a value updated by a
+regular additive step; `TripEvidence::Counted` means the IV is compared in a
+direction compatible with its step against an invariant bound. It does not
+prove termination or compute a numeric trip count.
+
+The default complexity consumer composes
+[`loop_forest`](../components/graph/loop-analysis.md) with the DFG-backed
+[`loop_induction`](../components/graph/induction-analysis.md). If the selected
+function has no CFG edge, if scope/forest/induction validation fails, or if the
+forest is empty, the exact legacy estimate is returned. No parser or source
+scanner exists in this analysis layer.
+
+Let $`\mathcal{L}_r`$ be the reducible loops and define
+
+```math
+d =
+\begin{cases}
+\max_{L \in \mathcal{L}_r} \operatorname{depth}(L)
+  & \text{if } \mathcal{L}_r \ne \varnothing,\\
+1 & \text{if every cyclic region is irreducible}.
+\end{cases}
+```
+
+The loop class is $`O(n^d)`$, represented by the dedicated `Linear`,
+`Quadratic`, and `Cubic` variants for $`d \in \{1,2,3\}`$ and
+`Polynomial(d)` thereafter. Confidence is bounded by the weakest evidence:
+
+```math
+c =
+\begin{cases}
+0.3 & \text{if an irreducible region exists},\\
+c_h & \text{if a trip remains unknown},\\
+1.0 & \text{if every reducible trip is counted},
+\end{cases}
+```
+
+where $`c_h`$ is the legacy loop-heuristic confidence. The canonical
+justification lists every loop header, IV, comparison, and bound, so the result
+is reproducible and reviewable rather than an opaque score.
+
+![The validated CFG/DFG evidence path, confidence policy, and exact fallback.](../diagrams/complexity-evidence.svg)
+
+*Figure — evidence-aware complexity semantics. Source:
+[`diagrams/complexity-evidence.puml`](../diagrams/complexity-evidence.puml).*
+
+---
+
+## 4. Recursion structure
 
 `ControlFlowAnalyzer::detect_recursion` finds call sites inside a function that target the function itself (direct recursion), classifies **tail** position, and gathers **base cases** (guarded `Return`s that contain no recursive call). It yields a `RecursionPattern { kind, base_cases, recursive_calls }` whose `kind` is one of `Direct`, `Indirect`, or `Tail`.
 
@@ -84,13 +159,15 @@ The number of recursive calls, together with a **divide‑and‑conquer** test, 
 
 The **divide‑and‑conquer** test (`is_divide_and_conquer`) is itself a heuristic: it looks for the input being halved — a division or right‑shift by $`2`$, or an identifier named `mid`, `middle`, `pivot`, or `…half…` — before the recursive calls. Its presence is what separates $`O(n \log n)`$ merge‑sort‑like recursion from $`O(2^n)`$ naïve‑Fibonacci‑like recursion at the same call count.
 
-When a function has *both* loops and recursion, the estimator keeps the **worse** of the two classes, compared via `ComplexityClass::is_better_than` (Section 5).
+When a function has both loops and recursion, the estimator keeps the
+asymptotically worse class using `ComplexityClass::is_better_than` (Section 6)
+and retains the subordinate evidence in the justification.
 
 > **Honesty — recursion coverage.** `RecursionKind::Indirect` exists in the type but the shipped analyzer emits only `Direct` or `Tail`: mutual (indirect) recursion between two functions is modelled but not detected. The divide‑and‑conquer test is name‑ and operator‑based, so it can be fooled by unconventional variable names or by halving expressed indirectly.
 
 ---
 
-## 4. The Master Theorem
+## 5. The Master Theorem
 
 The two‑call divide‑and‑conquer heuristic is grounded in the **Master Theorem** for divide‑and‑conquer recurrences (CLRS [[1]](#references)). A function that splits its input of size $`n`$ into $`a`$ subproblems of size $`n/b`$, with $`f(n)`$ non‑recursive work per level, satisfies
 
@@ -113,11 +190,13 @@ Merge sort is the canonical case: $`a = 2`$ subproblems, each of size $`n/2`$ ($
 
 ---
 
-## 5. The complexity ladder
+## 6. The complexity ladder
 
-`ComplexityClass` is a totally ordered ladder from cheapest to most expensive, backed by an integer `ordinal()`:
+`ComplexityClass::is_better_than` exposes a strict weak order from cheaper to
+more expensive growth. Its private rank gives equivalent encodings the same
+growth position:
 
-| `ComplexityClass` | `as_str()` | `ordinal()` |
+| `ComplexityClass` | `as_str()` | Private rank |
 |---|---|---|
 | `Constant` | `O(1)` | 0 |
 | `Logarithmic` | `O(log n)` | 1 |
@@ -125,18 +204,28 @@ Merge sort is the canonical case: $`a = 2`$ subproblems, each of size $`n/2`$ ($
 | `Linearithmic` | `O(n log n)` | 3 |
 | `Quadratic` | `O(n²)` | 4 |
 | `Cubic` | `O(n³)` | 5 |
-| `Polynomial(k)` | `O(n^k)` | $`5 + k`$ |
-| `Exponential` | `O(2^n)` | 100 |
-| `Factorial` | `O(n!)` | 200 |
+| `Polynomial(0)` | `O(n^k)` | 0 (equivalent to `Constant`) |
+| `Polynomial(1)` | `O(n^k)` | 2 (equivalent to `Linear`) |
+| `Polynomial(2)` | `O(n^k)` | 4 (equivalent to `Quadratic`) |
+| `Polynomial(3)` | `O(n^k)` | 5 (equivalent to `Cubic`) |
+| `Polynomial(k)`, $`k \ge 4`$ | `O(n^k)` | $`6 - 1/k`$ |
+| `Exponential` | `O(2^n)` | 10 |
+| `Factorial` | `O(n!)` | 20 |
 | `Unknown` | `Unknown` | 1000 |
 
-`is_better_than` compares ordinals, so "take the worse complexity" (Section 3) is just an ordinal `max`. The ladder is what makes loop and recursion estimates comparable.
+Every finite polynomial rank is below `Exponential`, and equal growth forms
+compare equivalent. The ladder makes the loop and recursion estimates
+comparable without exposing a misleading integer ordinal as API.
 
 ![Complexity ladder from O(1) up to O(n!), with representative growth curves.](../diagrams/complexity-ladder.svg)
 
-*Figure — the `ComplexityClass` ladder ordered by `ordinal()`, cheapest at the bottom. Source: [`diagrams/complexity-ladder.dot`](../diagrams/complexity-ladder.dot).*
+*Figure — the `ComplexityClass` ladder ordered by asymptotic growth. Source:
+[`diagrams/complexity-ladder.dot`](../diagrams/complexity-ladder.dot).*
 
-> **Honesty — the analyzer never emits `Factorial`.** `O(n!)` is a rung on the ladder (`ordinal() = 200`, `as_str() = "O(n!)"`) but the shipped `ComplexityAnalyzer` has **no path that produces it**: non‑divide‑and‑conquer recursion is capped at `Exponential` regardless of how many recursive calls it makes (see Section 3's table). So `Factorial` can appear in a hand‑constructed `ComplexityEstimate`, but *estimation from code tops out at `Exponential`*. Treat the ladder's top rung as reserved, not reachable, when reading analyzer output. Likewise, a `Polynomial(k)` for $`k \ge 4`$ arises only from loop nesting of depth $`\ge 4`$.
+> **Honesty — the analyzer never emits `Factorial`.** `O(n!)` is a rung on the
+> public ladder, but both time estimators cap non-divide-and-conquer recursion
+> at `Exponential`. `Factorial` can appear in a caller-constructed
+> `ComplexityEstimate`; it cannot appear from `ComplexityAnalyzer`.
 
 ### Worked examples
 
@@ -146,7 +235,7 @@ Merge sort is the canonical case: $`a = 2`$ subproblems, each of size $`n/2`$ ($
 
 ---
 
-## 6. Algorithm families as structural signatures
+## 7. Algorithm families as structural signatures
 
 Beyond cost, `libcpg` names an [algorithm family](../GLOSSARY.md#algorithm-family) from a *structural signature* — a combination of control‑flow shape and telltale operations. `AlgorithmFamily` enumerates **14** categories, each with a `typical_complexity()` string:
 
@@ -183,12 +272,23 @@ The **five implemented** detectors recognise their families by these signatures:
 
 ---
 
-## 7. Where this sits
+## 8. Where this sits
 
-Complexity and family analysis reuse the control‑flow theory of [file 02](02-control-flow-and-complexity.md) (loops, [cyclomatic complexity](../GLOSSARY.md#cyclomatic-complexity)) and the traversal API of [file 01](01-code-property-graphs.md), and they run per function like the [PDG‑based slicing](04-program-dependence-and-slicing.md) of file 04. Where [pattern detection](07-design-pattern-detection.md) recognises *design* structure, this pillar recognises *algorithmic* structure — both by shape, both heuristic, both advisory. The runnable API and further worked examples live in [`components/algorithms/complexity.md`](../components/algorithms/complexity.md) and [`components/algorithms/families.md`](../components/algorithms/families.md).
+Complexity and family analysis reuse the control-flow theory of [file
+02](02-control-flow-and-complexity.md), the CPG traversal of [file
+01](01-code-property-graphs.md), and the natural-loop/DFG evidence documented in
+the graph components. McCabe's cyclomatic complexity counts linearly
+independent CFG paths [[2]](#references); it is exact for the modeled CFG but is
+not an input-size Big-O estimate. The evidence-aware analyzer instead composes
+validated loop depth and trip evidence, while family labels remain heuristic.
+The runnable API lives in
+[`components/algorithms/complexity.md`](../components/algorithms/complexity.md).
 
 ---
 
 ## References
 
 1. Cormen, Leiserson, Rivest, Stein (2009). *Introduction to Algorithms* (3rd ed.). MIT Press. ISBN 978-0262033848 (no DOI). *(Master Theorem.)*
+2. McCabe, T. J. (1976). *A Complexity Measure.* IEEE Transactions on Software
+   Engineering SE-2(4), 308–320. DOI:
+   [10.1109/TSE.1976.233837](https://doi.org/10.1109/TSE.1976.233837)

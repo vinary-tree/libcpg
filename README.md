@@ -60,7 +60,9 @@ PDG). A query can therefore mix syntax, control flow, and data flow freely.
   graph similarity (Jaccard, cosine, Weisfeiler-Lehman, graph-edit).
 - **Design-pattern detection** (23 Gang-of-Four patterns) and **algorithm /
   complexity analysis**, behind the `design-patterns` and `algorithm-detection`
-  features.
+  features. The default algorithm detector grounds loop cost in validated CFG
+  nesting and DFG-backed induction/bound evidence, with an exact AST-heuristic
+  fallback when those overlays are absent.
 - Optional **GNN** embeddings (`gnn`) and **serde** serialization (`serde`).
 - **F1R3FLY.io languages** — **Rholang** and **MeTTa** are supported through
   Mode B (`build_from_tree`); their node mappers are implemented (features

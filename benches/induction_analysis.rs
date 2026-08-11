@@ -7,6 +7,9 @@ use libcpg::{
     LoopForest, MethodSignature, NodeId, ScopeId, SourceRange, TripEvidence, Visibility,
 };
 
+#[cfg(feature = "algorithm-detection")]
+use libcpg::algorithms::{detection::ComplexityAnalyzer, ComplexityClass};
+
 struct Fixture {
     cpg: CodePropertyGraph,
     function: NodeId,
@@ -321,5 +324,65 @@ fn benchmark_induction_analysis(c: &mut Criterion) {
     group.finish();
 }
 
+#[cfg(feature = "algorithm-detection")]
+fn benchmark_complexity_evidence(c: &mut Criterion) {
+    let cases = [
+        (64usize, counted_loop(64)),
+        (512, counted_loop(512)),
+        (2_048, counted_loop(2_048)),
+    ];
+    let analyzer = ComplexityAnalyzer::new();
+    let mut group = c.benchmark_group("complexity_evidence");
+    group.sample_size(20);
+    group.warm_up_time(Duration::from_secs(1));
+    group.measurement_time(Duration::from_secs(3));
+
+    for (size, fixture) in cases {
+        let before = (fixture.cpg.node_count(), fixture.cpg.edge_count());
+        let expected =
+            analyzer.estimate_time_complexity_with_evidence(&fixture.cpg, fixture.function);
+        assert_eq!(expected.class, ComplexityClass::Linear);
+        assert_eq!(expected.confidence, 1.0);
+        assert!(expected.justification.contains("counted IV i"));
+        assert!(expected
+            .justification
+            .contains(&format!("{:?}", fixture.forest.loops[0].header)));
+        assert!(expected
+            .justification
+            .contains(&format!("{:?}", fixture.comparison)));
+        assert!(expected
+            .justification
+            .contains(&format!("{:?}", fixture.bound_use)));
+        assert_eq!(
+            (fixture.cpg.node_count(), fixture.cpg.edge_count()),
+            before,
+            "complexity evidence is out-of-graph"
+        );
+
+        group.throughput(Throughput::Elements(fixture.cpg.node_count() as u64));
+        group.bench_with_input(
+            BenchmarkId::new("single_counted_loop", size),
+            &fixture,
+            |benchmark, fixture| {
+                benchmark.iter(|| {
+                    black_box(analyzer.estimate_time_complexity_with_evidence(
+                        black_box(&fixture.cpg),
+                        black_box(fixture.function),
+                    ))
+                });
+            },
+        );
+    }
+
+    group.finish();
+}
+
+#[cfg(feature = "algorithm-detection")]
+criterion_group!(
+    benches,
+    benchmark_induction_analysis,
+    benchmark_complexity_evidence
+);
+#[cfg(not(feature = "algorithm-detection"))]
 criterion_group!(benches, benchmark_induction_analysis);
 criterion_main!(benches);

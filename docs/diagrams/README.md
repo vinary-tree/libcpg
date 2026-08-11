@@ -1,6 +1,6 @@
 # Diagram catalog
 
-Every figure in the `libcpg` documentation is a **committed source** (`.puml` for PlantUML, `.dot` for Graphviz) rendered to a **committed `.svg`** that the Markdown pages embed. Sources are version-controlled so figures are reproducible and reviewable; SVGs are committed so they render on GitHub (which does not render PlantUML/Graphviz inline). This directory holds all 60 figures plus the shared theme.
+Every figure in the `libcpg` documentation is a **committed source** (`.puml` for PlantUML, `.dot` for Graphviz) rendered to a **committed `.svg`** that the Markdown pages embed. Sources are version-controlled so figures are reproducible and reviewable; SVGs are committed so they render on GitHub (which does not render PlantUML/Graphviz inline). This directory holds all 61 figures plus the shared theme.
 
 ## Conventions
 
@@ -101,6 +101,7 @@ Grouped by subject. Each row: the source (its `.svg` sibling is embedded by the 
 | `algorithm-family-taxonomy.puml` | mindmap | `AlgorithmFamily` heuristic detectors | components/algorithms/families |
 | `complexity-ladder.dot` | graph | `ComplexityClass` ordering with Big-O | theory/08, api/pattern-reference, components/algorithms/complexity |
 | `complexity-heuristics.puml` | activity | Structure → complexity class (Master Theorem) | theory/08, components/algorithms/complexity |
+| `complexity-evidence.puml` | activity/evidence flow | Validated CFG/DFG loop evidence, confidence policy, recursion composition, and exact legacy fallback | theory/08, components/algorithms/complexity, scientific/08 |
 
 ### Graph neural network
 | Source | Type | Depicts | Embedded by |

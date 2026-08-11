@@ -39,8 +39,10 @@ executable/dead CFG edges, and value-sensitive reachability refinement),
 bounded narrowing, and immutable block-entry ranges),
 **loop-induction analysis** (DFG-backed invariants, additive/affine induction
 variables, conservative hoist candidates, and counted-trip evidence),
-**algorithm detection** (from control-flow structure),
-**code-clone detection** (graph similarity), and **complexity analysis**.
+**algorithm detection** (from control-flow structure), **evidence-aware
+complexity analysis** (validated loop depth plus DFG-backed IV/bound evidence,
+with exact AST fallback), **code-clone detection** (graph similarity), and
+**graph-neural-network embeddings**.
 
 ## Quick start
 
@@ -100,7 +102,7 @@ let slice = backward_slice(&cpg, func, 256);         // bounded backward slice
 [Overview](architecture/overview.md) · [Graph data model](architecture/graph-data-model.md) · [Construction & analysis data flow](architecture/data-flow.md) · [Language frontends](architecture/language-frontends.md)
 
 ### Design decisions (ADRs)
-[Overview](design/00-overview.md) · [0001 Unified overlay graph](design/0001-unified-overlay-graph.md) · [0002 Mode B: build_from_tree](design/0002-mode-b-build-from-tree.md) · [0003 AST-ordered reaching definitions](design/0003-ast-ordered-reaching-defs.md) · [0004 Relaxed VF2 detection](design/0004-relaxed-vf2-detection.md) · [0005 Feature-flag taxonomy](design/0005-feature-flag-taxonomy.md) · [0006 Evidence-bounded call resolution](design/0006-evidence-bounded-call-resolution.md) · [0007 Dominator-based natural-loop forest](design/0007-dominator-natural-loop-forest.md) · [0008 Id-preserving basic-block CFG](design/0008-id-preserving-basic-block-cfg.md) · [0009 Deterministic monotone data flow](design/0009-deterministic-monotone-dataflow.md) · [0010 Dual-worklist SCCP](design/0010-dual-worklist-sccp.md) · [0011 Loop-header interval widening](design/0011-loop-header-interval-widening.md) · [0012 DFG-backed loop induction](design/0012-dfg-backed-loop-induction-evidence.md)
+[Overview](design/00-overview.md) · [0001 Unified overlay graph](design/0001-unified-overlay-graph.md) · [0002 Mode B: build_from_tree](design/0002-mode-b-build-from-tree.md) · [0003 AST-ordered reaching definitions](design/0003-ast-ordered-reaching-defs.md) · [0004 Relaxed VF2 detection](design/0004-relaxed-vf2-detection.md) · [0005 Feature-flag taxonomy](design/0005-feature-flag-taxonomy.md) · [0006 Evidence-bounded call resolution](design/0006-evidence-bounded-call-resolution.md) · [0007 Dominator-based natural-loop forest](design/0007-dominator-natural-loop-forest.md) · [0008 Id-preserving basic-block CFG](design/0008-id-preserving-basic-block-cfg.md) · [0009 Deterministic monotone data flow](design/0009-deterministic-monotone-dataflow.md) · [0010 Dual-worklist SCCP](design/0010-dual-worklist-sccp.md) · [0011 Loop-header interval widening](design/0011-loop-header-interval-widening.md) · [0012 DFG-backed loop induction](design/0012-dfg-backed-loop-induction-evidence.md) · [0013 Evidence-bounded complexity](design/0013-evidence-bounded-complexity-estimates.md)
 
 ### API reference
 [Graph / analysis reference](api/graph-reference.md) · [Builder reference](api/builder-reference.md) · [Pattern / algorithm / GNN reference](api/pattern-reference.md)
@@ -129,7 +131,7 @@ let slice = backward_slice(&cpg, func, 256);         // bounded backward slice
 [Overview](engineering/00-overview.md) · [Build & features](engineering/01-build-and-features.md) · [Testing](engineering/02-testing.md) · [Performance](engineering/03-performance.md) · [Contributing](engineering/04-contributing.md)
 
 ### Scientific validation
-[Overview](scientific/00-overview.md) · [CPG invariants & equivalence](scientific/01-cpg-invariants-and-equivalence.md) · [Reaching-defs validation](scientific/02-reaching-defs-validation.md) · [VF2 completeness](scientific/03-vf2-completeness.md) · [Measurement methodology](scientific/04-measurement-methodology.md) · [SCCP validation](scientific/05-sccp-validation.md) · [Interval validation](scientific/06-interval-analysis-validation.md)
+[Overview](scientific/00-overview.md) · [CPG invariants & equivalence](scientific/01-cpg-invariants-and-equivalence.md) · [Reaching-defs validation](scientific/02-reaching-defs-validation.md) · [VF2 completeness](scientific/03-vf2-completeness.md) · [Measurement methodology](scientific/04-measurement-methodology.md) · [SCCP validation](scientific/05-sccp-validation.md) · [Interval validation](scientific/06-interval-analysis-validation.md) · [Loop-induction validation](scientific/07-induction-analysis-validation.md) · [Complexity-evidence validation](scientific/08-complexity-evidence-validation.md)
 
 ### Security
 [Threat model](security/00-threat-model.md) · [Input & resource hardening](security/01-input-and-resource-hardening.md)
