@@ -435,6 +435,27 @@ propagation](../components/graph/sccp-analysis.md) for transfer semantics,
 checked arithmetic, the dual-worklist algorithm, complexity, validation, and
 limitations.
 
+### Interval value-range analysis
+
+The feature-free interval API computes sound integer ranges at reachable
+basic-block entries:
+
+| API | Signature | Result |
+|---|---|---|
+| `value_ranges` | `fn(&CodePropertyGraph, NodeId) -> Result<IntervalReport, AnalysisError>` | Canonical variable-name intervals keyed by block leader. |
+| `IntervalReport::interval_at` | `fn(&self, NodeId, &str) -> Option<Interval>` | One named range at one reported block entry. |
+
+`Bound::{NegInf, Finite(i128), PosInf}` defines extended endpoints.
+`Interval` exposes checked construction, top, singleton, hull, meet, widening,
+narrowing, subset, and membership operations. `IntervalEnv` is a sorted
+pointwise `Lattice` over stable variable ids. The built-in analysis refines
+integer comparison edges, widens only at `LoopForest` headers after three
+visits, performs two bounded narrowing sweeps, and enforces a 64-visit cap.
+
+See [Interval value-range
+analysis](../components/graph/interval-analysis.md) for the domain equations,
+transfer table, literate algorithm, examples, validation, and semantic limits.
+
 ### Subgraph extraction
 
 | Method | Signature | Notes |

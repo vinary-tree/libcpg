@@ -318,6 +318,33 @@ algorithm, checked operator semantics, and reachability composition are in the
 [SCCP component guide](../components/graph/sccp-analysis.md) and
 [ADR-0010](../design/0010-dual-worklist-sccp.md).
 
+## 7. Interval abstract interpretation
+
+SCCP proves exact scalar singletons, but many safety and optimization questions
+need non-singleton bounds. Interval analysis maps each integer variable to a
+closed abstract value $`[a,b]`$ that contains every modeled concrete value.
+Path confluence takes the convex hull:
+
+```math
+[a,b] \sqcup [c,d] = [\min(a,c),\max(b,d)].
+```
+
+The interval lattice has infinite height, so ordinary Kleene iteration need
+not terminate on a loop. Cousot–Cousot widening [[4]](#references) replaces an
+outward-moving endpoint with infinity at a loop header; bounded narrowing then
+descends toward a more precise post-fixpoint. libcpg instantiates the production
+`solve` framework with this domain, applying widening only at `LoopForest`
+headers and retaining a 64-visit hard cap.
+
+Typed edge transfer supplies path sensitivity. For example, the true edge of
+`x < k` meets the current range with $`[-\infty,k-1]`$, while the false edge
+meets it with $`[k,+\infty]`$. Integer literals and constant additions or
+subtractions transfer precisely; operations whose language-independent
+semantics are not represented become top. See the [interval component
+guide](../components/graph/interval-analysis.md),
+[ADR-0011](../design/0011-loop-header-interval-widening.md), and the [scientific
+validation](../scientific/06-interval-analysis-validation.md).
+
 ## Cross-references
 
 - The DFG edge alphabet (13 `DfgEdgeKind` variants): [Theory 01](01-code-property-graphs.md)
@@ -333,6 +360,9 @@ algorithm, checked operator semantics, and reachability composition are in the
   non-flow, shadowing, idempotency): [`scientific/02-reaching-defs-validation.md`](../scientific/02-reaching-defs-validation.md).
 - Concrete-execution, lattice-law, path-partition, and parser-backed SCCP
   validation: [`scientific/05-sccp-validation.md`](../scientific/05-sccp-validation.md).
+- Concrete-execution, widening, narrowing, determinism, parser, and
+  cross-analysis interval validation:
+  [`scientific/06-interval-analysis-validation.md`](../scientific/06-interval-analysis-validation.md).
 
 ## References
 

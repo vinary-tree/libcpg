@@ -22,12 +22,13 @@ think to write down.
 
 | Kind | Count | Where |
 | --- | ---: | --- |
-| Maximal-matrix library tests | 595 | inline `#[cfg(test)] mod …` next to the code; includes examples and properties |
+| Maximal-matrix library tests | 613 | inline `#[cfg(test)] mod …` next to the code; includes examples and properties |
 | Public-API integration tests | 21 | `tests/integration.rs` |
 | Malformed-input robustness tests | 5 | `tests/robustness.rs` |
 | SCCP public/parser integration tests | 3 | `tests/sccp_integration.rs` |
-| **Executable test cases** | **624** | excludes three ignored rustdoc examples |
-| `proptest!` blocks (subset of the library/robustness rows) | 41 | inline property and regression modules |
+| Interval public/parser integration tests | 3 | `tests/intervals_integration.rs` |
+| **Executable test cases** | **645** | excludes three ignored rustdoc examples |
+| `proptest!` blocks (subset of the library/robustness rows) | 46 | inline property and regression modules |
 
 The maximal-matrix library count is up from **99** inline tests and **zero**
 property tests before this work.
@@ -44,12 +45,13 @@ on the features enabled:
 
 | Command | Lib tests | Notes |
 | --- | ---: | --- |
-| `cargo test` | 304 | `default = []`: the feature-free surface only |
-| `cargo test --features "full rholang metta"` | 595 | the maximal matrix, including the Mode-B mappers |
+| `cargo test` | 322 | `default = []`: the feature-free surface only |
+| `cargo test --features "full rholang metta"` | 613 | the maximal matrix, including the Mode-B mappers |
 
-The feature-free 304 exercise the graph model, exact dominator/post-dominator,
+The feature-free 322 exercise the graph model, exact dominator/post-dominator,
 natural-loop, monotone data-flow, variable-liveness/dead-store,
-available/very-busy-expression, and CFG/call-graph SCC analyses, the
+available/very-busy-expression, SCCP, interval value-range, and CFG/call-graph
+SCC analyses, the
 CFG/DFG/PDG extractors, VF2, and similarity by building CPGs
 **by hand** — no grammar required. This is what
 the [`arb_well_formed_cpg`](#the-generators) generator exists for.
@@ -254,10 +256,10 @@ cargo +nightly cov-branch           # branch coverage needs nightly
 
 | Metric | Coverage | Lowest file |
 | --- | ---: | --- |
-| Lines | **97.89 %** | 91.67 % (`language.rs`) |
-| Regions | **97.83 %** | — |
-| Functions | **98.02 %** | — |
-| Branches | **83.68 %** | see below |
+| Lines | **97.96 %** | 91.67 % (`language.rs`) |
+| Regions | **97.89 %** | — |
+| Functions | **98.10 %** | — |
+| Branches | **84.11 %** | see below |
 
 Every source file is above 90 % line coverage; seventeen are at 100 %.
 The `analysis/dominators.rs` module measures **97.50 %** line and
@@ -284,6 +286,11 @@ The new `analysis/dataflow/sccp.rs` module measures **98.58 %** line,
 the epic's 90 % / 80 % thresholds. Its concrete interpreter, lattice laws,
 parser integration, endpoint filtering, and malformed-graph cases are catalogued in
 [`scientific/05-sccp-validation.md`](../scientific/05-sccp-validation.md).
+The new `analysis/dataflow/intervals.rs` module measures **99.38 %** line,
+**99.04 %** region, **100 %** function, and **93.24 %** branch coverage, clearing
+the same thresholds. Its independent concrete interpreters, algebraic laws,
+loop-convergence checks, SCCP cross-check, and parser experiment are catalogued
+in [`scientific/06-interval-analysis-validation.md`](../scientific/06-interval-analysis-validation.md).
 All figures come from clean maximal-matrix coverage runs; no focused-test
 figure is substituted for the repository gate.
 

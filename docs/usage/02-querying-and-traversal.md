@@ -159,6 +159,32 @@ external values, and conflicting executable definitions remain unproven rather
 than guessed. See the [SCCP component guide](../components/graph/sccp-analysis.md)
 for the full lattice and edge semantics.
 
+### Querying integer value ranges
+
+`value_ranges` uses the same feature-free graph substrate but answers
+non-singleton bound questions at basic-block entries:
+
+```rust
+use libcpg::{value_ranges, CodePropertyGraph, NodeId};
+
+fn integer_bounds(cpg: &CodePropertyGraph, function: NodeId) -> libcpg::Result<()> {
+    let report = value_ranges(cpg, function)?;
+    for (leader, variables) in &report.at_block_entry {
+        println!("entry {leader:?}: {variables:?}");
+    }
+    Ok(())
+}
+```
+
+For identifier/literal comparisons, true and false edges refine the variable
+to the matching half-line. Integer literal assignments and constant `+`/`-`
+shifts remain precise; unsupported right-hand sides become the top interval.
+Loop headers use widening and bounded narrowing, so callers receive a result or
+an explicit iteration error rather than an unbounded computation. Reports are
+immutable evidence, not source rewrites. See the [interval component
+guide](../components/graph/interval-analysis.md) for the complete domain and
+transfer contract.
+
 ---
 
 ## Call-graph traversal

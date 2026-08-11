@@ -279,6 +279,8 @@ So the safe pattern is: build (single-threaded, `&mut`), then analyse
   forward/backward Must states and dominance-backed advisory CSE/PRE evidence.
 - [Sparse conditional constant propagation](sccp-analysis.md) — coupled
   executable-edge and scalar-constant evidence with reachability refinement.
+- [Interval value ranges](interval-analysis.md) — forward integer abstract
+  interpretation with branch meets, loop-header widening, and narrowing.
 - [Dominators and post-dominators](dominator-analysis.md) — immediate
   dominators, frontiers, constant-time ancestry, and PDG control dependence.
 - [Strongly-connected components](scc-analysis.md) — exact CFG loops and

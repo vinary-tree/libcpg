@@ -8,6 +8,15 @@ Mathematical expressions use GitHub math spans: inline as ``$`…`$`` and displa
 
 ---
 
+### Abstract interpretation
+
+A static-analysis method that executes a program over an **abstract domain**
+whose elements summarize sets of concrete states. Sound transfer functions
+over-approximate every concrete behavior; joins combine paths, while widening
+and narrowing control convergence on infinite-height domains. libcpg's interval
+value-range analysis follows Cousot and Cousot [[20]](#references). See
+[`components/graph/interval-analysis.md`](components/graph/interval-analysis.md).
+
 ### Abstract Syntax Tree (AST)
 
 The tree that a parser produces from source code: interior nodes are language constructs (functions, `if`, expressions) and children are their syntactic parts. In `libcpg` the AST is the **base layer** of the [Code Property Graph](#code-property-graph-cpg) — every other layer overlays edges on the *same* AST nodes. AST edges are `AstChild` / `AstParent` / `AstNextSibling` / `AstPrevSibling`. See [`architecture/graph-data-model.md`](architecture/graph-data-model.md).
@@ -226,6 +235,14 @@ control enters at multiple nodes. `libcpg` detects non-dominating DFS retreating
 edges and reports the whole cyclic SCC with `NaturalLoop::irreducible = true`,
 making the conservative approximation explicit (Havlak [[17]](#references)).
 
+### Interval / Value range
+
+A non-empty closed set $`[lo,hi]`$ over extended integer bounds. `Bound` adds
+negative and positive infinity to finite `i128` endpoints; `IntervalEnv` maps
+stable variable ids to intervals, joins paths by convex hull, widens outward
+loop movement to infinity, and narrows afterward. See
+[`components/graph/interval-analysis.md`](components/graph/interval-analysis.md).
+
 ### Jaccard similarity
 
 The size of the intersection over the size of the union of two sets:
@@ -399,7 +416,9 @@ Abstract-interpretation convergence operators introduced by Cousot and Cousot
 [[20]](#references). **Widening** accelerates an ascending chain to a safe
 post-fixpoint; **narrowing** descends from it toward a more precise state.
 `solve` widens only at `LoopForest` headers and bounds narrowing by configured
-passes. See the [data-flow framework guide](components/graph/dataflow-framework.md#solver-and-convergence).
+passes. `value_ranges` is the built-in infinite-height instance. See the
+[data-flow framework guide](components/graph/dataflow-framework.md#solver-and-convergence)
+and [interval guide](components/graph/interval-analysis.md).
 
 ### Master Theorem
 
@@ -437,3 +456,4 @@ used by the complexity analyzer to classify recursive functions (e.g. $`a = b = 
 20. Cousot, P., Cousot, R. (1977). *Abstract Interpretation: A Unified Lattice Model for Static Analysis of Programs by Construction or Approximation of Fixpoints.* POPL '77, 238–252. DOI: [10.1145/512950.512973](https://doi.org/10.1145/512950.512973)
 21. Morel, E., Renvoise, C. (1979). *Global Optimization by Suppression of Partial Redundancies.* Communications of the ACM 22(2), 96–103. DOI: [10.1145/359060.359069](https://doi.org/10.1145/359060.359069)
 22. Wegman, M. N., Zadeck, F. K. (1991). *Constant Propagation with Conditional Branches.* ACM Transactions on Programming Languages and Systems 13(2), 181–210. DOI: [10.1145/103135.103136](https://doi.org/10.1145/103135.103136)
+23. Miné, A. (2006). *The Octagon Abstract Domain.* Higher-Order and Symbolic Computation 19, 31–100. DOI: [10.1007/s10990-006-8609-1](https://doi.org/10.1007/s10990-006-8609-1)

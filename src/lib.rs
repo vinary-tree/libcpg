@@ -12,6 +12,7 @@
 //! - **Basic-block CFGs**: Group reachable CFG nodes without losing CPG ids
 //! - **Monotone Data Flow**: Solve forward/backward analyses over block CFGs
 //! - **Sparse Constant Propagation**: Prove scalar constants and executable CFG edges
+//! - **Interval Value Ranges**: Bound integers with widening and narrowing
 //! - **Graph Projections**: Build deterministic forward/reverse CSR views
 //! - **Pattern Detection**: Detect design patterns using subgraph isomorphism (VF2/VF3)
 //! - **Algorithm Analysis**: Extract algorithm signatures and estimate complexity
@@ -73,16 +74,17 @@ pub use analysis::{
     available_expressions, block_cfg, build_symbol_table, call_graph_projection, call_graph_sccs,
     cfg_projection, control_flow_sccs, dead_stores, dfg_projection, dominator_tree,
     expression_facts, liveness, loop_forest, module_graph_projection, pdg_projection,
-    post_dominator_tree, projection_of, resolve_calls, sccp, solve, unreachable_code,
+    post_dominator_tree, projection_of, resolve_calls, sccp, solve, unreachable_code, value_ranges,
     variable_facts, very_busy_expressions, AnalysisError, AvailableExpressions, BasicBlock,
-    BitSetDomain, BlockCfg, BlockEdge, BlockId, CallGraphResolution, CallResolution, Confidence,
-    Confluence, ConstLattice, ConstValue, DataflowAnalysis, DataflowSolution, DeadBranch,
-    DeadStore, DeadStoreReport, Direction, DominatorTree, ExprFacts, ExprKey, ExprOperand,
-    FactUniverse, GraphProjection, Lattice, LivenessResult, LoopExitEdge, LoopForest, MustBits,
-    NaturalLoop, PostDominatorTree, ProjectionError, ProjectionKind, ReachabilityReport,
-    ResolveConfig, SccAnalysisError, SccComponent, SccCondensationEdge, SccDecomposition,
-    SccProjection, SccpResult, SolverConfig, SymbolCandidates, SymbolTable, UndirectedProjection,
-    VarFacts, VariableDefinition, VeryBusyExpressions,
+    BitSetDomain, BlockCfg, BlockEdge, BlockId, Bound, CallGraphResolution, CallResolution,
+    Confidence, Confluence, ConstLattice, ConstValue, DataflowAnalysis, DataflowSolution,
+    DeadBranch, DeadStore, DeadStoreReport, Direction, DominatorTree, ExprFacts, ExprKey,
+    ExprOperand, FactUniverse, GraphProjection, Interval, IntervalEnv, IntervalReport, Lattice,
+    LivenessResult, LoopExitEdge, LoopForest, MustBits, NaturalLoop, PostDominatorTree,
+    ProjectionError, ProjectionKind, ReachabilityReport, ResolveConfig, SccAnalysisError,
+    SccComponent, SccCondensationEdge, SccDecomposition, SccProjection, SccpResult, SolverConfig,
+    SymbolCandidates, SymbolTable, UndirectedProjection, VarFacts, VariableDefinition,
+    VeryBusyExpressions,
 };
 
 pub use builder::{

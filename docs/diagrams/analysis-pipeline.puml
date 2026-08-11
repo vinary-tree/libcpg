@@ -9,6 +9,7 @@ fork
   + liveness / dead_stores
   + available / very-busy expressions
   + SCCP constants / executable edges
+  + interval value ranges / widening
   + dominator_tree / post_dominator_tree
   + loop_forest
   + unreachable_code
@@ -31,7 +32,7 @@ end fork
 stop
 legend right
   |= colour |= analysis (module) |
-  |<#C3FAE8>| structural — blocks / data flow / liveness / expressions / SCCP / reachability / dominance / loops / SCCs |
+  |<#C3FAE8>| structural — blocks / data flow / liveness / expressions / SCCP / intervals / reachability / dominance / loops / SCCs |
   |<#E5DBFF>| PDG — program slicing |
   |<#FFE3E3>| VF2 — subgraph iso / GoF |
   |<#FFF3BF>| algorithm + complexity |

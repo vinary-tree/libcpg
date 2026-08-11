@@ -6,6 +6,7 @@
 
 mod expressions;
 mod facts;
+mod intervals;
 mod liveness;
 mod sccp;
 
@@ -25,6 +26,7 @@ pub use facts::{
     expression_facts, variable_facts, ExprFacts, ExprKey, ExprOperand, FactUniverse, VarFacts,
     VariableDefinition,
 };
+pub use intervals::{value_ranges, Bound, Interval, IntervalEnv, IntervalReport};
 pub use liveness::{dead_stores, liveness, DeadStore, DeadStoreReport, LivenessResult};
 pub use sccp::{sccp, ConstLattice, ConstValue, SccpResult};
 

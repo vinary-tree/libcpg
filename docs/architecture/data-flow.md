@@ -3,7 +3,7 @@
 This page traces how information moves through libcpg in two phases:
 
 1. the **construction pipeline** — source text becomes a [Code Property Graph](../GLOSSARY.md#code-property-graph-cpg) (Yamaguchi et al. [[1]](#references)) with AST, [CFG](../GLOSSARY.md#control-flow-graph-cfg), and [DFG](../GLOSSARY.md#data-flow-graph-dfg) overlays; and
-2. the **analysis pipeline** — a constructed CPG is queried by exact [dominator/post-dominator](../components/graph/dominator-analysis.md), [natural-loop](../components/graph/loop-analysis.md), [liveness](../components/graph/liveness-analysis.md), [available/very-busy expression](../components/graph/expression-analysis.md), and [SCC](../GLOSSARY.md#strongly-connected-component-scc) analyses, the [PDG](../GLOSSARY.md#program-dependence-graph-pdg)/slicer, the [VF2](../GLOSSARY.md#vf2) and [GoF](../GLOSSARY.md#gang-of-four-gof) detectors, the algorithm/complexity heuristics, and the [GNN](../GLOSSARY.md#graph-neural-network-gnn).
+2. the **analysis pipeline** — a constructed CPG is queried by exact [dominator/post-dominator](../components/graph/dominator-analysis.md), [natural-loop](../components/graph/loop-analysis.md), [liveness](../components/graph/liveness-analysis.md), [available/very-busy expression](../components/graph/expression-analysis.md), [SCCP](../components/graph/sccp-analysis.md), [interval value-range](../components/graph/interval-analysis.md), and [SCC](../GLOSSARY.md#strongly-connected-component-scc) analyses, the [PDG](../GLOSSARY.md#program-dependence-graph-pdg)/slicer, the [VF2](../GLOSSARY.md#vf2) and [GoF](../GLOSSARY.md#gang-of-four-gof) detectors, the algorithm/complexity heuristics, and the [GNN](../GLOSSARY.md#graph-neural-network-gnn).
 
 "Data flow" here means both the program's own data-flow overlay *and* the flow of data through libcpg's stages. This is a rewrite of an earlier draft that invented `BranchTrue`/`UseUse`/`Phi` edge kinds, an SSA-based DFG, a parse/embedding cache, and a bincode format — none of which exist. The real edge model is [`CpgEdgeKind::ControlFlow(CfgEdgeKind)`](../GLOSSARY.md#control-flow-graph-cfg) / [`DataFlow(DfgEdgeKind)`](../GLOSSARY.md#data-flow-graph-dfg), the DFG is [AST-ordered reaching definitions](../GLOSSARY.md#ast-ordered-reaching-definitions), and persistence is plain derive-based serde.
 
@@ -211,6 +211,13 @@ nodes; `ReachabilityReport::refine_with_sccp` composes those value proofs with
 the structural partition. Both APIs are deterministic, feature-free, and
 read-only. See [sparse conditional constant
 propagation](../components/graph/sccp-analysis.md).
+
+The `value_ranges(&cpg, function)` instance propagates sorted integer interval
+environments forward. Typed comparison edges intersect one variable with a
+half-line; loop headers widen after three visits, and two descending sweeps
+recover finite bounds. The immutable `IntervalReport` is keyed by basic-block
+leader. See [interval value-range
+analysis](../components/graph/interval-analysis.md).
 
 ### Strongly-connected components (feature-free)
 

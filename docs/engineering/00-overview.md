@@ -69,7 +69,7 @@ directly from that relationship, and both are visible in `Cargo.toml`:
 | Page | What it covers |
 | --- | --- |
 | [01 — Build and features](01-build-and-features.md) | The full feature matrix: 16 `lang-*` grammars, the language groups, the analysis features, the Mode-B toggles, `serde`, the reserved `gpu` flag, and the `full` umbrella; the pgmcp grammar-pin table; how to enable a language. |
-| [02 — Testing](02-testing.md) | The 624-test suite: example-based and `proptest` coverage plus the `tests/integration.rs`, `tests/robustness.rs`, and `tests/sccp_integration.rs` public-API suites; the `arb_*` generators; how to run each feature subset; measured coverage (97.89 % lines, 83.68 % branches); the eighteen defects the suite found; and the active Criterion benchmark substrate. |
+| [02 — Testing](02-testing.md) | The 645-test suite: example-based and `proptest` coverage plus the general, robustness, SCCP, and interval public-API suites; the `arb_*` generators; how to run each feature subset; measured coverage (97.96 % lines, 84.11 % branches); the eighteen defects the suite found; and the active Criterion benchmark substrate. |
 | [03 — Performance](03-performance.md) | The data-structure rationale, asymptotic costs, four active oracle-guarded Criterion targets, controlled-measurement protocol, and explicit remaining benchmark gaps. |
 | [04 — Contributing](04-contributing.md) | Step-by-step recipes: add a language mapper, add a Gang-of-Four template, add a similarity metric; plus the coding conventions the crate follows. |
 

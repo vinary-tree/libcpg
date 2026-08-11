@@ -163,6 +163,15 @@ and PRE candidates as advisory; applying them without language-aware checks for
 volatile access, traps, floating-point state, or concurrency can compromise the
 semantic integrity of transformed code.
 
+The built-in [`value_ranges`](../components/graph/interval-analysis.md)
+instance uses a stricter fixed policy: at most 64 visits per block, widening
+after the third visit only at a `LoopForest` header, and exactly two narrowing
+sweeps. Unsupported expressions become top rather than triggering recursive or
+language-specific evaluation. A visited stack cuts malformed AST expression
+cycles, and an empty branch meet remains environment bottom. The report may
+still contain $`O(BV)`$ interval pairs for $`B`$ blocks and $`V`$ variables, so
+source/graph size remains the caller's memory boundary.
+
 ## SCCP: coupled event bound
 
 [`sccp`](../components/graph/sccp-analysis.md) maintains separate ordered
@@ -295,6 +304,7 @@ correctness**: an analysis may return a meaningless answer, but it must
 | `loop_forest` | the shared visited function scope, iterative dominator/SCC/DFS walks, iterative reverse-body closure, and iterative nesting walk avoid recursion; a 25,000-node natural loop is regression-tested |
 | `unreachable_code` | visited function-scope and dense CFG sets bound discovery; iterative DFS is stack-safe on a 25,000-node reachable/disconnected graph |
 | `block_cfg` / `solve` | iterative CFG traversal and work queues avoid native-stack growth; `solve` also caps extractions per block and ignores inconsistent public loop-header mappings |
+| `value_ranges` | expression visited stack, loop-header-only widening, 64 visits per block, and two bounded narrowing sweeps |
 | `build_symbol_table` / `resolve_calls` | visited sets cut parent and callee-subtree cycles; deterministic scope-depth, candidate-retention, and call-count caps bound configured work |
 | `CfgExtractor::process_node` (and every `process_*` handler) | a **path set** on `CfgContext` — a node already on the current recursion path becomes its own exit instead of being re-entered |
 | DFG reaching definitions (`visit_reaching`) | a **path set** — same rule |
@@ -322,10 +332,13 @@ over each one — see
 6. **Lower `SolverConfig::max_visits_per_block`** for untrusted graphs or
    third-party analysis domains, and enable widening only with a matching loop
    forest.
-7. **Deserialize only trusted graphs** (see the [threat model](00-threat-model.md)
+7. **Treat interval and SCCP results as conservative evidence**, validating
+   language-specific widths, overflow, effects, and concurrency before any
+   transformation.
+8. **Deserialize only trusted graphs** (see the [threat model](00-threat-model.md)
    and [`usage/05-serialization.md`](../usage/05-serialization.md)).
-8. **Treat detection output as advisory**, never as a security gate.
-9. **Validate graphs you did not build yourself** (deserialized or caller-assembled) if you need *meaningful* results — the traversal guards guarantee termination, not that the answer means anything.
+9. **Treat detection output as advisory**, never as a security gate.
+10. **Validate graphs you did not build yourself** (deserialized or caller-assembled) if you need *meaningful* results — the traversal guards guarantee termination, not that the answer means anything.
 
 ## Related pages
 

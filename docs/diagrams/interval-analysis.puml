@@ -1,0 +1,61 @@
+@startuml
+title Interval value-range analysis
+skinparam backgroundColor #FAFCFF
+skinparam shadowing false
+skinparam roundcorner 14
+skinparam ArrowColor #324A5F
+skinparam defaultFontColor #172A3A
+skinparam rectangle {
+  BorderColor #324A5F
+  FontColor #172A3A
+}
+
+rectangle "Immutable CPG\nsemantic AST + typed CFG" as CPG #D8ECFF
+
+package "Canonical feature-free views" #EEF6FF {
+  rectangle "BlockCfg\nblocks + typed edges" as CFG #B8DCFF
+  rectangle "VarFacts\nsorted dense variable ids" as VAR #CDECCF
+  rectangle "LoopForest\nheader eligibility" as LOOP #FFE1A8
+}
+
+package "Forward-May fixed point" #FFF8E8 {
+  rectangle "IntervalEnv\n<latex>\rho : Var \to [Bound,Bound]</latex>" as ENV #D9F2D9
+  rectangle "Block transfer\nliterals, identifiers, shifts, assignments" as BLOCK #C8E6C9
+  rectangle "Typed edge transfer\n<latex>\rho'(x)=\rho(x)\cap constraint</latex>" as EDGE #CDE7FF
+  rectangle "Decision: loop header and\nvisit threshold passed?" as WIDEN_DECISION #FFD580
+  rectangle "Widen\noutward endpoint to infinity" as WIDEN #FFB3A7
+  rectangle "Exact replace / hull join" as EXACT_STEP #E4D7FF
+  rectangle "64-visit hard cap" as CAP #F5B7B1
+}
+
+rectangle "Two descending sweeps\naccept only <latex>candidate \sqsubseteq widened</latex>" as NARROW #DCC8FF
+rectangle "IntervalReport\nleader -> sorted (name, interval)" as REPORT #A8E6CF
+
+CPG --> CFG : project reachable flow
+CPG --> VAR : derive definitions
+CPG --> LOOP : analyze cycles
+CFG --> ENV : reverse-postorder worklist
+VAR --> ENV : boundary = all top
+ENV --> EDGE : predecessor output
+EDGE --> BLOCK : refined input
+BLOCK --> WIDEN_DECISION : candidate output
+LOOP --> WIDEN_DECISION : header set
+WIDEN_DECISION --> WIDEN : yes
+WIDEN_DECISION --> EXACT_STEP : no
+WIDEN --> CAP
+EXACT_STEP --> CAP
+CAP --> ENV : changed -> schedule successors
+CAP --> NARROW : widened fixed point
+NARROW --> REPORT : immutable canonical evidence
+
+legend right
+  | Color | Meaning |
+  |<#D8ECFF>| source graph evidence |
+  |<#CDECCF>| variable facts |
+  |<#FFE1A8>| loop/header evidence |
+  |<#D9F2D9>| interval environment |
+  |<#FFB3A7>| convergence acceleration |
+  |<#DCC8FF>| precision recovery |
+  |<#A8E6CF>| out-of-graph result |
+endlegend
+@enduml

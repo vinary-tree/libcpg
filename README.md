@@ -44,6 +44,9 @@ PDG). A query can therefore mix syntax, control flow, and data flow freely.
 - **Sparse conditional constant propagation** — coupled executable-edge and
   value-cell fixed points, checked scalar folding, and proof-backed reachability
   refinement.
+- **Interval value ranges** — forward abstract interpretation with comparison
+  refinement, loop-header widening, bounded narrowing, and canonical immutable
+  block-entry reports.
 - **DFG extraction** — intraprocedural, AST-ordered reaching definitions
   (Kildall 1973) and def-use chains (13 `DfgEdgeKind` variants).
 - **PDG + program slicing** — control-dependence edges via the reverse dominance
@@ -136,3 +139,4 @@ Licensed under either of [Apache License, Version 2.0](LICENSE-APACHE) or
 - Cordella, L. P., et al. (2004). *A (Sub)graph Isomorphism Algorithm for Matching Large Graphs.* IEEE TPAMI. DOI: [10.1109/TPAMI.2004.75](https://doi.org/10.1109/TPAMI.2004.75)
 - Kildall, G. A. (1973). *A Unified Approach to Global Program Optimization.* POPL. DOI: [10.1145/512927.512945](https://doi.org/10.1145/512927.512945)
 - Wegman, M. N., Zadeck, F. K. (1991). *Constant Propagation with Conditional Branches.* ACM TOPLAS. DOI: [10.1145/103135.103136](https://doi.org/10.1145/103135.103136)
+- Cousot, P., Cousot, R. (1977). *Abstract Interpretation: A Unified Lattice Model for Static Analysis of Programs by Construction or Approximation of Fixpoints.* POPL. DOI: [10.1145/512950.512973](https://doi.org/10.1145/512950.512973)

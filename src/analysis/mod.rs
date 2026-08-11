@@ -18,11 +18,12 @@ use crate::NodeId;
 pub use basic_blocks::{block_cfg, BasicBlock, BlockCfg, BlockEdge, BlockId};
 
 pub use dataflow::{
-    available_expressions, dead_stores, expression_facts, liveness, sccp, solve, variable_facts,
-    very_busy_expressions, AvailableExpressions, BitSetDomain, Confluence, ConstLattice,
-    ConstValue, DataflowAnalysis, DataflowSolution, DeadStore, DeadStoreReport, Direction,
-    ExprFacts, ExprKey, ExprOperand, FactUniverse, Lattice, LivenessResult, MustBits, SccpResult,
-    SolverConfig, VarFacts, VariableDefinition, VeryBusyExpressions,
+    available_expressions, dead_stores, expression_facts, liveness, sccp, solve, value_ranges,
+    variable_facts, very_busy_expressions, AvailableExpressions, BitSetDomain, Bound, Confluence,
+    ConstLattice, ConstValue, DataflowAnalysis, DataflowSolution, DeadStore, DeadStoreReport,
+    Direction, ExprFacts, ExprKey, ExprOperand, FactUniverse, Interval, IntervalEnv,
+    IntervalReport, Lattice, LivenessResult, MustBits, SccpResult, SolverConfig, VarFacts,
+    VariableDefinition, VeryBusyExpressions,
 };
 
 pub use projection::{
