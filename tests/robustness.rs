@@ -336,6 +336,16 @@ fn exercise_every_analysis(cpg: &CodePropertyGraph, func: NodeId) {
         .cyclic_core
         .iter()
         .all(|&dense| dense < call_projection.node_count()));
+    let wl_labels = libcpg::wl_labels(&call_projection, 3);
+    assert_eq!(wl_labels.len(), call_projection.node_count());
+    let clone_classes = libcpg::structural_clone_classes(&call_projection, 3, 2);
+    assert!(clone_classes.iter().all(|class| {
+        class.len() >= 2
+            && class.windows(2).all(|pair| pair[0] < pair[1])
+            && class
+                .iter()
+                .all(|&node| call_projection.dense_index(node).is_some())
+    }));
 
     // --- extractors ---
     let mut work = cpg.clone();

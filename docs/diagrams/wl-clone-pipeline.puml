@@ -1,0 +1,54 @@
+@startuml
+!include _libcpg-theme.iuml
+title Projection WL — deterministic labels to structural clone candidates
+
+rectangle "GraphProjection\nsorted NodeId universe\nforward + reverse CSR" as INPUT #F1F3F5
+rectangle "Validate complete projection\nnode order · CSR shape · bounds\nweights aligned · reverse agreement" as VALIDATE #FFE8CC
+rectangle "Directed-degree seed\n<latex>\ell_0(v)=mix(mix(A,d^-(v)),d^+(v))</latex>" as SEED #DBE4FF
+rectangle "Clamp refinement rounds\n<latex>k=min(requested,16)</latex>" as CAP #FFF3BF
+rectangle "Collect incident labels\nincoming + outgoing multiset" as COLLECT #D3F9D8
+rectangle "Sort multiset and fold\nfixed wrapping SplitMix combiner" as MIX #C3FAE8
+rectangle "Canonicalize whole round\nsorted distinct raw hash rank" as CANON #E5DBFF
+rectangle "Final Vec<u64>\naligned with projection nodes" as LABELS #C3FAE8
+rectangle "Group equal labels\nretain size >= max(min_class,2)" as GROUP #FCC2D7
+rectangle "Ordered Vec<Vec<NodeId>>\nmembers ascending\nsize descending · smallest id" as CLONES #FCC2D7
+rectangle "Empty result\nmalformed projection" as EMPTY #FFE3E3
+
+INPUT --> VALIDATE
+VALIDATE --> EMPTY : invalid
+VALIDATE --> SEED : valid
+SEED --> CAP
+CAP --> LABELS : k = 0
+CAP --> COLLECT : next round
+COLLECT --> MIX
+MIX --> CANON
+CANON --> COLLECT : another round
+CANON --> LABELS : k rounds complete
+LABELS --> GROUP
+GROUP --> CLONES
+
+note right of CANON
+  Sorting raw values before assigning ranks
+  preserves numeric labels under an
+  isomorphic stable-identifier relabeling.
+end note
+
+note bottom of CLONES
+  Equal WL labels are candidate evidence.
+  They do not prove exact isomorphism
+  or behavioral equivalence.
+end note
+
+legend right
+  |= colour |= role |
+  |<#F1F3F5>| payload-free graph input |
+  |<#FFE8CC>| structural validation |
+  |<#DBE4FF>| directed seed |
+  |<#FFF3BF>| resource bound |
+  |<#D3F9D8>| neighborhood collection |
+  |<#C3FAE8>| deterministic hashing or labels |
+  |<#E5DBFF>| graph-wide canonicalization |
+  |<#FCC2D7>| clone grouping and result |
+  |<#FFE3E3>| explicit invalid outcome |
+endlegend
+@enduml

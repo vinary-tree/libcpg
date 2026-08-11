@@ -221,3 +221,11 @@ harness = false
 [[bench]]
 name = "condensation"
 harness = false
+
+[[bench]]
+name = "dsm"
+harness = false
+
+[[bench]]
+name = "wl"
+harness = false

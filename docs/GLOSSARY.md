@@ -304,7 +304,8 @@ A deterministic, payload-free directed graph over sorted stable `NodeId`
 values, stored as forward and reverse compressed-sparse-row adjacency.
 `GraphProjection` selects one CPG overlay or accepts an external graph without
 cloning node payloads. It is the common feature-free substrate for dominance,
-SCC, DSM, and other exact analyses. See
+SCC, DSM, WL, and other exact analyses. `is_well_formed` checks the complete
+forward/reverse CSR contract before public-field consumers traverse it. See
 [`components/graph/projections.md`](components/graph/projections.md).
 
 ### Idempotent
@@ -485,9 +486,27 @@ definitions. libcpg implements Wegman–Zadeck SCCP [[22]](#references) and can
 refine structural reachability without mutating the CPG. See
 [`components/graph/sccp-analysis.md`](components/graph/sccp-analysis.md).
 
+### Structural clone class
+
+A deterministically ordered set of at least two stable `NodeId` values that
+share one final projection-level [WL](#weisfeilerleman-wl-refinement) label.
+It is a bounded topological candidate class, not proof of exact isomorphism,
+source equality, or behavioral equivalence. See
+[`components/graph/wl-analysis.md`](components/graph/wl-analysis.md).
+
 ### Static Single Assignment (SSA)
 
 An IR form in which every variable is assigned exactly once, with $`\phi`$-functions merging values at control-flow joins (Cytron et al. [[3]](#references)). `libcpg` deliberately does **not** use SSA for its DFG (it uses [AST-ordered reaching definitions](#ast-ordered-reaching-definitions)); SSA is defined here to make that contrast precise. See [`design/0003-ast-ordered-reaching-defs.md`](design/0003-ast-ordered-reaching-defs.md).
+
+### Weisfeiler–Lehman (WL) refinement
+
+An iterative graph-coloring procedure that replaces each vertex label with a
+digest of its current label and the multiset of neighboring labels. libcpg's
+projection API starts from directed in/out degree, uses a fixed mixer and at
+most 16 rounds, and returns [structural clone classes](#structural-clone-class).
+The separate `GraphSimilarity` metric starts from CPG node kinds and compares
+three-round label histograms. See
+[`theory/11-weisfeiler-lehman-structural-clones.md`](theory/11-weisfeiler-lehman-structural-clones.md).
 
 ### Strong update / Weak update
 

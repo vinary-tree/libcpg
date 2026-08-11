@@ -17,6 +17,7 @@
 //! - **Interval Value Ranges**: Bound integers with widening and narrowing
 //! - **Loop Induction**: Find invariant computations, induction variables, and counted guards
 //! - **Graph Projections**: Build deterministic forward/reverse CSR views
+//! - **Structural Clones**: Refine bounded Weisfeiler-Lehman projection labels
 //! - **Pattern Detection**: Detect design patterns using subgraph isomorphism (VF2/VF3)
 //! - **Algorithm Analysis**: Extract algorithm signatures and estimate complexity
 //! - **GNN Support**: Graph neural network message passing for semantic embeddings
@@ -78,19 +79,21 @@ pub use analysis::{
     call_graph_sccs, cfg_projection, classify_core_periphery, coffman_graham, condensation_metrics,
     control_flow_sccs, dead_stores, dfg_projection, dominator_tree, expression_facts, liveness,
     loop_forest, loop_induction, module_graph_projection, pdg_projection, post_dominator_tree,
-    projection_of, projection_sccs, resolve_calls, sccp, solve, unreachable_code, value_ranges,
-    variable_facts, very_busy_expressions, AnalysisError, AvailableExpressions, BasicBlock,
-    BitSetDomain, BlockCfg, BlockEdge, BlockId, Bound, CallGraphResolution, CallResolution,
-    CgLayering, CondensationMetrics, CondensationOptions, Confidence, Confluence, ConstLattice,
-    ConstValue, CorePeriphery, CorePeripheryResult, DataflowAnalysis, DataflowSolution, DeadBranch,
-    DeadStore, DeadStoreReport, Direction, DominatorTree, DsmAnalysis, ExprFacts, ExprKey,
-    ExprOperand, FactUniverse, GraphProjection, InductionAnalysis, InductionVariable, Interval,
-    IntervalEnv, IntervalReport, IvDirection, Lattice, LivenessResult, LoopBoundEvidence,
-    LoopExitEdge, LoopForest, LoopInvariants, MustBits, NaturalLoop, PostDominatorTree,
-    ProjectionError, ProjectionKind, ReachabilityReport, ResolveConfig, SccAnalysisError,
-    SccComponent, SccCondensationEdge, SccDecomposition, SccProjection, SccpResult, SolverConfig,
+    projection_of, projection_sccs, resolve_calls, sccp, solve, structural_clone_classes,
+    unreachable_code, value_ranges, variable_facts, very_busy_expressions, wl_labels,
+    AnalysisError, AvailableExpressions, BasicBlock, BitSetDomain, BlockCfg, BlockEdge, BlockId,
+    Bound, CallGraphResolution, CallResolution, CgLayering, CondensationMetrics,
+    CondensationOptions, Confidence, Confluence, ConstLattice, ConstValue, CorePeriphery,
+    CorePeripheryResult, DataflowAnalysis, DataflowSolution, DeadBranch, DeadStore,
+    DeadStoreReport, Direction, DominatorTree, DsmAnalysis, ExprFacts, ExprKey, ExprOperand,
+    FactUniverse, GraphProjection, InductionAnalysis, InductionVariable, Interval, IntervalEnv,
+    IntervalReport, IvDirection, Lattice, LivenessResult, LoopBoundEvidence, LoopExitEdge,
+    LoopForest, LoopInvariants, MustBits, NaturalLoop, PostDominatorTree, ProjectionError,
+    ProjectionKind, ReachabilityReport, ResolveConfig, SccAnalysisError, SccComponent,
+    SccCondensationEdge, SccDecomposition, SccProjection, SccpResult, SolverConfig,
     SymbolCandidates, SymbolTable, TripEvidence, UndirectedProjection, VarFacts,
     VariableDefinition, VeryBusyExpressions, MAX_CONDENSATION_COMPONENTS, MAX_DSM_NODES,
+    MAX_WL_ITERATIONS,
 };
 
 pub use builder::{

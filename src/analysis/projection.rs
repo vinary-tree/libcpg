@@ -151,6 +151,44 @@ impl GraphProjection {
         self.nodes.is_empty()
     }
 
+    /// Returns whether the public fields satisfy the constructor's CSR invariants.
+    ///
+    /// This validates strictly sorted stable nodes, forward and reverse CSR
+    /// shape, in-range sorted adjacency, optional-weight alignment, and exact
+    /// forward/reverse edge agreement. Analyses that accept deserialized or
+    /// caller-mutated projections can use this check before indexed traversal.
+    pub fn is_well_formed(&self) -> bool {
+        let n = self.node_count();
+        if self.nodes.windows(2).any(|pair| pair[0] >= pair[1])
+            || !csr_is_well_formed(&self.offsets, &self.targets, n)
+            || !csr_is_well_formed(&self.rev_offsets, &self.rev_targets, n)
+            || self.targets.len() != self.rev_targets.len()
+            || self
+                .weights
+                .as_ref()
+                .is_some_and(|weights| weights.len() != self.targets.len())
+        {
+            return false;
+        }
+
+        for source in 0..n {
+            let start = self.offsets[source] as usize;
+            let end = self.offsets[source + 1] as usize;
+            for &target in &self.targets[start..end] {
+                let target = target as usize;
+                let reverse_start = self.rev_offsets[target] as usize;
+                let reverse_end = self.rev_offsets[target + 1] as usize;
+                if self.rev_targets[reverse_start..reverse_end]
+                    .binary_search(&(source as u32))
+                    .is_err()
+                {
+                    return false;
+                }
+            }
+        }
+        true
+    }
+
     /// Maps a stable CPG node identifier to its dense projection identifier.
     pub fn dense_index(&self, id: NodeId) -> Option<u32> {
         self.nodes.binary_search(&id).ok().map(|index| index as u32)
@@ -551,6 +589,23 @@ fn csr_slice<'a>(offsets: &[u32], values: &'a [u32], dense: u32) -> &'a [u32] {
     &values[start..end]
 }
 
+fn csr_is_well_formed(offsets: &[u32], targets: &[u32], node_count: usize) -> bool {
+    if offsets.len() != node_count + 1
+        || offsets.first() != Some(&0)
+        || offsets.last().copied().map(|end| end as usize) != Some(targets.len())
+        || offsets.windows(2).any(|pair| pair[0] > pair[1])
+        || targets.iter().any(|&target| target as usize >= node_count)
+    {
+        return false;
+    }
+
+    offsets.windows(2).all(|range| {
+        targets[range[0] as usize..range[1] as usize]
+            .windows(2)
+            .all(|pair| pair[0] < pair[1])
+    })
+}
+
 #[cfg(test)]
 mod tests {
     use std::collections::BTreeSet;
@@ -618,6 +673,7 @@ mod tests {
         assert_eq!(projection.successors(0), &[2]);
         assert_eq!(projection.predecessors(0), &[2]);
         assert_eq!(projection.successor_weights(1), Some(&[1.0][..]));
+        assert!(projection.is_well_formed());
     }
 
     #[test]
@@ -641,6 +697,82 @@ mod tests {
         assert!(empty.is_empty());
         assert_eq!(empty.offsets, vec![0]);
         assert_eq!(empty.rev_offsets, vec![0]);
+        assert!(empty.is_well_formed());
+
+        let mut malformed = unit;
+        malformed.rev_targets[0] = 1;
+        assert!(!malformed.is_well_formed());
+    }
+
+    #[test]
+    fn public_projection_validation_rejects_each_csr_invariant_violation() {
+        let graph = GraphProjection::from_edges(
+            ProjectionKind::External,
+            [NodeId::new(0), NodeId::new(1), NodeId::new(2)],
+            [
+                (NodeId::new(0), NodeId::new(1), 2.0),
+                (NodeId::new(0), NodeId::new(2), 3.0),
+            ],
+        );
+        assert!(graph.is_well_formed());
+
+        let mut cases = Vec::new();
+
+        let mut duplicate_nodes = graph.clone();
+        duplicate_nodes.nodes[1] = duplicate_nodes.nodes[0];
+        cases.push(duplicate_nodes);
+
+        let mut short_offsets = graph.clone();
+        short_offsets.offsets.pop();
+        cases.push(short_offsets);
+
+        let mut nonzero_start = graph.clone();
+        nonzero_start.offsets[0] = 1;
+        cases.push(nonzero_start);
+
+        let mut wrong_end = graph.clone();
+        *wrong_end.offsets.last_mut().expect("nonempty offsets") = 1;
+        cases.push(wrong_end);
+
+        let mut descending_offsets = graph.clone();
+        descending_offsets.offsets = vec![0, 2, 1, 2];
+        cases.push(descending_offsets);
+
+        let mut out_of_range_target = graph.clone();
+        out_of_range_target.targets[0] = 3;
+        cases.push(out_of_range_target);
+
+        let mut duplicate_target = graph.clone();
+        duplicate_target.targets[1] = duplicate_target.targets[0];
+        cases.push(duplicate_target);
+
+        let mut short_reverse = graph.clone();
+        short_reverse.rev_offsets.pop();
+        cases.push(short_reverse);
+
+        let mut unequal_edge_counts = graph.clone();
+        unequal_edge_counts.rev_targets.pop();
+        *unequal_edge_counts
+            .rev_offsets
+            .last_mut()
+            .expect("nonempty reverse offsets") -= 1;
+        cases.push(unequal_edge_counts);
+
+        let mut mismatched_reverse = graph.clone();
+        mismatched_reverse.rev_targets[1] = 1;
+        cases.push(mismatched_reverse);
+
+        let mut short_weights = graph.clone();
+        short_weights
+            .weights
+            .as_mut()
+            .expect("weighted fixture")
+            .pop();
+        cases.push(short_weights);
+
+        for malformed in cases {
+            assert!(!malformed.is_well_formed());
+        }
     }
 
     #[test]
@@ -827,6 +959,7 @@ mod tests {
             prop_assert_eq!(forward.rev_offsets.len(), forward.node_count() + 1);
             prop_assert_eq!(forward.offsets.last().copied(), Some(forward.edge_count() as u32));
             prop_assert_eq!(forward.rev_offsets.last().copied(), Some(forward.edge_count() as u32));
+            prop_assert!(forward.is_well_formed());
             if let Some(weights) = &forward.weights {
                 prop_assert_eq!(weights.len(), forward.edge_count());
             }

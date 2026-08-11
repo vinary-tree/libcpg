@@ -295,6 +295,9 @@ So the safe pattern is: build (single-threaded, `&mut`), then analyse
 - [DSM visibility and core–periphery](dsm-analysis.md) — transitive visibility
   fan-in/fan-out, propagation cost, median roles, and the largest
   multi-vertex cyclic group over any directed projection.
+- [WL labels and structural clones](wl-analysis.md) — bounded deterministic
+  directed-degree refinement and ordered stable-id clone-candidate classes over
+  any valid directed projection.
 - [Natural loops and nesting](loop-analysis.md) — dominator-qualified headers,
   shared latches, conservative irreducible regions, strict nesting, and loop
   exits.

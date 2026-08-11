@@ -71,7 +71,10 @@ Any constructor-valid directed projection can be decomposed through
 `projection_sccs(&graph)`. The same projection can feed
 [`analyze_dsm`](dsm-analysis.md) and `classify_core_periphery` for transitive
 visibility, propagation cost, median roles, and largest cyclic-group evidence.
-These consumers read only CSR topology; DSM treats weights as binary adjacency.
+It can also feed [`wl_labels`](wl-analysis.md) and
+`structural_clone_classes` for bounded neighborhood refinement and stable-id
+clone candidates. These consumers read only CSR topology; DSM and WL treat
+weights as binary adjacency.
 
 ### The shared function CFG view
 
@@ -135,6 +138,12 @@ fn print_calls(cpg: &CodePropertyGraph) {
 `successors`, and `predecessors` panic for an out-of-range dense identifier;
 callers should obtain dense identifiers from `dense_index`, an iterator bounded
 by `node_count`, or an adjacency slice.
+
+`is_well_formed()` is the total public validator for a caller-constructed or
+deserialized projection. It checks sorted unique nodes, forward and reverse CSR
+shape, target bounds and strict adjacency ordering, weight alignment, equal
+edge counts, and exact forward/reverse agreement without using a panicking
+accessor. Exact consumers call it before indexed traversal.
 
 ## Canonical construction algorithm
 
@@ -211,6 +220,7 @@ The test suite combines:
   projections with direct traversal of the corresponding CPG overlays;
 - the SCC differential property, which also checks that every condensation
   projection is acyclic; and
+- WL isomorphic-relabeling properties over reordered and duplicate edge input;
 - serialization round-tripping when the `serde` feature is enabled.
 
 ## Related material

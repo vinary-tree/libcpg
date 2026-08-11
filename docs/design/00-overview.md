@@ -59,12 +59,13 @@ alternatives is folklore, and a decision without its costs is marketing.
 | [0013 — Evidence-bounded complexity estimates](0013-evidence-bounded-complexity-estimates.md) | Compose validated CFG loop depth and DFG-backed induction bounds into advisory complexity, with an exact legacy AST fallback. | Accepted |
 | [0014 — Deterministic condensation-DAG analytics](0014-deterministic-condensation-analytics.md) | Compute canonical SCC-weighted critical paths and source levels, plus sink-first width-bounded Coffman–Graham layers, without rebuilding graph identity. | Accepted |
 | [0015 — Bounded DSM visibility analysis](0015-bounded-dsm-visibility-analysis.md) | Compute transitive visibility and median roles over validated projections, reuse the shared SCC engine for cyclic core, and expose cap/malformed states explicitly. | Accepted |
+| [0016 — Stable WL projection labels](0016-stable-wl-projection-labels.md) | Refine directed-degree labels with a fixed mixer, sorted round canonicalization, a hard iteration ceiling, and deterministic stable-id clone classes. | Accepted |
 
-These fifteen are not independent. ADR-0001 fixes the substrate that all analyses
+These sixteen are not independent. ADR-0001 fixes the substrate that all analyses
 write onto; ADR-0002 and ADR-0005 together explain how a language reaches that
 substrate and what you must switch on to get there; ADR-0003 and ADR-0004 are
 two analyses *over* the substrate (one always-on, one feature-gated) that each
-chose a pragmatic algorithm over a textbook-maximal one; ADR-0006 defines when
+chose an evidence-bounded algorithm over a textbook-maximal one; ADR-0006 defines when
 parsed call syntax may become interprocedural graph topology; ADR-0007 combines
 the shared CFG scope, dominance, and SCC substrate into natural-loop structure;
 ADR-0008 projects that same scope into deterministic blocks without breaking
@@ -85,6 +86,8 @@ malformed-input policy for downstream graph-theory analyses.
 ADR-0015 consumes ADR-0001's projection/out-of-graph discipline and the shared
 SCC engine, then fixes visibility direction, median thresholds, stable
 provenance, malformed-CSR behavior, and the quadratic-work cap.
+ADR-0016 consumes that projection discipline, centralizes complete CSR
+validation for DSM and WL, and adds a separately bounded structural-clone view.
 
 ![Module architecture of libcpg, showing the graph core and the analysis modules layered over it](../diagrams/module-architecture.svg)
 

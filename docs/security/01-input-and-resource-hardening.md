@@ -34,6 +34,7 @@ Source: [`diagrams/resource-bounds.puml`](../diagrams/resource-bounds.puml).*
 | SCCP event cap | `4 * (scope nodes + DefUse edges)` | `sccp` | returns `AnalysisError::IterationLimitExceeded` if malformed dependencies exceed the finite-lattice schedule bound |
 | `CondensationOptions::max_components` | `1_000_000` hard maximum | `condensation_metrics`; `coffman_graham` always uses the hard maximum | the total metrics API returns an incomplete capped report; the direct CG API returns `AnalysisError::BudgetExceeded` |
 | `MAX_DSM_NODES` | `50_000` hard maximum | `analyze_dsm`; independently rechecked by `classify_core_periphery` | returns an incomplete capped result with the stable node universe and no partial visibility/class vectors |
+| `MAX_WL_ITERATIONS` | `16` hard maximum | `wl_labels`; inherited by `structural_clone_classes` | clamps the request before refinement; malformed projections return empty vectors before indexed traversal |
 | Loop-induction structural bounds | at most `candidate_count + 1` invariant rounds per loop; affine depth `3` | `loop_induction` | reaches a finite fixed point; malformed AST cycles are cut by visited sets and arithmetic overflow becomes unknown evidence |
 | Complexity-evidence bounds | validated finite function scope plus loop/induction provider bounds | `estimate_time_complexity_with_evidence` (feature `algorithm-detection`) | provider failure or absent CFG evidence returns the exact legacy total estimate; justification grows with loop count |
 
@@ -246,6 +247,28 @@ hostile or interactive workloads should enforce a tighter input-specific node
 limit before calling the fixed-signature API. Edge weights and payload sizes do
 not affect visibility topology, but the source projection and returned SCC
 decomposition still occupy $`O(n+m)`$ storage.
+
+## WL refinement: round cap and total projection validation
+
+[`wl_labels`](../components/graph/wl-analysis.md) clamps every request to
+`MAX_WL_ITERATIONS = 16`. Each round reads the forward and reverse adjacency,
+sorts one incident-label multiset per vertex, and sorts the graph-wide raw-label
+vocabulary. The ceiling bounds caller-controlled repeated work even when the
+request is `usize::MAX`; the implementation is iterative and cannot consume
+native stack proportional to graph depth.
+
+WL shares `GraphProjection::is_well_formed` with DSM. Before any indexed
+access, that validator checks stable-node ordering, both CSR shapes, target
+bounds/order, weight alignment, edge counts, and forward/reverse agreement.
+Malformed public or deserialized state yields empty labels and clone classes.
+This safe failure is distinguishable from a valid nonempty result because a
+successful label vector is exactly aligned with `node_count`.
+
+The round cap does not bound graph size. Sorting and storage still scale with
+the supplied projection, so hostile-input applications must cap source, node,
+and edge counts before projection construction. Equal 64-bit labels are
+candidate evidence and must not authorize security-sensitive equivalence or
+code transformation without exact semantic validation.
 
 ## Loop induction: finite structural bounds
 

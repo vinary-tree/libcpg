@@ -72,7 +72,7 @@ fn analyze_dsm_with_cap(graph: &GraphProjection, max_nodes: usize) -> DsmAnalysi
     if n > max_nodes {
         return DsmAnalysis::unavailable(graph, true);
     }
-    if !projection_is_well_formed(graph) {
+    if !graph.is_well_formed() {
         return DsmAnalysis::unavailable(graph, false);
     }
 
@@ -214,11 +214,7 @@ impl CorePeripheryResult {
 /// explicitly incomplete result instead of indexing malformed input.
 pub fn classify_core_periphery(graph: &GraphProjection, dsm: &DsmAnalysis) -> CorePeripheryResult {
     let capped = dsm.capped || graph.node_count() > MAX_DSM_NODES;
-    if !projection_is_well_formed(graph)
-        || !dsm.complete
-        || capped
-        || !dsm_is_well_formed_for(graph, dsm)
-    {
+    if !graph.is_well_formed() || !dsm.complete || capped || !dsm_is_well_formed_for(graph, dsm) {
         return CorePeripheryResult::unavailable(graph, capped);
     }
 
@@ -275,55 +271,6 @@ pub fn classify_core_periphery(graph: &GraphProjection, dsm: &DsmAnalysis) -> Co
         complete: true,
         capped: false,
     }
-}
-
-fn projection_is_well_formed(graph: &GraphProjection) -> bool {
-    let n = graph.node_count();
-    if graph.nodes.windows(2).any(|pair| pair[0] >= pair[1])
-        || !csr_is_well_formed(&graph.offsets, &graph.targets, n)
-        || !csr_is_well_formed(&graph.rev_offsets, &graph.rev_targets, n)
-        || graph.targets.len() != graph.rev_targets.len()
-        || graph
-            .weights
-            .as_ref()
-            .is_some_and(|weights| weights.len() != graph.targets.len())
-    {
-        return false;
-    }
-
-    for source in 0..n {
-        let start = graph.offsets[source] as usize;
-        let end = graph.offsets[source + 1] as usize;
-        for &target in &graph.targets[start..end] {
-            let target = target as usize;
-            let reverse_start = graph.rev_offsets[target] as usize;
-            let reverse_end = graph.rev_offsets[target + 1] as usize;
-            if graph.rev_targets[reverse_start..reverse_end]
-                .binary_search(&(source as u32))
-                .is_err()
-            {
-                return false;
-            }
-        }
-    }
-    true
-}
-
-fn csr_is_well_formed(offsets: &[u32], targets: &[u32], node_count: usize) -> bool {
-    if offsets.len() != node_count + 1
-        || offsets.first() != Some(&0)
-        || offsets.last().copied().map(|end| end as usize) != Some(targets.len())
-        || offsets.windows(2).any(|pair| pair[0] > pair[1])
-        || targets.iter().any(|&target| target as usize >= node_count)
-    {
-        return false;
-    }
-
-    offsets.windows(2).all(|range| {
-        targets[range[0] as usize..range[1] as usize]
-            .windows(2)
-            .all(|pair| pair[0] < pair[1])
-    })
 }
 
 fn dsm_is_well_formed_for(graph: &GraphProjection, dsm: &DsmAnalysis) -> bool {

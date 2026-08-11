@@ -176,17 +176,19 @@ integration, and the hand-built public integration compile with
 `--no-default-features`. The parser experiment alone requires `lang-rust`.
 Serialization derives and the JSON round trip alone require `serde`.
 
-No DSM benchmark is part of this work-item contract. Correctness and resource
-behavior are decided by the tests above; no runtime-performance claim is
-inferred from them. The [performance guide](../engineering/03-performance.md)
-records the algorithmic cost and the current timed-operation boundary.
+`benches/dsm.rs` measures visibility and classification separately over paths
+and rings at 256 and 1,024 vertices. Before Criterion enters either timed loop,
+the fixture checks exact VFO/VFI patterns, propagation cost, median classes,
+completion flags, and cyclic-core membership. A smoke run is therefore a
+correctness check as well as a harness check. Timing remains evidence for only
+those named shapes and sizes; it is not a latency guarantee at the hard cap.
 
 ## 8. Coverage result
 
 A clean maximal-matrix `cargo cov-text` run measured `analysis/dsm.rs` at
-**99.79% line**, **99.48% region**, and **98.04% function** coverage. A clean
-nightly `cargo +nightly cov-branch` run measured **82.43% branch** coverage.
-Both runs executed all **655 library tests** and the **42 public integration and
+**99.77% line**, **99.42% region**, and **97.62% function** coverage. A clean
+nightly `cargo +nightly cov-branch` run measured **90.38% branch** coverage.
+Both runs executed all **665 library tests** and the **43 public integration and
 robustness tests**, including both DSM integration cases; these are not
 focused-test extrapolations. The module therefore clears the epic's 90% line
 and 80% branch thresholds.
@@ -209,6 +211,10 @@ cargo test --no-default-features analysis::scc::tests
 # Whole malformed-CPG campaign and repository gates:
 cargo test --no-default-features --test robustness
 ./scripts/verify.sh
+
+# Oracle-guarded benchmark smoke and measurement:
+cargo bench --bench dsm --no-default-features -- --test
+cargo bench --bench dsm --no-default-features
 
 # Coverage (stable lines/regions/functions; nightly branches):
 cargo cov-text

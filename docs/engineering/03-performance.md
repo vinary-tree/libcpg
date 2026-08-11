@@ -55,7 +55,8 @@ see [contributing](04-contributing.md).
 The table gives *expected* costs. Symbols: $`n`$ = number of tree-sitter /
 AST nodes, $`V`$ and $`E`$ = node and edge counts of the (sub)graph an
 operation touches, $`L`$ = GNN layers (`num_layers`), $`d`$ = embedding
-dimension, $`k`$ = Weisfeiler-Lehman iterations (3).
+dimension, $`k`$ = whole-graph similarity WL iterations (3), and
+$`q=\min(\mathtt{iterations},16)`$ = projection-WL rounds.
 
 | Operation | Expected cost | Notes |
 | --- | --- | --- |
@@ -75,6 +76,7 @@ dimension, $`k`$ = Weisfeiler-Lehman iterations (3).
 | [VF2](../GLOSSARY.md#vf2) `find_matches` | worst case $`O(N!\,N)`$; pruned in practice | Feasibility rules and `max_matches` cut the state space dramatically; see [`theory/05-subgraph-isomorphism-vf2.md`](../theory/05-subgraph-isomorphism-vf2.md). |
 | [Jaccard](../GLOSSARY.md#jaccard-similarity) similarity | $`O(V_1 + V_2)`$ | Over the two graphs' node-kind multisets. |
 | Weisfeiler-Lehman similarity | $`O(k(V + E))`$ | $`k = 3`$ label-refinement rounds. |
+| Projection WL labels / clone classes | $`O(q(V\log V+E+\sum_v d(v)\log d(v)))`$ time, $`O(V+d_{max})`$ temporary space | Directed-degree seeds; sorted incident-label multisets; sorted raw-label ranks each round; clone grouping adds $`O(V\log V)`$ time and $`O(V)`$ space. |
 | GNN `propagate` | $`O(L \cdot (V + E) \cdot d)`$ | Each layer means neighbour vectors over the AST/CFG/DFG overlays, then ReLU. |
 
 Two of these deserve emphasis. VF2 is worst-case super-exponential, which is why
@@ -85,8 +87,8 @@ once, loop bodies twice, and a path set cuts malformed AST cycles.
 
 ## Benchmark coverage and remaining gaps
 
-Six Criterion targets are active. Their seven baseline operation groups are
-feature-free; `induction_analysis` also registers an eighth,
+Eight Criterion targets are active. Their eleven baseline operation groups are
+feature-free; `induction_analysis` also registers a twelfth,
 `algorithm-detection`-gated operation. Every active group constructs and checks a deterministic oracle
 before Criterion enters the timed loop:
 
@@ -108,6 +110,12 @@ before Criterion enters the timed loop:
   `algorithm-detection`, its `complexity_evidence` group measures the public
   evidence consumer on the same sizes after checking class, confidence,
   provenance nodes, and non-mutation.
+- `dsm` measures repeated-BFS visibility and median/SCC classification over
+  256- and 1,024-vertex paths and rings, with exact count, cost, class, and
+  cyclic-core oracles;
+- `wl` measures four-round labels and clone grouping over 1,024- and
+  8,192-vertex rings and outward stars, with exact symmetry, distinction,
+  membership, and ordering oracles.
 
 ```toml
 [[bench]]
@@ -133,6 +141,14 @@ harness = false
 [[bench]]
 name = "induction_analysis"
 harness = false
+
+[[bench]]
+name = "dsm"
+harness = false
+
+[[bench]]
+name = "wl"
+harness = false
 ```
 
 Run it directly, or save and compare named baselines:
@@ -146,13 +162,15 @@ cargo bench --bench scc_analysis --no-default-features -- --baseline before
 ./scripts/bench.sh pattern_matching --save-baseline before
 ./scripts/bench.sh dataflow_liveness --save-baseline before
 ./scripts/bench.sh induction_analysis --save-baseline before
+cargo bench --bench dsm --no-default-features
+cargo bench --bench wl --no-default-features
 cargo bench --no-default-features --features algorithm-detection \
   --bench induction_analysis -- --test
 ```
 
-DSM visibility, DFG/PDG construction, whole-corpus analysis, and GNN propagation
-still lack runnable benchmarks. Their owning analysis tasks add focused targets and establish
-correctness oracles before optimization.
+DFG/PDG construction, whole-corpus analysis, and GNN propagation remain the
+runnable-benchmark gaps. Every implemented architecture-analysis operation in
+this epic has an oracle-guarded target before optimization work begins.
 
 ### Liveness replay finding
 

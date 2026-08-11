@@ -244,7 +244,8 @@ root and `libcpg::analysis`:
 
 `GraphProjection::from_edges` is the external-graph adapter. Accessors include
 `dense_index`, `node_id`, `successors`, `predecessors`, `successor_weights`,
-`edges`, `transpose`, and `undirected`. Parallel edges are merged by summing
+`edges`, `transpose`, `undirected`, and the total `is_well_formed` validator.
+Parallel edges are merged by summing
 their weights; sorted nodes and adjacency make the result independent of input
 enumeration order. See the complete [projection component guide](../components/graph/projections.md)
 for field invariants, scope boundaries, complexity, pseudocode, and examples.
@@ -334,6 +335,26 @@ result. Derived vectors are empty in both cases, never partial. See the [DSM com
 guide](../components/graph/dsm-analysis.md) for formulae, edge direction,
 literate BFS/SCC composition, degenerate median semantics, examples, tests,
 and interpretation limits.
+
+### Weisfeiler–Lehman labels and structural clones
+
+These feature-free functions consume a valid `GraphProjection` without
+mutating it or its source CPG:
+
+| Function | Signature | Result |
+|---|---|---|
+| `wl_labels` | `fn(&GraphProjection, usize) -> Vec<u64>` | Final deterministic labels aligned with projection nodes after the bounded requested round count. |
+| `structural_clone_classes` | `fn(&GraphProjection, usize, usize) -> Vec<Vec<NodeId>>` | Equal-label stable-id classes ordered by size and smallest member. |
+
+The directed in/out degree pair seeds each label. Refinement folds the sorted
+incoming-plus-outgoing neighbor-label multiset through a fixed wrapping mixer,
+then assigns sorted raw-value ranks. `MAX_WL_ITERATIONS = 16` clamps hostile
+requests; `min_class` has an effective floor of two. Edge weights are ignored,
+and malformed public projection values return empty results before indexed
+traversal. Equal labels are structural candidates, not a proof of exact
+isomorphism or behavioral equivalence. See the complete [WL component
+guide](../components/graph/wl-analysis.md) for formulas, pseudocode, examples,
+collision limits, properties, and benchmark evidence.
 
 ### Natural loops and nesting
 

@@ -88,7 +88,10 @@ detection ([Theory 05](05-subgraph-isomorphism-vf2.md)),
 [graph-neural-network](../GLOSSARY.md#graph-neural-network-gnn) embeddings
 ([Theory 09](09-graph-neural-networks.md)), and
 [Design Structure Matrix](../GLOSSARY.md#design-structure-matrix-dsm)
-visibility/core analysis ([Theory 10](10-design-structure-matrix-analysis.md)). Each consumes the same
+visibility/core analysis ([Theory 10](10-design-structure-matrix-analysis.md)), and
+[Weisfeiler–Lehman](../GLOSSARY.md#weisfeilerleman-wl-refinement)
+structural-clone refinement
+([Theory 11](11-weisfeiler-lehman-structural-clones.md)). Each consumes the same
 `CodePropertyGraph`; none needs its own bespoke intermediate representation.
 
 ## 4. The four overlays at a glance

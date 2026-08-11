@@ -50,6 +50,13 @@ returns a capped incomplete result with no partial vectors.;
 ***[#F1F3F5]:public projection + provenance validation
 rejects malformed forward/reverse CSR, mismatched nodes,
 vector lengths, and incomplete source analyses.;
+**[#FFE3E3] WL refinement
+***[#F1F3F5]:MAX_WL_ITERATIONS = 16
+clamps every requested round count before work,
+including a request of the machine maximum.;
+***[#F1F3F5]:shared public projection validation
+rejects malformed node, CSR, weight, or reverse state
+before indexed traversal and returns empty output.;
 **[#FFE3E3] Slicing
 ***[#F1F3F5]:max_nodes on backward_slice / forward_slice
 bounds the PDG reverse/forward BFS —

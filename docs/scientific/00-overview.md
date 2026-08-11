@@ -16,7 +16,7 @@ A CPG library makes three kinds of assertion, and each demands a different stand
 
 These are distinct from *performance* claims ("construction is fast", "VF2
 prunes well"), which require controlled measurement rather than assertion.
-`libcpg` ships six oracle-guarded Criterion targets (eight operation groups when
+`libcpg` ships eight oracle-guarded Criterion targets (twelve operation groups when
 the gated complexity-evidence group is enabled), but their evidence is limited to
 the named graph families, sizes, environment, and operation. The
 protocol and remaining gaps are specified in [04 — Measurement
@@ -50,16 +50,17 @@ Two properties of the suite make this rigorous rather than merely suggestive:
 
 ## 3. The evidence base
 
-The maximal matrix contains **655 library tests**, **21 general public-API
+The maximal matrix contains **665 library tests**, **21 general public-API
 integration tests**, **5 malformed-input robustness tests**, **3 SCCP
 public/parser integration tests**, and **3 interval public/parser integration
 tests**, plus **3 loop-induction** and **3 complexity-evidence public/parser
 integration tests**, plus **2 condensation** and **2 DSM public/parser
-integration tests**. These 697 executable cases combine fixed examples,
-differential oracles, and 46 exact source-level `proptest!` blocks. The feature-free matrix remains
+integration tests**, plus **1 WL public integration test**. These 708 executable
+cases combine fixed examples, differential oracles, and 47 exact source-level
+`proptest!` blocks. The feature-free matrix remains
 independently runnable and exercises the exact graph/data-flow substrate
-without compiling any grammar. Six active Criterion targets supplement
-correctness with eight scoped operation groups when
+without compiling any grammar. Eight active Criterion targets supplement
+correctness with twelve scoped operation groups when
 `algorithm-detection` is enabled; see
 [Testing](../engineering/02-testing.md) for the census and [04](04-measurement-methodology.md)
 for the measurement contract.
@@ -73,13 +74,14 @@ Because `default = []`, many tests are **feature-gated**. The end-to-end reachin
 | [01 — Invariants & equivalence](01-cpg-invariants-and-equivalence.md) | Single shared node set; graph-assigned unique IDs; AST child/parent consistency; idempotent extractors; `build` ≡ `build_from_tree` (identical node/edge counts + language) | `test_build_from_tree_matches_build`, `parsed_shadowing_and_idempotent`, `def_use_backward_slice`, `parsed_nested_use_resolves_and_chains` | `lang-rust` (equivalence, DFG) / feature-free (slice) |
 | [02 — Reaching-defs validation](02-reaching-defs-validation.md) | Nested-expression use resolution; latest-definition (strong update); non-flow of unrelated variables; shadowing scope; idempotency | `parsed_nested_use_resolves_and_chains`, `parsed_reassignment_uses_latest_definition`, `parsed_unrelated_variable_does_not_flow`, `parsed_shadowing_and_idempotent` | `lang-rust` |
 | [03 — VF2 completeness](03-vf2-completeness.md) | Soundness floor (empty pattern → no match); kind-feasibility pruning; **all** embeddings found (diamond → exactly 2) with exact backtracking | `test_empty_pattern`, `test_single_node_match`, `test_multi_embedding_backtracking` | feature-free |
-| [04 — Measurement methodology](04-measurement-methodology.md) | Environment control and exact-oracle timing for SCC, condensation analytics, arena construction, bounded VF2, liveness, and loop induction | six `benches/*.rs` Criterion targets | feature-free |
+| [04 — Measurement methodology](04-measurement-methodology.md) | Environment control and exact-oracle timing for SCC, condensation analytics, arena construction, bounded VF2, liveness, loop induction, DSM, and WL | eight `benches/*.rs` Criterion targets | feature-free |
 | [05 — SCCP validation](05-sccp-validation.md) | Concrete value soundness, lattice laws, conditional-edge partition, refinement monotonicity, determinism, parser integration | `straight_line_literal_programs_match_the_concrete_interpreter`, SCCP unit/property tests, `sccp_integration` | feature-free / `lang-rust` parser case |
 | [06 — Interval validation](06-interval-analysis-validation.md) | Concrete range soundness, hull/widen/narrow laws, loop convergence, narrowing descent, determinism, SCCP cross-check, parser integration | interval unit/property tests, `intervals_integration` | feature-free / `lang-rust` parser case |
 | [07 — Loop-induction validation](07-induction-analysis-validation.md) | DFG invariant contract, unique latch-dominating recurrences, checked affine steps, comparison direction, determinism, parser integration, malformed/stack safety | induction unit/property tests, `induction_integration`, robustness harness | feature-free / `serde` / `lang-rust` parser case |
 | [08 — Complexity-evidence validation](08-complexity-evidence-validation.md) | Counted-loop polynomial degree/provenance, confidence precedence, exact legacy fallback, storage determinism, parser/default-detector integration | complexity unit/property tests, `complexity_evidence_integration`, robustness harness, gated benchmark oracle | `algorithm-detection` / `lang-rust` parser case |
 | [09 — Condensation validation](09-condensation-validation.md) | Weighted critical paths, source levels, width-bounded CG precedence, exact/approximate schedule height, cap/malformed behavior, storage determinism, parser integration | condensation unit/property tests, exhaustive path/schedule oracles, `condensation_integration`, benchmark oracle | feature-free / `serde` / `lang-rust` parser case |
 | [10 — DSM validation](10-dsm-validation.md) | Transitive visibility vectors, propagation cost, median roles, largest multi-vertex SCC, cap/malformed/provenance behavior, storage determinism, parser integration | DSM unit/property tests, Floyd–Warshall/mutual-reachability oracles, `dsm_integration`, robustness harness | feature-free / `serde` / `lang-rust` parser case |
+| [11 — WL validation](11-wl-validation.md) | Directed-degree labels, stable mixing, isomorphic-relabeling invariance, clone ordering, round cap, malformed behavior, public composition | WL unit/property tests, `wl_integration`, robustness harness, benchmark oracles | feature-free |
 
 ## 5. What is proven, and what is advisory
 
@@ -90,6 +92,9 @@ Scientific honesty requires separating the two:
   Floyd–Warshall closure; largest cyclic groups are checked from mutual
   reachability; insertion/duplicate invariance and malformed/provenance states
   are regression-locked as well.
+  Projection-WL label multisets and logical clone partitions are invariant
+  under 256 generated isomorphic relabelings, reordered input, and duplicate
+  input edges; fixed vectors lock the mixer and boundary behavior.
 - **Advisory (policy-sensitive by design).** The available/very-busy states are
   exact for the modeled structural expressions and CFG, while their CSE/PRE
   transformation candidates still require language side-effect policy.
@@ -103,10 +108,13 @@ Scientific honesty requires separating the two:
   [GNN](../GLOSSARY.md#graph-neural-network-gnn) embeddings are heuristics: they
   score likelihood, they do not prove identity. Treat all such evidence at its
   documented boundary rather than as ground truth.
+  WL structural clone classes are likewise candidate evidence because
+  one-dimensional refinement and a finite digest are not an exact isomorphism
+  proof.
 - **Empirically bounded.** Performance results apply only to a target's named
-  fixture, size, and controlled environment. DSM visibility, DFG/PDG
+  fixture, size, and controlled environment. DFG/PDG
   construction, whole-corpus analysis, and GNN propagation remain measurement gaps; no result
-  from the six active targets (or eight enabled operation groups) may be
+  from the eight active targets (or twelve enabled operation groups) may be
   generalized to them.
 
 ## 6. Reproducing the experiments

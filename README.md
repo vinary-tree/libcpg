@@ -36,6 +36,8 @@ PDG). A query can therefore mix syntax, control flow, and data flow freely.
 - **Design Structure Matrix analytics** — bounded transitive visibility
   fan-out/fan-in, propagation cost, deterministic median core–periphery roles,
   and largest cyclic-group evidence over any graph projection.
+- **WL structural clones** — deterministic directed-degree labels and ordered
+  Weisfeiler–Lehman clone-candidate classes over validated graph projections.
 - **CFG reachability** — feature-free, deterministic reachable/unreachable
   partitions and structural dead-branch evidence without graph mutation.
 - **Basic-block CFGs** — deterministic, id-preserving block partitions, typed

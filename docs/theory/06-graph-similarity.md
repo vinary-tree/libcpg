@@ -105,6 +105,13 @@ Algorithm WL‑Histogram(G, iterations = 3):
 
 The result is a **histogram** of every refined label the graph produced across the three rounds (the last round's labels are counted once more when the sweep ends — a harmless quirk applied identically to both graphs). The initial round‑0 labels are not tallied on their own; they enter only through the refinements they seed.
 
+This whole-CPG similarity metric is distinct from the feature-free
+[`wl_labels`](11-weisfeiler-lehman-structural-clones.md) projection API. The
+projection API seeds directed degree, uses a fixed cross-release mixer, accepts
+a bounded round count, returns final per-node labels, and groups structural
+clone candidates inside one graph. Numeric labels from the two variants are
+not interchangeable.
+
 ### Comparing two histograms
 
 Two graphs are then scored by the **cosine of their label histograms**. Treat each distinct label as a coordinate; a label present in only one graph contributes $`0`$ to the dot product:

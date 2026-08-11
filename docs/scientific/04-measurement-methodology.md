@@ -1,6 +1,6 @@
 # Measurement methodology
 
-`libcpg` ships six runnable Criterion targets. Their baseline groups are
+`libcpg` ships eight runnable Criterion targets. Their baseline groups are
 feature-free; the `induction_analysis` target also registers an
 `algorithm-detection`-gated complexity-evidence group. Each active group
 asserts a deterministic correctness oracle **before** entering the timed loop.
@@ -19,7 +19,7 @@ the source transformation under study does not [[1]](#references).
 
 ## 1. Current evidence
 
-All six targets use `harness = false`, which hands execution to Criterion
+All eight targets use `harness = false`, which hands execution to Criterion
 rather than Rust's test harness:
 
 ```toml
@@ -49,6 +49,14 @@ harness = false
 [[bench]]
 name = "induction_analysis"
 harness = false
+
+[[bench]]
+name = "dsm"
+harness = false
+
+[[bench]]
+name = "wl"
+harness = false
 ```
 
 | Target | Public operation | Families and sizes | Pre-timing oracle |
@@ -60,6 +68,8 @@ harness = false
 | `dataflow_liveness` | `liveness` | chains at 512/4,096 nodes, diamond ladders at 64/512 rungs, nested loops at 128/1,024 nodes | exact per-node equality with an independent round-robin solver |
 | `induction_analysis` | `loop_induction` | single counted loops with 64/512/2,048 invariant definitions | exact IV, bound, intended-invariant, DFG-contract, subset, and non-mutation checks |
 | `induction_analysis` with `algorithm-detection` | `ComplexityAnalyzer::estimate_time_complexity_with_evidence` | the same single counted loops at 64/512/2,048 invariant definitions | exact class/confidence, header/comparison/bound provenance, IV name, and non-mutation checks |
+| `dsm` | `analyze_dsm`, `classify_core_periphery` | directed paths and rings at 256 and 1,024 vertices | exact visibility vectors, propagation cost, roles, completion, and cyclic core |
+| `wl` | `wl_labels`, `structural_clone_classes` | four-round directed rings and outward stars at 1,024 and 8,192 vertices | exact label symmetry/distinction and exact ordered clone membership |
 
 The evidence is deliberately local: a result for one named family, size,
 machine, toolchain, and environment is not a universal speed claim. DFG/PDG
@@ -222,6 +232,8 @@ $`H \le F`$ is lattice height, and $`d`$ is embedding dimension.
 | CPG arena construction | $`O(V + E)`$ insertion work | active path target |
 | bounded VF2 | factorial worst case; pruning-dependent [[3]](#references) | active bounded path target |
 | variable liveness | $`O(H(B + E_b)W + NW)`$ conventional bound | active chain/diamond/nested-loop target |
+| DSM visibility / classification | $`O(V(V+E))`$ visibility plus SCC and median classification | active path/ring target |
+| projection WL labels / clones | $`O(q(V\log V+E+\sum_v d(v)\log d(v)))`$ for $`q\le16`$, plus clone sorting | active four-round ring/star target |
 | DFG/PDG construction | analysis-specific; must separate extraction from slicing | benchmark gap |
 | GNN propagation | $`O(\text{layers}\cdot(V+E)\cdot d)`$ | benchmark gap |
 

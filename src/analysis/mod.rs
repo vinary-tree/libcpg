@@ -15,6 +15,7 @@ mod projection;
 mod reachability;
 mod resolve;
 mod scc;
+pub(crate) mod wl;
 
 use crate::NodeId;
 
@@ -65,6 +66,8 @@ pub use scc::{
     call_graph_sccs, control_flow_sccs, projection_sccs, SccAnalysisError, SccComponent,
     SccCondensationEdge, SccDecomposition, SccProjection,
 };
+
+pub use wl::{structural_clone_classes, wl_labels, MAX_WL_ITERATIONS};
 
 /// Errors shared by exact structural analyses.
 #[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
