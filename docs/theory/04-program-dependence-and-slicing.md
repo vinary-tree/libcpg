@@ -207,7 +207,7 @@ and [`components/builder/pdg-and-slicing.md`](../components/builder/pdg-and-slic
   and [`components/graph/edges.md`](../components/graph/edges.md).
 - The control edges that seed control dependence: [Theory 02](02-control-flow-and-complexity.md).
 - The data-flow edges that reproject into data dependence: [Theory 03](03-data-flow-and-reaching-definitions.md).
-- SSA and the dominance frontier, defined for contrast: [Theory 03 §3](03-data-flow-and-reaching-definitions.md#3-why-an-ast-ordered-sweep-instead-of-ssa-or-a-cfg-fixed-point).
+- SSA and the dominance frontier, defined for contrast: [Theory 03 §3](03-data-flow-and-reaching-definitions.md#3-why-dfg-materialization-uses-an-ast-ordered-sweep).
 
 ## References
 

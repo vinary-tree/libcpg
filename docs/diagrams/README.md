@@ -1,6 +1,6 @@
 # Diagram catalog
 
-Every figure in the `libcpg` documentation is a **committed source** (`.puml` for PlantUML, `.dot` for Graphviz) rendered to a **committed `.svg`** that the Markdown pages embed. Sources are version-controlled so figures are reproducible and reviewable; SVGs are committed so they render on GitHub (which does not render PlantUML/Graphviz inline). This directory holds all 59 figures plus the shared theme.
+Every figure in the `libcpg` documentation is a **committed source** (`.puml` for PlantUML, `.dot` for Graphviz) rendered to a **committed `.svg`** that the Markdown pages embed. Sources are version-controlled so figures are reproducible and reviewable; SVGs are committed so they render on GitHub (which does not render PlantUML/Graphviz inline). This directory holds all 60 figures plus the shared theme.
 
 ## Conventions
 
@@ -39,9 +39,9 @@ Grouped by subject. Each row: the source (its `.svg` sibling is embedded by the 
 |---|---|---|---|
 | `cpg-overlay.dot` | graph | AST⊕CFG⊕DFG overlays on one shared node set (hero figure) | README, docs/README, theory/00–01, architecture/graph-data-model, api/graph-reference, components/graph/overview, design/0001 |
 | `cpg-vs-traditional.dot` | graph | Three separate views vs one unified CPG | theory/00, architecture/overview |
-| `module-architecture.puml` | component | Crate modules, always-on projections/block-CFG/data-flow/liveness/reachability/dominator/loop/SCC analysis, and feature gates | architecture/overview, design/00 |
+| `module-architecture.puml` | component | Crate modules, always-on projections/block-CFG/data-flow/liveness/induction/reachability/dominator/loop/SCC analysis, and feature gates | architecture/overview, design/00 |
 | `construction-pipeline.puml` | activity | parse → AST → CFG → optional definite-call resolution → DFG | architecture/data-flow, components/builder/overview, api/builder-reference, usage/01 |
-| `analysis-pipeline.puml` | activity | CPG → blocks/data-flow/liveness/reachability/dominance/loops/SCC, PDG/slice, VF2/GoF, algorithm, GNN | architecture/data-flow |
+| `analysis-pipeline.puml` | activity | CPG → blocks/data-flow/liveness/induction/reachability/dominance/loops/SCC, PDG/slice, VF2/GoF, algorithm, GNN | architecture/data-flow |
 | `feature-flag-map.puml` | mindmap | Cargo feature taxonomy (`default = []`) | design/0005, engineering/01, usage/00 |
 
 ### Graph data model
@@ -59,6 +59,7 @@ Grouped by subject. Each row: the source (its `.svg` sibling is embedded by the 
 | `expression-analysis.puml` | component flow | CPG + canonical expression facts → forward/backward Must fixed points → dominance-backed advisory CSE/PRE evidence | components/graph/expression-analysis |
 | `sccp-analysis.puml` | coupled worklist flow | CFG executability + sparse value propagation → constants, dead edges, unreachable nodes, and structural-reachability refinement | components/graph/sccp-analysis |
 | `interval-analysis.puml` | component/fixed-point flow | Block/variable/loop evidence → interval transfer, branch meet, widening, narrowing, and canonical report | components/graph/interval-analysis |
+| `induction-analysis.puml` | component/evidence flow | Semantic AST/CFG/DFG plus loop/dominance evidence → invariants, hoist candidates, induction variables, and counted bounds | components/graph/induction-analysis |
 | `call-resolution.puml` | activity | Lexical symbols and syntax evidence crossing the guarded topology boundary | components/graph/call-resolution |
 
 ### Control flow, data flow, dependence

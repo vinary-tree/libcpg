@@ -235,6 +235,20 @@ control enters at multiple nodes. `libcpg` detects non-dominating DFS retreating
 edges and reports the whole cyclic SCC with `NaturalLoop::irreducible = true`,
 making the conservative approximation explicit (Havlak [[17]](#references)).
 
+### Induction variable / Loop invariant / Trip evidence
+
+A **loop-invariant** computation has modeled operands whose reaching
+definitions are outside the loop region or already invariant. A **basic
+induction variable** changes by one invariant additive step on every path back
+to the loop header; a **derived induction variable** is a one-level affine
+expression $`a i + b`$ of a basic variable. `loop_induction` also reports
+**trip evidence** when a reducible loop compares an induction variable with an
+invariant bound in a compatible direction. `Counted` is structural evidence,
+not an exact count or termination proof. Its `hoistable` invariant subset is
+advisory [loop-invariant code motion](#loop-invariant-code-motion-licm)
+evidence. See
+[`components/graph/induction-analysis.md`](components/graph/induction-analysis.md).
+
 ### Interval / Value range
 
 A non-empty closed set $`[lo,hi]`$ over extended integer bounds. `Bound` adds
@@ -274,6 +288,16 @@ backward may analysis: successor inputs meet by union, and a node removes its
 definitions before adding its uses. `libcpg::liveness` returns deterministic
 per-node `live_in` and `live_out` sets. See
 [`components/graph/liveness-analysis.md`](components/graph/liveness-analysis.md).
+
+### Loop-invariant code motion (LICM)
+
+A compiler transformation that moves a loop-invariant computation to a
+preheader so it executes once instead of once per iteration. Legal motion
+requires more than invariance: execution-frequency, dominance, definition/use,
+side-effect, trap, aliasing, volatile/atomic, and concurrency obligations can
+all matter. `libcpg` reports only the structurally checked `hoistable` evidence
+subset and does not rewrite source. See [Induction variable / Loop invariant /
+Trip evidence](#induction-variable--loop-invariant--trip-evidence).
 
 ### May analysis / Must analysis
 

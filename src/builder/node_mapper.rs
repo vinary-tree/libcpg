@@ -259,6 +259,9 @@ impl NodeMapper {
             "binary_expression" => CpgNodeKind::BinaryOp {
                 operator: self.extract_operator(node, source),
             },
+            "range_expression" => CpgNodeKind::BinaryOp {
+                operator: self.extract_operator(node, source),
+            },
             "unary_expression" => CpgNodeKind::UnaryOp {
                 operator: self.extract_operator(node, source),
             },
@@ -286,6 +289,12 @@ impl NodeMapper {
                 member: self.extract_child_text(node, "field", source),
             },
             "index_expression" => CpgNodeKind::IndexAccess,
+            "identifier" if self.is_rust_for_binding(node) => CpgNodeKind::Variable {
+                name: Arc::from(self.node_text(node, source)),
+                var_type: None,
+                scope: ScopeId::GLOBAL,
+                is_mutable: false,
+            },
             "identifier" | "type_identifier" | "field_identifier" => CpgNodeKind::Identifier {
                 name: Arc::from(self.node_text(node, source)),
                 definition: None,
@@ -1951,6 +1960,7 @@ impl NodeMapper {
                     || kind.contains('|')
                     || kind.contains('^')
                     || kind.contains('!')
+                    || kind.starts_with("..")
                     || kind == "and"
                     || kind == "or"
                     || kind == "not")
@@ -1962,6 +1972,24 @@ impl NodeMapper {
             }
         }
         Arc::from("?")
+    }
+
+    /// Returns whether a Rust identifier belongs to a `for` pattern.
+    ///
+    /// Tree-sitter exposes the complete pattern through the `pattern` field.
+    /// Walking to the direct child of `for_expression` also handles identifiers
+    /// nested in tuple and reference patterns without matching source text.
+    fn is_rust_for_binding(&self, node: &tree_sitter::Node) -> bool {
+        let mut current = *node;
+        while let Some(parent) = current.parent() {
+            if parent.kind() == "for_expression" {
+                return parent
+                    .child_by_field_name("pattern")
+                    .is_some_and(|pattern| pattern.id() == current.id());
+            }
+            current = parent;
+        }
+        false
     }
 
     fn extract_pattern_name(&self, node: &tree_sitter::Node, source: &str) -> Arc<str> {
@@ -2877,6 +2905,7 @@ pub async fn f<A>(a: i32, b: &str) -> i32 {
     while x > 0 { break; }
     loop { continue; }
     for i in 0..3 { }
+    for j in 0..=3 { }
     match x { 1 => { }, _ => { } }
     let r = g()?;
     return x;
@@ -2913,6 +2942,7 @@ fn g() -> Result<i32, ()> { Ok(1) }
             "continue_expression" => CpgNodeKind::Continue,
             "try_expression" => CpgNodeKind::Try,
             "binary_expression" => CpgNodeKind::BinaryOp { .. },
+            "range_expression" => CpgNodeKind::BinaryOp { .. },
             "unary_expression" => CpgNodeKind::UnaryOp { .. },
             "assignment_expression" => CpgNodeKind::Assignment { .. },
             "compound_assignment_expr" => CpgNodeKind::Assignment { .. },
@@ -2939,6 +2969,26 @@ fn g() -> Result<i32, ()> { Ok(1) }
             "generic_type" => CpgNodeKind::GenericParam { .. },
             "type_parameters" => CpgNodeKind::GenericParam { .. },
         );
+
+        let mut range_operators: Vec<&str> = p
+            .iter()
+            .filter(|(kind, _)| kind == "range_expression")
+            .filter_map(|(_, mapped)| match mapped {
+                CpgNodeKind::BinaryOp { operator } => Some(&**operator),
+                _ => None,
+            })
+            .collect();
+        range_operators.sort_unstable();
+        assert_eq!(range_operators, vec!["..", "..="]);
+        for binding in ["i", "j"] {
+            assert!(
+                p.iter().any(|(kind, mapped)| {
+                    kind == "identifier"
+                        && matches!(mapped, CpgNodeKind::Variable { name, .. } if &**name == binding)
+                }),
+                "the `for {binding}` pattern must be a semantic variable definition"
+            );
+        }
 
         // ---- a method call is a `call_expression` over a `field_expression` ----
         // This grammar has no `method_call_expression` node, so `is_method` is

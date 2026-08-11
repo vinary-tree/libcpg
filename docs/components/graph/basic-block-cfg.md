@@ -4,7 +4,8 @@ A **control-flow graph** (CFG) connects program points by possible execution
 transitions. A **basic block** is a maximal CFG run with one entry, whose
 internal transitions are unbranched `Sequential` edges. A **leader** is the
 first CPG node in such a block. `libcpg::block_cfg` computes a read-only,
-feature-free block view while retaining every original [`NodeId`](../../GLOSSARY.md#node-id).
+feature-free block view while retaining every original
+[`NodeId`](../../api/graph-reference.md#where-these-types-live).
 
 ![The function-scoped CFG passes through deterministic leader discovery, sequential-chain growth, block-edge projection, and iterative traversal ordering.](../../diagrams/basic-block-cfg.svg)
 

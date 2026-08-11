@@ -89,6 +89,12 @@ MeTTa keyword atoms remain because they are named `identifier` nodes.
 
 Each routine matches the grammar's node-kind strings onto shared `CpgNodeKind` variants — `function_item` → `Function`, `if_expression` → `If`, `call_expression` → `Call`, `integer_literal` → `Literal`, and so on — and always has an `Unknown { kind }` fallback so an unrecognized construct is preserved rather than lost. Two invariants the mappers uphold make the downstream overlays work: a named function/procedure maps to `Function` (so the CFG builder seeds an entry and treats its trailing body child as the body), and a *bound* name maps to `Variable`/`Parameter` (a DFG definition) while a *referenced* name maps to `Identifier` (a DFG use). The per-language routines are catalogued in [`../components/builder/node-mapper.md`](../components/builder/node-mapper.md).
 
+For Rust specifically, the grammar's `range_expression` becomes semantic
+`BinaryOp("..")` / `BinaryOp("..=")`, and an identifier under a
+`for_expression`'s `pattern` field becomes a `Variable`; iterator and body
+identifiers remain uses. This field-aware normalization lets feature-free graph
+analyses consume ranges and definitions without reparsing source text.
+
 ## The Rholang frontend (Mode B)
 
 Rholang is the concurrent [process-calculus](../GLOSSARY.md#rholang) language of the F1R3FLY.io ecosystem (`Paradigm::ProcessCalculus`). Its grammar has no imperative anchors of its own, so `map_rholang` normalizes ρ-calculus constructs onto the nearest CPG kind that keeps the CFG/DFG sound:

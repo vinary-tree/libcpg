@@ -1,6 +1,6 @@
 # Measurement methodology
 
-`libcpg` ships four runnable, feature-free Criterion benchmarks. Each harness
+`libcpg` ships five runnable, feature-free Criterion benchmarks. Each harness
 asserts a deterministic correctness oracle **before** entering the timed loop.
 Timing therefore measures an already-validated operation; a faster but
 incorrect implementation fails before it can produce a result.
@@ -17,7 +17,7 @@ the source transformation under study does not [[1]](#references).
 
 ## 1. Current evidence
 
-All four targets use `harness = false`, which hands execution to Criterion
+All five targets use `harness = false`, which hands execution to Criterion
 rather than Rust's test harness:
 
 ```toml
@@ -39,6 +39,10 @@ harness = false
 [[bench]]
 name = "dataflow_liveness"
 harness = false
+
+[[bench]]
+name = "induction_analysis"
+harness = false
 ```
 
 | Target | Public operation | Families and sizes | Pre-timing oracle |
@@ -47,6 +51,7 @@ harness = false
 | `cpg_construction` | graph-arena construction | paths at 1,000 and 10,000 nodes | exact node/edge counts and identifiers |
 | `pattern_matching` | bounded `Vf2Matcher::find_matches` | paths at 256 and 4,096 nodes | exact bounded embedding set |
 | `dataflow_liveness` | `liveness` | chains at 512/4,096 nodes, diamond ladders at 64/512 rungs, nested loops at 128/1,024 nodes | exact per-node equality with an independent round-robin solver |
+| `induction_analysis` | `loop_induction` | single counted loops with 64/512/2,048 invariant definitions | exact IV, bound, intended-invariant, DFG-contract, subset, and non-mutation checks |
 
 The evidence is deliberately local: a result for one named family, size,
 machine, toolchain, and environment is not a universal speed claim. DFG/PDG
@@ -92,6 +97,7 @@ tees Criterion output to one timestamped log:
 ./scripts/bench.sh dataflow_liveness
 ./scripts/bench.sh dataflow_liveness --save-baseline before
 ./scripts/bench.sh dataflow_liveness --baseline before
+./scripts/bench.sh induction_analysis --save-baseline before
 ```
 
 For a reportable campaign, record:

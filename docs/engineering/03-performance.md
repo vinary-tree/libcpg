@@ -81,7 +81,7 @@ monotone convergence, so it is bounded even on pathological control flow.
 
 ## Benchmark coverage and remaining gaps
 
-Four feature-free Criterion targets are active. Every target constructs and
+Five feature-free Criterion targets are active. Every target constructs and
 checks a deterministic oracle before Criterion enters the timed loop:
 
 - `scc_analysis` measures public call-graph decomposition over 1,000- and
@@ -92,7 +92,9 @@ checks a deterministic oracle before Criterion enters the timed loop:
   paths;
 - `dataflow_liveness` measures backward-May liveness over 512- and 4,096-node
   chains, 64- and 512-rung diamond ladders, and 128- and 1,024-node nested-loop
-  families.
+  families;
+- `induction_analysis` measures DFG-backed invariant and induction analysis on
+  single counted loops with 64, 512, and 2,048 invariant definitions.
 
 ```toml
 [[bench]]
@@ -110,6 +112,10 @@ harness = false
 [[bench]]
 name = "dataflow_liveness"
 harness = false
+
+[[bench]]
+name = "induction_analysis"
+harness = false
 ```
 
 Run it directly, or save and compare named baselines:
@@ -121,6 +127,7 @@ cargo bench --bench scc_analysis --no-default-features -- --baseline before
 ./scripts/bench.sh cpg_construction --save-baseline before
 ./scripts/bench.sh pattern_matching --save-baseline before
 ./scripts/bench.sh dataflow_liveness --save-baseline before
+./scripts/bench.sh induction_analysis --save-baseline before
 ```
 
 DFG/PDG construction, whole-corpus analysis, and GNN propagation still lack runnable

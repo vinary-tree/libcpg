@@ -47,6 +47,9 @@ PDG). A query can therefore mix syntax, control flow, and data flow freely.
 - **Interval value ranges** — forward abstract interpretation with comparison
   refinement, loop-header widening, bounded narrowing, and canonical immutable
   block-entry reports.
+- **Loop invariants and induction variables** — DFG-backed invariant fixed
+  points, unique latch-dominating additive/affine IVs, conservative hoist
+  candidates, and counted-trip evidence.
 - **DFG extraction** — intraprocedural, AST-ordered reaching definitions
   (Kildall 1973) and def-use chains (13 `DfgEdgeKind` variants).
 - **PDG + program slicing** — control-dependence edges via the reverse dominance

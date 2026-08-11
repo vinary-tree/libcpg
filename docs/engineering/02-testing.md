@@ -22,20 +22,22 @@ think to write down.
 
 | Kind | Count | Where |
 | --- | ---: | --- |
-| Maximal-matrix library tests | 613 | inline `#[cfg(test)] mod …` next to the code; includes examples and properties |
+| Maximal-matrix library tests | 627 | inline `#[cfg(test)] mod …` next to the code; includes examples and properties |
 | Public-API integration tests | 21 | `tests/integration.rs` |
 | Malformed-input robustness tests | 5 | `tests/robustness.rs` |
 | SCCP public/parser integration tests | 3 | `tests/sccp_integration.rs` |
 | Interval public/parser integration tests | 3 | `tests/intervals_integration.rs` |
-| **Executable test cases** | **645** | excludes three ignored rustdoc examples |
-| `proptest!` blocks (subset of the library/robustness rows) | 46 | inline property and regression modules |
+| Loop-induction public/parser integration tests | 3 | `tests/induction_integration.rs` |
+| **Executable test cases** | **662** | excludes three ignored rustdoc examples |
+| `proptest!` blocks (subset of the library/robustness rows) | 43 | exact source-level macro count in `src/` and `tests/` |
 
 The maximal-matrix library count is up from **99** inline tests and **zero**
 property tests before this work.
 
 Each property runs many generated cases (`ProptestConfig::with_cases(N)`, with
-`N` tuned to the cost of the property: 256 for cheap structural laws, 128 or 96
-for mid-weight ones, 64 for parser-backed ones, 32 for the heaviest), so the
+`N` tuned to the cost of the property: 256 for cheap structural laws, 192 for
+induction arithmetic/permutation contracts, 128 or 96 for other mid-weight
+ones, 64 for parser-backed ones, 32 for the heaviest), so the
 property suites execute on the order of ten thousand distinct inputs per run.
 
 ### Not every test compiles under every build
@@ -45,10 +47,10 @@ on the features enabled:
 
 | Command | Lib tests | Notes |
 | --- | ---: | --- |
-| `cargo test` | 322 | `default = []`: the feature-free surface only |
-| `cargo test --features "full rholang metta"` | 613 | the maximal matrix, including the Mode-B mappers |
+| `cargo test` | 334 | `default = []`: the feature-free surface only |
+| `cargo test --features "full rholang metta"` | 627 | the maximal matrix, including the Mode-B mappers |
 
-The feature-free 322 exercise the graph model, exact dominator/post-dominator,
+The feature-free 334 exercise the graph model, exact dominator/post-dominator,
 natural-loop, monotone data-flow, variable-liveness/dead-store,
 available/very-busy-expression, SCCP, interval value-range, and CFG/call-graph
 SCC analyses, the
@@ -124,6 +126,7 @@ The invariants fall into complementary families.
 | **Function CFG scope** | the reachable CFG view is invariant under node, edge, and recorded-exit insertion permutations; call edges never enter the view; dense entry/exit identifiers map back to the same stable nodes |
 | **Dominance** | CHK immediate dominators equal `petgraph::algo::dominators::simple_fast` under edge permutations; post-dominators and control edges equal the former PDG oracle; `PdgBuilder` emits exactly `PostDominatorTree::control_dependence_edges`; a 25,000-node path is stack-safe |
 | **Natural loops** | insertion permutations preserve the forest; dominator-qualified back edges and reverse-closure bodies equal independent brute-force oracles through 24 nodes; every body lies in a cyclic SCC; child bodies are strict parent subsets; `LoopExit` exactly crosses AST loop scope and starts a basic block; a 25,000-node loop is stack-safe |
+| **Loop invariants / induction variables** | every invariant use has non-empty `DefUse` evidence only from outside or already-invariant definitions; explicit recurrences are unique and dominate every latch; 192-case insertion permutations preserve complete reports and checked affine steps; a second 192-case oracle covers the full `i64` direction domain and comparison reversal; examples cover every supported update/range/affine shape, duplicate/conditional updates, nested/irreducible loops, hoist dominance, symbolic/overflow outcomes, serde, invalid/foreign forests, graph non-mutation, a real Rust `for i in 0..x`, and a 25,000-node stack-safe region; the malformed-graph property harness checks result references and subset laws |
 | **CFG reachability** | iterative DFS equals `petgraph::visit::Bfs`; reachable and unreachable sets form a disjoint, exhaustive partition; insertion permutations preserve reports; adding an edge never shrinks reachability; generated post-terminator tails remain unreachable; parser wrappers and all-return branches preserve termination; a 25,000-node graph is stack-safe |
 | **Basic-block CFGs** | insertion permutations preserve blocks, membership, typed edges, exits, and traversal orders; the blocks form a disjoint exhaustive projection partition; intra-block pairs have the required unique `Sequential` relation; every typed CFG edge is either an internal chain step or a block edge; parser, CFG-only, serde, invalid-selector, and non-mutation examples pass; a 25,000-block graph is stack-safe |
 | **Monotone data flow** | union and intersection joins are idempotent, commutative, and associative; priority/RPO, FIFO, and LIFO worklists reach identical states over generated CFGs; forward/backward boundaries, typed edge transfer, header-only widening, visit-cap failure, narrowing/non-ascent, malformed public views, node replay, serde, and non-mutation examples pass; a private reaching-definitions instance equals the retired acyclic CFG fixpoint and covers core AST-ordered def-use edges on a cycle; public integration tests implement the traits downstream and extract canonical facts from parsed code; the malformed-graph property harness invokes both fact extraction and solving |
@@ -256,10 +259,10 @@ cargo +nightly cov-branch           # branch coverage needs nightly
 
 | Metric | Coverage | Lowest file |
 | --- | ---: | --- |
-| Lines | **97.96 %** | 91.67 % (`language.rs`) |
-| Regions | **97.89 %** | — |
-| Functions | **98.10 %** | — |
-| Branches | **84.11 %** | see below |
+| Lines | **97.95 %** | 91.67 % (`language.rs`) |
+| Regions | **97.88 %** | — |
+| Functions | **98.08 %** | — |
+| Branches | **84.27 %** | see below |
 
 Every source file is above 90 % line coverage; seventeen are at 100 %.
 The `analysis/dominators.rs` module measures **97.50 %** line and
@@ -286,11 +289,17 @@ The new `analysis/dataflow/sccp.rs` module measures **98.58 %** line,
 the epic's 90 % / 80 % thresholds. Its concrete interpreter, lattice laws,
 parser integration, endpoint filtering, and malformed-graph cases are catalogued in
 [`scientific/05-sccp-validation.md`](../scientific/05-sccp-validation.md).
-The new `analysis/dataflow/intervals.rs` module measures **99.38 %** line,
-**99.04 %** region, **100 %** function, and **93.24 %** branch coverage, clearing
+The new `analysis/dataflow/intervals.rs` module measures **99.46 %** line,
+**99.08 %** region, **100 %** function, and **95.95 %** branch coverage, clearing
 the same thresholds. Its independent concrete interpreters, algebraic laws,
 loop-convergence checks, SCCP cross-check, and parser experiment are catalogued
 in [`scientific/06-interval-analysis-validation.md`](../scientific/06-interval-analysis-validation.md).
+The new `analysis/induction.rs` module measures **97.67 %** line,
+**97.44 %** region, **97.26 %** function, and **84.44 %** branch coverage,
+clearing the same thresholds. Its DFG invariant contracts, unique/dominating
+recurrence counterexamples, affine/direction oracles, insertion permutations,
+parser experiment, corruption campaign, and stack test are catalogued in
+[`scientific/07-induction-analysis-validation.md`](../scientific/07-induction-analysis-validation.md).
 All figures come from clean maximal-matrix coverage runs; no focused-test
 figure is substituted for the repository gate.
 
@@ -325,13 +334,13 @@ dependencies and are not part of the `full` feature set.
 | --- | --- |
 | `examples/` directory | present but **empty** — no runnable `cargo run --example …` programs. |
 | Doctests | none run — every code fence in a doc comment is marked `ignore` / `rust,ignore`, so `cargo test --doc` executes nothing. Feature-gating individual doctests in a `default = []` crate is awkward; the snippets are instead validated by the documentation snippet-check harness. |
-| Benchmarks | Four active feature-free Criterion targets cover SCC paths/rings/clusters, graph-arena paths, bounded VF2 paths, and liveness chains/diamond ladders/nested loops. Each asserts an exact deterministic oracle before timing; see [performance](03-performance.md). |
+| Benchmarks | Five active feature-free Criterion targets cover SCC paths/rings/clusters, graph-arena paths, bounded VF2 paths, liveness chains/diamond ladders/nested loops, and counted-loop induction regions. Each asserts an exact deterministic oracle before timing; see [performance](03-performance.md). |
 | `ml-linfa`, `gpu` | not exercised: optional heavy dependencies outside the `full` feature set. |
 
 ## Related pages
 
 - [Build and features](01-build-and-features.md) — the feature subsets used above.
-- [Performance](03-performance.md) — current SCC measurements and the remaining benchmarking gaps.
+- [Performance](03-performance.md) — current oracle-guarded targets and the remaining benchmarking gaps.
 - [`scientific/00-overview.md`](../scientific/00-overview.md) — how these tests
   are read as validation evidence.
 - [`security/01-input-and-resource-hardening.md`](../security/01-input-and-resource-hardening.md)

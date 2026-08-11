@@ -64,7 +64,10 @@ map_rust(ts_kind, node, source):
     "while_expression"      → While
     "call_expression"       → Call { target: None, is_method: false }
     "binary_expression"     → BinaryOp { operator }
-    "identifier"            → Identifier { name, definition: None }  # a DFG use
+    "range_expression"      → BinaryOp { operator: ".." or "..=" }
+    "identifier" in a for pattern
+                            → Variable { name, is_mutable: false }    # a DFG definition
+    "identifier" elsewhere → Identifier { name, definition: None }  # a DFG use
     "integer_literal"       → Literal { kind: Integer(..) }
     "use_declaration"       → Import { path }
     …                       → …
@@ -78,6 +81,29 @@ becomes `Variable`/`Parameter` (a DFG definition) while a *referenced* name beco
 `Identifier` (a DFG use), so def-use edges form; and a call/send becomes `Call` (so the
 argument→parameter machinery fires). Unrecognised kinds degrade to `Unknown { kind }` rather
 than failing — construction never aborts on an unfamiliar node.
+
+### Rust range and `for`-binding normalization
+
+The Rust grammar represents `0..x` and `0..=x` with the named
+`range_expression` rule. `map_rust` preserves that rule as a semantic
+`BinaryOp("..")` or `BinaryOp("..=")`; `extract_operator` reads the anonymous
+operator token from the tree-sitter node. This is syntax normalization inside
+the existing parser frontend, not a second parser.
+
+Rust uses the general `identifier` rule for both reads and binding patterns.
+For each identifier, the mapper walks raw tree-sitter ancestors until a
+`for_expression`; it classifies the identifier as a non-mutable `Variable`
+only when the direct ancestor on that path is the node stored in the
+`for_expression`'s grammar-defined `pattern` field. Identifiers in the
+iterator/range or body remain `Identifier` uses. Comparing tree node identity
+rather than source text also handles identifiers nested in tuple/reference
+patterns without name-based guessing.
+
+The exhaustive Rust mapping-table test parses both `for i in 0..3` and
+`for j in 0..=3`, requires both semantic operators, and requires both binders
+to be definitions. The parser-backed loop-induction integration test then
+checks that the shared DFG links a body use to the binder and that the analysis
+recognizes the step-one range.
 
 ---
 

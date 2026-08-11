@@ -19,7 +19,7 @@ Source: [`diagrams/expression-analysis.puml`](../../diagrams/expression-analysis
 
 ## 1. Structural expression facts
 
-Fix the finite universe $`E`$ of unary and binary [`ExprKey`](dataflow-framework.md#canonical-fact-universes)s
+Fix the finite universe $`E`$ of unary and binary [`ExprKey`](dataflow-framework.md#built-in-domains-and-fact-universes)s
 in one function. A key preserves:
 
 - operator spelling and operand order;

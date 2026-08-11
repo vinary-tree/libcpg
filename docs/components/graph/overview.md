@@ -281,6 +281,9 @@ So the safe pattern is: build (single-threaded, `&mut`), then analyse
   executable-edge and scalar-constant evidence with reachability refinement.
 - [Interval value ranges](interval-analysis.md) — forward integer abstract
   interpretation with branch meets, loop-header widening, and narrowing.
+- [Loop induction](induction-analysis.md) — DFG-backed invariant fixed points,
+  additive and one-level-affine induction variables, conservative hoist
+  candidates, and counted-trip evidence.
 - [Dominators and post-dominators](dominator-analysis.md) — immediate
   dominators, frontiers, constant-time ancestry, and PDG control dependence.
 - [Strongly-connected components](scc-analysis.md) — exact CFG loops and

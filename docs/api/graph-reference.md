@@ -456,6 +456,35 @@ See [Interval value-range
 analysis](../components/graph/interval-analysis.md) for the domain equations,
 transfer table, literate algorithm, examples, validation, and semantic limits.
 
+### Loop invariants and induction variables
+
+The feature-free loop-induction API composes a caller-supplied `LoopForest`
+with semantic AST, CFG, `DefUse` DFG, canonical variable facts, and dominance
+evidence:
+
+| API | Signature | Result |
+|---|---|---|
+| `loop_induction` | `fn(&CodePropertyGraph, NodeId, &LoopForest) -> Result<InductionAnalysis, AnalysisError>` | One immutable function report containing per-loop invariants, basic/derived IVs, and counted-trip evidence. |
+
+`InductionAnalysis` exposes `function`, `invariants`, `ivs`, and `bounds`.
+`LoopInvariants` exposes a stable `loop_id`, sorted `invariant_nodes`, and a
+sorted advisory `hoistable` subset. `InductionVariable` records its `loop_id`,
+canonical `variable`, `update_node`, checked `step: Option<i64>`,
+`IvDirection::{Increasing, Decreasing, Stationary, Unknown}`, and sorted
+outside-loop `init_defs`. `LoopBoundEvidence` contains either
+`TripEvidence::Counted { iv, comparison, bound_node }` or `Unknown`.
+
+The analysis recognizes additive explicit recurrences, semantic step-one
+ranges, and one level of affine derivation. A counted record is structural
+direction/bound evidence, not an exact trip count or termination proof. Every
+forest node and exit endpoint is validated against the function; foreign
+references return `AnalysisError::UnknownNode`. The CPG is never mutated.
+
+See [Loop invariants, induction variables, and trip
+evidence](../components/graph/induction-analysis.md) for fixed-point equations,
+supported forms, hoist obligations, pseudocode, complexity, validation, and
+limitations.
+
 ### Subgraph extraction
 
 | Method | Signature | Notes |

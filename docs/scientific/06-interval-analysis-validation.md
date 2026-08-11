@@ -146,8 +146,8 @@ Fixed examples cover:
 - Serde round trips for every public result/domain layer under `serde`.
 
 The clean maximal-matrix coverage runs measure the interval module at
-**99.38 % line**, **99.04 % region**, **100 % function**, and **93.24 % branch
-coverage**. These figures come from the complete 645-test matrix, not a focused
+**99.46 % line**, **99.08 % region**, **100 % function**, and **95.95 % branch
+coverage**. These figures come from the complete 662-test matrix, not a focused
 subset.
 
 ## Reproduction

@@ -31,6 +31,7 @@ Source: [`diagrams/resource-bounds.puml`](../diagrams/resource-bounds.puml).*
 | `SolverConfig::max_visits_per_block` | `256` | `solve` | returns `AnalysisError::IterationLimitExceeded` before another extraction of that block |
 | `SolverConfig::narrow_passes` | `0` | `solve` | performs exactly the configured number of post-widening deterministic sweeps |
 | SCCP event cap | `4 * (scope nodes + DefUse edges)` | `sccp` | returns `AnalysisError::IterationLimitExceeded` if malformed dependencies exceed the finite-lattice schedule bound |
+| Loop-induction structural bounds | at most `candidate_count + 1` invariant rounds per loop; affine depth `3` | `loop_induction` | reaches a finite fixed point; malformed AST cycles are cut by visited sets and arithmetic overflow becomes unknown evidence |
 
 All of these are on the **feature-free surface** — you can configure and use them
 with `default = []`.
@@ -195,6 +196,30 @@ concatenation allocates a result proportional to its two constant operands, and
 the public maps can grow with the scoped graph. Continue to enforce source and
 CPG size limits for hostile input.
 
+## Loop induction: finite structural bounds
+
+[`loop_induction`](../components/graph/induction-analysis.md) computes each
+loop's invariant set monotonically over a finite candidate list. A round can
+only add candidates, so the implementation performs at most
+$`candidate\_count + 1`$ rounds before stopping. Basic-IV recognition scans the
+finite loop region; derived affine recognition descends through at most three
+operator levels. Checked `i64` arithmetic maps negation, coefficient, or step
+overflow to unknown evidence rather than panicking or wrapping.
+
+Region, candidate-use, initialization, and guard discovery all use explicit
+work vectors plus visited sets. Malformed `AstChild` cycles therefore terminate,
+and a 25,000-node region is regression-tested for native-stack safety. The
+caller-supplied `LoopForest` is not trusted blindly: every header, entry, latch,
+body member, exit source, and exit target must resolve inside the selected
+function's reachable CFG projection or the call returns
+`AnalysisError::UnknownNode`.
+
+The fixed point bounds termination, not output size or transformation safety.
+Nested loop regions may overlap, worst-case candidate rescanning is polynomial,
+and `hoistable`/`Counted` results remain language-neutral advisory evidence.
+Continue to bound source/CPG size and apply language-specific overflow, trap,
+aliasing, volatile/atomic, and concurrency policy before consuming them.
+
 ## Dominance: structural convergence cap
 
 [`dominator_tree`](../components/graph/dominator-analysis.md) and
@@ -305,6 +330,7 @@ correctness**: an analysis may return a meaningless answer, but it must
 | `unreachable_code` | visited function-scope and dense CFG sets bound discovery; iterative DFS is stack-safe on a 25,000-node reachable/disconnected graph |
 | `block_cfg` / `solve` | iterative CFG traversal and work queues avoid native-stack growth; `solve` also caps extractions per block and ignores inconsistent public loop-header mappings |
 | `value_ranges` | expression visited stack, loop-header-only widening, 64 visits per block, and two bounded narrowing sweeps |
+| `loop_induction` | validates every supplied loop reference; finite invariant rounds, depth-three affine recognition, checked arithmetic, and iterative visited-set AST walks; a 25,000-node region is regression-tested |
 | `build_symbol_table` / `resolve_calls` | visited sets cut parent and callee-subtree cycles; deterministic scope-depth, candidate-retention, and call-count caps bound configured work |
 | `CfgExtractor::process_node` (and every `process_*` handler) | a **path set** on `CfgContext` — a node already on the current recursion path becomes its own exit instead of being re-entered |
 | DFG reaching definitions (`visit_reaching`) | a **path set** — same rule |
@@ -332,9 +358,9 @@ over each one — see
 6. **Lower `SolverConfig::max_visits_per_block`** for untrusted graphs or
    third-party analysis domains, and enable widening only with a matching loop
    forest.
-7. **Treat interval and SCCP results as conservative evidence**, validating
-   language-specific widths, overflow, effects, and concurrency before any
-   transformation.
+7. **Treat interval, SCCP, and loop-induction results as conservative
+   evidence**, validating language-specific widths, overflow, termination,
+   traps, effects, aliasing, and concurrency before any transformation.
 8. **Deserialize only trusted graphs** (see the [threat model](00-threat-model.md)
    and [`usage/05-serialization.md`](../usage/05-serialization.md)).
 9. **Treat detection output as advisory**, never as a security gate.

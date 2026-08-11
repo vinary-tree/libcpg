@@ -213,3 +213,7 @@ harness = false
 [[bench]]
 name = "dataflow_liveness"
 harness = false
+
+[[bench]]
+name = "induction_analysis"
+harness = false

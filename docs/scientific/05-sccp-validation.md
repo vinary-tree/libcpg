@@ -140,9 +140,9 @@ Repository verification additionally runs all features, Clippy, rustdoc,
 documentation rendering/link checks, stable line/region coverage, nightly
 branch coverage, and the staged pgmcp bug gate.
 
-The clean maximal-feature coverage runs execute 613 library tests, 21 general
-integration tests, 5 robustness tests, 3 SCCP integration tests, and 3 interval
-integration tests. For
+The clean maximal-feature coverage runs execute 627 library tests, 21 general
+integration tests, 5 robustness tests, 3 SCCP integration tests, 3 interval
+integration tests, and 3 loop-induction integration tests. For
 `analysis/dataflow/sccp.rs`, stable coverage reports **98.58 % lines**,
 **98.67 % regions**, and **100 % functions**; the nightly branch run reports
 **80.00 % branches**. These figures satisfy the epic's per-module 90 % line and

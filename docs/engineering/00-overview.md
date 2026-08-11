@@ -69,8 +69,8 @@ directly from that relationship, and both are visible in `Cargo.toml`:
 | Page | What it covers |
 | --- | --- |
 | [01 — Build and features](01-build-and-features.md) | The full feature matrix: 16 `lang-*` grammars, the language groups, the analysis features, the Mode-B toggles, `serde`, the reserved `gpu` flag, and the `full` umbrella; the pgmcp grammar-pin table; how to enable a language. |
-| [02 — Testing](02-testing.md) | The 645-test suite: example-based and `proptest` coverage plus the general, robustness, SCCP, and interval public-API suites; the `arb_*` generators; how to run each feature subset; measured coverage (97.96 % lines, 84.11 % branches); the eighteen defects the suite found; and the active Criterion benchmark substrate. |
-| [03 — Performance](03-performance.md) | The data-structure rationale, asymptotic costs, four active oracle-guarded Criterion targets, controlled-measurement protocol, and explicit remaining benchmark gaps. |
+| [02 — Testing](02-testing.md) | The 662-test suite: example-based and `proptest` coverage plus the general, robustness, SCCP, interval, and loop-induction public-API suites; the `arb_*` generators; how to run each feature subset; measured coverage (97.95 % lines, 84.27 % branches); the defects the suite found; and the active Criterion benchmark substrate. |
+| [03 — Performance](03-performance.md) | The data-structure rationale, asymptotic costs, five active oracle-guarded Criterion targets, controlled-measurement protocol, and explicit remaining benchmark gaps. |
 | [04 — Contributing](04-contributing.md) | Step-by-step recipes: add a language mapper, add a Gang-of-Four template, add a similarity metric; plus the coding conventions the crate follows. |
 
 ## Map of the security pillar
@@ -90,7 +90,7 @@ maturity than exists. The most consequential items:
 | --- | --- | --- |
 | Default build | `default = []`; `build` fails without a `lang-*` feature | [01](01-build-and-features.md) |
 | `examples/` directory | present but **empty** — no runnable examples (`tests/` now holds the integration and robustness suites) | [02](02-testing.md) |
-| Benchmarks | `criterion` is a dev-dependency but both `[[bench]]` targets are **commented out** | [02](02-testing.md), [03](03-performance.md) |
+| Benchmarks | five feature-free, oracle-guarded Criterion targets are active; DFG/PDG construction, whole-corpus analysis, and GNN propagation remain gaps | [02](02-testing.md), [03](03-performance.md) |
 | `rayon`, `ahash`, `string_cache`, `regex` | declared in `Cargo.toml` but **not yet wired** into `src/` (`proptest` is now used throughout the test suite) | [02](02-testing.md), [03](03-performance.md) |
 | `gpu` feature | **reserved** — enables `wgpu`/`pollster` but no GPU code is written | [01](01-build-and-features.md) |
 | Detection results | pattern/algorithm/complexity outputs are **heuristics**, not proofs | [`security/00`](../security/00-threat-model.md) |

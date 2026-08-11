@@ -16,7 +16,7 @@ A CPG library makes three kinds of assertion, and each demands a different stand
 
 These are distinct from *performance* claims ("construction is fast", "VF2
 prunes well"), which require controlled measurement rather than assertion.
-`libcpg` ships four oracle-guarded Criterion targets, but their evidence is
+`libcpg` ships five oracle-guarded Criterion targets, but their evidence is
 limited to the named graph families, sizes, environment, and operation. The
 protocol and remaining gaps are specified in [04 — Measurement
 methodology](04-measurement-methodology.md).
@@ -49,13 +49,14 @@ Two properties of the suite make this rigorous rather than merely suggestive:
 
 ## 3. The evidence base
 
-The maximal matrix contains **613 library tests**, **21 general public-API
+The maximal matrix contains **627 library tests**, **21 general public-API
 integration tests**, **5 malformed-input robustness tests**, **3 SCCP
 public/parser integration tests**, and **3 interval public/parser integration
-tests**. These 645 executable cases combine fixed examples, differential
-oracles, and 46 `proptest!` blocks. The
+tests**, plus **3 loop-induction public/parser integration tests**. These 662
+executable cases combine fixed examples, differential oracles, and 43 exact
+source-level `proptest!` blocks. The
 feature-free matrix remains independently runnable and exercises the exact
-graph/data-flow substrate without compiling any grammar. Four active Criterion
+graph/data-flow substrate without compiling any grammar. Five active Criterion
 targets supplement correctness with scoped performance evidence; see
 [Testing](../engineering/02-testing.md) for the census and [04](04-measurement-methodology.md)
 for the measurement contract.
@@ -69,18 +70,21 @@ Because `default = []`, many tests are **feature-gated**. The end-to-end reachin
 | [01 — Invariants & equivalence](01-cpg-invariants-and-equivalence.md) | Single shared node set; graph-assigned unique IDs; AST child/parent consistency; idempotent extractors; `build` ≡ `build_from_tree` (identical node/edge counts + language) | `test_build_from_tree_matches_build`, `parsed_shadowing_and_idempotent`, `def_use_backward_slice`, `parsed_nested_use_resolves_and_chains` | `lang-rust` (equivalence, DFG) / feature-free (slice) |
 | [02 — Reaching-defs validation](02-reaching-defs-validation.md) | Nested-expression use resolution; latest-definition (strong update); non-flow of unrelated variables; shadowing scope; idempotency | `parsed_nested_use_resolves_and_chains`, `parsed_reassignment_uses_latest_definition`, `parsed_unrelated_variable_does_not_flow`, `parsed_shadowing_and_idempotent` | `lang-rust` |
 | [03 — VF2 completeness](03-vf2-completeness.md) | Soundness floor (empty pattern → no match); kind-feasibility pruning; **all** embeddings found (diamond → exactly 2) with exact backtracking | `test_empty_pattern`, `test_single_node_match`, `test_multi_embedding_backtracking` | feature-free |
-| [04 — Measurement methodology](04-measurement-methodology.md) | Environment control and exact-oracle timing for SCC, arena construction, bounded VF2, and liveness | four `benches/*.rs` Criterion targets | feature-free |
+| [04 — Measurement methodology](04-measurement-methodology.md) | Environment control and exact-oracle timing for SCC, arena construction, bounded VF2, liveness, and loop induction | five `benches/*.rs` Criterion targets | feature-free |
 | [05 — SCCP validation](05-sccp-validation.md) | Concrete value soundness, lattice laws, conditional-edge partition, refinement monotonicity, determinism, parser integration | `straight_line_literal_programs_match_the_concrete_interpreter`, SCCP unit/property tests, `sccp_integration` | feature-free / `lang-rust` parser case |
 | [06 — Interval validation](06-interval-analysis-validation.md) | Concrete range soundness, hull/widen/narrow laws, loop convergence, narrowing descent, determinism, SCCP cross-check, parser integration | interval unit/property tests, `intervals_integration` | feature-free / `lang-rust` parser case |
+| [07 — Loop-induction validation](07-induction-analysis-validation.md) | DFG invariant contract, unique latch-dominating recurrences, checked affine steps, comparison direction, determinism, parser integration, malformed/stack safety | induction unit/property tests, `induction_integration`, robustness harness | feature-free / `serde` / `lang-rust` parser case |
 
 ## 5. What is proven, and what is advisory
 
 Scientific honesty requires separating the two:
 
-- **Proven (guarded by the tests above).** The CPG's structural invariants; deterministic graph projection; immediate dominance (differentially checked against `petgraph`); post-dominance and control-dependence equivalence with the former production oracle; natural back edges and loop bodies (checked against independent brute-force dominance and closure oracles); exact SCC partitioning and condensation acyclicity (differentially checked against `petgraph`'s Tarjan implementation); liveness fixed points (checked against an independent Gauss–Seidel solver); available/very-busy Must states (checked by exhaustive entry/exit path enumeration on generated acyclic CFGs); SCCP constants on the generated `StmtSpec` language (checked by a concrete mini-interpreter), conditional-edge partitions, and deterministic insertion permutations; interval membership on generated straight-line and bounded-loop programs, widening/narrowing laws, convergence caps, SCCP singleton containment, and deterministic reports; the reaching-definition semantics on the audited corpus; and VF2's completeness on the discriminating diamond. These are deterministic and regression-locked.
+- **Proven (guarded by the tests above).** The CPG's structural invariants; deterministic graph projection; immediate dominance (differentially checked against `petgraph`); post-dominance and control-dependence equivalence with the former production oracle; natural back edges and loop bodies (checked against independent brute-force dominance and closure oracles); exact SCC partitioning and condensation acyclicity (differentially checked against `petgraph`'s Tarjan implementation); liveness fixed points (checked against an independent Gauss–Seidel solver); available/very-busy Must states (checked by exhaustive entry/exit path enumeration on generated acyclic CFGs); SCCP constants on the generated `StmtSpec` language (checked by a concrete mini-interpreter), conditional-edge partitions, and deterministic insertion permutations; interval membership on generated straight-line and bounded-loop programs, widening/narrowing laws, convergence caps, SCCP singleton containment, and deterministic reports; loop-invariant DFG contracts, checked additive/affine IV steps, direction compatibility, insertion-order determinism, and conservative rejection cases; the reaching-definition semantics on the audited corpus; and VF2's completeness on the discriminating diamond. These are deterministic and regression-locked.
 - **Advisory (policy-sensitive by design).** The available/very-busy states are
   exact for the modeled structural expressions and CFG, while their CSE/PRE
   transformation candidates still require language side-effect policy.
+  Loop-induction `hoistable` and `Counted` evidence likewise requires
+  language-aware transformation and termination policy.
   [Design-pattern detection](../GLOSSARY.md#design-pattern),
   [algorithm-family](../GLOSSARY.md#algorithm-family) recognition, and
   [GNN](../GLOSSARY.md#graph-neural-network-gnn) embeddings are heuristics: they
@@ -89,7 +93,7 @@ Scientific honesty requires separating the two:
 - **Empirically bounded.** Performance results apply only to a target's named
   fixture, size, and controlled environment. DFG/PDG construction,
   whole-corpus analysis, and GNN propagation remain measurement gaps; no result
-  from the four active targets may be generalized to them.
+  from the five active targets may be generalized to them.
 
 ## 6. Reproducing the experiments
 

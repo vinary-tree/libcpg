@@ -1,0 +1,62 @@
+@startuml
+!include _libcpg-theme.iuml
+title Loop-invariant and induction analysis
+
+component "Immutable CPG" as CPG #DBE4FF
+component "Semantic AST\nexpressions + assignments" as AST #DBE4FF
+component "Typed CFG\nloop paths + exits" as CFG #D3F9D8
+component "DefUse DFG\nreaching definitions" as DFG #FFF3BF
+
+component "LoopForest\nbody, latches, exits" as LOOPS #D3F9D8
+component "DominatorTree\nmandatory-path evidence" as DOM #E5DBFF
+component "VarFacts\ncanonical definitions + uses" as FACTS #FFF3BF
+
+component "Least fixed point\nloop-invariant nodes" as INV #FFE8CC
+component "Hoist filter\nside-effect-free shape\n+ unique definition\n+ dominated observations/uses" as HOIST #C3FAE8
+component "Basic induction variables\nunique dominating recurrence\nor semantic range" as BASIC #FCC2D7
+component "One-level affine variables\ny = a*i + b" as DERIVED #FCC2D7
+component "Counted-trip evidence\ndirection-compatible guard\n+ invariant bound" as BOUND #FFE3E3
+
+component "InductionAnalysis\ncanonical out-of-graph report" as REPORT #F1F3F5
+
+CPG --> AST : project existing nodes
+CPG --> CFG : project existing edges
+CPG --> DFG : project existing edges
+CFG --> LOOPS : natural-loop analysis
+CFG --> DOM : dominance analysis
+AST --> FACTS : classify names
+DFG --> FACTS : bind uses to definitions
+
+LOOPS --> INV : finite loop region
+FACTS --> INV : outside/invariant definitions
+INV --> HOIST : candidate subset
+DOM --> HOIST : dominates latches, exits, uses
+INV --> BASIC : invariant recurrence operand
+FACTS --> BASIC : one in-loop definition
+DOM --> BASIC : update reaches every latch
+BASIC --> DERIVED : affine base
+INV --> DERIVED : invariant coefficients/offsets
+BASIC --> BOUND : step direction
+DERIVED --> BOUND : derived step direction
+LOOPS --> BOUND : exit guards / range header
+INV --> BOUND : invariant bound operand
+
+INV --> REPORT
+HOIST --> REPORT
+BASIC --> REPORT
+DERIVED --> REPORT
+BOUND --> REPORT
+
+legend right
+  |= Colour |= Evidence / phase |
+  |<#DBE4FF>| source and semantic AST |
+  |<#D3F9D8>| control flow and loop structure |
+  |<#FFF3BF>| data flow and variable facts |
+  |<#E5DBFF>| dominance evidence |
+  |<#FFE8CC>| invariant fixed point |
+  |<#C3FAE8>| advisory hoist candidates |
+  |<#FCC2D7>| induction variables |
+  |<#FFE3E3>| counted-trip evidence |
+  |<#F1F3F5>| immutable result |
+endlegend
+@enduml

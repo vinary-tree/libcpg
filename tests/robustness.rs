@@ -378,6 +378,40 @@ fn exercise_every_analysis(cpg: &CodePropertyGraph, func: NodeId) {
         .all(|store| work.node(store.node).is_some()));
     let first_resolution = libcpg::resolve_calls(&mut work, &libcpg::ResolveConfig::default());
     libcpg::DfgExtractor::new().extract(&mut work);
+    let sparse_constants = libcpg::sccp(&work, func).expect("SCCP remains total");
+    assert!(sparse_constants
+        .constants
+        .keys()
+        .chain(&sparse_constants.unreachable_nodes)
+        .all(|node| work.node(*node).is_some()));
+    assert!(sparse_constants
+        .executable_edges
+        .iter()
+        .chain(&sparse_constants.dead_edges)
+        .all(|(source, target, _)| {
+            work.node(*source).is_some() && work.node(*target).is_some()
+        }));
+    let ranges = libcpg::value_ranges(&work, func).expect("interval analysis remains total");
+    assert!(ranges.at_block_entry.iter().all(|(leader, entries)| {
+        work.node(*leader).is_some()
+            && entries
+                .windows(2)
+                .all(|pair| pair[0].0.as_ref() < pair[1].0.as_ref())
+    }));
+    let induction = libcpg::loop_induction(&work, func, &loops)
+        .expect("loop induction remains total on the validated forest");
+    assert_eq!(induction.invariants.len(), loops.loops.len());
+    assert_eq!(induction.bounds.len(), loops.loops.len());
+    assert!(induction
+        .invariants
+        .iter()
+        .flat_map(|report| report.invariant_nodes.iter().chain(&report.hoistable))
+        .chain(induction.ivs.iter().map(|iv| &iv.update_node))
+        .all(|node| work.node(*node).is_some()));
+    assert!(induction.invariants.iter().all(|report| report
+        .hoistable
+        .iter()
+        .all(|node| report.invariant_nodes.binary_search(node).is_ok())));
     libcpg::PdgBuilder::new().build(&mut work, func);
 
     // Re-running is idempotent even on corrupt input.
@@ -523,6 +557,18 @@ fn an_absent_node_id_is_inert_everywhere() {
     );
     assert_eq!(
         libcpg::very_busy_expressions(&cpg, dangling()),
+        Err(libcpg::AnalysisError::UnknownNode(dangling()))
+    );
+    assert_eq!(
+        libcpg::sccp(&cpg, dangling()),
+        Err(libcpg::AnalysisError::UnknownNode(dangling()))
+    );
+    assert_eq!(
+        libcpg::value_ranges(&cpg, dangling()),
+        Err(libcpg::AnalysisError::UnknownNode(dangling()))
+    );
+    assert_eq!(
+        libcpg::loop_induction(&cpg, dangling(), &libcpg::LoopForest::default()),
         Err(libcpg::AnalysisError::UnknownNode(dangling()))
     );
 

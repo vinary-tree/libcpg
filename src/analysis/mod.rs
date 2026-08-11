@@ -7,6 +7,7 @@ mod basic_blocks;
 pub(crate) mod cfg_scope;
 pub mod dataflow;
 mod dominators;
+mod induction;
 mod loops;
 mod projection;
 mod reachability;
@@ -32,6 +33,11 @@ pub use projection::{
 };
 
 pub use dominators::{dominator_tree, post_dominator_tree, DominatorTree, PostDominatorTree};
+
+pub use induction::{
+    loop_induction, InductionAnalysis, InductionVariable, IvDirection, LoopBoundEvidence,
+    LoopInvariants, TripEvidence,
+};
 
 pub use loops::{loop_forest, LoopExitEdge, LoopForest, NaturalLoop};
 
