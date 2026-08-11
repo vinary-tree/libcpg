@@ -287,6 +287,28 @@ clusters; singleton SCCs are marked cyclic only when they have a self-loop.
 See the [SCC component guide](../components/graph/scc-analysis.md) for projection
 boundaries, accepted call encodings, complexity, and examples.
 
+### Condensation-DAG analytics
+
+These feature-free functions consume the SCC result without mutating or
+re-projecting the CPG:
+
+| Function | Signature | Result |
+|---|---|---|
+| `condensation_metrics` | `fn(&SccDecomposition, &CondensationOptions) -> CondensationMetrics` | Source-oriented longest-path levels, SCC-member-weighted critical path, height/width, and an optional CG schedule; total incomplete/capped signaling. |
+| `coffman_graham` | `fn(&SccDecomposition, u32) -> Result<CgLayering, AnalysisError>` | Sink-first width-bounded layers, or explicit invalid-input/budget error. |
+
+`CondensationOptions` exposes `max_components` and
+`coffman_graham_width`. `CondensationMetrics` exposes `levels`,
+`critical_path`, `critical_path_weight`, `height`, `width`,
+`coffman_graham`, `complete`, and `capped`. `CgLayering` exposes
+`width_limit`, sorted `layers`, direct `layer_of`, and `height()` / `width()`.
+The hard ceiling is the root-exported
+`MAX_CONDENSATION_COMPONENTS = 1_000_000`.
+
+See the [condensation component guide](../components/graph/condensation-analysis.md)
+for orientation, Kahn and Coffman–Graham pseudocode, malformed-input policy,
+complexity, examples, and exhaustive path/schedule oracles.
+
 ### Natural loops and nesting
 
 The feature-free loop API uses the shared reachable function CFG and dominator

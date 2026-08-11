@@ -10,7 +10,8 @@ timeout).
 ![Resource bounds that keep libcpg finite on large or untrusted input](../diagrams/resource-bounds.svg)
 
 *Figure — finite-work safeguards for construction, call resolution, VF2
-matching, monotone solving, the structural DFG sweep, and slicing.
+matching, monotone solving, condensation analytics, the structural DFG sweep,
+and slicing.
 Source: [`diagrams/resource-bounds.puml`](../diagrams/resource-bounds.puml).*
 
 ## The bounds at a glance
@@ -31,6 +32,7 @@ Source: [`diagrams/resource-bounds.puml`](../diagrams/resource-bounds.puml).*
 | `SolverConfig::max_visits_per_block` | `256` | `solve` | returns `AnalysisError::IterationLimitExceeded` before another extraction of that block |
 | `SolverConfig::narrow_passes` | `0` | `solve` | performs exactly the configured number of post-widening deterministic sweeps |
 | SCCP event cap | `4 * (scope nodes + DefUse edges)` | `sccp` | returns `AnalysisError::IterationLimitExceeded` if malformed dependencies exceed the finite-lattice schedule bound |
+| `CondensationOptions::max_components` | `1_000_000` hard maximum | `condensation_metrics`; `coffman_graham` always uses the hard maximum | the total metrics API returns an incomplete capped report; the direct CG API returns `AnalysisError::BudgetExceeded` |
 | Loop-induction structural bounds | at most `candidate_count + 1` invariant rounds per loop; affine depth `3` | `loop_induction` | reaches a finite fixed point; malformed AST cycles are cut by visited sets and arithmetic overflow becomes unknown evidence |
 | Complexity-evidence bounds | validated finite function scope plus loop/induction provider bounds | `estimate_time_complexity_with_evidence` (feature `algorithm-detection`) | provider failure or absent CFG evidence returns the exact legacy total estimate; justification grows with loop count |
 
@@ -197,6 +199,25 @@ The cap bounds scheduling, not operator cost or output size. String
 concatenation allocates a result proportional to its two constant operands, and
 the public maps can grow with the scoped graph. Continue to enforce source and
 CPG size limits for hostile input.
+
+## Condensation analytics: component cap and structural validation
+
+[`condensation_metrics`](../components/graph/condensation-analysis.md) clamps
+the caller's `max_components` option to the hard
+`MAX_CONDENSATION_COMPONENTS = 1_000_000` ceiling. A decomposition above the
+effective limit returns `complete = false`, `capped = true`, and empty metric
+vectors. The direct `coffman_graham` API uses the hard ceiling and returns
+`AnalysisError::BudgetExceeded` instead. A zero CG width is invalid.
+
+The input is a public `SccDecomposition`, so the analytics do not assume that
+it came from libcpg's SCC engine. Validation requires positional component ids,
+nonempty and exactly mapped membership, in-range non-self edges, and an acyclic
+normalized condensation graph. Malformed input produces an incomplete total
+report or `AnalysisError::InvalidInput`; it never causes partial mutation or
+recursive traversal. Work uses explicit heaps and vectors. The cap limits the
+number of components, while total SCC membership and edge storage still scale
+with the supplied decomposition, so callers must retain source/graph size
+limits for hostile inputs.
 
 ## Loop induction: finite structural bounds
 

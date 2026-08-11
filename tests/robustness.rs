@@ -309,6 +309,18 @@ fn exercise_every_analysis(cpg: &CodePropertyGraph, func: NodeId) {
                 .all(|edge| edge.source != edge.target),
             "condensation edges never contain self-loops"
         );
+        let metrics = libcpg::condensation_metrics(
+            decomposition,
+            &libcpg::CondensationOptions {
+                coffman_graham_width: Some(2),
+                ..libcpg::CondensationOptions::default()
+            },
+        );
+        assert!(metrics.complete, "SCC output is a valid condensation");
+        assert_eq!(metrics.levels.len(), decomposition.components.len());
+        let layering = libcpg::coffman_graham(decomposition, 2)
+            .expect("SCC output has a valid bounded layering");
+        assert_eq!(layering.layer_of.len(), decomposition.components.len());
     }
 
     // --- extractors ---
@@ -592,6 +604,13 @@ fn the_empty_graph_is_analyzable() {
     let sccs = libcpg::call_graph_sccs(&cpg);
     assert_eq!(sccs.node_count(), 0);
     assert!(sccs.is_acyclic());
+    let metrics = libcpg::condensation_metrics(&sccs, &libcpg::CondensationOptions::default());
+    assert!(metrics.complete);
+    assert_eq!(metrics.height, 0);
+    assert!(libcpg::coffman_graham(&sccs, 1)
+        .expect("empty condensation is layerable")
+        .layers
+        .is_empty());
 
     let mut work = cpg.clone();
     libcpg::CfgExtractor::new().extract(&mut work);

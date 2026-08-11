@@ -65,6 +65,8 @@ dimension, $`k`$ = Weisfeiler-Lehman iterations (3).
 | Dominator/post-dominator tree | worst case $`O(VE)`$ time, $`O(V + E)`$ auxiliary space | Deterministic CHK fixed point with a $`V + 2`$ pass cap, Cytron frontier, and iterative Euler intervals; ancestry queries are $`O(1)`$. |
 | PDG construction (per function) | worst case $`O(VE)`$ for control dependence, plus a DFG scan | Reuses the public post-dominator tree's reverse frontier, then emits deduplicated control and data dependence edges. |
 | CFG/call-graph SCC decomposition | $`O(V + E)`$ after adjacency normalization | Iterative Tarjan plus condensation construction; dense indices avoid traversal hash lookups, and explicit stacks avoid native-stack growth with path depth. |
+| Condensation metrics | $`O(M + E\log E + (C+E)\log C)`$ time, $`O(C+E)`$ auxiliary space | $`C`$ components, $`E`$ condensation edges, and $`M`$ SCC members. Validation checks the public membership map, adjacency is normalized, and a min-id Kahn heap drives levels and weighted critical paths. |
+| Coffman–Graham layering | worst case $`O(M + E\log E + C^2\log C)`$ time, $`O(C+E)`$ auxiliary space | Predecessor-label vectors make heap comparison linear in $`C`$ in the worst case; ordered available layers enforce the requested width. The component cap is $`10^6`$. |
 | Variable liveness | conventional $`O(H(B + E_b)W)`$ solve plus $`O(NW)`$ report replay | $`B`$ blocks, $`E_b`$ block edges, $`N`$ reachable CFG nodes, lattice height $`H \le F`$ for $`F`$ variables, and $`W = \lceil F/64 \rceil`$ machine words per state. |
 | Available / very-busy expressions | each has conventional $`O(H(B + E_b)W)`$ solve plus $`O(NW)`$ report replay; advisory candidate filtering adds dominance and bounded kill-reachability checks | $`F`$ structural expressions, $`H \le F`$, and $`W = \lceil F/64 \rceil`$; kill indexing is linear in operand memberships and definitions. |
 | Evidence-aware complexity | provider cost plus $`O(L + R)`$ composition | Computes the legacy AST fallback, validated function scope, loop forest/dominance, and induction report; then formats $`L`$ loops and combines $`R`$ recursion sites. Provider worst cases are documented with loop and induction analysis. |
@@ -82,13 +84,17 @@ once, loop bodies twice, and a path set cuts malformed AST cycles.
 
 ## Benchmark coverage and remaining gaps
 
-Five Criterion targets are active. Their baseline operations are feature-free;
-`induction_analysis` also registers a sixth, `algorithm-detection`-gated
-operation. Every active group constructs and checks a deterministic oracle
+Six Criterion targets are active. Their seven baseline operation groups are
+feature-free; `induction_analysis` also registers an eighth,
+`algorithm-detection`-gated operation. Every active group constructs and checks a deterministic oracle
 before Criterion enters the timed loop:
 
 - `scc_analysis` measures public call-graph decomposition over 1,000- and
   10,000-function paths, rings, and cyclic clusters;
+- `condensation` measures public metrics with and without Coffman–Graham
+  layering over 1,024- and 8,192-component paths and eight independent chains;
+  each fixture checks exact levels, critical path, height, width, coverage, and
+  edge orientation before timing;
 - `cpg_construction` measures deterministic graph-arena construction over
   1,000- and 10,000-node paths;
 - `pattern_matching` measures bounded VF2 matching over 256- and 4,096-node
@@ -105,6 +111,10 @@ before Criterion enters the timed loop:
 ```toml
 [[bench]]
 name = "scc_analysis"
+harness = false
+
+[[bench]]
+name = "condensation"
 harness = false
 
 [[bench]]
@@ -130,6 +140,7 @@ Run it directly, or save and compare named baselines:
 cargo bench --bench scc_analysis --no-default-features
 cargo bench --bench scc_analysis --no-default-features -- --save-baseline before
 cargo bench --bench scc_analysis --no-default-features -- --baseline before
+./scripts/bench.sh condensation --save-baseline before
 ./scripts/bench.sh cpg_construction --save-baseline before
 ./scripts/bench.sh pattern_matching --save-baseline before
 ./scripts/bench.sh dataflow_liveness --save-baseline before

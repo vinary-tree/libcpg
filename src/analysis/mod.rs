@@ -5,6 +5,7 @@
 
 mod basic_blocks;
 pub(crate) mod cfg_scope;
+mod condensation;
 pub mod dataflow;
 mod dominators;
 mod induction;
@@ -17,6 +18,11 @@ mod scc;
 use crate::NodeId;
 
 pub use basic_blocks::{block_cfg, BasicBlock, BlockCfg, BlockEdge, BlockId};
+
+pub use condensation::{
+    coffman_graham, condensation_metrics, CgLayering, CondensationMetrics, CondensationOptions,
+    MAX_CONDENSATION_COMPONENTS,
+};
 
 pub use dataflow::{
     available_expressions, dead_stores, expression_facts, liveness, sccp, solve, value_ranges,
@@ -91,6 +97,16 @@ pub enum AnalysisError {
         /// Function selected by the supplied refinement.
         actual: NodeId,
     },
+    /// An analysis received a structurally invalid input or option.
+    #[error("{analysis} received invalid {input}: {reason}")]
+    InvalidInput {
+        /// Stable analysis name used in diagnostics.
+        analysis: &'static str,
+        /// Input or option whose contract was violated.
+        input: &'static str,
+        /// Human-readable description of the violated contract.
+        reason: &'static str,
+    },
     /// Projection construction failed before the analysis could run.
     #[error(transparent)]
     Projection(#[from] ProjectionError),
@@ -131,6 +147,16 @@ mod tests {
         assert_eq!(
             budget.to_string(),
             "paths needs 11 states, exceeding the configured cap of 10"
+        );
+
+        let invalid = AnalysisError::InvalidInput {
+            analysis: "coffman_graham",
+            input: "width",
+            reason: "must be at least one",
+        };
+        assert_eq!(
+            invalid.to_string(),
+            "coffman_graham received invalid width: must be at least one"
         );
     }
 }

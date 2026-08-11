@@ -228,6 +228,15 @@ and the acyclic condensation graph. The analysis is exact for the projected
 edges and does not guess unresolved calls. See the
 [SCC component guide](../components/graph/scc-analysis.md) for the full contract.
 
+`condensation_metrics(&sccs, &options)` continues that pipeline without
+revisiting the CPG. A minimum-id Kahn order drives source-oriented longest-path
+levels and an SCC-member-weighted critical path; optional
+`coffman_graham(&sccs, width)` produces sink-oriented width-bounded scheduling
+layers. Both are feature-free, iterative, canonical by component id, and
+out-of-graph. See [condensation-DAG
+analytics](../components/graph/condensation-analysis.md) for the two layer
+orientations, cap/error contract, and exhaustive path/schedule oracles.
+
 ### Natural loops and nesting (feature-free)
 
 `loop_forest(&cpg, function)` combines the same reachable intraprocedural CFG,

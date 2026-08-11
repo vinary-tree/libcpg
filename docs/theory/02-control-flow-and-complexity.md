@@ -92,6 +92,47 @@ a cyclic strongly-connected component is reported explicitly as irreducible.
 an AST loop scope, so the classification changes while $`E`$, $`N`$, and hence
 $`M = E - N + 2`$ do not.
 
+### From cycles to a condensation DAG
+
+[Strongly connected components
+(SCCs)](../GLOSSARY.md#strongly-connected-component-scc) isolate mutually
+reachable regions. Contracting each SCC $`C_i`$ produces the
+[condensation graph](../GLOSSARY.md#condensation-graph--condensation-metrics),
+which is a [directed acyclic graph
+(DAG)](../GLOSSARY.md#directed-acyclic-graph-dag). `libcpg` uses that acyclic
+quotient for evidence that cannot be defined directly on a recursive cycle.
+
+For component $`v`$, Kahn's canonical [topological
+order](../GLOSSARY.md#topological-order) [[2]](#references)
+supports the source-depth recurrence
+
+```math
+\ell(v)=
+\begin{cases}
+0, & pred(v)=\varnothing,\\
+1+\max_{u\in pred(v)}\ell(u), & \text{otherwise}.
+\end{cases}
+```
+
+Weighting $`v`$ by its SCC member count $`|C_v|`$ produces a structural
+[`critical path`](../GLOSSARY.md#critical-path) that preserves the size of
+recursive/cyclic clusters. The separate
+[Coffman–Graham layering](../GLOSSARY.md#coffmangraham-layering-cg)
+[[3]](#references) uses sink layer zero and a
+positive width limit $`w`$; every edge points to a strictly lower layer and no
+layer contains more than $`w`$ components. The opposite orientations are
+explicit rather than interchangeable.
+
+![A condensation DAG shown under source-oriented longest-path levels and sink-oriented Coffman–Graham layers.](../diagrams/condensation-layer-orientation.svg)
+
+*Figure — one condensation under the two documented layer conventions. Source:
+[`diagrams/condensation-layer-orientation.puml`](../diagrams/condensation-layer-orientation.puml).*
+
+These are exact graph/schedule metrics for the supplied condensation, not an
+execution-time prediction. See the
+[condensation component guide](../components/graph/condensation-analysis.md)
+for the full algorithms, caps, and exhaustive oracles.
+
 ![Control-flow graph of a small function with edge kinds labelled](../diagrams/cfg-example.svg)
 
 *Figure — the CFG of a small function, each edge annotated with its `CfgEdgeKind`. Source: [`diagrams/cfg-example.dot`](../diagrams/cfg-example.dot).*
@@ -228,8 +269,16 @@ the effort of testing a routine.
   the edge catalogue: [`components/graph/edges.md`](../components/graph/edges.md);
   traversal recipes: [`components/graph/traversal.md`](../components/graph/traversal.md);
   reachable/unreachable partitioning:
-  [`components/graph/reachability-analysis.md`](../components/graph/reachability-analysis.md).
+  [`components/graph/reachability-analysis.md`](../components/graph/reachability-analysis.md);
+  SCC contraction and scheduling:
+  [`components/graph/condensation-analysis.md`](../components/graph/condensation-analysis.md).
 
 ## References
 
 1. McCabe, T. J. (1976). *A Complexity Measure.* IEEE TSE SE-2(4). DOI: [10.1109/TSE.1976.233837](https://doi.org/10.1109/TSE.1976.233837)
+2. Kahn, A. B. (1962). *Topological sorting of large networks.* Communications
+   of the ACM 5(11), 558. DOI:
+   [10.1145/368996.369025](https://doi.org/10.1145/368996.369025)
+3. Coffman, E. G., Jr., Graham, R. L. (1972). *Optimal scheduling for
+   two-processor systems.* Acta Informatica 1, 200–213. DOI:
+   [10.1007/BF00288685](https://doi.org/10.1007/BF00288685)

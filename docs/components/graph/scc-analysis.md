@@ -69,6 +69,12 @@ same node and edge set, independent of hash-table iteration order.
 When the `serde` feature is enabled, the projection, components, membership
 map, and condensation edges serialize and deserialize together.
 
+The decomposition is also the direct input to feature-free
+[`condensation_metrics`](condensation-analysis.md) and `coffman_graham`. Those
+APIs preserve component ids while computing SCC-member-weighted critical paths,
+source-oriented level height/width, and optional sink-oriented width-bounded
+layers. They do not rerun Tarjan or reconstruct call/CFG topology.
+
 ## CFG projection boundaries
 
 The CFG projection starts at the requested function and follows its `AstChild`

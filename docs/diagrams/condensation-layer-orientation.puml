@@ -1,0 +1,27 @@
+@startuml
+!include _libcpg-theme.iuml
+title One condensation DAG, two explicit layer orientations
+left to right direction
+
+rectangle "**Contracted SCC DAG**\n\ncomponent 0 {first, second}, weight 2\n          |\n          v\ncomponent 1 {middle}, weight 1\n         / \\\n        v   v\ncomponent 2   component 3\n{left_sink}   {right_sink}\nweight 1      weight 1" as DAG #C3FAE8
+
+rectangle "**Source-oriented levels**\n\nlevel 0   {0}\n   |\n   v\nlevel 1   {1}\n   |\n   v\nlevel 2   {2, 3}\n\n<latex>\ell(v)=\max_{u\to v}(\ell(u)+1)</latex>\nheight = 3, width = 2" as SOURCE #DBE4FF
+
+rectangle "**Sink-oriented CG layers**\nwidth limit <latex>w=2</latex>\n\nlayer 2   {0}\n   |  edge points downward\n   v\nlayer 1   {1}\n   |  edge points downward\n   v\nlayer 0   {2, 3}\n\nheight = 3, actual width = 2" as CG #FCC2D7
+
+DAG -right-> SOURCE : Kahn + longest-path DP
+DAG -right-> CG : lexicographic CG labeling
+
+note bottom of SOURCE
+  Critical path: 0 -> 1 -> 2
+  Weight: 2 + 1 + 1 = 4
+  Equal path through 3 loses the stable id tie.
+end note
+
+legend right
+  |= colour |= meaning |
+  |<#C3FAE8>| contracted strongly connected component |
+  |<#DBE4FF>| source-first longest-path level |
+  |<#FCC2D7>| sink-first width-bounded CG layer |
+endlegend
+@enduml

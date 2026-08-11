@@ -1,0 +1,52 @@
+@startuml
+!include _libcpg-theme.iuml
+title Condensation-DAG analytics — canonical paths and bounded scheduling
+
+rectangle "SccDecomposition\ncomponents · sorted condensation edges" as SCC #C3FAE8
+rectangle "Validate public structure\nids · exact membership · endpoints · DAG\ncomponents <= effective cap" as VALIDATE #FFE8CC
+rectangle "condensation_projection()\ncanonical forward/reverse CSR\nrepresentative -> component id" as PROJECTION #F1F3F5
+rectangle "Canonical Kahn order\nmin component-id heap" as KAHN #D3F9D8
+rectangle "Longest-path dynamic program\n<latex>\ell(v)=\max_{u\to v}(\ell(u)+1)</latex>\nweight = sum of SCC sizes" as DP #DBE4FF
+rectangle "Level occupancy\nheight · width" as OCCUPANCY #E5DBFF
+
+rectangle "Optional width w?" as OPTIONAL #FFF3BF
+rectangle "Coffman–Graham labels\nsource-ready heap\ndescending predecessor labels" as LABELS #FCC2D7
+rectangle "Reverse-label placement\nlowest non-full layer above successors" as PLACE #D3F9D8
+rectangle "CgLayering\nsink layer 0 · width <= w\nedges strictly downward" as CG #C3FAE8
+
+rectangle "CondensationMetrics\nlevels · critical path/weight\nheight · width · optional CG" as REPORT #C3FAE8
+rectangle "Incomplete/capped report\nor AnalysisError for direct CG" as BOUNDED #FFE3E3
+
+SCC --> VALIDATE
+VALIDATE --> PROJECTION : valid and within cap
+VALIDATE --> BOUNDED : malformed or over cap
+PROJECTION --> KAHN
+KAHN --> DP
+DP --> OCCUPANCY
+OCCUPANCY --> OPTIONAL
+OPTIONAL --> LABELS : Some(w >= 1)
+OPTIONAL --> REPORT : None
+OPTIONAL --> BOUNDED : Some(0)
+LABELS --> PLACE
+PLACE --> CG
+CG --> REPORT
+
+note right of KAHN
+  Every public boundary is canonical:
+  component ids, adjacency, heap ties,
+  path ties, and layer members.
+end note
+
+legend right
+  |= colour |= role |
+  |<#C3FAE8>| SCC input or immutable public result |
+  |<#FFE8CC>| validation and resource policy |
+  |<#F1F3F5>| shared payload-free graph projection |
+  |<#D3F9D8>| directed-acyclic-graph traversal/scheduling |
+  |<#DBE4FF>| longest-path recurrence |
+  |<#E5DBFF>| aggregate metric |
+  |<#FFF3BF>| option decision |
+  |<#FCC2D7>| lexicographic Coffman–Graham labeling |
+  |<#FFE3E3>| bounded or invalid outcome |
+endlegend
+@enduml

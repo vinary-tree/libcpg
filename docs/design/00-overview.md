@@ -57,8 +57,9 @@ alternatives is folklore, and a decision without its costs is marketing.
 | [0011 — Loop-header interval widening](0011-loop-header-interval-widening.md) | Compute sound integer ranges with pointwise interval environments, header-only widening, bounded narrowing, and typed comparison-edge meets. | Accepted |
 | [0012 — DFG-backed loop-induction evidence](0012-dfg-backed-loop-induction-evidence.md) | Compute reaching-definition-backed invariants, unique latch-dominating induction variables, conservative hoist candidates, and direction-compatible trip evidence outside the graph. | Accepted |
 | [0013 — Evidence-bounded complexity estimates](0013-evidence-bounded-complexity-estimates.md) | Compose validated CFG loop depth and DFG-backed induction bounds into advisory complexity, with an exact legacy AST fallback. | Accepted |
+| [0014 — Deterministic condensation-DAG analytics](0014-deterministic-condensation-analytics.md) | Compute canonical SCC-weighted critical paths and source levels, plus sink-first width-bounded Coffman–Graham layers, without rebuilding graph identity. | Accepted |
 
-These thirteen are not independent. ADR-0001 fixes the substrate that all analyses
+These fourteen are not independent. ADR-0001 fixes the substrate that all analyses
 write onto; ADR-0002 and ADR-0005 together explain how a language reaches that
 substrate and what you must switch on to get there; ADR-0003 and ADR-0004 are
 two analyses *over* the substrate (one always-on, one feature-gated) that each
@@ -77,6 +78,9 @@ ADR-0012 composes ADR-0003's `DefUse` evidence with ADR-0007's loops and the
 dominance substrate, while keeping its optimization and trip results advisory.
 ADR-0013 consumes ADR-0012 and ADR-0007 from the feature-gated algorithm layer,
 preserving the original AST heuristic as an exact compatibility boundary.
+ADR-0014 consumes ADR-0001's out-of-graph result discipline and the canonical
+SCC condensation substrate, then fixes deterministic tie, orientation, cap, and
+malformed-input policy for downstream graph-theory analyses.
 
 ![Module architecture of libcpg, showing the graph core and the analysis modules layered over it](../diagrams/module-architecture.svg)
 
@@ -88,7 +92,7 @@ preserving the original AST heuristic as an exact compatibility boundary.
   (`0001`…). Numbers are never reused; a reversed decision is marked
   *Superseded* and a new record supersedes it, so history stays legible.
 - **Status lifecycle.** `Proposed → Accepted → (Superseded by NNNN | Deprecated)`.
-  All thirteen current records are **Accepted** and reflect the shipped `v0.1.1`
+  All fourteen current records are **Accepted** and reflect the shipped `v0.1.1`
   code.
 - **Grounding.** Every claim here is traceable to source: the
   [`Cargo.toml`](../engineering/01-build-and-features.md) feature block, the

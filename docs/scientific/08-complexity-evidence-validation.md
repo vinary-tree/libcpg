@@ -138,8 +138,10 @@ whole-corpus or symbolic-complexity claim.
 ## 7. Clean maximal-matrix coverage result
 
 The stable `cargo cov-text` and nightly `cargo +nightly cov-branch` experiments
-both ran the complete `full + rholang + metta` matrix: 634 library tests and all
-38 integration/robustness cases. For
+both ran the then-complete `full + rholang + metta` matrix: 634 library tests
+and all 38 integration/robustness cases. Those recorded runs predate the
+condensation suite; the current census is in
+[Testing](../engineering/02-testing.md). For
 `algorithms/detection/complexity.rs`, they measured:
 
 | Metric | Covered | Epic threshold |

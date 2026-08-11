@@ -30,6 +30,9 @@ PDG). A query can therefore mix syntax, control flow, and data flow freely.
 - **Strongly-connected components** — exact, deterministic decomposition of
   per-function CFGs and the resolved whole-CPG call graph, including
   loop/recursion classification and the condensation DAG.
+- **Condensation-DAG analytics** — canonical longest-path levels, SCC-size
+  weighted critical paths, level width, and deterministic width-bounded
+  Coffman–Graham scheduling with explicit caps and malformed-input handling.
 - **CFG reachability** — feature-free, deterministic reachable/unreachable
   partitions and structural dead-branch evidence without graph mutation.
 - **Basic-block CFGs** — deterministic, id-preserving block partitions, typed
@@ -124,8 +127,8 @@ Comprehensive documentation lives under [`docs/`](docs/README.md):
 - **[Theory](docs/theory/00-overview.md)** — the CPG model, control/data flow, program dependence & slicing, subgraph isomorphism, similarity, pattern detection, complexity, and GNNs, with proofs, math, and citations.
 - **[Architecture](docs/architecture/overview.md)** — module map, the graph data model, construction & analysis pipelines, and language frontends.
 - **[Design decisions](docs/design/00-overview.md)** — ADR-style records for load-bearing graph, construction, analysis, and feature choices.
-- **[API reference](docs/api/graph-reference.md)** — graph/projection/block-CFG/SCC/reachability, builder, and pattern/algorithm/GNN reference.
-- **[Components](docs/README.md#components)** — graph projections, basic blocks, dominators, SCCs, reachability, builders, patterns, algorithms, and GNN internals.
+- **[API reference](docs/api/graph-reference.md)** — graph/projection/block-CFG/SCC/condensation/reachability, builder, and pattern/algorithm/GNN reference.
+- **[Components](docs/README.md#components)** — graph projections, basic blocks, dominators, SCC/condensation analytics, reachability, builders, patterns, algorithms, and GNN internals.
 - **[Usage guides](docs/usage/00-getting-started.md)** — task-oriented how-tos.
 - **[Engineering](docs/engineering/00-overview.md)** · **[Scientific validation](docs/scientific/00-overview.md)** · **[Security](docs/security/00-threat-model.md)**.
 - **[Glossary](docs/GLOSSARY.md)** and the **[diagram catalog](docs/diagrams/README.md)**.
@@ -145,3 +148,5 @@ Licensed under either of [Apache License, Version 2.0](LICENSE-APACHE) or
 - Kildall, G. A. (1973). *A Unified Approach to Global Program Optimization.* POPL. DOI: [10.1145/512927.512945](https://doi.org/10.1145/512927.512945)
 - Wegman, M. N., Zadeck, F. K. (1991). *Constant Propagation with Conditional Branches.* ACM TOPLAS. DOI: [10.1145/103135.103136](https://doi.org/10.1145/103135.103136)
 - Cousot, P., Cousot, R. (1977). *Abstract Interpretation: A Unified Lattice Model for Static Analysis of Programs by Construction or Approximation of Fixpoints.* POPL. DOI: [10.1145/512950.512973](https://doi.org/10.1145/512950.512973)
+- Kahn, A. B. (1962). *Topological sorting of large networks.* Communications of the ACM. DOI: [10.1145/368996.369025](https://doi.org/10.1145/368996.369025)
+- Coffman, E. G., Jr., Graham, R. L. (1972). *Optimal scheduling for two-processor systems.* Acta Informatica. DOI: [10.1007/BF00288685](https://doi.org/10.1007/BF00288685)

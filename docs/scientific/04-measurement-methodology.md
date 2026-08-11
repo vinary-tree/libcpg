@@ -1,6 +1,6 @@
 # Measurement methodology
 
-`libcpg` ships five runnable Criterion targets. Their baseline groups are
+`libcpg` ships six runnable Criterion targets. Their baseline groups are
 feature-free; the `induction_analysis` target also registers an
 `algorithm-detection`-gated complexity-evidence group. Each active group
 asserts a deterministic correctness oracle **before** entering the timed loop.
@@ -19,7 +19,7 @@ the source transformation under study does not [[1]](#references).
 
 ## 1. Current evidence
 
-All five targets use `harness = false`, which hands execution to Criterion
+All six targets use `harness = false`, which hands execution to Criterion
 rather than Rust's test harness:
 
 ```toml
@@ -28,6 +28,10 @@ criterion = "0.5"
 
 [[bench]]
 name = "scc_analysis"
+harness = false
+
+[[bench]]
+name = "condensation"
 harness = false
 
 [[bench]]
@@ -50,6 +54,7 @@ harness = false
 | Target | Public operation | Families and sizes | Pre-timing oracle |
 |---|---|---|---|
 | `scc_analysis` | `call_graph_sccs` | function paths, rings, and cyclic clusters at 1,000 and 10,000 nodes | exact component partition, cycle flags, and condensation edges |
+| `condensation` | `condensation_metrics` with and without `coffman_graham` | component paths and eight independent chains at 1,024 and 8,192 components | exact source levels, weighted critical path, height, width, optional CG coverage, width, and downward precedence |
 | `cpg_construction` | graph-arena construction | paths at 1,000 and 10,000 nodes | exact node/edge counts and identifiers |
 | `pattern_matching` | bounded `Vf2Matcher::find_matches` | paths at 256 and 4,096 nodes | exact bounded embedding set |
 | `dataflow_liveness` | `liveness` | chains at 512/4,096 nodes, diamond ladders at 64/512 rungs, nested loops at 128/1,024 nodes | exact per-node equality with an independent round-robin solver |
@@ -100,6 +105,7 @@ tees Criterion output to one timestamped log:
 ./scripts/bench.sh dataflow_liveness
 ./scripts/bench.sh dataflow_liveness --save-baseline before
 ./scripts/bench.sh dataflow_liveness --baseline before
+./scripts/bench.sh condensation --save-baseline before
 ./scripts/bench.sh induction_analysis --save-baseline before
 cargo bench --no-default-features --features algorithm-detection \
   --bench induction_analysis -- --test
@@ -204,6 +210,7 @@ measurements sharing the controlled core remain serialized.
 ## 7. Expected scaling and next measurements
 
 Symbols are defined before use: $`V`$ is graph vertices, $`E`$ is graph edges,
+$`C`$ is condensation components, $`M`$ is their total SCC members,
 $`N`$ is reachable CFG nodes, $`B`$ is basic blocks, $`E_b`$ is block edges,
 $`F`$ is variable facts, $`W = \lceil F/64 \rceil`$ is words per bit state,
 $`H \le F`$ is lattice height, and $`d`$ is embedding dimension.
@@ -211,6 +218,7 @@ $`H \le F`$ is lattice height, and $`d`$ is embedding dimension.
 | Operation | Analytical expectation | Evidence state |
 |---|---|---|
 | SCC decomposition | $`O(V + E)`$ after normalization | active path/ring/cluster target |
+| condensation metrics | $`O(M + E\log E + (C+E)\log C)`$; CG comparison is worst-case $`O(C^2\log C)`$ | active path/eight-chain target with and without CG |
 | CPG arena construction | $`O(V + E)`$ insertion work | active path target |
 | bounded VF2 | factorial worst case; pruning-dependent [[3]](#references) | active bounded path target |
 | variable liveness | $`O(H(B + E_b)W + NW)`$ conventional bound | active chain/diamond/nested-loop target |

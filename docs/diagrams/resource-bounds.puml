@@ -36,6 +36,13 @@ would be extracted beyond the hard cap.;
 ***[#F1F3F5]:widen_after + narrow_passes
 widening is confined to LoopForest headers,
 narrowing runs exactly the bounded pass count.;
+**[#FFE3E3] Condensation analytics
+***[#F1F3F5]:max_components = 1,000,000 hard ceiling
+total metrics return a capped incomplete report and
+direct Coffman-Graham returns BudgetExceeded.;
+***[#F1F3F5]:public decomposition validation
+rejects inconsistent membership, invalid edges,
+self-loops, cycles, and zero layering width.;
 **[#FFE3E3] Slicing
 ***[#F1F3F5]:max_nodes on backward_slice / forward_slice
 bounds the PDG reverse/forward BFS —

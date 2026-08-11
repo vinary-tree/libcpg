@@ -1,6 +1,6 @@
 # Diagram catalog
 
-Every figure in the `libcpg` documentation is a **committed source** (`.puml` for PlantUML, `.dot` for Graphviz) rendered to a **committed `.svg`** that the Markdown pages embed. Sources are version-controlled so figures are reproducible and reviewable; SVGs are committed so they render on GitHub (which does not render PlantUML/Graphviz inline). This directory holds all 61 figures plus the shared theme.
+Every figure in the `libcpg` documentation is a **committed source** (`.puml` for PlantUML, `.dot` for Graphviz) rendered to a **committed `.svg`** that the Markdown pages embed. Sources are version-controlled so figures are reproducible and reviewable; SVGs are committed so they render on GitHub (which does not render PlantUML/Graphviz inline). This directory holds all 63 figures plus the shared theme.
 
 ## Conventions
 
@@ -58,6 +58,8 @@ Grouped by subject. Each row: the source (its `.svg` sibling is embedded by the 
 | `liveness-analysis.puml` | component flow | CPG + block CFG + canonical variable facts → backward-May fixed point → per-node liveness and advisory dead stores | components/graph/liveness-analysis |
 | `expression-analysis.puml` | component flow | CPG + canonical expression facts → forward/backward Must fixed points → dominance-backed advisory CSE/PRE evidence | components/graph/expression-analysis |
 | `sccp-analysis.puml` | coupled worklist flow | CFG executability + sparse value propagation → constants, dead edges, unreachable nodes, and structural-reachability refinement | components/graph/sccp-analysis |
+| `condensation-analytics.puml` | component/algorithm flow | SCC decomposition → validated condensation DAG → Kahn levels, weighted critical path, and optional Coffman–Graham layers | components/graph/condensation-analysis, design/0014 |
+| `condensation-layer-orientation.puml` | comparative DAG views | One contracted DAG under source-level and sink-oriented CG layer numbering | components/graph/condensation-analysis, theory/02 |
 | `interval-analysis.puml` | component/fixed-point flow | Block/variable/loop evidence → interval transfer, branch meet, widening, narrowing, and canonical report | components/graph/interval-analysis |
 | `induction-analysis.puml` | component/evidence flow | Semantic AST/CFG/DFG plus loop/dominance evidence → invariants, hoist candidates, induction variables, and counted bounds | components/graph/induction-analysis |
 | `call-resolution.puml` | activity | Lexical symbols and syntax evidence crossing the guarded topology boundary | components/graph/call-resolution |

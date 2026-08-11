@@ -71,6 +71,16 @@ stronger information; `resolve_calls` can materialize definite targets through
 
 A single directed graph that merges several program views onto **one shared node set**: the [AST](#abstract-syntax-tree-ast), the [CFG](#control-flow-graph-cfg), the [DFG](#data-flow-graph-dfg), and — on demand — the [PDG](#program-dependence-graph-pdg). Introduced by Yamaguchi et al. [[1]](#references) to express vulnerability queries that need syntax, control, and data flow simultaneously. In `libcpg` the CPG is the type `CodePropertyGraph`, backed by a [petgraph](#petgraph) `DiGraph<CpgNode, CpgEdge>`. See [`theory/01-code-property-graphs.md`](theory/01-code-property-graphs.md).
 
+### Coffman–Graham layering (CG)
+
+A deterministic assignment of a [DAG](#directed-acyclic-graph-dag) to ordered,
+width-bounded layers. Coffman–Graham first gives each vertex a precedence-aware
+label, then visits labels in reverse order and places each vertex in the lowest
+non-full layer strictly above its successors [[25]](#references). `libcpg`
+uses component-id tie breaks and exposes the result as `CgLayering`; layer zero
+contains sinks, so every condensation edge points strictly downward. See
+[`components/graph/condensation-analysis.md`](components/graph/condensation-analysis.md).
+
 ### Common-subexpression elimination (CSE)
 
 An optimization that reuses a prior evaluation when the same expression is
@@ -99,6 +109,16 @@ $`O(n^3)`$, `Polynomial(k)` $`O(n^k)`$, `Exponential` $`O(2^n)`$,
 growth to its named counterpart, and every finite polynomial compares better
 than `Exponential`. See
 [`components/algorithms/complexity.md`](components/algorithms/complexity.md).
+
+### Condensation graph / Condensation metrics
+
+The graph obtained by contracting every [SCC](#strongly-connected-component-scc)
+to one vertex. It is necessarily a [DAG](#directed-acyclic-graph-dag).
+`condensation_metrics` reports source-oriented longest-path levels, height,
+maximum level width, an SCC-membership-weighted [critical
+path](#critical-path), and optional [Coffman–Graham](#coffmangraham-layering-cg)
+layers without mutating the decomposition. See
+[`components/graph/condensation-analysis.md`](components/graph/condensation-analysis.md).
 
 ### Confidence (pattern match)
 
@@ -141,6 +161,16 @@ A similarity measure between two vectors, used to compare [embeddings](#embeddin
 
 It ranges over $`[-1, 1]`$ ($`1`$ = identical direction). Exposed as `NodeEmbedding::cosine_similarity`. Also the basis of the `Cosine` [similarity metric](#similarity-metric). See [`components/gnn/embeddings.md`](components/gnn/embeddings.md).
 
+### Critical path
+
+A maximum-weight directed path through a [DAG](#directed-acyclic-graph-dag).
+For condensation analytics, each component's weight is its SCC member count;
+`critical_path_weight` is therefore the largest total number of original graph
+nodes on any condensation path. Dynamic programming follows the canonical
+[topological order](#topological-order) and resolves equal weights by component
+id. See
+[`components/graph/condensation-analysis.md`](components/graph/condensation-analysis.md).
+
 ### Cyclomatic complexity
 
 McCabe's structural complexity metric [[7]](#references): the number of linearly independent paths through a function's CFG. `libcpg` computes `cyclomatic_complexity()` as
@@ -174,6 +204,15 @@ A **definition** is a program point that assigns a variable a value; a **use** i
 ### Design pattern
 
 A reusable solution to a recurring design problem. `libcpg` detects the 23 [Gang-of-Four](#gang-of-four-gof) patterns structurally, by matching each pattern's template graph against the CPG with a relaxed [VF2](#vf2) matcher. See [`components/patterns/gang-of-four.md`](components/patterns/gang-of-four.md).
+
+### Directed acyclic graph (DAG)
+
+A directed graph with no directed cycle. Every DAG has a [topological
+order](#topological-order); Kahn's source-removal algorithm constructs one or
+detects a cycle when no source remains [[24]](#references). Contracting the
+[SCCs](#strongly-connected-component-scc) of any directed graph produces its
+condensation DAG. See
+[`components/graph/condensation-analysis.md`](components/graph/condensation-analysis.md).
 
 ### Dominator / Post-dominator
 
@@ -417,7 +456,7 @@ When a reaching-definitions sweep processes a definition of $`x`$ in **straight-
 
 ### Strongly-connected component (SCC)
 
-A maximal set of vertices in a directed graph where every vertex can reach every other vertex. `libcpg` computes exact SCC partitions for per-function CFGs and the resolved function call graph; cyclic CFG components identify loop regions, while cyclic call-graph components identify direct or mutual recursion. Contracting each SCC produces a directed acyclic condensation graph (CLRS [[13]](#references)). See [`components/graph/scc-analysis.md`](components/graph/scc-analysis.md).
+A maximal set of vertices in a directed graph where every vertex can reach every other vertex. `libcpg` computes exact SCC partitions for per-function CFGs and the resolved function call graph; cyclic CFG components identify loop regions, while cyclic call-graph components identify direct or mutual recursion. Contracting each SCC produces a directed acyclic condensation graph (CLRS [[13]](#references)). See [`components/graph/scc-analysis.md`](components/graph/scc-analysis.md) and [condensation analytics](components/graph/condensation-analysis.md).
 
 ### Subgraph
 
@@ -430,6 +469,14 @@ A data-flow query that tracks whether values from *untrusted sources* can reach 
 ### Terminal set (VF2)
 
 In [VF2](#vf2), the sets of candidate nodes adjacent to the current partial mapping (the "fringe"), used to generate the next candidate pair and to test feasibility. `libcpg`'s matcher restores terminal sets exactly on backtracking (the "pop-order fix"). See [`theory/05-subgraph-isomorphism-vf2.md`](theory/05-subgraph-isomorphism-vf2.md).
+
+### Topological order
+
+A linear ordering of a [DAG's](#directed-acyclic-graph-dag) vertices in which
+every edge's source precedes its target. `libcpg` uses Kahn's algorithm with a
+minimum-component-id ready heap, making condensation levels and critical-path
+tie breaks independent of edge insertion order [[24]](#references). See
+[`components/graph/condensation-analysis.md`](components/graph/condensation-analysis.md).
 
 ### Tree-sitter
 
@@ -498,3 +545,5 @@ used by the complexity analyzer to classify recursive functions (e.g. $`a = b = 
 21. Morel, E., Renvoise, C. (1979). *Global Optimization by Suppression of Partial Redundancies.* Communications of the ACM 22(2), 96–103. DOI: [10.1145/359060.359069](https://doi.org/10.1145/359060.359069)
 22. Wegman, M. N., Zadeck, F. K. (1991). *Constant Propagation with Conditional Branches.* ACM Transactions on Programming Languages and Systems 13(2), 181–210. DOI: [10.1145/103135.103136](https://doi.org/10.1145/103135.103136)
 23. Miné, A. (2006). *The Octagon Abstract Domain.* Higher-Order and Symbolic Computation 19, 31–100. DOI: [10.1007/s10990-006-8609-1](https://doi.org/10.1007/s10990-006-8609-1)
+24. Kahn, A. B. (1962). *Topological Sorting of Large Networks.* Communications of the ACM 5(11), 558–562. DOI: [10.1145/368996.369025](https://doi.org/10.1145/368996.369025)
+25. Coffman, E. G., Jr., Graham, R. L. (1972). *Optimal Scheduling for Two-Processor Systems.* Acta Informatica 1, 200–213. DOI: [10.1007/BF00288685](https://doi.org/10.1007/BF00288685)
