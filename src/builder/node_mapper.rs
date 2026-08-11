@@ -164,27 +164,20 @@ impl NodeMapper {
 
     /// Node-aware inclusion test used by the [`crate::builder::TreeSitterCpgBuilder`]
     /// walk. It layers a check that *requires* the
-    /// raw node on top of the string-keyed [`Self::should_include`]: for
-    /// Rholang it drops anonymous keyword/operator/punctuation **tokens**
-    /// (`is_named() == false`), which the string test cannot filter because
-    /// their `kind()` collides with the same-named semantic rule nodes
-    /// (`contract`, `match`, `new`, `let`, `bundle`, `method`, …). Dropping the
-    /// tokens — but never the rules — yields clean child ordering for the CFG
-    /// builder (e.g. an `ifElse` node's surviving children become exactly
-    /// `[condition, consequence, alternative]`, matching `process_if`) and keeps
-    /// operator glyphs (`!`, `|`, `++`, `*`) out of the DFG use-set. All CFG/DFG
-    /// content in Rholang lives in named rules, so no information is lost.
-    ///
-    /// MeTTa needs no token filtering: its only anonymous tokens are `(`/`)`
-    /// (already dropped as punctuation), and its "keywords" (`if`, `let`,
-    /// `import!`) are *named* `identifier` atoms that `map_metta` dispatches on —
-    /// they must be retained.
+    /// raw node on top of the string-keyed [`Self::should_include`]: anonymous
+    /// keyword/operator/punctuation **tokens** (`is_named() == false`) are
+    /// syntax carried by their named parent rule, not independent semantic CPG
+    /// nodes. Their `kind()` can collide with a same-named rule (`contract`,
+    /// `match`, `new`, `let`, …), so only the node-aware predicate can remove
+    /// the token while retaining the rule. This keeps control constructs in
+    /// canonical child order and keeps operator glyphs out of expression
+    /// operands. MeTTa keyword atoms remain intact because its semantic
+    /// identifiers are named nodes.
     pub fn should_include_node(&self, node: &tree_sitter::Node, include_comments: bool) -> bool {
         if !self.should_include(node.kind(), include_comments) {
             return false;
         }
-        #[cfg(feature = "rholang")]
-        if self.language == Language::Rholang && !node.is_named() {
+        if !node.is_named() {
             return false;
         }
         true
@@ -2284,6 +2277,38 @@ mod tests {
         // Regular nodes should be included
         assert!(mapper.should_include("function_item", false));
         assert!(mapper.should_include("identifier", false));
+    }
+
+    #[test]
+    #[cfg(feature = "lang-rust")]
+    fn node_aware_filter_drops_rust_tokens_but_keeps_named_rules() {
+        let source = "fn f() { if true { let x = 1 + 2; } }";
+        let mut parser = tree_sitter::Parser::new();
+        parser
+            .set_language(&tree_sitter_rust::LANGUAGE.into())
+            .expect("set Rust grammar");
+        let tree = parser.parse(source, None).expect("parse Rust");
+        let root = tree.root_node();
+        let mapper = NodeMapper::new(Language::Rust);
+
+        for spelling in ["if", "let", "=", "+"] {
+            let start = source.find(spelling).expect("token spelling");
+            let token = root
+                .descendant_for_byte_range(start, start + spelling.len())
+                .expect("anonymous Rust token");
+            assert!(!token.is_named(), "{spelling} is grammar syntax");
+            assert!(
+                !mapper.should_include_node(&token, false),
+                "anonymous {spelling} token must not become a CPG operand"
+            );
+        }
+
+        let binary_start = source.find("1 + 2").expect("binary start");
+        let binary = root
+            .named_descendant_for_byte_range(binary_start, binary_start + 5)
+            .expect("named binary expression");
+        assert_eq!(binary.kind(), "binary_expression");
+        assert!(mapper.should_include_node(&binary, false));
     }
 
     // ========================================================================

@@ -414,6 +414,27 @@ expressions](../components/graph/expression-analysis.md) for equations,
 candidate invariants, example code, complexity, independent path-enumeration
 oracles, limitations, and citations.
 
+### Sparse conditional constant propagation
+
+The feature-free SCCP API couples executable CFG edges with sparse definition
+and expression values:
+
+| API | Signature | Result |
+|---|---|---|
+| `sccp` | `fn(&CodePropertyGraph, NodeId) -> Result<SccpResult, AnalysisError>` | Proven scalar constants, executable CFG edges, dead conditional edges, and unreachable CFG nodes. |
+| `ReachabilityReport::refine_with_sccp` | `fn(&self, &SccpResult) -> Result<ReachabilityReport, AnalysisError>` | A new structural report refined by same-function SCCP path evidence. |
+
+`ConstValue::{Int, Float, Bool, Str, Char, Null}` preserves exact scalar
+payloads; `ConstLattice::{Unknown, Constant, Overdefined}` implements the public
+`Lattice` trait. `SccpResult` fields are public and deterministic. Mismatching
+the two functions during reachability refinement returns
+`AnalysisError::FunctionMismatch`.
+
+See [Sparse conditional constant
+propagation](../components/graph/sccp-analysis.md) for transfer semantics,
+checked arithmetic, the dual-worklist algorithm, complexity, validation, and
+limitations.
+
 ### Subgraph extraction
 
 | Method | Signature | Notes |

@@ -1,6 +1,6 @@
 # Diagram catalog
 
-Every figure in the `libcpg` documentation is a **committed source** (`.puml` for PlantUML, `.dot` for Graphviz) rendered to a **committed `.svg`** that the Markdown pages embed. Sources are version-controlled so figures are reproducible and reviewable; SVGs are committed so they render on GitHub (which does not render PlantUML/Graphviz inline). This directory holds all 57 figures plus the shared theme.
+Every figure in the `libcpg` documentation is a **committed source** (`.puml` for PlantUML, `.dot` for Graphviz) rendered to a **committed `.svg`** that the Markdown pages embed. Sources are version-controlled so figures are reproducible and reviewable; SVGs are committed so they render on GitHub (which does not render PlantUML/Graphviz inline). This directory holds all 58 figures plus the shared theme.
 
 ## Conventions
 
@@ -57,6 +57,7 @@ Grouped by subject. Each row: the source (its `.svg` sibling is embedded by the 
 | `dataflow-framework.puml` | component flow | Block CFG + lattice + facts + loop evidence + convergence controls → deterministic fixed-point solution | components/graph/dataflow-framework |
 | `liveness-analysis.puml` | component flow | CPG + block CFG + canonical variable facts → backward-May fixed point → per-node liveness and advisory dead stores | components/graph/liveness-analysis |
 | `expression-analysis.puml` | component flow | CPG + canonical expression facts → forward/backward Must fixed points → dominance-backed advisory CSE/PRE evidence | components/graph/expression-analysis |
+| `sccp-analysis.puml` | coupled worklist flow | CFG executability + sparse value propagation → constants, dead edges, unreachable nodes, and structural-reachability refinement | components/graph/sccp-analysis |
 | `call-resolution.puml` | activity | Lexical symbols and syntax evidence crossing the guarded topology boundary | components/graph/call-resolution |
 
 ### Control flow, data flow, dependence

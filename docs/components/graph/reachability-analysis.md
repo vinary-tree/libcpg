@@ -251,9 +251,21 @@ size limits before analyzing hostile source.
 Plain reachability answers a topological question only. It does not infer
 constant guard values, path feasibility, exception behavior absent from the
 CFG, or callee behavior. A reachable conditional target is therefore possible,
-not necessarily executable in a concrete run. Value-sensitive SCCP refinement
-is the layer that can add proof-backed dead branches without weakening this
-conservative base report.
+not necessarily executable in a concrete run. Value-sensitive
+[`sccp`](sccp-analysis.md) refinement adds proof-backed dead branches without
+weakening this conservative base report:
+
+```rust
+let plain = libcpg::unreachable_code(&cpg, function)?;
+let constants = libcpg::sccp(&cpg, function)?;
+let refined = plain.refine_with_sccp(&constants)?;
+# Ok::<(), libcpg::AnalysisError>(())
+```
+
+The method returns a new canonical report and rejects results from a different
+function with `AnalysisError::FunctionMismatch`. A dead conditional edge can
+target a node that remains reachable through another executable predecessor;
+the edge proof and node partition are intentionally distinct.
 
 ## Related documentation
 
@@ -261,6 +273,8 @@ conservative base report.
 - [Deterministic projections](projections.md) — scoped CSR representation.
 - [Dominators](dominator-analysis.md) — path universality over reachable CFGs.
 - [Natural loops](loop-analysis.md) — dominator-qualified cyclic regions.
+- [Sparse conditional constant propagation](sccp-analysis.md) — value-sensitive
+  branch feasibility and the refinement contract.
 - [Control-flow theory](../../theory/02-control-flow-and-complexity.md) — CFG
   semantics and edge kinds.
 - [Input hardening](../../security/01-input-and-resource-hardening.md) — finite

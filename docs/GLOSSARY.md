@@ -70,6 +70,15 @@ already [available](#available-expression). `libcpg` reports a conservative
 available second occurrence; it does not perform the rewrite. See
 [`components/graph/expression-analysis.md`](components/graph/expression-analysis.md).
 
+### Constant lattice
+
+The SCCP abstract-value order
+$`Unknown \sqsubset Constant(c) \sqsubset Overdefined`$. `Unknown` is bottom
+and means no executable definition has supplied information; `Overdefined` is
+top and means values conflict or the operation is not safely foldable. Distinct
+constants join to `Overdefined`. See [Sparse conditional constant
+propagation](#sparse-conditional-constant-propagation-sccp).
+
 ### Complexity class / Big-O
 
 An asymptotic growth category for a function's running time. `libcpg`'s `ComplexityClass` ladder is, from cheapest to most expensive, `Constant` $`O(1)`$, `Logarithmic` $`O(\log n)`$, `Linear` $`O(n)`$, `Linearithmic` $`O(n \log n)`$, `Quadratic` $`O(n^2)`$, `Cubic` $`O(n^3)`$, `Polynomial(k)` $`O(n^k)`$, `Exponential` $`O(2^n)`$, `Factorial` $`O(n!)`$, and `Unknown`. See [`components/algorithms/complexity.md`](components/algorithms/complexity.md).
@@ -331,6 +340,15 @@ A symbolic expression: either an atom or a parenthesised list of S-expressions �
 
 The strategy `GraphSimilarity` uses to score two graphs' likeness: `SimilarityMetric::Jaccard` (default), `Cosine`, `WeisfeilerLehman`, or `GraphEdit`. Scores blend a structural component (weight `0.7`) and a label component (weight `0.3`). See [`theory/06-graph-similarity.md`](theory/06-graph-similarity.md).
 
+### Sparse conditional constant propagation (SCCP)
+
+A fixed-point analysis that proves scalar constants and executable CFG edges
+together. Boolean constants prune one true/false edge; value cells propagate
+through AST dependencies and DFG `DefUse` edges, joining only executable
+definitions. libcpg implements Wegman–Zadeck SCCP [[22]](#references) and can
+refine structural reachability without mutating the CPG. See
+[`components/graph/sccp-analysis.md`](components/graph/sccp-analysis.md).
+
 ### Static Single Assignment (SSA)
 
 An IR form in which every variable is assigned exactly once, with $`\phi`$-functions merging values at control-flow joins (Cytron et al. [[3]](#references)). `libcpg` deliberately does **not** use SSA for its DFG (it uses [AST-ordered reaching definitions](#ast-ordered-reaching-definitions)); SSA is defined here to make that contrast precise. See [`design/0003-ast-ordered-reaching-defs.md`](design/0003-ast-ordered-reaching-defs.md).
@@ -418,3 +436,4 @@ used by the complexity analyzer to classify recursive functions (e.g. $`a = b = 
 19. Kam, J. B., Ullman, J. D. (1977). *Monotone Data Flow Analysis Frameworks.* Acta Informatica 7, 305–317. DOI: [10.1007/BF00290339](https://doi.org/10.1007/BF00290339)
 20. Cousot, P., Cousot, R. (1977). *Abstract Interpretation: A Unified Lattice Model for Static Analysis of Programs by Construction or Approximation of Fixpoints.* POPL '77, 238–252. DOI: [10.1145/512950.512973](https://doi.org/10.1145/512950.512973)
 21. Morel, E., Renvoise, C. (1979). *Global Optimization by Suppression of Partial Redundancies.* Communications of the ACM 22(2), 96–103. DOI: [10.1145/359060.359069](https://doi.org/10.1145/359060.359069)
+22. Wegman, M. N., Zadeck, F. K. (1991). *Constant Propagation with Conditional Branches.* ACM Transactions on Programming Languages and Systems 13(2), 181–210. DOI: [10.1145/103135.103136](https://doi.org/10.1145/103135.103136)

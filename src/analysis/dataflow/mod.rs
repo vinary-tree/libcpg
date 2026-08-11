@@ -7,6 +7,7 @@
 mod expressions;
 mod facts;
 mod liveness;
+mod sccp;
 
 use std::{cmp::Reverse, collections::BinaryHeap, fmt::Debug};
 
@@ -25,6 +26,7 @@ pub use facts::{
     VariableDefinition,
 };
 pub use liveness::{dead_stores, liveness, DeadStore, DeadStoreReport, LivenessResult};
+pub use sccp::{sccp, ConstLattice, ConstValue, SccpResult};
 
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};

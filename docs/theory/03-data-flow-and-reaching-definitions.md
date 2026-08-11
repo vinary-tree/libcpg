@@ -296,6 +296,28 @@ and `build_def_use_chains` returns the per-variable
 off by default) is set through `DfgExtractorConfig` — see
 [`components/builder/dfg.md`](../components/builder/dfg.md).
 
+## 6. Sparse conditional constant propagation
+
+SCCP applies the same lattice and fixed-point foundations to two mutually
+dependent questions: which scalar values are constant, and which CFG edges are
+executable. Its value domain is:
+
+```math
+Unknown \sqsubset Constant(c) \sqsubset Overdefined.
+```
+
+Its path domain grows a set of executable edges. A boolean `Constant(c)` admits
+only the edge matching $`c`$; definitions on other edges are excluded from
+later `DefUse` joins. If new information raises the guard to `Overdefined`, the
+remaining edges are added. Both domains therefore move monotonically upward.
+
+Unlike the AST-ordered DFG builder above, SCCP is a query over an already-built
+CPG and computes a genuine fixed point. Unlike dense block constant
+propagation, it follows AST parent and `DefUse` dependencies sparsely. The full
+algorithm, checked operator semantics, and reachability composition are in the
+[SCCP component guide](../components/graph/sccp-analysis.md) and
+[ADR-0010](../design/0010-dual-worklist-sccp.md).
+
 ## Cross-references
 
 - The DFG edge alphabet (13 `DfgEdgeKind` variants): [Theory 01](01-code-property-graphs.md)
@@ -309,6 +331,8 @@ off by default) is set through `DfgExtractorConfig` — see
   and [`design/0009-deterministic-monotone-dataflow.md`](../design/0009-deterministic-monotone-dataflow.md).
 - Validation of the sweep against a real test corpus (nested use, latest-def,
   non-flow, shadowing, idempotency): [`scientific/02-reaching-defs-validation.md`](../scientific/02-reaching-defs-validation.md).
+- Concrete-execution, lattice-law, path-partition, and parser-backed SCCP
+  validation: [`scientific/05-sccp-validation.md`](../scientific/05-sccp-validation.md).
 
 ## References
 
@@ -317,3 +341,4 @@ off by default) is set through `DfgExtractorConfig` — see
 3. Kam, J. B., Ullman, J. D. (1977). *Monotone Data Flow Analysis Frameworks.* Acta Informatica 7, 305–317. DOI: [10.1007/BF00290339](https://doi.org/10.1007/BF00290339)
 4. Cousot, P., Cousot, R. (1977). *Abstract Interpretation: A Unified Lattice Model for Static Analysis of Programs by Construction or Approximation of Fixpoints.* POPL '77, 238–252. DOI: [10.1145/512950.512973](https://doi.org/10.1145/512950.512973)
 5. Morel, E., Renvoise, C. (1979). *Global Optimization by Suppression of Partial Redundancies.* Communications of the ACM 22(2), 96–103. DOI: [10.1145/359060.359069](https://doi.org/10.1145/359060.359069)
+6. Wegman, M. N., Zadeck, F. K. (1991). *Constant Propagation with Conditional Branches.* ACM TOPLAS 13(2), 181–210. DOI: [10.1145/103135.103136](https://doi.org/10.1145/103135.103136)

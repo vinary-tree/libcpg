@@ -11,13 +11,14 @@ use crate::{CfgEdgeKind, CodePropertyGraph, CpgEdgeKind, NodeId};
 use super::{
     cfg_projection,
     cfg_scope::{cfg_kind_rank, function_cfg_view},
+    dataflow::SccpResult,
     AnalysisError,
 };
 
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
 
-/// One conditional CFG edge whose target cannot be reached from the function.
+/// One conditional CFG edge that structural or value evidence proves dead.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct DeadBranch {
@@ -25,7 +26,9 @@ pub struct DeadBranch {
     pub guard: NodeId,
     /// Original conditional CFG edge classification.
     pub edge_kind: CfgEdgeKind,
-    /// Branch target that is unreachable from the function entry.
+    /// Target of the dead conditional edge.
+    ///
+    /// The node can remain reachable through another executable predecessor.
     pub target: NodeId,
 }
 
@@ -49,6 +52,57 @@ impl ReachabilityReport {
     /// Returns whether `node` belongs to the reachable partition.
     pub fn is_reachable(&self, node: NodeId) -> bool {
         self.reachable.binary_search(&node).is_ok()
+    }
+
+    /// Returns this structural partition refined by SCCP path feasibility.
+    ///
+    /// SCCP-unreachable nodes move from `reachable` into `unreachable`, while
+    /// SCCP dead conditional edges are merged with structural dead branches.
+    /// A dead edge's target can remain reachable through another executable
+    /// predecessor. Both inputs remain unchanged and output ordering is
+    /// canonical. Results for different functions are rejected.
+    pub fn refine_with_sccp(&self, refinement: &SccpResult) -> Result<Self, AnalysisError> {
+        if self.function != refinement.function {
+            return Err(AnalysisError::FunctionMismatch {
+                expected: self.function,
+                actual: refinement.function,
+            });
+        }
+
+        let sccp_unreachable: FxHashSet<_> = refinement.unreachable_nodes.iter().copied().collect();
+        let reachable = self
+            .reachable
+            .iter()
+            .copied()
+            .filter(|node| !sccp_unreachable.contains(node))
+            .collect();
+        let mut unreachable = self.unreachable.clone();
+        unreachable.extend(refinement.unreachable_nodes.iter().copied());
+        unreachable.sort_unstable();
+        unreachable.dedup();
+
+        let mut dead_branches = self.dead_branches.clone();
+        dead_branches.extend(
+            refinement
+                .dead_edges
+                .iter()
+                .map(|&(guard, target, edge_kind)| DeadBranch {
+                    guard,
+                    edge_kind,
+                    target,
+                }),
+        );
+        dead_branches.sort_unstable_by_key(|branch| {
+            (branch.guard, cfg_kind_rank(branch.edge_kind), branch.target)
+        });
+        dead_branches.dedup();
+
+        Ok(Self {
+            function: self.function,
+            reachable,
+            unreachable,
+            dead_branches,
+        })
     }
 }
 

@@ -1,0 +1,49 @@
+@startuml
+!include _libcpg-theme.iuml
+title Sparse conditional constant propagation
+
+rectangle "CodePropertyGraph\nimmutable AST + CFG + DefUse" as CPG #F1F3F5
+rectangle "FunctionCfgView\ncanonical flow edges + entry" as CFG #D3F9D8
+rectangle "Value cells\ndefinitions + expressions\nConstLattice" as CELLS #FFF3BF
+rectangle "Flow worklist\nmark executable CFG edges" as FLOW #DBE4FF
+rectangle "Value worklist\nAST parents + DefUse successors" as VALUE #E5DBFF
+rectangle "Boolean constant guard?\ntrue / false / conservative both" as GUARD #FFE8CC
+rectangle "SccpResult\nconstants + executable/dead edges\n+ unreachable nodes" as RESULT #C3FAE8
+rectangle "ReachabilityReport\nrefine_with_sccp" as REACH #FFE3E3
+
+CPG --> CFG : function_cfg_view
+CPG --> CELLS : AST + DFG projection
+CFG --> FLOW : seed function entry
+CELLS --> VALUE : seed entry-owned cells
+FLOW --> GUARD : executable source
+GUARD --> FLOW : admitted target\nnew executable node
+VALUE --> VALUE : lattice rise\nenqueue dependencies
+VALUE --> GUARD : changed guard cell
+FLOW --> RESULT : executable-edge set
+VALUE --> RESULT : <latex>Constant(c)</latex> cells
+CFG --> RESULT : scoped edge/node universe
+RESULT --> REACH : add proof-backed dead paths
+
+note bottom of CELLS
+  <latex>Unknown \sqsubset Constant(c) \sqsubset Overdefined</latex>
+  Distinct constants join to Overdefined.
+end note
+
+note bottom of RESULT
+  Deterministic and out of graph.
+  Defensive cap: <latex>4(N + D)</latex>.
+  <latex>N</latex> = scope nodes; <latex>D</latex> = DefUse edges.
+end note
+
+legend right
+  |= colour |= role |
+  |<#F1F3F5>| immutable CPG substrate |
+  |<#D3F9D8>| CFG execution scope |
+  |<#FFF3BF>| DFG-backed constant cells |
+  |<#DBE4FF>| executable-flow worklist |
+  |<#E5DBFF>| sparse value worklist |
+  |<#FFE8CC>| guard decision |
+  |<#C3FAE8>| deterministic SCCP result |
+  |<#FFE3E3>| reachability refinement |
+endlegend
+@enduml

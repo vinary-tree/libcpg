@@ -131,6 +131,34 @@ fn data_flow(cpg: &CodePropertyGraph, use_site: NodeId, definition: NodeId) {
 
 libcpg's [reaching definitions](../GLOSSARY.md#reaching-definition) are computed by a single AST-ordered sweep, **not** [SSA](../GLOSSARY.md#static-single-assignment-ssa) and not a CFG fixed point; the rationale and the loop-double-sweep detail are in [DFG construction](../components/builder/dfg.md) and [ADR-0003](../design/0003-ast-ordered-reaching-defs.md).
 
+### Proving constants and dead branches
+
+SCCP consumes the CFG and those `DefUse` edges together. It remains feature-free
+once a CPG exists:
+
+```rust
+use libcpg::{sccp, unreachable_code, CodePropertyGraph, NodeId};
+
+fn feasible_paths(cpg: &CodePropertyGraph, function: NodeId) -> libcpg::Result<()> {
+    let constants = sccp(cpg, function)?;
+    for (node, value) in &constants.constants {
+        println!("proven {node:?} = {value:?}");
+    }
+
+    let plain = unreachable_code(cpg, function)?;
+    let refined = plain.refine_with_sccp(&constants)?;
+    for node in refined.unreachable {
+        println!("unreachable after constant-path refinement: {node:?}");
+    }
+    Ok(())
+}
+```
+
+The result is evidence, not a source rewrite. Unsupported operations, calls,
+external values, and conflicting executable definitions remain unproven rather
+than guessed. See the [SCCP component guide](../components/graph/sccp-analysis.md)
+for the full lattice and edge semantics.
+
 ---
 
 ## Call-graph traversal

@@ -277,6 +277,8 @@ So the safe pattern is: build (single-threaded, `&mut`), then analyse
   variable states and conservative advisory evidence for unused writes.
 - [Available and very-busy expressions](expression-analysis.md) — dual
   forward/backward Must states and dominance-backed advisory CSE/PRE evidence.
+- [Sparse conditional constant propagation](sccp-analysis.md) — coupled
+  executable-edge and scalar-constant evidence with reachability refinement.
 - [Dominators and post-dominators](dominator-analysis.md) — immediate
   dominators, frontiers, constant-time ancestry, and PDG control dependence.
 - [Strongly-connected components](scc-analysis.md) — exact CFG loops and

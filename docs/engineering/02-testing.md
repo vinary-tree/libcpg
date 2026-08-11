@@ -22,18 +22,19 @@ think to write down.
 
 | Kind | Count | Where |
 | --- | ---: | --- |
-| Maximal-matrix library tests | 574 | inline `#[cfg(test)] mod …` next to the code; includes examples and properties |
+| Maximal-matrix library tests | 595 | inline `#[cfg(test)] mod …` next to the code; includes examples and properties |
 | Public-API integration tests | 21 | `tests/integration.rs` |
 | Malformed-input robustness tests | 5 | `tests/robustness.rs` |
-| **Executable test cases** | **600** | excludes three ignored rustdoc examples |
-| `proptest!` blocks (subset of the library/robustness rows) | 40 | inline property and regression modules |
+| SCCP public/parser integration tests | 3 | `tests/sccp_integration.rs` |
+| **Executable test cases** | **624** | excludes three ignored rustdoc examples |
+| `proptest!` blocks (subset of the library/robustness rows) | 41 | inline property and regression modules |
 
 The maximal-matrix library count is up from **99** inline tests and **zero**
 property tests before this work.
 
 Each property runs many generated cases (`ProptestConfig::with_cases(N)`, with
-`N` tuned to the cost of the property: 256 for cheap structural laws, 128 for
-mid-weight ones, 64 for parser-backed ones, 32 for the heaviest), so the
+`N` tuned to the cost of the property: 256 for cheap structural laws, 128 or 96
+for mid-weight ones, 64 for parser-backed ones, 32 for the heaviest), so the
 property suites execute on the order of ten thousand distinct inputs per run.
 
 ### Not every test compiles under every build
@@ -43,10 +44,10 @@ on the features enabled:
 
 | Command | Lib tests | Notes |
 | --- | ---: | --- |
-| `cargo test` | 285 | `default = []`: the feature-free surface only |
-| `cargo test --features "full rholang metta"` | 574 | the maximal matrix, including the Mode-B mappers |
+| `cargo test` | 304 | `default = []`: the feature-free surface only |
+| `cargo test --features "full rholang metta"` | 595 | the maximal matrix, including the Mode-B mappers |
 
-The feature-free 285 exercise the graph model, exact dominator/post-dominator,
+The feature-free 304 exercise the graph model, exact dominator/post-dominator,
 natural-loop, monotone data-flow, variable-liveness/dead-store,
 available/very-busy-expression, and CFG/call-graph SCC analyses, the
 CFG/DFG/PDG extractors, VF2, and similarity by building CPGs
@@ -226,6 +227,7 @@ test beside the fix:
 | 15 | a cyclic `idom` map from malformed serialized data made `dominators_of` unbounded | a consumer collecting the iterator could run indefinitely or exhaust memory | robustness review |
 | 16 | callee-name reconstruction was depth-bounded but had no visited set | a cyclic malformed callee subtree could repeat nodes exponentially before reaching the depth cap | robustness review |
 | 17 | a parser wrapper around `Return` hid the terminator from `process_block` | the return node was wired sequentially into source that must be unreachable | parser-backed integration test |
+| 18 | anonymous tree-sitter keyword/operator tokens were retained as semantic CPG nodes outside Rholang | Rust `+` became a binary operand and `if` became the CFG condition, corrupting expression and branch semantics | parser-backed SCCP integration oracle |
 
 Defects 2, 3 and 7 were found by generated input within seconds of the
 robustness suite first running — none of them is reachable from any
@@ -252,12 +254,12 @@ cargo +nightly cov-branch           # branch coverage needs nightly
 
 | Metric | Coverage | Lowest file |
 | --- | ---: | --- |
-| Lines | **97.88 %** | 91.67 % (`language.rs`) |
-| Regions | **97.80 %** | — |
-| Functions | **97.98 %** | — |
-| Branches | **83.87 %** | see below |
+| Lines | **97.89 %** | 91.67 % (`language.rs`) |
+| Regions | **97.83 %** | — |
+| Functions | **98.02 %** | — |
+| Branches | **83.68 %** | see below |
 
-Every source file is above 90 % line coverage; eighteen are at 100 %.
+Every source file is above 90 % line coverage; seventeen are at 100 %.
 The `analysis/dominators.rs` module measures **97.50 %** line and
 **81.25 %** branch coverage, above the epic's 90 % / 80 % thresholds.
 The new `analysis/resolve.rs` module measures **98.99 %** line and
@@ -266,8 +268,8 @@ The new `analysis/cfg_scope.rs` module measures **97.31 %** line and
 **92.31 %** branch coverage, above the same thresholds.
 The new `analysis/loops.rs` module measures **99.04 %** line and
 **93.18 %** branch coverage, above the same thresholds.
-The new `analysis/reachability.rs` module measures **100 %** line and
-**91.67 %** branch coverage, above the same thresholds.
+The new `analysis/reachability.rs` module measures **99.08 %** line and
+**92.31 %** branch coverage, above the same thresholds.
 The new `analysis/basic_blocks.rs` module measures **97.30 %** line and
 **82.76 %** branch coverage, above the same thresholds.
 The new `analysis/dataflow/facts.rs` module measures **99.61 %** line and
@@ -277,6 +279,11 @@ The new `analysis/dataflow/liveness.rs` module measures **99.26 %** line and
 **100 %** branch coverage, above the same thresholds.
 The new `analysis/dataflow/expressions.rs` module measures **99.45 %** line and
 **91.67 %** branch coverage, above the same thresholds.
+The new `analysis/dataflow/sccp.rs` module measures **98.58 %** line,
+**98.67 %** region, **100 %** function, and **80.00 %** branch coverage, clearing
+the epic's 90 % / 80 % thresholds. Its concrete interpreter, lattice laws,
+parser integration, endpoint filtering, and malformed-graph cases are catalogued in
+[`scientific/05-sccp-validation.md`](../scientific/05-sccp-validation.md).
 All figures come from clean maximal-matrix coverage runs; no focused-test
 figure is substituted for the repository gate.
 

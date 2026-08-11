@@ -104,16 +104,16 @@ Dropping a wrapper **reparents its children** to the enclosing construct (see
 tree has the real structure the CFG/DFG expect — e.g. an `ifElse`'s children collapse to
 exactly `[condition, consequence, alternative]`, matching `process_if`.
 
-**`should_include_node(node, include_comments) -> bool`** layers a node-aware check on top:
-for **Rholang** it additionally drops anonymous keyword/operator/punctuation **tokens**
-(`node.is_named() == false`). This is necessary because in tree-sitter an anonymous token
-shares its `kind()` string with the same-named semantic rule — the `"contract"` keyword vs.
-the `contract` rule, `"match"`, `"new"`, `"let"`, `"bundle"`, `"method"`, … — so the string
-test alone cannot drop the token without also dropping the rule. Removing the tokens (but
-never the rules) yields clean child ordering for the CFG builder and keeps operator glyphs
-out of the DFG use-set. MeTTa needs no token filtering: its only anonymous tokens are `(` /
-`)` (already dropped as punctuation), and its "keywords" (`if`, `let`, `import!`) are
-*named* `identifier` atoms that `map_metta` dispatches on and must retain.
+**`should_include_node(node, include_comments) -> bool`** layers a node-aware
+check on top: it drops every anonymous keyword/operator/punctuation **token**
+(`node.is_named() == false`). Tree-sitter stores semantics on named rules; an
+anonymous token merely spells syntax already represented by its parent. The raw
+node check is necessary because a token can share its `kind()` string with a
+same-named semantic rule — the Rholang `"contract"` keyword versus the
+`contract` rule, for example. Removing tokens but never named rules yields clean
+CFG child order and expression operands for every frontend. MeTTa's semantic
+`if`, `let`, and `import!` atoms remain because they are named `identifier`
+nodes.
 
 > **A key subtlety.** The mapper navigates the **raw tree-sitter tree**, in which the
 > wrappers still exist; `should_include` only decides which nodes get a *CPG* node. That is

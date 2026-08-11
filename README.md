@@ -41,6 +41,9 @@ PDG). A query can therefore mix syntax, control flow, and data flow freely.
   with sorted per-node states and conservative, advisory dead-write evidence.
 - **Expression optimization evidence** — forward-Must available expressions,
   backward-Must anticipability, and dominance-backed advisory CSE/PRE candidates.
+- **Sparse conditional constant propagation** — coupled executable-edge and
+  value-cell fixed points, checked scalar folding, and proof-backed reachability
+  refinement.
 - **DFG extraction** — intraprocedural, AST-ordered reaching definitions
   (Kildall 1973) and def-use chains (13 `DfgEdgeKind` variants).
 - **PDG + program slicing** — control-dependence edges via the reverse dominance
@@ -132,3 +135,4 @@ Licensed under either of [Apache License, Version 2.0](LICENSE-APACHE) or
 - Weiser, M. (1984). *Program Slicing.* IEEE TSE. DOI: [10.1109/TSE.1984.5010248](https://doi.org/10.1109/TSE.1984.5010248)
 - Cordella, L. P., et al. (2004). *A (Sub)graph Isomorphism Algorithm for Matching Large Graphs.* IEEE TPAMI. DOI: [10.1109/TPAMI.2004.75](https://doi.org/10.1109/TPAMI.2004.75)
 - Kildall, G. A. (1973). *A Unified Approach to Global Program Optimization.* POPL. DOI: [10.1145/512927.512945](https://doi.org/10.1145/512927.512945)
+- Wegman, M. N., Zadeck, F. K. (1991). *Constant Propagation with Conditional Branches.* ACM TOPLAS. DOI: [10.1145/103135.103136](https://doi.org/10.1145/103135.103136)

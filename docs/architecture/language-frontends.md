@@ -63,7 +63,15 @@ Once a tree exists, AST construction (`convert_node`) asks the `NodeMapper` two 
 
 `should_include(ts_kind, include_comments)` is the string-keyed filter: it drops pure punctuation (`(`, `)`, `{`, `,`, `;`, …), drops comments unless configured, and drops language-specific *transparent wrapper / grouping-container* rules whose names never collide with a semantic rule (for MeTTa, the `expression`/`atom_expression`/`prefixed_expression` wrappers; for Rholang, container/marker rules like `names`, `receipts`, `send_single`). Dropping a wrapper reparents its children so the real structure is visible to `map_kind`.
 
-`should_include_node(node, include_comments)` layers a *node-aware* check on top: for Rholang it additionally drops anonymous keyword/operator **tokens** (`is_named() == false`) whose `kind()` string collides with a same-named semantic rule — the `"contract"` keyword token versus the `contract` rule node, for instance. The rule is kept; the bare keyword is dropped, yielding clean child ordering for the CFG builder.
+`should_include_node(node, include_comments)` layers a *node-aware* check on
+top: every anonymous keyword/operator/punctuation **token**
+(`is_named() == false`) is dropped because its named parent rule already
+captures its semantics. A token's `kind()` can collide with a same-named
+semantic rule — the Rholang `"contract"` keyword token versus the `contract`
+rule node, for instance — so the raw node is required to distinguish them. The
+named rule is kept; the bare token is dropped. This also prevents Rust `if`,
+`let`, `=`, and `+` tokens from corrupting control-child and operand order.
+MeTTa keyword atoms remain because they are named `identifier` nodes.
 
 ### Kind mapping: `map_kind`
 

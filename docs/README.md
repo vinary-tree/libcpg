@@ -33,6 +33,8 @@ widening/narrowing, and bounded convergence),
 unused-write evidence),
 **available and very-busy expressions** (dual Must analyses with conservative
 CSE/PRE evidence),
+**sparse conditional constant propagation** (checked scalar constants,
+executable/dead CFG edges, and value-sensitive reachability refinement),
 **algorithm detection** (from control-flow structure),
 **code-clone detection** (graph similarity), and **complexity analysis**.
 
@@ -94,7 +96,7 @@ let slice = backward_slice(&cpg, func, 256);         // bounded backward slice
 [Overview](architecture/overview.md) · [Graph data model](architecture/graph-data-model.md) · [Construction & analysis data flow](architecture/data-flow.md) · [Language frontends](architecture/language-frontends.md)
 
 ### Design decisions (ADRs)
-[Overview](design/00-overview.md) · [0001 Unified overlay graph](design/0001-unified-overlay-graph.md) · [0002 Mode B: build_from_tree](design/0002-mode-b-build-from-tree.md) · [0003 AST-ordered reaching definitions](design/0003-ast-ordered-reaching-defs.md) · [0004 Relaxed VF2 detection](design/0004-relaxed-vf2-detection.md) · [0005 Feature-flag taxonomy](design/0005-feature-flag-taxonomy.md) · [0006 Evidence-bounded call resolution](design/0006-evidence-bounded-call-resolution.md) · [0007 Dominator-based natural-loop forest](design/0007-dominator-natural-loop-forest.md) · [0008 Id-preserving basic-block CFG](design/0008-id-preserving-basic-block-cfg.md) · [0009 Deterministic monotone data flow](design/0009-deterministic-monotone-dataflow.md)
+[Overview](design/00-overview.md) · [0001 Unified overlay graph](design/0001-unified-overlay-graph.md) · [0002 Mode B: build_from_tree](design/0002-mode-b-build-from-tree.md) · [0003 AST-ordered reaching definitions](design/0003-ast-ordered-reaching-defs.md) · [0004 Relaxed VF2 detection](design/0004-relaxed-vf2-detection.md) · [0005 Feature-flag taxonomy](design/0005-feature-flag-taxonomy.md) · [0006 Evidence-bounded call resolution](design/0006-evidence-bounded-call-resolution.md) · [0007 Dominator-based natural-loop forest](design/0007-dominator-natural-loop-forest.md) · [0008 Id-preserving basic-block CFG](design/0008-id-preserving-basic-block-cfg.md) · [0009 Deterministic monotone data flow](design/0009-deterministic-monotone-dataflow.md) · [0010 Dual-worklist SCCP](design/0010-dual-worklist-sccp.md)
 
 ### API reference
 [Graph / analysis reference](api/graph-reference.md) · [Builder reference](api/builder-reference.md) · [Pattern / algorithm / GNN reference](api/pattern-reference.md)
@@ -102,7 +104,7 @@ let slice = backward_slice(&cpg, func, 256);         // bounded backward slice
 ### Components
 
 #### Graph core
-[Overview](components/graph/overview.md) · [Nodes](components/graph/nodes.md) · [Edges](components/graph/edges.md) · [Traversal](components/graph/traversal.md) · [Deterministic projections](components/graph/projections.md) · [Basic-block CFGs](components/graph/basic-block-cfg.md) · [Monotone data-flow framework](components/graph/dataflow-framework.md) · [Variable liveness and dead stores](components/graph/liveness-analysis.md) · [Available and very-busy expressions](components/graph/expression-analysis.md) · [Dominators and post-dominators](components/graph/dominator-analysis.md) · [Strongly-connected components](components/graph/scc-analysis.md) · [Natural loops and nesting](components/graph/loop-analysis.md) · [CFG reachability and dead branches](components/graph/reachability-analysis.md) · [Evidence-bounded call resolution](components/graph/call-resolution.md)
+[Overview](components/graph/overview.md) · [Nodes](components/graph/nodes.md) · [Edges](components/graph/edges.md) · [Traversal](components/graph/traversal.md) · [Deterministic projections](components/graph/projections.md) · [Basic-block CFGs](components/graph/basic-block-cfg.md) · [Monotone data-flow framework](components/graph/dataflow-framework.md) · [Variable liveness and dead stores](components/graph/liveness-analysis.md) · [Available and very-busy expressions](components/graph/expression-analysis.md) · [Sparse conditional constant propagation](components/graph/sccp-analysis.md) · [Dominators and post-dominators](components/graph/dominator-analysis.md) · [Strongly-connected components](components/graph/scc-analysis.md) · [Natural loops and nesting](components/graph/loop-analysis.md) · [CFG reachability and dead branches](components/graph/reachability-analysis.md) · [Evidence-bounded call resolution](components/graph/call-resolution.md)
 
 #### Builder
 [Overview](components/builder/overview.md) · [CFG extraction](components/builder/cfg.md) · [DFG extraction](components/builder/dfg.md) · [PDG & slicing](components/builder/pdg-and-slicing.md) · [Node mapper](components/builder/node-mapper.md)
@@ -123,7 +125,7 @@ let slice = backward_slice(&cpg, func, 256);         // bounded backward slice
 [Overview](engineering/00-overview.md) · [Build & features](engineering/01-build-and-features.md) · [Testing](engineering/02-testing.md) · [Performance](engineering/03-performance.md) · [Contributing](engineering/04-contributing.md)
 
 ### Scientific validation
-[Overview](scientific/00-overview.md) · [CPG invariants & equivalence](scientific/01-cpg-invariants-and-equivalence.md) · [Reaching-defs validation](scientific/02-reaching-defs-validation.md) · [VF2 completeness](scientific/03-vf2-completeness.md) · [Measurement methodology](scientific/04-measurement-methodology.md)
+[Overview](scientific/00-overview.md) · [CPG invariants & equivalence](scientific/01-cpg-invariants-and-equivalence.md) · [Reaching-defs validation](scientific/02-reaching-defs-validation.md) · [VF2 completeness](scientific/03-vf2-completeness.md) · [Measurement methodology](scientific/04-measurement-methodology.md) · [SCCP validation](scientific/05-sccp-validation.md)
 
 ### Security
 [Threat model](security/00-threat-model.md) · [Input & resource hardening](security/01-input-and-resource-hardening.md)

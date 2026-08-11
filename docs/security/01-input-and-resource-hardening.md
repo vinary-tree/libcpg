@@ -30,6 +30,7 @@ Source: [`diagrams/resource-bounds.puml`](../diagrams/resource-bounds.puml).*
 | Basic-block traversal guard | *(always on)* | `block_cfg` | every scoped node is assigned once; iterative DFS avoids native-stack growth; `Call` edges and nested functions are excluded |
 | `SolverConfig::max_visits_per_block` | `256` | `solve` | returns `AnalysisError::IterationLimitExceeded` before another extraction of that block |
 | `SolverConfig::narrow_passes` | `0` | `solve` | performs exactly the configured number of post-widening deterministic sweeps |
+| SCCP event cap | `4 * (scope nodes + DefUse edges)` | `sccp` | returns `AnalysisError::IterationLimitExceeded` if malformed dependencies exceed the finite-lattice schedule bound |
 
 All of these are on the **feature-free surface** — you can configure and use them
 with `default = []`.
@@ -161,6 +162,29 @@ Bound source/CPG size before analysis when accepting hostile input. Treat CSE
 and PRE candidates as advisory; applying them without language-aware checks for
 volatile access, traps, floating-point state, or concurrency can compromise the
 semantic integrity of transformed code.
+
+## SCCP: coupled event bound
+
+[`sccp`](../components/graph/sccp-analysis.md) maintains separate ordered
+worklists for executable CFG sources and definition/expression value cells. A
+constant cell can rise at most twice (`Unknown` to one constant, then to
+`Overdefined`), and an executable edge is inserted once. The solver still
+enforces the explicit cap
+
+```math
+4(N + D)
+```
+
+for $`N`$ function-scope nodes and $`D`$ scoped `DefUse` edges. Exceeding it
+returns `AnalysisError::IterationLimitExceeded { analysis: "sccp", ... }`.
+Visited sets separately cut AST cycles while finding execution owners and guard
+expressions. SCCP borrows the CPG immutably, so even a malformed input cannot
+cause partial graph mutation before an error.
+
+The cap bounds scheduling, not operator cost or output size. String
+concatenation allocates a result proportional to its two constant operands, and
+the public maps can grow with the scoped graph. Continue to enforce source and
+CPG size limits for hostile input.
 
 ## Dominance: structural convergence cap
 

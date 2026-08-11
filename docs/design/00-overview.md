@@ -53,8 +53,9 @@ alternatives is folklore, and a decision without its costs is marketing.
 | [0007 — Dominator-based natural-loop forest](0007-dominator-natural-loop-forest.md) | Qualify natural back edges with dominance, expose irreducible SCC regions explicitly, nest by strict body containment, and retype loop-leaving continuations as `LoopExit`. | Accepted |
 | [0008 — Id-preserving basic-block CFG view](0008-id-preserving-basic-block-cfg.md) | Partition the reachable function CFG without rewriting CPG nodes; assign blocks by sorted leaders and preserve every typed non-internal edge. | Accepted |
 | [0009 — Deterministic monotone data-flow solver](0009-deterministic-monotone-dataflow.md) | Share a bounded forward/backward Kildall worklist over `BlockCfg`, with canonical facts and loop-header widening. | Accepted |
+| [0010 — Dual-worklist sparse conditional constant propagation](0010-dual-worklist-sccp.md) | Couple executable CFG edges with sparse AST/DFG value cells; keep proof results out of graph and composable with reachability. | Accepted |
 
-These nine are not independent. ADR-0001 fixes the substrate that all analyses
+These ten are not independent. ADR-0001 fixes the substrate that all analyses
 write onto; ADR-0002 and ADR-0005 together explain how a language reaches that
 substrate and what you must switch on to get there; ADR-0003 and ADR-0004 are
 two analyses *over* the substrate (one always-on, one feature-gated) that each
@@ -65,7 +66,9 @@ ADR-0008 projects that same scope into deterministic blocks without breaking
 overlay identity; ADR-0009 supplies the generic fixed-point engine over those
 blocks while keeping the AST-ordered DFG builder as a distinct materialization
 pass.
-Read 0001 first.
+ADR-0010 specializes the lattice and deterministic-worklist discipline of
+ADR-0009 while using the sparse `DefUse` evidence produced by ADR-0003. Read
+0001 first.
 
 ![Module architecture of libcpg, showing the graph core and the analysis modules layered over it](../diagrams/module-architecture.svg)
 
@@ -77,7 +80,7 @@ Read 0001 first.
   (`0001`…). Numbers are never reused; a reversed decision is marked
   *Superseded* and a new record supersedes it, so history stays legible.
 - **Status lifecycle.** `Proposed → Accepted → (Superseded by NNNN | Deprecated)`.
-  All nine current records are **Accepted** and reflect the shipped `v0.1.1`
+  All ten current records are **Accepted** and reflect the shipped `v0.1.1`
   code.
 - **Grounding.** Every claim here is traceable to source: the
   [`Cargo.toml`](../engineering/01-build-and-features.md) feature block, the

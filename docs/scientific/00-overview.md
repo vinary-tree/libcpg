@@ -49,9 +49,10 @@ Two properties of the suite make this rigorous rather than merely suggestive:
 
 ## 3. The evidence base
 
-The maximal matrix contains **574 library tests**, **21 public-API integration
-tests**, and **5 malformed-input robustness tests**. These 600 executable cases
-combine fixed examples, differential oracles, and 40 `proptest!` blocks. The
+The maximal matrix contains **595 library tests**, **21 general public-API
+integration tests**, **5 malformed-input robustness tests**, and **3 SCCP
+public/parser integration tests**. These 624 executable cases combine fixed
+examples, differential oracles, and 41 `proptest!` blocks. The
 feature-free matrix remains independently runnable and exercises the exact
 graph/data-flow substrate without compiling any grammar. Four active Criterion
 targets supplement correctness with scoped performance evidence; see
@@ -68,12 +69,13 @@ Because `default = []`, many tests are **feature-gated**. The end-to-end reachin
 | [02 — Reaching-defs validation](02-reaching-defs-validation.md) | Nested-expression use resolution; latest-definition (strong update); non-flow of unrelated variables; shadowing scope; idempotency | `parsed_nested_use_resolves_and_chains`, `parsed_reassignment_uses_latest_definition`, `parsed_unrelated_variable_does_not_flow`, `parsed_shadowing_and_idempotent` | `lang-rust` |
 | [03 — VF2 completeness](03-vf2-completeness.md) | Soundness floor (empty pattern → no match); kind-feasibility pruning; **all** embeddings found (diamond → exactly 2) with exact backtracking | `test_empty_pattern`, `test_single_node_match`, `test_multi_embedding_backtracking` | feature-free |
 | [04 — Measurement methodology](04-measurement-methodology.md) | Environment control and exact-oracle timing for SCC, arena construction, bounded VF2, and liveness | four `benches/*.rs` Criterion targets | feature-free |
+| [05 — SCCP validation](05-sccp-validation.md) | Concrete value soundness, lattice laws, conditional-edge partition, refinement monotonicity, determinism, parser integration | `straight_line_literal_programs_match_the_concrete_interpreter`, SCCP unit/property tests, `sccp_integration` | feature-free / `lang-rust` parser case |
 
 ## 5. What is proven, and what is advisory
 
 Scientific honesty requires separating the two:
 
-- **Proven (guarded by the tests above).** The CPG's structural invariants; deterministic graph projection; immediate dominance (differentially checked against `petgraph`); post-dominance and control-dependence equivalence with the former production oracle; natural back edges and loop bodies (checked against independent brute-force dominance and closure oracles); exact SCC partitioning and condensation acyclicity (differentially checked against `petgraph`'s Tarjan implementation); liveness fixed points (checked against an independent Gauss–Seidel solver); available/very-busy Must states (checked by exhaustive entry/exit path enumeration on generated acyclic CFGs); the reaching-definition semantics on the audited corpus; and VF2's completeness on the discriminating diamond. These are deterministic and regression-locked.
+- **Proven (guarded by the tests above).** The CPG's structural invariants; deterministic graph projection; immediate dominance (differentially checked against `petgraph`); post-dominance and control-dependence equivalence with the former production oracle; natural back edges and loop bodies (checked against independent brute-force dominance and closure oracles); exact SCC partitioning and condensation acyclicity (differentially checked against `petgraph`'s Tarjan implementation); liveness fixed points (checked against an independent Gauss–Seidel solver); available/very-busy Must states (checked by exhaustive entry/exit path enumeration on generated acyclic CFGs); SCCP constants on the generated `StmtSpec` language (checked by a concrete mini-interpreter), conditional-edge partitions, and deterministic insertion permutations; the reaching-definition semantics on the audited corpus; and VF2's completeness on the discriminating diamond. These are deterministic and regression-locked.
 - **Advisory (policy-sensitive by design).** The available/very-busy states are
   exact for the modeled structural expressions and CFG, while their CSE/PRE
   transformation candidates still require language side-effect policy.

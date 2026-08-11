@@ -1,6 +1,6 @@
 @startuml
 !include _libcpg-theme.iuml
-title CPG analysis pipeline — five analyses fan out over one CodePropertyGraph
+title CPG analysis pipeline — analysis families fan out over one CodePropertyGraph
 start
 :CodePropertyGraph
 (AST + CFG + DFG over one shared node set);
@@ -8,6 +8,7 @@ fork
   :block_cfg → solve(DataflowAnalysis)
   + liveness / dead_stores
   + available / very-busy expressions
+  + SCCP constants / executable edges
   + dominator_tree / post_dominator_tree
   + loop_forest
   + unreachable_code
@@ -30,7 +31,7 @@ end fork
 stop
 legend right
   |= colour |= analysis (module) |
-  |<#C3FAE8>| structural — blocks / data flow / liveness / expressions / reachability / dominance / loops / SCCs |
+  |<#C3FAE8>| structural — blocks / data flow / liveness / expressions / SCCP / reachability / dominance / loops / SCCs |
   |<#E5DBFF>| PDG — program slicing |
   |<#FFE3E3>| VF2 — subgraph iso / GoF |
   |<#FFF3BF>| algorithm + complexity |

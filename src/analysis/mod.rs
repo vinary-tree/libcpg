@@ -18,11 +18,11 @@ use crate::NodeId;
 pub use basic_blocks::{block_cfg, BasicBlock, BlockCfg, BlockEdge, BlockId};
 
 pub use dataflow::{
-    available_expressions, dead_stores, expression_facts, liveness, solve, variable_facts,
-    very_busy_expressions, AvailableExpressions, BitSetDomain, Confluence, DataflowAnalysis,
-    DataflowSolution, DeadStore, DeadStoreReport, Direction, ExprFacts, ExprKey, ExprOperand,
-    FactUniverse, Lattice, LivenessResult, MustBits, SolverConfig, VarFacts, VariableDefinition,
-    VeryBusyExpressions,
+    available_expressions, dead_stores, expression_facts, liveness, sccp, solve, variable_facts,
+    very_busy_expressions, AvailableExpressions, BitSetDomain, Confluence, ConstLattice,
+    ConstValue, DataflowAnalysis, DataflowSolution, DeadStore, DeadStoreReport, Direction,
+    ExprFacts, ExprKey, ExprOperand, FactUniverse, Lattice, LivenessResult, MustBits, SccpResult,
+    SolverConfig, VarFacts, VariableDefinition, VeryBusyExpressions,
 };
 
 pub use projection::{
@@ -75,6 +75,14 @@ pub enum AnalysisError {
         needed: u64,
         /// Configured maximum resource amount.
         cap: u64,
+    },
+    /// Two composable analysis results were produced for different functions.
+    #[error("analysis result function mismatch: expected {expected:?}, got {actual:?}")]
+    FunctionMismatch {
+        /// Function selected by the receiving result.
+        expected: NodeId,
+        /// Function selected by the supplied refinement.
+        actual: NodeId,
     },
     /// Projection construction failed before the analysis could run.
     #[error(transparent)]

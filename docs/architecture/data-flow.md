@@ -203,6 +203,15 @@ operand. The reports expose per-node states plus conservative,
 dominance-qualified CSE/PRE candidates without rewriting the CPG. See
 [available and very-busy expressions](../components/graph/expression-analysis.md).
 
+The separate `sccp(&cpg, function)` instance couples a flow-edge worklist with
+a sparse AST/DFG value-cell worklist. Checked scalar folding can prove a boolean
+guard, which prevents the rejected branch's definitions from joining later
+uses. `SccpResult` exposes constants, executable/dead edges, and unreachable
+nodes; `ReachabilityReport::refine_with_sccp` composes those value proofs with
+the structural partition. Both APIs are deterministic, feature-free, and
+read-only. See [sparse conditional constant
+propagation](../components/graph/sccp-analysis.md).
+
 ### Strongly-connected components (feature-free)
 
 `control_flow_sccs(&cpg, function)` partitions one function's intraprocedural
