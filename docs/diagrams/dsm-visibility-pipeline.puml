@@ -1,0 +1,54 @@
+@startuml
+!include _libcpg-theme.iuml
+title DSM visibility analysis — bounded closure summaries and cyclic core
+
+rectangle "GraphProjection\nsorted NodeId universe\nforward + reverse CSR" as INPUT #F1F3F5
+rectangle "Validate projection\ncanonical nodes · CSR shape\nforward/reverse agreement" as VALIDATE #FFE8CC
+rectangle "n <= 50,000?" as CAP #FFF3BF
+rectangle "For each source s\nforward breadth-first search\nvisited[s] := true" as BFS #DBE4FF
+rectangle "Visibility summaries\n<latex>VFO(s)=\sum_j R_{sj}</latex>\n<latex>VFI(j)=\sum_i R_{ij}</latex>" as VIS #D3F9D8
+rectangle "Propagation cost\n<latex>PC=\frac{\sum_{i,j}R_{ij}}{n^2}</latex>" as COST #C3FAE8
+
+rectangle "Median thresholds\n<latex>\widetilde{VFI}</latex> · <latex>\widetilde{VFO}</latex>" as MEDIAN #FFF3BF
+rectangle "Core · Shared\nControl · Peripheral" as QUADRANTS #E5DBFF
+
+rectangle "projection_sccs()\nshared iterative Tarjan engine" as SCC #C3FAE8
+rectangle "Largest SCC with at least 2 members\ntie: smallest stable NodeId" as CYCLIC #FCC2D7
+
+rectangle "DsmAnalysis + CorePeripheryResult\nNodeId provenance · complete · capped\nno CPG mutation" as RESULT #C3FAE8
+rectangle "Incomplete result\nempty derived vectors\nmalformed or over cap" as INCOMPLETE #FFE3E3
+
+INPUT --> VALIDATE
+VALIDATE --> INCOMPLETE : malformed
+VALIDATE --> CAP : valid
+CAP --> INCOMPLETE : no / capped
+CAP --> BFS : yes / analyze
+CAP --> SCC : yes / classify
+BFS --> VIS
+VIS --> COST
+VIS --> MEDIAN
+MEDIAN --> QUADRANTS
+SCC --> CYCLIC
+COST --> RESULT
+QUADRANTS --> RESULT
+CYCLIC --> RESULT
+
+note right of BFS
+  The diagonal is excluded.
+  A cycle returning to s does not
+  make s visible from itself.
+end note
+
+legend right
+  |= colour |= role |
+  |<#F1F3F5>| payload-free graph input |
+  |<#FFE8CC>| structural validation |
+  |<#FFF3BF>| resource or threshold decision |
+  |<#DBE4FF>| one-source reachability traversal |
+  |<#D3F9D8>| visibility counts |
+  |<#C3FAE8>| graph metric, SCC reuse, or immutable result |
+  |<#E5DBFF>| median quadrant classification |
+  |<#FCC2D7>| cyclic architectural core |
+  |<#FFE3E3>| explicit incomplete outcome |
+endlegend
+@enduml

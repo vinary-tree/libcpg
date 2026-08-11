@@ -10,8 +10,8 @@ timeout).
 ![Resource bounds that keep libcpg finite on large or untrusted input](../diagrams/resource-bounds.svg)
 
 *Figure — finite-work safeguards for construction, call resolution, VF2
-matching, monotone solving, condensation analytics, the structural DFG sweep,
-and slicing.
+matching, monotone solving, condensation/DSM analytics, the structural DFG
+sweep, and slicing.
 Source: [`diagrams/resource-bounds.puml`](../diagrams/resource-bounds.puml).*
 
 ## The bounds at a glance
@@ -33,6 +33,7 @@ Source: [`diagrams/resource-bounds.puml`](../diagrams/resource-bounds.puml).*
 | `SolverConfig::narrow_passes` | `0` | `solve` | performs exactly the configured number of post-widening deterministic sweeps |
 | SCCP event cap | `4 * (scope nodes + DefUse edges)` | `sccp` | returns `AnalysisError::IterationLimitExceeded` if malformed dependencies exceed the finite-lattice schedule bound |
 | `CondensationOptions::max_components` | `1_000_000` hard maximum | `condensation_metrics`; `coffman_graham` always uses the hard maximum | the total metrics API returns an incomplete capped report; the direct CG API returns `AnalysisError::BudgetExceeded` |
+| `MAX_DSM_NODES` | `50_000` hard maximum | `analyze_dsm`; independently rechecked by `classify_core_periphery` | returns an incomplete capped result with the stable node universe and no partial visibility/class vectors |
 | Loop-induction structural bounds | at most `candidate_count + 1` invariant rounds per loop; affine depth `3` | `loop_induction` | reaches a finite fixed point; malformed AST cycles are cut by visited sets and arithmetic overflow becomes unknown evidence |
 | Complexity-evidence bounds | validated finite function scope plus loop/induction provider bounds | `estimate_time_complexity_with_evidence` (feature `algorithm-detection`) | provider failure or absent CFG evidence returns the exact legacy total estimate; justification grows with loop count |
 
@@ -219,6 +220,33 @@ number of components, while total SCC membership and edge storage still scale
 with the supplied decomposition, so callers must retain source/graph size
 limits for hostile inputs.
 
+## DSM visibility: quadratic-work cap and CSR validation
+
+[`analyze_dsm`](../components/graph/dsm-analysis.md) performs one forward
+breadth-first search per projected vertex, with worst-case time
+$`O(n(n+m))`$. It checks `n > MAX_DSM_NODES` before validating CSR or
+allocating traversal state. An input above the 50,000-vertex hard ceiling
+returns `complete = false`, `capped = true`, retains only stable node
+provenance, and reports no partial visibility vectors or scalar inference.
+
+For an in-budget public `GraphProjection`, the analysis validates strictly
+sorted nodes, forward/reverse offset shape and monotonicity, in-range and
+strictly sorted targets, optional-weight alignment, equal edge counts, and
+forward/reverse agreement before calling any indexing accessor. Malformed CSR
+returns an uncapped incomplete result. `classify_core_periphery` repeats graph
+validation and requires exact `NodeId` provenance, node count, vector lengths,
+per-node count bounds, equal fan-in/fan-out totals, finite and count-consistent
+propagation cost, and a complete source analysis before median or SCC work.
+This prevents mixing results from different same-sized projections and rejects
+caller-forged inconsistent fields before classification.
+
+The hard ceiling is a denial-of-service boundary, not a latency guarantee:
+quadratic work can be expensive far below 50,000. Applications processing
+hostile or interactive workloads should enforce a tighter input-specific node
+limit before calling the fixed-signature API. Edge weights and payload sizes do
+not affect visibility topology, but the source projection and returned SCC
+decomposition still occupy $`O(n+m)`$ storage.
+
 ## Loop induction: finite structural bounds
 
 [`loop_induction`](../components/graph/induction-analysis.md) computes each
@@ -366,6 +394,7 @@ correctness**: an analysis may return a meaningless answer, but it must
 | `ast_descendants`, `ast_ancestors`, `ast_depth` | a **visited set** — each node is expanded at most once, so the walk is bounded by the node count |
 | `ast_ancestors` | additionally stops at a parent pointer that names a node not in the graph, rather than returning an id `node()` cannot resolve |
 | `control_flow_sccs` / `call_graph_sccs` | a visited set guards AST scope discovery; dense discovery/low-link arrays and explicit DFS/component stacks make iterative Tarjan visit every projected vertex and normalized edge without consuming native stack per path element |
+| `analyze_dsm` / `classify_core_periphery` | validates public CSR and exact result provenance, caps vertices before work, and uses iterative queues plus the iterative shared SCC engine; no path depth consumes native stack |
 | `loop_forest` | the shared visited function scope, iterative dominator/SCC/DFS walks, iterative reverse-body closure, and iterative nesting walk avoid recursion; a 25,000-node natural loop is regression-tested |
 | `unreachable_code` | visited function-scope and dense CFG sets bound discovery; iterative DFS is stack-safe on a 25,000-node reachable/disconnected graph |
 | `block_cfg` / `solve` | iterative CFG traversal and work queues avoid native-stack growth; `solve` also caps extractions per block and ignores inconsistent public loop-header mappings |
@@ -405,6 +434,9 @@ over each one — see
    and [`usage/05-serialization.md`](../usage/05-serialization.md)).
 9. **Treat detection output as advisory**, never as a security gate.
 10. **Validate graphs you did not build yourself** (deserialized or caller-assembled) if you need *meaningful* results — the traversal guards guarantee termination, not that the answer means anything.
+11. **Preflight DSM latency below its hard cap** for interactive or hostile
+    workloads; 50,000 prevents unbounded input but does not make
+    $`O(n(n+m))`$ work inexpensive.
 
 ## Related pages
 

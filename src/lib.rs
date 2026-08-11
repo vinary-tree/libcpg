@@ -74,22 +74,23 @@ pub use graph::{
 };
 
 pub use analysis::{
-    available_expressions, block_cfg, build_symbol_table, call_graph_projection, call_graph_sccs,
-    cfg_projection, coffman_graham, condensation_metrics, control_flow_sccs, dead_stores,
-    dfg_projection, dominator_tree, expression_facts, liveness, loop_forest, loop_induction,
-    module_graph_projection, pdg_projection, post_dominator_tree, projection_of, resolve_calls,
-    sccp, solve, unreachable_code, value_ranges, variable_facts, very_busy_expressions,
-    AnalysisError, AvailableExpressions, BasicBlock, BitSetDomain, BlockCfg, BlockEdge, BlockId,
-    Bound, CallGraphResolution, CallResolution, CgLayering, CondensationMetrics,
-    CondensationOptions, Confidence, Confluence, ConstLattice, ConstValue, DataflowAnalysis,
-    DataflowSolution, DeadBranch, DeadStore, DeadStoreReport, Direction, DominatorTree, ExprFacts,
-    ExprKey, ExprOperand, FactUniverse, GraphProjection, InductionAnalysis, InductionVariable,
-    Interval, IntervalEnv, IntervalReport, IvDirection, Lattice, LivenessResult, LoopBoundEvidence,
+    analyze_dsm, available_expressions, block_cfg, build_symbol_table, call_graph_projection,
+    call_graph_sccs, cfg_projection, classify_core_periphery, coffman_graham, condensation_metrics,
+    control_flow_sccs, dead_stores, dfg_projection, dominator_tree, expression_facts, liveness,
+    loop_forest, loop_induction, module_graph_projection, pdg_projection, post_dominator_tree,
+    projection_of, projection_sccs, resolve_calls, sccp, solve, unreachable_code, value_ranges,
+    variable_facts, very_busy_expressions, AnalysisError, AvailableExpressions, BasicBlock,
+    BitSetDomain, BlockCfg, BlockEdge, BlockId, Bound, CallGraphResolution, CallResolution,
+    CgLayering, CondensationMetrics, CondensationOptions, Confidence, Confluence, ConstLattice,
+    ConstValue, CorePeriphery, CorePeripheryResult, DataflowAnalysis, DataflowSolution, DeadBranch,
+    DeadStore, DeadStoreReport, Direction, DominatorTree, DsmAnalysis, ExprFacts, ExprKey,
+    ExprOperand, FactUniverse, GraphProjection, InductionAnalysis, InductionVariable, Interval,
+    IntervalEnv, IntervalReport, IvDirection, Lattice, LivenessResult, LoopBoundEvidence,
     LoopExitEdge, LoopForest, LoopInvariants, MustBits, NaturalLoop, PostDominatorTree,
     ProjectionError, ProjectionKind, ReachabilityReport, ResolveConfig, SccAnalysisError,
     SccComponent, SccCondensationEdge, SccDecomposition, SccProjection, SccpResult, SolverConfig,
     SymbolCandidates, SymbolTable, TripEvidence, UndirectedProjection, VarFacts,
-    VariableDefinition, VeryBusyExpressions, MAX_CONDENSATION_COMPONENTS,
+    VariableDefinition, VeryBusyExpressions, MAX_CONDENSATION_COMPONENTS, MAX_DSM_NODES,
 };
 
 pub use builder::{

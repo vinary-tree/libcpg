@@ -86,7 +86,9 @@ detection ([Theory 05](05-subgraph-isomorphism-vf2.md)),
 [complexity-class](../GLOSSARY.md#complexity-class--big-o) estimation
 ([Theory 08](08-algorithm-and-complexity-analysis.md)), and
 [graph-neural-network](../GLOSSARY.md#graph-neural-network-gnn) embeddings
-([Theory 09](09-graph-neural-networks.md)). Each consumes the same
+([Theory 09](09-graph-neural-networks.md)), and
+[Design Structure Matrix](../GLOSSARY.md#design-structure-matrix-dsm)
+visibility/core analysis ([Theory 10](10-design-structure-matrix-analysis.md)). Each consumes the same
 `CodePropertyGraph`; none needs its own bespoke intermediate representation.
 
 ## 4. The four overlays at a glance
@@ -149,7 +151,7 @@ same graph. Errors are the crate's own [`libcpg::Error`](../api/graph-reference.
 
 ## 6. Map of the theory pillar
 
-This overview sits above nine formal chapters. Read them in order for a ground-up
+This overview sits above ten formal chapters. Read them in order for a ground-up
 development, or jump to the layer you need:
 
 1. **[01 — Code Property Graphs](01-code-property-graphs.md).** The formal model:
@@ -171,6 +173,9 @@ development, or jump to the layer you need:
 7. **[07 — Design-Pattern Detection](07-design-pattern-detection.md).**
 8. **[08 — Algorithm and Complexity Analysis](08-algorithm-and-complexity-analysis.md).**
 9. **[09 — Graph Neural Networks](09-graph-neural-networks.md).**
+10. **[10 — Design Structure Matrices, visibility, and architectural cores](10-design-structure-matrix-analysis.md).**
+    Transitive visibility, propagation cost, median quadrants, and the largest
+    multi-vertex SCC as distinct architecture evidence.
 
 For how these ideas are realised in code, cross the bridge to the architecture
 pillar ([`architecture/overview.md`](../architecture/overview.md),

@@ -33,6 +33,9 @@ PDG). A query can therefore mix syntax, control flow, and data flow freely.
 - **Condensation-DAG analytics** — canonical longest-path levels, SCC-size
   weighted critical paths, level width, and deterministic width-bounded
   Coffman–Graham scheduling with explicit caps and malformed-input handling.
+- **Design Structure Matrix analytics** — bounded transitive visibility
+  fan-out/fan-in, propagation cost, deterministic median core–periphery roles,
+  and largest cyclic-group evidence over any graph projection.
 - **CFG reachability** — feature-free, deterministic reachable/unreachable
   partitions and structural dead-branch evidence without graph mutation.
 - **Basic-block CFGs** — deterministic, id-preserving block partitions, typed
@@ -127,8 +130,8 @@ Comprehensive documentation lives under [`docs/`](docs/README.md):
 - **[Theory](docs/theory/00-overview.md)** — the CPG model, control/data flow, program dependence & slicing, subgraph isomorphism, similarity, pattern detection, complexity, and GNNs, with proofs, math, and citations.
 - **[Architecture](docs/architecture/overview.md)** — module map, the graph data model, construction & analysis pipelines, and language frontends.
 - **[Design decisions](docs/design/00-overview.md)** — ADR-style records for load-bearing graph, construction, analysis, and feature choices.
-- **[API reference](docs/api/graph-reference.md)** — graph/projection/block-CFG/SCC/condensation/reachability, builder, and pattern/algorithm/GNN reference.
-- **[Components](docs/README.md#components)** — graph projections, basic blocks, dominators, SCC/condensation analytics, reachability, builders, patterns, algorithms, and GNN internals.
+- **[API reference](docs/api/graph-reference.md)** — graph/projection/block-CFG/SCC/condensation/DSM/reachability, builder, and pattern/algorithm/GNN reference.
+- **[Components](docs/README.md#components)** — graph projections, basic blocks, dominators, SCC/condensation/DSM analytics, reachability, builders, patterns, algorithms, and GNN internals.
 - **[Usage guides](docs/usage/00-getting-started.md)** — task-oriented how-tos.
 - **[Engineering](docs/engineering/00-overview.md)** · **[Scientific validation](docs/scientific/00-overview.md)** · **[Security](docs/security/00-threat-model.md)**.
 - **[Glossary](docs/GLOSSARY.md)** and the **[diagram catalog](docs/diagrams/README.md)**.
@@ -150,3 +153,5 @@ Licensed under either of [Apache License, Version 2.0](LICENSE-APACHE) or
 - Cousot, P., Cousot, R. (1977). *Abstract Interpretation: A Unified Lattice Model for Static Analysis of Programs by Construction or Approximation of Fixpoints.* POPL. DOI: [10.1145/512950.512973](https://doi.org/10.1145/512950.512973)
 - Kahn, A. B. (1962). *Topological sorting of large networks.* Communications of the ACM. DOI: [10.1145/368996.369025](https://doi.org/10.1145/368996.369025)
 - Coffman, E. G., Jr., Graham, R. L. (1972). *Optimal scheduling for two-processor systems.* Acta Informatica. DOI: [10.1007/BF00288685](https://doi.org/10.1007/BF00288685)
+- MacCormack, A., Rusnak, J., Baldwin, C. Y. (2006). *Exploring the Structure of Complex Software Designs: An Empirical Study of Open Source and Proprietary Code.* Management Science. DOI: [10.1287/mnsc.1060.0552](https://doi.org/10.1287/mnsc.1060.0552)
+- Baldwin, C. Y., MacCormack, A., Rusnak, J. (2014). *Hidden Structure: Using Network Methods to Map System Architecture.* Research Policy. DOI: [10.1016/j.respol.2014.05.004](https://doi.org/10.1016/j.respol.2014.05.004)

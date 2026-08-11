@@ -272,13 +272,14 @@ complexity, validation, and examples.
 
 ### Strongly-connected components
 
-These feature-free functions compute exact SCC partitions over two graph
-projections:
+These feature-free functions compute exact SCC partitions over CPG-specific or
+caller-supplied graph projections:
 
 | Function | Signature | Projection |
 |---|---|---|
 | `control_flow_sccs` | `fn control_flow_sccs(&CodePropertyGraph, NodeId) -> Result<SccDecomposition, SccAnalysisError>` | One function's intraprocedural CFG; nested functions and interprocedural call edges are excluded. |
 | `call_graph_sccs` | `fn call_graph_sccs(&CodePropertyGraph) -> SccDecomposition` | All functions and resolved caller-to-callee relations in the CPG. |
+| `projection_sccs` | `fn projection_sccs(&GraphProjection) -> SccDecomposition` | Any constructor-valid deterministic projection, preserving specialized CFG/call provenance or recording `Projection(kind)`. |
 
 `SccDecomposition` exposes deterministic `components`, a
 `component_by_node` membership map, cycle-only iteration, and the condensation
@@ -308,6 +309,31 @@ The hard ceiling is the root-exported
 See the [condensation component guide](../components/graph/condensation-analysis.md)
 for orientation, Kahn and Coffman–Graham pseudocode, malformed-input policy,
 complexity, examples, and exhaustive path/schedule oracles.
+
+### Design Structure Matrix visibility and core–periphery
+
+These feature-free functions consume a valid `GraphProjection` without
+mutating it or its source CPG:
+
+| Function | Signature | Result |
+|---|---|---|
+| `analyze_dsm` | `fn(&GraphProjection) -> DsmAnalysis` | Non-reflexive transitive visibility fan-out/fan-in and propagation cost via repeated forward BFS. |
+| `classify_core_periphery` | `fn(&GraphProjection, &DsmAnalysis) -> CorePeripheryResult` | Inclusive-median `Core`/`Shared`/`Control`/`Peripheral` roles plus the largest multi-vertex SCC. |
+
+`DsmAnalysis` exposes stable `nodes`, aligned `visibility_fan_out` and
+`visibility_fan_in`, `propagation_cost`, `n`, `complete`, and `capped`.
+`CorePeripheryResult` exposes stable `nodes`, aligned `classes`, both median
+thresholds, dense `cyclic_core`, `complete`, and `capped`; `class_of` and
+`cyclic_core_nodes` provide stable-identifier lookup. `CorePeriphery::as_str`
+returns stable lowercase labels.
+
+The hard ceiling is `MAX_DSM_NODES = 50_000`. Oversized input produces an
+explicitly capped incomplete result; malformed public CSR or mismatched
+analysis provenance/count/scalar consistency produces an uncapped incomplete
+result. Derived vectors are empty in both cases, never partial. See the [DSM component
+guide](../components/graph/dsm-analysis.md) for formulae, edge direction,
+literate BFS/SCC composition, degenerate median semantics, examples, tests,
+and interpretation limits.
 
 ### Natural loops and nesting
 

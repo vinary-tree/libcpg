@@ -50,13 +50,13 @@ Two properties of the suite make this rigorous rather than merely suggestive:
 
 ## 3. The evidence base
 
-The maximal matrix contains **640 library tests**, **21 general public-API
+The maximal matrix contains **655 library tests**, **21 general public-API
 integration tests**, **5 malformed-input robustness tests**, **3 SCCP
 public/parser integration tests**, and **3 interval public/parser integration
 tests**, plus **3 loop-induction** and **3 complexity-evidence public/parser
-integration tests**, plus **2 condensation public/parser integration tests**.
-These 680 executable cases combine fixed examples, differential oracles, and
-45 exact source-level `proptest!` blocks. The feature-free matrix remains
+integration tests**, plus **2 condensation** and **2 DSM public/parser
+integration tests**. These 697 executable cases combine fixed examples,
+differential oracles, and 46 exact source-level `proptest!` blocks. The feature-free matrix remains
 independently runnable and exercises the exact graph/data-flow substrate
 without compiling any grammar. Six active Criterion targets supplement
 correctness with eight scoped operation groups when
@@ -79,12 +79,17 @@ Because `default = []`, many tests are **feature-gated**. The end-to-end reachin
 | [07 — Loop-induction validation](07-induction-analysis-validation.md) | DFG invariant contract, unique latch-dominating recurrences, checked affine steps, comparison direction, determinism, parser integration, malformed/stack safety | induction unit/property tests, `induction_integration`, robustness harness | feature-free / `serde` / `lang-rust` parser case |
 | [08 — Complexity-evidence validation](08-complexity-evidence-validation.md) | Counted-loop polynomial degree/provenance, confidence precedence, exact legacy fallback, storage determinism, parser/default-detector integration | complexity unit/property tests, `complexity_evidence_integration`, robustness harness, gated benchmark oracle | `algorithm-detection` / `lang-rust` parser case |
 | [09 — Condensation validation](09-condensation-validation.md) | Weighted critical paths, source levels, width-bounded CG precedence, exact/approximate schedule height, cap/malformed behavior, storage determinism, parser integration | condensation unit/property tests, exhaustive path/schedule oracles, `condensation_integration`, benchmark oracle | feature-free / `serde` / `lang-rust` parser case |
+| [10 — DSM validation](10-dsm-validation.md) | Transitive visibility vectors, propagation cost, median roles, largest multi-vertex SCC, cap/malformed/provenance behavior, storage determinism, parser integration | DSM unit/property tests, Floyd–Warshall/mutual-reachability oracles, `dsm_integration`, robustness harness | feature-free / `serde` / `lang-rust` parser case |
 
 ## 5. What is proven, and what is advisory
 
 Scientific honesty requires separating the two:
 
 - **Proven (guarded by the tests above).** The CPG's structural invariants; deterministic graph projection; immediate dominance (differentially checked against `petgraph`); post-dominance and control-dependence equivalence with the former production oracle; natural back edges and loop bodies (checked against independent brute-force dominance and closure oracles); exact SCC partitioning and condensation acyclicity (differentially checked against `petgraph`'s Tarjan implementation); condensation weighted paths (exhaustive path oracle), source levels, CG coverage/precedence/width, and exact/approximate unit-schedule height (exhaustive subset-schedule oracle); liveness fixed points (checked against an independent Gauss–Seidel solver); available/very-busy Must states (checked by exhaustive entry/exit path enumeration on generated acyclic CFGs); SCCP constants on the generated `StmtSpec` language (checked by a concrete mini-interpreter), conditional-edge partitions, and deterministic insertion permutations; interval membership on generated straight-line and bounded-loop programs, widening/narrowing laws, convergence caps, SCCP singleton containment, and deterministic reports; loop-invariant DFG contracts, checked additive/affine IV steps, direction compatibility, insertion-order determinism, and conservative rejection cases; the reaching-definition semantics on the audited corpus; and VF2's completeness on the discriminating diamond. These are deterministic and regression-locked.
+  DSM visibility vectors and propagation cost are independently checked by
+  Floyd–Warshall closure; largest cyclic groups are checked from mutual
+  reachability; insertion/duplicate invariance and malformed/provenance states
+  are regression-locked as well.
 - **Advisory (policy-sensitive by design).** The available/very-busy states are
   exact for the modeled structural expressions and CFG, while their CSE/PRE
   transformation candidates still require language side-effect policy.
@@ -99,8 +104,8 @@ Scientific honesty requires separating the two:
   score likelihood, they do not prove identity. Treat all such evidence at its
   documented boundary rather than as ground truth.
 - **Empirically bounded.** Performance results apply only to a target's named
-  fixture, size, and controlled environment. DFG/PDG construction,
-  whole-corpus analysis, and GNN propagation remain measurement gaps; no result
+  fixture, size, and controlled environment. DSM visibility, DFG/PDG
+  construction, whole-corpus analysis, and GNN propagation remain measurement gaps; no result
   from the six active targets (or eight enabled operation groups) may be
   generalized to them.
 

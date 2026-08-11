@@ -8,6 +8,7 @@ pub(crate) mod cfg_scope;
 mod condensation;
 pub mod dataflow;
 mod dominators;
+mod dsm;
 mod induction;
 mod loops;
 mod projection;
@@ -40,6 +41,11 @@ pub use projection::{
 
 pub use dominators::{dominator_tree, post_dominator_tree, DominatorTree, PostDominatorTree};
 
+pub use dsm::{
+    analyze_dsm, classify_core_periphery, CorePeriphery, CorePeripheryResult, DsmAnalysis,
+    MAX_DSM_NODES,
+};
+
 pub use induction::{
     loop_induction, InductionAnalysis, InductionVariable, IvDirection, LoopBoundEvidence,
     LoopInvariants, TripEvidence,
@@ -56,8 +62,8 @@ pub use resolve::{
 
 pub(crate) use scc::function_scope_nodes;
 pub use scc::{
-    call_graph_sccs, control_flow_sccs, SccAnalysisError, SccComponent, SccCondensationEdge,
-    SccDecomposition, SccProjection,
+    call_graph_sccs, control_flow_sccs, projection_sccs, SccAnalysisError, SccComponent,
+    SccCondensationEdge, SccDecomposition, SccProjection,
 };
 
 /// Errors shared by exact structural analyses.

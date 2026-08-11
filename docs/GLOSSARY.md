@@ -161,6 +161,17 @@ A similarity measure between two vectors, used to compare [embeddings](#embeddin
 
 It ranges over $`[-1, 1]`$ ($`1`$ = identical direction). Exposed as `NodeEmbedding::cosine_similarity`. Also the basis of the `Cosine` [similarity metric](#similarity-metric). See [`components/gnn/embeddings.md`](components/gnn/embeddings.md).
 
+### Core–periphery classification / Cyclic core
+
+A comparative classification of directed-graph vertices by high/low
+[visibility fan-in and fan-out](#visibility-fan-in-vfi--visibility-fan-out-vfo).
+libcpg uses inclusive per-axis medians to label `Core`, `Shared`, `Control`, and
+`Peripheral`. The **cyclic core** is reported separately: it is the largest
+multi-vertex [SCC](#strongly-connected-component-scc), following the
+directed-network architectural focus of Baldwin, MacCormack, and Rusnak
+[[27]](#references). See
+[`components/graph/dsm-analysis.md`](components/graph/dsm-analysis.md).
+
 ### Critical path
 
 A maximum-weight directed path through a [DAG](#directed-acyclic-graph-dag).
@@ -204,6 +215,17 @@ A **definition** is a program point that assigns a variable a value; a **use** i
 ### Design pattern
 
 A reusable solution to a recurring design problem. `libcpg` detects the 23 [Gang-of-Four](#gang-of-four-gof) patterns structurally, by matching each pattern's template graph against the CPG with a relaxed [VF2](#vf2) matcher. See [`components/patterns/gang-of-four.md`](components/patterns/gang-of-four.md).
+
+### Design Structure Matrix (DSM)
+
+A square matrix whose rows and columns represent the same component set and
+whose marked cell $`(i,j)`$ records a directed dependency from component $`i`$
+to component $`j`$. Its non-reflexive transitive closure is the visibility
+matrix used to derive [propagation cost](#propagation-cost) and
+[VFI/VFO](#visibility-fan-in-vfi--visibility-fan-out-vfo) [[26]](#references).
+libcpg consumes the equivalent sparse [`GraphProjection`](#graph-projection)
+rather than materializing the matrix. See
+[`theory/10-design-structure-matrix-analysis.md`](theory/10-design-structure-matrix-analysis.md).
 
 ### Directed acyclic graph (DAG)
 
@@ -275,6 +297,15 @@ The minimum number of node/edge insertions, deletions, and relabellings that tur
 ### Graph Neural Network (GNN)
 
 A neural network that computes node representations by repeatedly [aggregating](#aggregation-gnn) information from neighbours ([message passing](#message-passing)), pioneered for graphs by Scarselli et al. [[9]](#references) and applied to vulnerability detection by Devign (Zhou et al. [[12]](#references)). `libcpg`'s `CpgGnn` (feature `gnn`) owns a CPG and produces [embeddings](#embedding). See [`components/gnn/overview.md`](components/gnn/overview.md).
+
+### Graph projection
+
+A deterministic, payload-free directed graph over sorted stable `NodeId`
+values, stored as forward and reverse compressed-sparse-row adjacency.
+`GraphProjection` selects one CPG overlay or accepts an external graph without
+cloning node payloads. It is the common feature-free substrate for dominance,
+SCC, DSM, and other exact analyses. See
+[`components/graph/projections.md`](components/graph/projections.md).
 
 ### Idempotent
 
@@ -417,6 +448,14 @@ The overlay of [control-dependence](#control-dependence) and [data-dependence](#
 
 Reducing a program to just the statements that affect (or are affected by) a chosen point of interest, the **slicing criterion**. Introduced by Weiser [[8]](#references). `libcpg` computes [backward and forward slices](#backward-slice--forward-slice) over the PDG. See [`usage/04-program-slicing.md`](usage/04-program-slicing.md).
 
+### Propagation cost
+
+The density of the non-reflexive transitive-closure visibility matrix of a
+[DSM](#design-structure-matrix-dsm): the number of reachable ordered pairs
+divided by $`n^2`$ for $`n`$ components [[26]](#references). libcpg computes it
+from repeated graph searches without storing the $`n\times n`$ matrix. See
+[`components/graph/dsm-analysis.md`](components/graph/dsm-analysis.md).
+
 ### Reaching definition
 
 A definition of a variable that reaches a program point with no intervening redefinition on some path. The `ReachingDef` DFG edge connects such a definition to the use it reaches. Computed by [AST-ordered reaching definitions](#ast-ordered-reaching-definitions). See [`theory/03-data-flow-and-reaching-definitions.md`](theory/03-data-flow-and-reaching-definitions.md).
@@ -490,6 +529,16 @@ It is a backward [Must analysis](#may-analysis--must-analysis) with intersection
 at branches and supplies evidence for [PRE](#partial-redundancy-elimination-pre).
 See [`components/graph/expression-analysis.md`](components/graph/expression-analysis.md).
 
+### Visibility fan-in (VFI) / Visibility fan-out (VFO)
+
+For the non-reflexive transitive closure $`R`$ of a directed graph,
+$`VFO(i)=\sum_jR_{ij}`$ counts distinct other vertices reachable from $`i`$,
+while $`VFI(i)=\sum_jR_{ji}`$ counts distinct other vertices that can reach
+$`i`$. Their totals are equal because both count reachable ordered pairs.
+They supply [propagation cost](#propagation-cost) and median
+[core–periphery](#coreperiphery-classification--cyclic-core) evidence. See
+[`theory/10-design-structure-matrix-analysis.md`](theory/10-design-structure-matrix-analysis.md).
+
 ### VF2
 
 The subgraph-isomorphism algorithm of Cordella, Foggia, Sansone, and Vento [[4]](#references): a depth-first state-space search that grows a partial node mapping, pruning with feasibility rules over node kinds and incident edges, and backtracking when stuck. `libcpg`'s `Vf2Matcher` implements it with an explicit push-order stack so backtracking restores the mapping and [terminal sets](#terminal-set-vf2) exactly. Worst-case cost is $`O(N!\,N)`$ but pruning makes it practical. See [`theory/05-subgraph-isomorphism-vf2.md`](theory/05-subgraph-isomorphism-vf2.md).
@@ -547,3 +596,5 @@ used by the complexity analyzer to classify recursive functions (e.g. $`a = b = 
 23. Miné, A. (2006). *The Octagon Abstract Domain.* Higher-Order and Symbolic Computation 19, 31–100. DOI: [10.1007/s10990-006-8609-1](https://doi.org/10.1007/s10990-006-8609-1)
 24. Kahn, A. B. (1962). *Topological Sorting of Large Networks.* Communications of the ACM 5(11), 558–562. DOI: [10.1145/368996.369025](https://doi.org/10.1145/368996.369025)
 25. Coffman, E. G., Jr., Graham, R. L. (1972). *Optimal Scheduling for Two-Processor Systems.* Acta Informatica 1, 200–213. DOI: [10.1007/BF00288685](https://doi.org/10.1007/BF00288685)
+26. MacCormack, A., Rusnak, J., Baldwin, C. Y. (2006). *Exploring the Structure of Complex Software Designs: An Empirical Study of Open Source and Proprietary Code.* Management Science 52(7), 1015–1030. DOI: [10.1287/mnsc.1060.0552](https://doi.org/10.1287/mnsc.1060.0552)
+27. Baldwin, C. Y., MacCormack, A., Rusnak, J. (2014). *Hidden Structure: Using Network Methods to Map System Architecture.* Research Policy 43(8), 1381–1397. DOI: [10.1016/j.respol.2014.05.004](https://doi.org/10.1016/j.respol.2014.05.004)

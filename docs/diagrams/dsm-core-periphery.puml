@@ -1,0 +1,34 @@
+@startuml
+!include _libcpg-theme.iuml
+title Core–periphery visibility quadrants and the independent cyclic core
+left to right direction
+
+rectangle "**Shared**\n<latex>VFI \ge \widetilde{VFI}</latex>\n<latex>VFO < \widetilde{VFO}</latex>\nmany depend on it\nit depends on few" as SHARED #D3F9D8
+rectangle "**Core**\n<latex>VFI \ge \widetilde{VFI}</latex>\n<latex>VFO \ge \widetilde{VFO}</latex>\ncentral in both directions" as CORE #C3FAE8
+rectangle "**Peripheral**\n<latex>VFI < \widetilde{VFI}</latex>\n<latex>VFO < \widetilde{VFO}</latex>\nlocally connected or isolated" as PERIPHERAL #F1F3F5
+rectangle "**Control**\n<latex>VFI < \widetilde{VFI}</latex>\n<latex>VFO \ge \widetilde{VFO}</latex>\ndepends on many\nfew depend on it" as CONTROL #DBE4FF
+
+SHARED -[hidden]right-> CORE
+SHARED -[hidden]down-> PERIPHERAL
+CORE -[hidden]down-> CONTROL
+PERIPHERAL -right-> CONTROL : visibility fan-out increases
+PERIPHERAL -up-> SHARED : visibility fan-in increases
+
+rectangle "**Cyclic core**\nlargest multi-vertex SCC\nreported separately from quadrants\nequal sizes choose smallest NodeId" as CYCLIC #FCC2D7
+CORE -right-> CYCLIC : related architectural evidence
+
+note bottom of PERIPHERAL
+  High means greater than or equal to the median.
+  On an all-zero graph every vertex is mechanically Core;
+  the labels are comparative evidence, not semantic truth.
+end note
+
+legend right
+  |= colour |= meaning |
+  |<#D3F9D8>| high fan-in, low fan-out |
+  |<#C3FAE8>| high fan-in, high fan-out |
+  |<#F1F3F5>| low fan-in, low fan-out |
+  |<#DBE4FF>| low fan-in, high fan-out |
+  |<#FCC2D7>| largest multi-vertex strongly connected component |
+endlegend
+@enduml

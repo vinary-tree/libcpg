@@ -322,6 +322,20 @@ fn exercise_every_analysis(cpg: &CodePropertyGraph, func: NodeId) {
             .expect("SCC output has a valid bounded layering");
         assert_eq!(layering.layer_of.len(), decomposition.components.len());
     }
+    let call_projection = libcpg::call_graph_projection(cpg);
+    let projected_sccs = libcpg::projection_sccs(&call_projection);
+    assert_eq!(projected_sccs, call_sccs);
+    let dsm = libcpg::analyze_dsm(&call_projection);
+    assert!(dsm.complete);
+    assert_eq!(dsm.visibility_fan_in.len(), call_projection.node_count());
+    assert_eq!(dsm.visibility_fan_out.len(), call_projection.node_count());
+    let core_periphery = libcpg::classify_core_periphery(&call_projection, &dsm);
+    assert!(core_periphery.complete);
+    assert_eq!(core_periphery.classes.len(), call_projection.node_count());
+    assert!(core_periphery
+        .cyclic_core
+        .iter()
+        .all(|&dense| dense < call_projection.node_count()));
 
     // --- extractors ---
     let mut work = cpg.clone();

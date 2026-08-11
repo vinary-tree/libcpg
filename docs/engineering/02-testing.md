@@ -22,7 +22,7 @@ think to write down.
 
 | Kind | Count | Where |
 | --- | ---: | --- |
-| Maximal-matrix library tests | 640 | inline `#[cfg(test)] mod …` next to the code; includes examples and properties |
+| Maximal-matrix library tests | 655 | inline `#[cfg(test)] mod …` next to the code; includes examples and properties |
 | Public-API integration tests | 21 | `tests/integration.rs` |
 | Malformed-input robustness tests | 5 | `tests/robustness.rs` |
 | SCCP public/parser integration tests | 3 | `tests/sccp_integration.rs` |
@@ -30,8 +30,9 @@ think to write down.
 | Loop-induction public/parser integration tests | 3 | `tests/induction_integration.rs` |
 | Complexity-evidence public/parser integration tests | 3 | `tests/complexity_evidence_integration.rs` |
 | Condensation public/parser integration tests | 2 | `tests/condensation_integration.rs` |
-| **Executable test cases** | **680** | excludes three ignored rustdoc examples |
-| `proptest!` blocks (subset of the library/robustness rows) | 45 | exact source-level macro count in `src/` and `tests/` |
+| DSM public/parser integration tests | 2 | `tests/dsm_integration.rs` |
+| **Executable test cases** | **697** | excludes three ignored rustdoc examples |
+| `proptest!` blocks (subset of the library/robustness rows) | 46 | exact source-level macro count in `src/` and `tests/` |
 
 The maximal-matrix library count is up from **99** inline tests and **zero**
 property tests before this work.
@@ -49,13 +50,14 @@ on the features enabled:
 
 | Command | Lib tests | Notes |
 | --- | ---: | --- |
-| `cargo test` | 339 | `default = []`: the feature-free surface only |
-| `cargo test --features "full rholang metta"` | 640 | the maximal matrix, including the Mode-B mappers and evidence-aware complexity |
+| `cargo test` | 353 | `default = []`: the feature-free surface only |
+| `cargo test --features "full rholang metta"` | 655 | the maximal matrix, including the Mode-B mappers and evidence-aware complexity |
 
-The feature-free 339 exercise the graph model, exact dominator/post-dominator,
+The feature-free 353 exercise the graph model, exact dominator/post-dominator,
 natural-loop, monotone data-flow, variable-liveness/dead-store,
 available/very-busy-expression, SCCP, interval value-range, CFG/call-graph
-SCC analyses, and condensation-DAG analytics, the
+SCC analyses, condensation-DAG analytics, and DSM visibility/core–periphery
+classification, the
 CFG/DFG/PDG extractors, VF2, and similarity by building CPGs
 **by hand** — no grammar required. This is what
 the [`arb_well_formed_cpg`](#the-generators) generator exists for.
@@ -147,6 +149,7 @@ The invariants fall into complementary families.
 | **Matching & similarity** | VF2 embeddings are injective, kind-consistent, and edge-preserving; relaxed matching $`\supseteq`$ strict; all four metrics land in $`[0,1]`$, are symmetric, and are maximal on self-comparison |
 | **Ordering & confidence** | `ComplexityClass::is_better_than` is a strict order (irreflexive, asymmetric, transitive); complexity is monotone in loop nesting; every detector's results are sorted by descending confidence and clear its `min_confidence` |
 | **Complexity evidence** | fully counted reducible depth maps to the exact polynomial degree; opposite storage orders produce identical class/confidence/justification; every generated CFG-free function returns the exact legacy estimate; fixed examples decide unknown-trip and irreducible confidence precedence, provenance, recursion composition, public parsing, and graph non-mutation |
+| **DSM visibility / architecture roles** | repeated-BFS VFO/VFI vectors and propagation cost equal an independent Floyd–Warshall closure; the largest multi-vertex SCC equals an independent mutual-reachability partition; reversed enumeration and duplicate edges preserve reports; examples cover chain/cycle/hub/isolates, equal-core ties, caps, malformed CSR/reverse data, cross-projection provenance, serde, public construction, parser integration, and graph non-mutation |
 
 ### Two invariants worth singling out
 
@@ -268,10 +271,10 @@ cargo +nightly cov-branch           # branch coverage needs nightly
 
 | Metric | Coverage | Lowest file |
 | --- | ---: | --- |
-| Lines | **97.92 %** | 91.67 % (`language.rs`) |
-| Regions | **97.87 %** | — |
+| Lines | **97.95 %** | 91.67 % (`language.rs`) |
+| Regions | **97.90 %** | — |
 | Functions | **98.08 %** | — |
-| Branches | **84.59 %** | see below |
+| Branches | **84.44 %** | see below |
 
 Every source file is above 90 % line coverage; seventeen are at 100 %.
 The `analysis/dominators.rs` module measures **97.50 %** line and
@@ -322,6 +325,12 @@ representative/edge-storage permutations, malformed-decomposition matrix,
 whole-CPG robustness campaign, parser integration, and benchmark oracle are
 catalogued in
 [`scientific/09-condensation-validation.md`](../scientific/09-condensation-validation.md).
+The new `analysis/dsm.rs` module measures **99.79 %** line, **99.48 %** region,
+**98.04 %** function, and **82.43 %** branch coverage, clearing the same
+thresholds. Its independent closure/core oracles, storage permutations,
+fixed-role/cap/malformed-result examples, public/parser integration, and serde
+experiment are catalogued in
+[`scientific/10-dsm-validation.md`](../scientific/10-dsm-validation.md).
 All figures come from clean maximal-matrix coverage runs; no focused-test
 figure is substituted for the repository gate.
 

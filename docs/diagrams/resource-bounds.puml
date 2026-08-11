@@ -43,6 +43,13 @@ direct Coffman-Graham returns BudgetExceeded.;
 ***[#F1F3F5]:public decomposition validation
 rejects inconsistent membership, invalid edges,
 self-loops, cycles, and zero layering width.;
+**[#FFE3E3] DSM visibility
+***[#F1F3F5]:MAX_DSM_NODES = 50,000
+rejects before repeated breadth-first search,
+returns a capped incomplete result with no partial vectors.;
+***[#F1F3F5]:public projection + provenance validation
+rejects malformed forward/reverse CSR, mismatched nodes,
+vector lengths, and incomplete source analyses.;
 **[#FFE3E3] Slicing
 ***[#F1F3F5]:max_nodes on backward_slice / forward_slice
 bounds the PDG reverse/forward BFS —

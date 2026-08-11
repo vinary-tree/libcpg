@@ -1,10 +1,11 @@
 # Strongly-connected-component analysis
 
 `libcpg` provides exact, feature-free strongly-connected-component (SCC)
-analysis for two directed projections of a code property graph:
+analysis for CPG-specific and general directed projections:
 
 - one function's intraprocedural control-flow graph (CFG); and
-- the whole CPG's resolved function-to-function call graph.
+- the whole CPG's resolved function-to-function call graph; or
+- any constructor-valid deterministic `GraphProjection`.
 
 SCCs expose loop regions in a CFG and direct or mutual recursion in a call
 graph. Unlike the optional algorithm-family detector, this structural analysis
@@ -17,7 +18,10 @@ The functions and result types are available from both `libcpg::analysis` and
 the crate root:
 
 ```rust
-use libcpg::{call_graph_sccs, control_flow_sccs, CodePropertyGraph, NodeId};
+use libcpg::{
+    call_graph_projection, call_graph_sccs, control_flow_sccs,
+    projection_sccs, CodePropertyGraph, GraphProjection, NodeId,
+};
 
 fn analyze(cpg: &CodePropertyGraph, function: NodeId) {
     let cfg = control_flow_sccs(cpg, function).expect("function node");
@@ -29,6 +33,9 @@ fn analyze(cpg: &CodePropertyGraph, function: NodeId) {
     for component in calls.cyclic_components() {
         println!("recursive function cluster: {:?}", component.nodes);
     }
+
+    let projected_calls = call_graph_projection(cpg);
+    assert_eq!(projection_sccs(&projected_calls), calls);
 }
 ```
 
@@ -39,11 +46,16 @@ pub fn control_flow_sccs(
 ) -> Result<SccDecomposition, SccAnalysisError>;
 
 pub fn call_graph_sccs(cpg: &CodePropertyGraph) -> SccDecomposition;
+
+pub fn projection_sccs(projection: &GraphProjection) -> SccDecomposition;
 ```
 
 `control_flow_sccs` distinguishes an unknown node from a node that exists but
 is not a function. `call_graph_sccs` needs no input node because it includes
-every function in the CPG, including isolated functions.
+every function in the CPG, including isolated functions. `projection_sccs`
+accepts the canonical dense order and adjacency already carried by a
+`GraphProjection`; this is the shared entry point used by DSM cyclic-core
+classification.
 
 ## Result contract
 
@@ -51,7 +63,7 @@ every function in the CPG, including isolated functions.
 
 | Field / method | Meaning |
 |---|---|
-| `projection` | `ControlFlow { function }` or `CallGraph`. |
+| `projection` | `ControlFlow { function }`, `CallGraph`, or `Projection(ProjectionKind)`. |
 | `components` | Every maximal SCC, ordered by its smallest node id. |
 | `component_by_node` | Deterministic `BTreeMap<NodeId, usize>` membership lookup. |
 | `condensation_edges` | Deduplicated edges between distinct SCC ids. |
@@ -74,6 +86,26 @@ The decomposition is also the direct input to feature-free
 APIs preserve component ids while computing SCC-member-weighted critical paths,
 source-oriented level height/width, and optional sink-oriented width-bounded
 layers. They do not rerun Tarjan or reconstruct call/CFG topology.
+
+Feature-free [DSM visibility and core–periphery
+analysis](dsm-analysis.md) instead starts from any `GraphProjection` and calls
+`projection_sccs` only for its largest multi-vertex cyclic group. It reuses
+this engine rather than carrying a second Tarjan implementation.
+
+## Direct projection boundary
+
+`projection_sccs` maps `ProjectionKind::CallGraph` and
+`ProjectionKind::ControlFlow { function }` back to the specialized
+`SccProjection` variants, so decompositions from the two construction paths are
+equal when topology is equal. Module, data-flow, program-dependence,
+condensation, and external kinds retain their source as
+`SccProjection::Projection(kind)`.
+
+The function consumes forward CSR only and assumes the documented
+constructor-valid `GraphProjection` invariants. Algorithms accepting untrusted
+public-field projections must validate them before this call; DSM does so. This
+matches `GraphProjection::successors` and `node_id`, whose out-of-range behavior
+is already documented as panicking for invalid dense identifiers.
 
 ## CFG projection boundaries
 

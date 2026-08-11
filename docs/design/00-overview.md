@@ -58,8 +58,9 @@ alternatives is folklore, and a decision without its costs is marketing.
 | [0012 — DFG-backed loop-induction evidence](0012-dfg-backed-loop-induction-evidence.md) | Compute reaching-definition-backed invariants, unique latch-dominating induction variables, conservative hoist candidates, and direction-compatible trip evidence outside the graph. | Accepted |
 | [0013 — Evidence-bounded complexity estimates](0013-evidence-bounded-complexity-estimates.md) | Compose validated CFG loop depth and DFG-backed induction bounds into advisory complexity, with an exact legacy AST fallback. | Accepted |
 | [0014 — Deterministic condensation-DAG analytics](0014-deterministic-condensation-analytics.md) | Compute canonical SCC-weighted critical paths and source levels, plus sink-first width-bounded Coffman–Graham layers, without rebuilding graph identity. | Accepted |
+| [0015 — Bounded DSM visibility analysis](0015-bounded-dsm-visibility-analysis.md) | Compute transitive visibility and median roles over validated projections, reuse the shared SCC engine for cyclic core, and expose cap/malformed states explicitly. | Accepted |
 
-These fourteen are not independent. ADR-0001 fixes the substrate that all analyses
+These fifteen are not independent. ADR-0001 fixes the substrate that all analyses
 write onto; ADR-0002 and ADR-0005 together explain how a language reaches that
 substrate and what you must switch on to get there; ADR-0003 and ADR-0004 are
 two analyses *over* the substrate (one always-on, one feature-gated) that each
@@ -81,6 +82,9 @@ preserving the original AST heuristic as an exact compatibility boundary.
 ADR-0014 consumes ADR-0001's out-of-graph result discipline and the canonical
 SCC condensation substrate, then fixes deterministic tie, orientation, cap, and
 malformed-input policy for downstream graph-theory analyses.
+ADR-0015 consumes ADR-0001's projection/out-of-graph discipline and the shared
+SCC engine, then fixes visibility direction, median thresholds, stable
+provenance, malformed-CSR behavior, and the quadratic-work cap.
 
 ![Module architecture of libcpg, showing the graph core and the analysis modules layered over it](../diagrams/module-architecture.svg)
 
@@ -92,7 +96,7 @@ malformed-input policy for downstream graph-theory analyses.
   (`0001`…). Numbers are never reused; a reversed decision is marked
   *Superseded* and a new record supersedes it, so history stays legible.
 - **Status lifecycle.** `Proposed → Accepted → (Superseded by NNNN | Deprecated)`.
-  All fourteen current records are **Accepted** and reflect the shipped `v0.1.1`
+  All fifteen current records are **Accepted** and reflect the shipped `v0.1.1`
   code.
 - **Grounding.** Every claim here is traceable to source: the
   [`Cargo.toml`](../engineering/01-build-and-features.md) feature block, the

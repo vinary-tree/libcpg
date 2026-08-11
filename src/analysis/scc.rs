@@ -1,4 +1,4 @@
-//! Strongly-connected-component analysis for CFG and call-graph projections.
+//! Strongly-connected-component analysis for deterministic graph projections.
 //!
 //! The implementation uses an iterative Tarjan decomposition over dense
 //! internal vertex indices. Graph traversal and AST scope discovery use
@@ -10,6 +10,8 @@ use std::collections::BTreeMap;
 use rustc_hash::{FxHashMap, FxHashSet};
 
 use crate::{CfgEdgeKind, CodePropertyGraph, CpgEdgeKind, CpgNodeKind, NodeId};
+
+use super::projection::{GraphProjection, ProjectionKind};
 
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
@@ -25,6 +27,8 @@ pub enum SccProjection {
     },
     /// The function-to-function call graph for the whole CPG.
     CallGraph,
+    /// A direct [`GraphProjection`] analysis for another projection kind.
+    Projection(ProjectionKind),
 }
 
 /// One maximal strongly-connected component.
@@ -168,6 +172,25 @@ pub fn call_graph_sccs(cpg: &CodePropertyGraph) -> SccDecomposition {
     let nodes = sorted_nodes(cpg.functions().map(|node| node.id));
     let adjacency = adjacency_from_edges(&nodes, call_graph_edges(cpg, &nodes));
     decompose(SccProjection::CallGraph, nodes, adjacency)
+}
+
+/// Decomposes any deterministic [`GraphProjection`] into SCCs.
+///
+/// The projection's canonical dense node order and sorted CSR successors feed
+/// the same iterative Tarjan engine used by [`control_flow_sccs`] and
+/// [`call_graph_sccs`]. Known CFG and call-graph kinds retain their specialized
+/// [`SccProjection`] provenance; every other kind records the originating
+/// [`ProjectionKind`] directly.
+pub fn projection_sccs(projection: &GraphProjection) -> SccDecomposition {
+    let provenance = match projection.kind {
+        ProjectionKind::ControlFlow { function } => SccProjection::ControlFlow { function },
+        ProjectionKind::CallGraph => SccProjection::CallGraph,
+        kind => SccProjection::Projection(kind),
+    };
+    let adjacency = (0..projection.node_count())
+        .map(|dense| projection.successors(dense as DenseNodeId).to_vec())
+        .collect();
+    decompose(provenance, projection.nodes.clone(), adjacency)
 }
 
 /// Derives resolved caller-function to callee-function edges for `nodes`.
@@ -706,6 +729,45 @@ mod tests {
             vec![SccCondensationEdge {
                 source: 1,
                 target: 0,
+            }]
+        );
+    }
+
+    #[test]
+    fn direct_projection_sccs_preserve_kind_and_stable_membership() {
+        let projection = GraphProjection::from_edges(
+            ProjectionKind::ModuleGraph,
+            [
+                NodeId::new(40),
+                NodeId::new(10),
+                NodeId::new(30),
+                NodeId::new(20),
+            ],
+            [
+                (NodeId::new(10), NodeId::new(20), 1.0),
+                (NodeId::new(20), NodeId::new(10), 1.0),
+                (NodeId::new(20), NodeId::new(30), 1.0),
+            ],
+        );
+
+        let result = projection_sccs(&projection);
+        assert_eq!(
+            result.projection,
+            SccProjection::Projection(ProjectionKind::ModuleGraph)
+        );
+        assert_eq!(result.node_count(), 4);
+        assert_eq!(
+            result.components[0].nodes,
+            vec![NodeId::new(10), NodeId::new(20)]
+        );
+        assert!(result.components[0].is_multi_node_cycle());
+        assert_eq!(result.components[1].nodes, vec![NodeId::new(30)]);
+        assert_eq!(result.components[2].nodes, vec![NodeId::new(40)]);
+        assert_eq!(
+            result.condensation_edges,
+            vec![SccCondensationEdge {
+                source: 0,
+                target: 1,
             }]
         );
     }

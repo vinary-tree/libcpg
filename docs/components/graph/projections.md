@@ -67,6 +67,12 @@ when `f` is absent and `ProjectionError::NotAFunction` when it is not a
 function. `dfg_projection` deliberately accepts any AST scope root; an absent
 root yields an empty view instead of inventing a vertex.
 
+Any constructor-valid directed projection can be decomposed through
+`projection_sccs(&graph)`. The same projection can feed
+[`analyze_dsm`](dsm-analysis.md) and `classify_core_periphery` for transitive
+visibility, propagation cost, median roles, and largest cyclic-group evidence.
+These consumers read only CSR topology; DSM treats weights as binary adjacency.
+
 ### The shared function CFG view
 
 Exact intraprocedural analyses need one additional contract beyond the public

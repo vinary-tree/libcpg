@@ -67,6 +67,7 @@ dimension, $`k`$ = Weisfeiler-Lehman iterations (3).
 | CFG/call-graph SCC decomposition | $`O(V + E)`$ after adjacency normalization | Iterative Tarjan plus condensation construction; dense indices avoid traversal hash lookups, and explicit stacks avoid native-stack growth with path depth. |
 | Condensation metrics | $`O(M + E\log E + (C+E)\log C)`$ time, $`O(C+E)`$ auxiliary space | $`C`$ components, $`E`$ condensation edges, and $`M`$ SCC members. Validation checks the public membership map, adjacency is normalized, and a min-id Kahn heap drives levels and weighted critical paths. |
 | Coffman–Graham layering | worst case $`O(M + E\log E + C^2\log C)`$ time, $`O(C+E)`$ auxiliary space | Predecessor-label vectors make heap comparison linear in $`C`$ in the worst case; ordered available layers enforce the requested width. The component cap is $`10^6`$. |
+| DSM visibility and core–periphery | $`O(V(V+E))`$ time and $`O(V+E)`$ working space after $`O(V+E\log d_{max})`$ validation | One iterative BFS per vertex computes non-reflexive fan-out/fan-in; shared iterative SCC analysis supplies the cyclic core. Inputs above 50,000 vertices return a total capped result before traversal. |
 | Variable liveness | conventional $`O(H(B + E_b)W)`$ solve plus $`O(NW)`$ report replay | $`B`$ blocks, $`E_b`$ block edges, $`N`$ reachable CFG nodes, lattice height $`H \le F`$ for $`F`$ variables, and $`W = \lceil F/64 \rceil`$ machine words per state. |
 | Available / very-busy expressions | each has conventional $`O(H(B + E_b)W)`$ solve plus $`O(NW)`$ report replay; advisory candidate filtering adds dominance and bounded kill-reachability checks | $`F`$ structural expressions, $`H \le F`$, and $`W = \lceil F/64 \rceil`$; kill indexing is linear in operand memberships and definitions. |
 | Evidence-aware complexity | provider cost plus $`O(L + R)`$ composition | Computes the legacy AST fallback, validated function scope, loop forest/dominance, and induction report; then formats $`L`$ loops and combines $`R`$ recursion sites. Provider worst cases are documented with loop and induction analysis. |
@@ -149,8 +150,8 @@ cargo bench --no-default-features --features algorithm-detection \
   --bench induction_analysis -- --test
 ```
 
-DFG/PDG construction, whole-corpus analysis, and GNN propagation still lack runnable
-benchmarks. Their owning analysis tasks add focused targets and establish
+DSM visibility, DFG/PDG construction, whole-corpus analysis, and GNN propagation
+still lack runnable benchmarks. Their owning analysis tasks add focused targets and establish
 correctness oracles before optimization.
 
 ### Liveness replay finding

@@ -3,7 +3,8 @@
 The `graph` module holds the data structures at the heart of `libcpg`: the
 [Code Property Graph](../../GLOSSARY.md#code-property-graph-cpg) (CPG) and the
 node, edge, and identifier types it is built from. Everything else in the crate
-— the builders, graph projections, dominator, SCC, and condensation analyses, the pattern matchers, the slicer, the GNN — reads
+— the builders, graph projections, dominator, SCC, condensation, and DSM
+analyses, the pattern matchers, the slicer, the GNN — reads
 from or writes to this one structure. This page explains what a CPG is, why `libcpg` merges
 several program views into a single graph, how that graph is stored, and how you
 create and inspect one.
@@ -291,6 +292,9 @@ So the safe pattern is: build (single-threaded, `&mut`), then analyse
 - [Condensation-DAG analytics](condensation-analysis.md) — canonical
   source-oriented depth/width, SCC-member-weighted critical paths, and
   sink-oriented width-bounded Coffman–Graham layers.
+- [DSM visibility and core–periphery](dsm-analysis.md) — transitive visibility
+  fan-in/fan-out, propagation cost, median roles, and the largest
+  multi-vertex cyclic group over any directed projection.
 - [Natural loops and nesting](loop-analysis.md) — dominator-qualified headers,
   shared latches, conservative irreducible regions, strict nesting, and loop
   exits.
