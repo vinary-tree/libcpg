@@ -51,6 +51,7 @@ analytics](../GLOSSARY.md#condensation-graph--condensation-metrics),
 [community detection](../GLOSSARY.md#community-detection),
 [cohesion and structural-robustness analysis](../GLOSSARY.md#cohesion--structural-robustness),
 [spectral connectivity](../GLOSSARY.md#algebraic-connectivity--fiedler-vector),
+[bounded simple cycles](../GLOSSARY.md#elementary-cycle--simple-cycle),
 [VF2](../GLOSSARY.md#vf2) matching, and PDG slicing — works out of the box. The
 [build and features](01-build-and-features.md) page explains how to turn on what
 you need.
@@ -78,8 +79,8 @@ directly from that relationship, and both are visible in `Cargo.toml`:
 | Page | What it covers |
 | --- | --- |
 | [01 — Build and features](01-build-and-features.md) | The full feature matrix: 16 `lang-*` grammars, the language groups, the analysis features, the Mode-B toggles, `serde`, the reserved `gpu` flag, and the `full` umbrella; the pgmcp grammar-pin table; how to enable a language. |
-| [02 — Testing](02-testing.md) | The example-based and `proptest` suite plus the general, robustness, SCCP, interval, loop-induction, complexity-evidence, condensation, DSM, WL, centrality, community, cohesion, and spectral public-API suites; the `arb_*` generators; how to run each feature subset; measured coverage; the defects the suite found; and the active Criterion benchmark substrate. |
-| [03 — Performance](03-performance.md) | The data-structure rationale, asymptotic costs, twelve active oracle-guarded Criterion targets with nineteen feature-free operation groups plus one gated group, controlled-measurement protocol, and explicit remaining benchmark gaps. |
+| [02 — Testing](02-testing.md) | The example-based and `proptest` suite plus the general, robustness, SCCP, interval, loop-induction, complexity-evidence, condensation, DSM, WL, centrality, community, cohesion, spectral, and cycle public-API suites; the `arb_*` generators; how to run each feature subset; measured coverage; the defects the suite found; and the active Criterion benchmark substrate. |
+| [03 — Performance](03-performance.md) | The data-structure rationale, asymptotic costs, thirteen active oracle-guarded Criterion targets, controlled-measurement protocol, and explicit remaining benchmark gaps. |
 | [04 — Contributing](04-contributing.md) | Step-by-step recipes: add a language mapper, add a Gang-of-Four template, add a similarity metric; plus the coding conventions the crate follows. |
 
 ## Map of the security pillar
@@ -99,7 +100,7 @@ maturity than exists. The most consequential items:
 | --- | --- | --- |
 | Default build | `default = []`; `build` fails without a `lang-*` feature | [01](01-build-and-features.md) |
 | `examples/` directory | present but **empty** — no runnable examples (`tests/` now holds the integration and robustness suites) | [02](02-testing.md) |
-| Benchmarks | twelve oracle-guarded Criterion targets are active; nineteen operation groups are feature-free and the twentieth, complexity evidence, is `algorithm-detection`-gated; DFG/PDG construction, whole-corpus analysis, and GNN propagation remain gaps | [02](02-testing.md), [03](03-performance.md) |
+| Benchmarks | thirteen oracle-guarded Criterion targets are active; twenty-two operation groups are feature-free and the twenty-third, complexity evidence, is `algorithm-detection`-gated; DFG/PDG construction, whole-corpus analysis, and GNN propagation remain gaps | [02](02-testing.md), [03](03-performance.md) |
 | `rayon`, `ahash`, `string_cache`, `regex` | declared in `Cargo.toml` but **not yet wired** into `src/` (`proptest` is now used throughout the test suite) | [02](02-testing.md), [03](03-performance.md) |
 | `gpu` feature | **reserved** — enables `wgpu`/`pollster` but no GPU code is written | [01](01-build-and-features.md) |
 | Detection results | pattern/algorithm/complexity outputs are **heuristics**, not proofs | [`security/00`](../security/00-threat-model.md) |

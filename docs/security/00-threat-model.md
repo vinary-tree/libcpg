@@ -137,8 +137,9 @@ and its build pipeline.
 | Adversarial community search or weights | 50-pass/10-level ceilings plus complete CSR, resolution, weight, and overflow validation | [hardening §community detection](01-input-and-resource-hardening.md#community-detection-pass-level-and-numeric-bounds) |
 | Adversarial cohesion topology, weighted cut, or removal trace | 200,000-edge truss, 1,024-node minimum-cut, and 10,000-step attack ceilings; iterative traversals; complete CSR and weight validation | [hardening §cohesion](01-input-and-resource-hardening.md#cohesion-edge-matrix-traversal-and-numeric-bounds) |
 | Expensive or slow-converging spectral topology | 1,000-iteration ceiling, iterative sparse traversal, complete CSR/options validation, and explicit convergence/residual evidence | [hardening §spectral analysis](01-input-and-resource-hardening.md#spectral-analysis-iteration-and-numerical-evidence) |
+| Exponential directed-cycle family | length 32 and retained-count 100,000 hard ceilings, SCC pruning, iterative reusable DFS state, and a concrete first-omission witness | [hardening §simple cycles](01-input-and-resource-hardening.md#simple-cycles-exponential-output-boundaries) |
 | Untrusted serialized graph | Deserialize only trusted bytes | [`usage/05-serialization.md`](../usage/05-serialization.md) |
-| Over-trusting heuristics, rankings, partitions, or cut/robustness evidence | Treat pattern/algorithm/GNN, centrality, community, cohesion, and spectral output as advisory | this page |
+| Over-trusting heuristics, rankings, partitions, cut/robustness evidence, or bounded cycle prefixes | Treat pattern/algorithm/GNN, centrality, community, cohesion, spectral, and truncated-cycle output as advisory | this page |
 
 ## References
 

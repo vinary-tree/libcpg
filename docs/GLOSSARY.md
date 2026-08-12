@@ -338,6 +338,17 @@ The **dominance frontier** of node $`d`$ is the set of nodes where $`d`$'s domin
 
 `libcpg`'s small YAML/TOML schema for declaring a pattern as roles (`DpmlRole`) and constraints (`DpmlConstraint`), loaded into a `DpmlTemplate` and compiled to a [`PatternTemplate`](#pattern-template). Malformed input yields `DpmlError`. Lets users add pattern templates without writing Rust. See [`components/patterns/dpml.md`](components/patterns/dpml.md).
 
+### Elementary cycle / simple cycle
+
+An **elementary** or **simple** directed cycle is a closed directed walk whose
+vertices are distinct except for the implicit closing return to its start.
+Cyclic rotations denote the same cycle; reversing the vertex sequence is a
+different directed cycle unless the reverse edges exist. libcpg returns the
+rotation with the smallest stable `NodeId` first and bounds enumeration by
+length and count [[33]](#references). See
+[`theory/16-bounded-simple-cycle-enumeration.md`](theory/16-bounded-simple-cycle-enumeration.md)
+and [`components/graph/cycle-analysis.md`](components/graph/cycle-analysis.md).
+
 ### Embedding
 
 A dense real-valued vector that summarises a node (`NodeEmbedding`) or a subgraph (`SubgraphEmbedding`) so that structurally/semantically similar code lands nearby in vector space. Produced by the [GNN](#graph-neural-network-gnn) and compared with [cosine similarity](#cosine-similarity). See [`components/gnn/embeddings.md`](components/gnn/embeddings.md).
@@ -743,3 +754,4 @@ used by the complexity analyzer to classify recursive functions (e.g. $`a = b = 
 30. Traag, V. A., Waltman, L., van Eck, N. J. (2019). *From Louvain to Leiden: Guaranteeing Well-Connected Communities.* Scientific Reports 9, 5233. DOI: [10.1038/s41598-019-41695-z](https://doi.org/10.1038/s41598-019-41695-z)
 31. Cohesion and robustness foundations: (**31a**) Seidman, S. B. (1983). *Network Structure and Minimum Degree.* DOI: [10.1016/0378-8733(83)90028-X](https://doi.org/10.1016/0378-8733(83)90028-X). (**31b**) Batagelj, V., Zaveršnik, M. (2003). *An O(m) Algorithm for Cores Decomposition of Networks.* [arXiv:cs/0310049](https://arxiv.org/abs/cs/0310049). (**31c**) Cohen, J. (2008). *Trusses: Cohesive Subgraphs for Social Network Analysis.* NSA Technical Report (no DOI assigned). (**31d**) Hopcroft, J., Tarjan, R. (1973). *Algorithm 447: Efficient Algorithms for Graph Manipulation.* DOI: [10.1145/362248.362272](https://doi.org/10.1145/362248.362272). (**31e**) Tarjan, R. (1972). *Depth-First Search and Linear Graph Algorithms.* DOI: [10.1137/0201010](https://doi.org/10.1137/0201010). (**31f**) Stoer, M., Wagner, F. (1997). *A Simple Min-Cut Algorithm.* DOI: [10.1145/263867.263872](https://doi.org/10.1145/263867.263872). (**31g**) Newman, M. E. J. (2003). *Mixing Patterns in Networks.* DOI: [10.1103/PhysRevE.67.026126](https://doi.org/10.1103/PhysRevE.67.026126). (**31h**) Holme, P., Kim, B. J., Yoon, C. N., Han, S. K. (2002). *Attack Vulnerability of Complex Networks.* DOI: [10.1103/PhysRevE.65.056109](https://doi.org/10.1103/PhysRevE.65.056109).
 32. Spectral foundations: (**32a**) Fiedler, M. (1973). *Algebraic Connectivity of Graphs.* DOI: [10.21136/CMJ.1973.101168](https://doi.org/10.21136/CMJ.1973.101168). (**32b**) Shi, J., Malik, J. (2000). *Normalized Cuts and Image Segmentation.* DOI: [10.1109/34.868688](https://doi.org/10.1109/34.868688).
+33. Johnson, D. B. (1975). *Finding All the Elementary Circuits of a Directed Graph.* SIAM Journal on Computing 4(1), 77–84. DOI: [10.1137/0204007](https://doi.org/10.1137/0204007).

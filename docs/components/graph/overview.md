@@ -126,6 +126,11 @@ node-aligned Fiedler vector, and its sign split. Exact disconnected handling and
 a bounded sparse iteration keep results deterministic, out-of-graph, and
 numerically qualified by convergence and residual evidence.
 
+[Bounded simple-cycle analysis](cycle-analysis.md) preserves projection edge
+direction and returns concrete elementary-cycle witnesses. It reuses the shared
+SCC engine, canonicalizes rotations, and exposes the first omitted cycle when
+the result-count cap binds.
+
 ### Creating a CPG
 
 With **no cargo features enabled** (`default = []`), `libcpg` links no grammars,
@@ -326,6 +331,8 @@ So the safe pattern is: build (single-threaded, `&mut`), then analyse
 - [Cohesion and structural robustness](cohesion-analysis.md) — deterministic
   k-core/k-truss peeling, iterative articulation/bridge and robust-block
   analysis, bounded weighted minimum cut, assortativity, and attack traces.
+- [Bounded simple cycles](cycle-analysis.md) — SCC-pruned directed witnesses,
+  canonical rotations, hard length/count ceilings, and explicit truncation.
 - [Natural loops and nesting](loop-analysis.md) — dominator-qualified headers,
   shared latches, conservative irreducible regions, strict nesting, and loop
   exits.

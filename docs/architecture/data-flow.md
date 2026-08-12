@@ -3,7 +3,7 @@
 This page traces how information moves through libcpg in two phases:
 
 1. the **construction pipeline** — source text becomes a [Code Property Graph](../GLOSSARY.md#code-property-graph-cpg) (Yamaguchi et al. [[1]](#references)) with AST, [CFG](../GLOSSARY.md#control-flow-graph-cfg), and [DFG](../GLOSSARY.md#data-flow-graph-dfg) overlays; and
-2. the **analysis pipeline** — a constructed CPG is queried by exact [dominator/post-dominator](../components/graph/dominator-analysis.md), [natural-loop](../components/graph/loop-analysis.md), [loop-induction](../components/graph/induction-analysis.md), [liveness](../components/graph/liveness-analysis.md), [available/very-busy expression](../components/graph/expression-analysis.md), [SCCP](../components/graph/sccp-analysis.md), [interval value-range](../components/graph/interval-analysis.md), [SCC](../GLOSSARY.md#strongly-connected-component-scc), [DSM visibility](../components/graph/dsm-analysis.md), [WL structural-clone](../components/graph/wl-analysis.md), [centrality](../components/graph/centrality-analysis.md), [community](../components/graph/community-detection.md), [cohesion/robustness](../components/graph/cohesion-analysis.md), and [spectral connectivity](../components/graph/spectral-analysis.md) analyses, the [PDG](../GLOSSARY.md#program-dependence-graph-pdg)/slicer, the [VF2](../GLOSSARY.md#vf2) and [GoF](../GLOSSARY.md#gang-of-four-gof) detectors, the algorithm/complexity heuristics, and the [GNN](../GLOSSARY.md#graph-neural-network-gnn).
+2. the **analysis pipeline** — a constructed CPG is queried by exact [dominator/post-dominator](../components/graph/dominator-analysis.md), [natural-loop](../components/graph/loop-analysis.md), [loop-induction](../components/graph/induction-analysis.md), [liveness](../components/graph/liveness-analysis.md), [available/very-busy expression](../components/graph/expression-analysis.md), [SCCP](../components/graph/sccp-analysis.md), [interval value-range](../components/graph/interval-analysis.md), [SCC](../GLOSSARY.md#strongly-connected-component-scc), [DSM visibility](../components/graph/dsm-analysis.md), [WL structural-clone](../components/graph/wl-analysis.md), [centrality](../components/graph/centrality-analysis.md), [community](../components/graph/community-detection.md), [cohesion/robustness](../components/graph/cohesion-analysis.md), [spectral connectivity](../components/graph/spectral-analysis.md), and [bounded simple-cycle](../components/graph/cycle-analysis.md) analyses, the [PDG](../GLOSSARY.md#program-dependence-graph-pdg)/slicer, the [VF2](../GLOSSARY.md#vf2) and [GoF](../GLOSSARY.md#gang-of-four-gof) detectors, the algorithm/complexity heuristics, and the [GNN](../GLOSSARY.md#graph-neural-network-gnn).
 
 "Data flow" here means both the program's own data-flow overlay *and* the flow of data through libcpg's stages. This is a rewrite of an earlier draft that invented `BranchTrue`/`UseUse`/`Phi` edge kinds, an SSA-based DFG, a parse/embedding cache, and a bincode format — none of which exist. The real edge model is [`CpgEdgeKind::ControlFlow(CfgEdgeKind)`](../GLOSSARY.md#control-flow-graph-cfg) / [`DataFlow(DfgEdgeKind)`](../GLOSSARY.md#data-flow-graph-dfg), the DFG is [AST-ordered reaching definitions](../GLOSSARY.md#ast-ordered-reaching-definitions), and persistence is plain derive-based serde.
 
@@ -281,6 +281,13 @@ the simple-undirected unweighted path, detects disconnected components exactly,
 and otherwise runs at most 1,000 sparse deflated power iterations. The returned
 Fiedler vector and sign partition align with stable projection identifiers;
 iteration count, convergence, and residual make numerical status explicit.
+
+[`simple_cycles`](../components/graph/cycle-analysis.md) preserves directed
+projection topology and reuses `projection_sccs` to skip acyclic regions. An
+iterative DFS enumerates exact bounded cycle lengths in stable order, rotates
+each witness to its minimum `NodeId`, and stops inside discovery when the count
+cap is exceeded. The partial result includes the first omitted cycle, so a
+bounded witness prefix cannot be mistaken for a complete census.
 
 ### Natural loops and nesting (feature-free)
 

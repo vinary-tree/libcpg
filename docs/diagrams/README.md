@@ -39,9 +39,9 @@ Grouped by subject. Each row: the source (its `.svg` sibling is embedded by the 
 |---|---|---|---|
 | `cpg-overlay.dot` | graph | AST⊕CFG⊕DFG overlays on one shared node set (hero figure) | README, docs/README, theory/00–01, architecture/graph-data-model, api/graph-reference, components/graph/overview, design/0001 |
 | `cpg-vs-traditional.dot` | graph | Three separate views vs one unified CPG | theory/00, architecture/overview |
-| `module-architecture.puml` | component | Crate modules, always-on projections/block-CFG/data-flow/liveness/induction/reachability/dominator/loop/SCC/DSM/WL/centrality/community/cohesion/spectral analysis, and feature gates | architecture/overview, design/00 |
+| `module-architecture.puml` | component | Crate modules, always-on projections/block-CFG/data-flow/liveness/induction/reachability/dominator/loop/SCC/DSM/WL/centrality/community/cohesion/spectral/cycle analysis, and feature gates | architecture/overview, design/00 |
 | `construction-pipeline.puml` | activity | parse → AST → CFG → optional definite-call resolution → DFG | architecture/data-flow, components/builder/overview, api/builder-reference, usage/01 |
-| `analysis-pipeline.puml` | activity | CPG → blocks/data-flow/liveness/induction/reachability/dominance/loops/SCC/DSM/WL/centrality/community/cohesion/spectral, PDG/slice, VF2/GoF, algorithm, GNN | architecture/data-flow |
+| `analysis-pipeline.puml` | activity | CPG → blocks/data-flow/liveness/induction/reachability/dominance/loops/SCC/DSM/WL/centrality/community/cohesion/spectral/cycles, PDG/slice, VF2/GoF, algorithm, GNN | architecture/data-flow |
 | `feature-flag-map.puml` | mindmap | Cargo feature taxonomy (`default = []`) | design/0005, engineering/01, usage/00 |
 
 ### Graph data model
@@ -54,6 +54,7 @@ Grouped by subject. Each row: the source (its `.svg` sibling is embedded by the 
 | `community-pipeline.puml` | component/algorithm flow | validated projection → deterministic local moving and bounded aggregation → canonical assignment → optional connected refinement | components/graph/community-detection, theory/13, design/0018 |
 | `cohesion-pipeline.puml` | component/algorithm flow | validated projection → simple topology or weighted matrix → peeling, low-link, cut, correlation, and attack kernels → canonical results | components/graph/cohesion-analysis, theory/14, design/0019 |
 | `spectral-pipeline.puml` | component/algorithm flow | validated projection → simple topology → exact disconnected certificate or bounded sparse Fiedler iteration → aligned eigenpair/partition evidence | components/graph/spectral-analysis, theory/15, design/0020 |
+| `cycle-enumeration-pipeline.puml` | activity/algorithm flow | validated directed projection → SCC pruning → bounded canonical DFS → complete result or first-omission witness | components/graph/cycle-analysis, theory/16, design/0021 |
 | `dominator-analysis.puml` | component | Shared CHK engine for forward dominance, reversed-CFG post-dominance, and PDG control edges | components/graph/dominator-analysis |
 | `loop-analysis.puml` | activity/component flow | Shared CFG scope and dominance evidence → natural/irreducible regions → strict nesting; builder continuation → `LoopExit` | components/graph/loop-analysis |
 | `reachability-analysis.puml` | component/decision flow | Function scope and iterative DFS → reachable/unreachable partition → structural dead branches; builder terminators → disconnected islands | components/graph/reachability-analysis |

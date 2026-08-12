@@ -468,6 +468,23 @@ iteration over the combinatorial Laplacian. See the [spectral component
 guide](../components/graph/spectral-analysis.md) for formulas, pseudocode,
 closed forms, convergence policy, and interpretation boundaries.
 
+### Bounded simple-cycle enumeration
+
+The feature-free cycle API validates directed CSR topology, reuses SCC
+decomposition, and returns canonical stable-identifier witnesses.
+
+| Function | Signature | Result |
+|---|---|---|
+| `simple_cycles` | `fn(&GraphProjection, &CycleOptions) -> Result<CycleSet, AnalysisError>` | cycles sorted by length/lexicographic order plus effective caps and first-omission evidence |
+
+`CycleOptions` defaults to `max_length = 10` and `max_cycles = 10_000`.
+Requests clamp to `MAX_CYCLE_LENGTH = 32` and
+`MAX_SIMPLE_CYCLES = 100_000`. `CycleSet::truncated` and
+`first_dropped_cycle` make a binding count limit explicit; individual retained
+cycles remain valid witnesses. See the [cycle component
+guide](../components/graph/cycle-analysis.md) for directed semantics,
+canonicalization, literate pseudocode, complexity, and validation boundaries.
+
 ### Natural loops and nesting
 
 The feature-free loop API uses the shared reachable function CFG and dominator

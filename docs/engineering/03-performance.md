@@ -104,8 +104,8 @@ once, loop bodies twice, and a path set cuts malformed AST cycles.
 
 ## Benchmark coverage and remaining gaps
 
-Twelve Criterion targets are active. Their nineteen baseline operation groups are
-feature-free; `induction_analysis` also registers a twentieth,
+Thirteen Criterion targets are active. Their twenty-two baseline operation groups are
+feature-free; `induction_analysis` also registers a twenty-third,
 `algorithm-detection`-gated operation. Every active group constructs and checks a deterministic oracle
 before Criterion enters the timed loop:
 
@@ -154,6 +154,11 @@ before Criterion enters the timed loop:
   of stars with 1,024 and 8,192 total vertices. Closed-form connectivity,
   convergence/residual, alignment, sign, partition, and repeatability oracles
   run before timing.
+- `cycles` measures SCC rejection on 1,024- and 8,192-vertex acyclic paths,
+  complete enumeration on 1,023- and 8,190-vertex disjoint-triangle families,
+  and explicit 1,000-cycle truncation on complete directed graphs of 8 and 10
+  vertices. Exact counts, edge closure, canonical starts, repeatability, caps,
+  and first-omission evidence are asserted before timing.
 
 ```toml
 [[bench]]
@@ -203,6 +208,10 @@ harness = false
 [[bench]]
 name = "spectral"
 harness = false
+
+[[bench]]
+name = "cycles"
+harness = false
 ```
 
 Run it directly, or save and compare named baselines:
@@ -222,6 +231,7 @@ cargo bench --bench centrality --no-default-features
 cargo bench --bench community --no-default-features
 cargo bench --bench cohesion --no-default-features
 cargo bench --bench spectral --no-default-features
+cargo bench --bench cycles --no-default-features
 cargo bench --no-default-features --features algorithm-detection \
   --bench induction_analysis -- --test
 ```

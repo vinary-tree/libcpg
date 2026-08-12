@@ -50,6 +50,9 @@ PDG). A query can therefore mix syntax, control flow, and data flow freely.
 - **Spectral connectivity** — deterministic combinatorial-Laplacian algebraic
   connectivity, aligned Fiedler vectors, sign partitions, exact disconnected
   certificates, and bounded sparse iteration with residual evidence.
+- **Bounded simple cycles** — feature-free SCC-pruned enumeration of canonical
+  directed cycle witnesses with explicit length/count ceilings and a concrete
+  first-omission witness when the result cap binds.
 - **CFG reachability** — feature-free, deterministic reachable/unreachable
   partitions and structural dead-branch evidence without graph mutation.
 - **Basic-block CFGs** — deterministic, id-preserving block partitions, typed

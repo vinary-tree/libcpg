@@ -10,6 +10,7 @@ pub(crate) mod cfg_scope;
 mod cohesion;
 mod community;
 mod condensation;
+mod cycles;
 pub mod dataflow;
 mod dominators;
 mod dsm;
@@ -50,6 +51,8 @@ pub use condensation::{
     coffman_graham, condensation_metrics, CgLayering, CondensationMetrics, CondensationOptions,
     MAX_CONDENSATION_COMPONENTS,
 };
+
+pub use cycles::{simple_cycles, CycleOptions, CycleSet, MAX_CYCLE_LENGTH, MAX_SIMPLE_CYCLES};
 
 pub use dataflow::{
     available_expressions, dead_stores, expression_facts, liveness, sccp, solve, value_ranges,

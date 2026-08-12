@@ -325,6 +325,24 @@ fn exercise_every_analysis(cpg: &CodePropertyGraph, func: NodeId) {
     let call_projection = libcpg::call_graph_projection(cpg);
     let projected_sccs = libcpg::projection_sccs(&call_projection);
     assert_eq!(projected_sccs, call_sccs);
+    let cycles = libcpg::simple_cycles(
+        &call_projection,
+        &libcpg::CycleOptions {
+            max_length: libcpg::MAX_CYCLE_LENGTH,
+            max_cycles: 1_000,
+        },
+    )
+    .expect("call projection is structurally valid");
+    assert_eq!(cycles.nodes, call_projection.nodes);
+    assert!(cycles.cycles.len() <= 1_000);
+    assert!(cycles.cycles.iter().all(|cycle| {
+        !cycle.is_empty()
+            && cycle.len() <= libcpg::MAX_CYCLE_LENGTH
+            && cycle
+                .iter()
+                .all(|node| call_projection.dense_index(*node).is_some())
+    }));
+    assert_eq!(cycles.truncated, cycles.first_dropped_cycle.is_some());
     let dsm = libcpg::analyze_dsm(&call_projection);
     assert!(dsm.complete);
     assert_eq!(dsm.visibility_fan_in.len(), call_projection.node_count());

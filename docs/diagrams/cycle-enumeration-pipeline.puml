@@ -1,0 +1,62 @@
+@startuml
+title Bounded simple-cycle enumeration — validated, canonical, and explicit about truncation
+
+skinparam backgroundColor #FFFFFF
+skinparam activity {
+  BackgroundColor #E7F5FF
+  BorderColor #1971C2
+  FontColor #102A43
+  DiamondBackgroundColor #FFF3BF
+  DiamondBorderColor #F08C00
+  StartColor #2F9E44
+  EndColor #C92A2A
+}
+skinparam note {
+  BackgroundColor #FFF9DB
+  BorderColor #F59F00
+  FontColor #5F3B00
+}
+skinparam ArrowColor #495057
+skinparam ArrowThickness 1.2
+
+start
+:Borrow GraphProjection + CycleOptions; <<#E7F5FF>>
+if (forward/reverse CSR valid?) then (yes)
+  :Clamp <latex>L \le 32</latex> and <latex>C_{max} \le 100000</latex>; <<#D3F9D8>>
+else (no)
+  :AnalysisError::InvalidInput; <<#FFE3E3>>
+  stop
+endif
+
+:Reuse iterative projection_sccs; <<#E5DBFF>>
+:Discard acyclic SCCs; <<#F3F0FF>>
+
+repeat
+  :Next length, then start, then sorted successor; <<#E7F5FF>>
+  :Iterative DFS inside one cyclic SCC
+  with reusable path / frame / membership buffers; <<#D0EBFF>>
+  if (closing edge to start?) then (yes)
+    :Rotate minimum NodeId first;
+    :Deduplicate in BTreeSet; <<#C3FAE8>>
+    if (<latex>C_{max}</latex> cycles already retained?) then (yes)
+      :Store first_dropped_cycle
+      dropped_cycles = 1
+      truncated = true; <<#FFE3E3>>
+      break
+    else (no)
+      :Retain cycle; <<#D3F9D8>>
+    endif
+  endif
+repeat while (bounded search remains?) is (yes)
+->no;
+
+:Sort by (length, lexicographic NodeId sequence); <<#C3FAE8>>
+:Return immutable CycleSet; <<#B2F2BB>>
+stop
+
+note right
+  A cycle [a,b,c] stores no repeated a.
+  Required edges: a→b, b→c, c→a.
+  Reversal remains distinct in a digraph.
+end note
+@enduml

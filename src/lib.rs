@@ -22,6 +22,8 @@
 //! - **Spectral Connectivity**: Approximate the combinatorial Laplacian's
 //!   second eigenpair with bounded deterministic multi-start iteration,
 //!   aligned Fiedler vectors, and sign partitions
+//! - **Simple Cycles**: Enumerate canonical directed cycles with explicit
+//!   length and result-count bounds
 //! - **Structural Clones**: Refine bounded Weisfeiler-Lehman projection labels
 //! - **Pattern Detection**: Detect design patterns using subgraph isomorphism (VF2/VF3)
 //! - **Algorithm Analysis**: Extract algorithm signatures and estimate complexity
@@ -89,16 +91,17 @@ pub use analysis::{
     harmonic_centrality, hits, k_core_decomposition, k_truss_decomposition, katz_centrality,
     liveness, loop_forest, loop_induction, louvain, module_graph_projection, pagerank,
     pdg_projection, personalized_pagerank, post_dominator_tree, projection_of, projection_sccs,
-    refine_connected, resolve_calls, reverse_pagerank, sccp, solve, structural_clone_classes,
-    try_algebraic_connectivity, try_refine_connected, two_edge_connected_components,
-    unreachable_code, value_ranges, variable_facts, very_busy_expressions, wl_labels,
-    AnalysisError, AttackResult, AttackStep, AvailableExpressions, BasicBlock, BetweennessOptions,
-    BitSetDomain, BlockCfg, BlockEdge, BlockId, Bound, CallGraphResolution, CallResolution,
-    CentralityBudget, CentralityKind, CentralityScores, CgLayering, CommunityAssignment,
-    CommunityKind, CondensationMetrics, CondensationOptions, Confidence, Confluence, ConstLattice,
-    ConstValue, CorePeriphery, CorePeripheryResult, CutStructure, DataflowAnalysis,
-    DataflowSolution, DeadBranch, DeadStore, DeadStoreReport, Direction, DominatorTree,
-    DsmAnalysis, EdgeCentralityScores, ExprFacts, ExprKey, ExprOperand, FactUniverse, GlobalMinCut,
+    refine_connected, resolve_calls, reverse_pagerank, sccp, simple_cycles, solve,
+    structural_clone_classes, try_algebraic_connectivity, try_refine_connected,
+    two_edge_connected_components, unreachable_code, value_ranges, variable_facts,
+    very_busy_expressions, wl_labels, AnalysisError, AttackResult, AttackStep,
+    AvailableExpressions, BasicBlock, BetweennessOptions, BitSetDomain, BlockCfg, BlockEdge,
+    BlockId, Bound, CallGraphResolution, CallResolution, CentralityBudget, CentralityKind,
+    CentralityScores, CgLayering, CommunityAssignment, CommunityKind, CondensationMetrics,
+    CondensationOptions, Confidence, Confluence, ConstLattice, ConstValue, CorePeriphery,
+    CorePeripheryResult, CutStructure, CycleOptions, CycleSet, DataflowAnalysis, DataflowSolution,
+    DeadBranch, DeadStore, DeadStoreReport, Direction, DominatorTree, DsmAnalysis,
+    EdgeCentralityScores, ExprFacts, ExprKey, ExprOperand, FactUniverse, GlobalMinCut,
     GraphProjection, HitsScores, InductionAnalysis, InductionVariable, Interval, IntervalEnv,
     IntervalReport, IterationOptions, IvDirection, KCoreDecomposition, KTrussDecomposition,
     KatzOptions, Lattice, LivenessResult, LoopBoundEvidence, LoopExitEdge, LoopForest,
@@ -108,9 +111,9 @@ pub use analysis::{
     Spectral, SpectralOptions, SymbolCandidates, SymbolTable, TripEvidence, TrussEdge,
     TwoEdgeConnectedComponents, UndirectedProjection, VarFacts, VariableDefinition,
     VeryBusyExpressions, DEFAULT_CENTRALITY_WORK_LIMIT, MAX_ATTACK_STEPS,
-    MAX_CENTRALITY_ITERATIONS, MAX_CONDENSATION_COMPONENTS, MAX_DSM_NODES, MAX_K_TRUSS_EDGES,
-    MAX_LOUVAIN_LEVELS, MAX_LOUVAIN_PASSES, MAX_MIN_CUT_NODES, MAX_SPECTRAL_ITERATIONS,
-    MAX_SPECTRAL_STARTS, MAX_WL_ITERATIONS,
+    MAX_CENTRALITY_ITERATIONS, MAX_CONDENSATION_COMPONENTS, MAX_CYCLE_LENGTH, MAX_DSM_NODES,
+    MAX_K_TRUSS_EDGES, MAX_LOUVAIN_LEVELS, MAX_LOUVAIN_PASSES, MAX_MIN_CUT_NODES,
+    MAX_SIMPLE_CYCLES, MAX_SPECTRAL_ITERATIONS, MAX_SPECTRAL_STARTS, MAX_WL_ITERATIONS,
 };
 
 pub use builder::{

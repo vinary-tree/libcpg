@@ -99,6 +99,15 @@ symmetry-induced higher-eigenpair convergence.;
 component BFS and matrix-vector steps avoid recursion
 complete CSR and finite nonnegative tolerance
 are validated before indexed numerical work.;
+**[#FFE3E3] Simple cycles
+***[#F1F3F5]:MAX_CYCLE_LENGTH = 32
+clamps path depth before enumeration.;
+***[#F1F3F5]:MAX_SIMPLE_CYCLES = 100,000
+stops inside DFS at retained capacity plus one
+and returns the first omitted canonical witness.;
+***[#F1F3F5]:SCC pruning + explicit stack
+skip acyclic regions, reuse graph-sized scratch once,
+and reject malformed CSR before indexed traversal.;
 **[#FFE3E3] Slicing
 ***[#F1F3F5]:max_nodes on backward_slice / forward_slice
 bounds the PDG reverse/forward BFS —

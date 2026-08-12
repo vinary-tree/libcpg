@@ -516,6 +516,45 @@ for topology semantics and numerical limits.
 
 ---
 
+## Enumerating bounded directed cycles
+
+Use `simple_cycles` when you need concrete recursion, dependency, or control-
+flow cycle witnesses rather than SCC membership alone:
+
+```rust
+use libcpg::{
+    call_graph_projection, simple_cycles, AnalysisError, CodePropertyGraph,
+    CycleOptions,
+};
+
+fn inspect_recursive_cycles(cpg: &CodePropertyGraph) -> Result<(), AnalysisError> {
+    let graph = call_graph_projection(cpg);
+    let cycles = simple_cycles(
+        &graph,
+        &CycleOptions {
+            max_length: 8,
+            max_cycles: 256,
+        },
+    )?;
+
+    for cycle in &cycles.cycles {
+        println!("recursive call cycle: {cycle:?}");
+    }
+    if let Some(first_omitted) = &cycles.first_dropped_cycle {
+        println!("more cycles exist; first omitted: {first_omitted:?}");
+    }
+    Ok(())
+}
+```
+
+Each sequence omits the repeated closing start. Do not interpret an empty
+retained vector as acyclic unless `truncated` is false: with `max_cycles = 0`,
+the first cycle appears only as `first_dropped_cycle`. For a complete, cheaper
+acyclicity test, use `projection_sccs`; for concrete bounded witnesses, see
+[bounded simple-cycle analysis](../components/graph/cycle-analysis.md).
+
+---
+
 ## Next steps
 
 - Detect design patterns over the graph you just queried: [Pattern Detection](03-pattern-detection.md).
@@ -524,6 +563,7 @@ for topology semantics and numerical limits.
 - Partition a projected relation: [Community Detection](../components/graph/community-detection.md).
 - Inspect cohesive regions and failure seams: [Cohesion and Structural Robustness](../components/graph/cohesion-analysis.md).
 - Find a global spectral seam: [Spectral Connectivity](../components/graph/spectral-analysis.md).
+- Enumerate concrete recursion/dependency witnesses: [Bounded Simple Cycles](../components/graph/cycle-analysis.md).
 - The complete method tables (construction, AST, CFG, DFG, call, query, metrics, subgraph) are in the [graph reference](../api/graph-reference.md); traversal internals are in [Graph Traversal](../components/graph/traversal.md).
 
 ---

@@ -101,7 +101,10 @@ from core/truss persistence, low links, weighted cuts, assortativity, and attack
 traces ([Theory 14](14-graph-cohesion-and-robustness.md)), and
 [algebraic connectivity](../GLOSSARY.md#algebraic-connectivity--fiedler-vector)
 with deterministic Fiedler bisection
-([Theory 15](15-spectral-connectivity-and-bisection.md)). Each consumes the same
+([Theory 15](15-spectral-connectivity-and-bisection.md)), and bounded
+[elementary-cycle](../GLOSSARY.md#elementary-cycle--simple-cycle) enumeration
+with canonical rotations and explicit truncation
+([Theory 16](16-bounded-simple-cycle-enumeration.md)). Each consumes the same
 `CodePropertyGraph`; none needs its own bespoke intermediate representation.
 
 ## 4. The four overlays at a glance

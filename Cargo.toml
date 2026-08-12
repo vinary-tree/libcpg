@@ -245,3 +245,7 @@ harness = false
 [[bench]]
 name = "spectral"
 harness = false
+
+[[bench]]
+name = "cycles"
+harness = false

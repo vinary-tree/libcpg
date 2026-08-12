@@ -16,7 +16,7 @@ A CPG library makes three kinds of assertion, and each demands a different stand
 
 These are distinct from *performance* claims ("construction is fast", "VF2
 prunes well"), which require controlled measurement rather than assertion.
-`libcpg` ships twelve oracle-guarded Criterion targets (nineteen feature-free
+`libcpg` ships thirteen oracle-guarded Criterion targets (twenty-two feature-free
 operation groups plus the gated complexity-evidence group), but their evidence is limited to
 the named graph families, sizes, environment, and operation. The
 protocol and remaining gaps are specified in [04 — Measurement
@@ -50,18 +50,18 @@ Two properties of the suite make this rigorous rather than merely suggestive:
 
 ## 3. The evidence base
 
-The maximal matrix contains **714 library tests**, **21 general public-API
+The maximal matrix contains **726 library tests**, **21 general public-API
 integration tests**, **5 malformed-input robustness tests**, **3 SCCP
 public/parser integration tests**, and **3 interval public/parser integration
 tests**, plus **3 loop-induction** and **3 complexity-evidence public/parser
 integration tests**, plus **2 condensation** and **2 DSM public/parser
 integration tests**, plus **1 WL**, **2 centrality**, **2 community**, **2
-cohesion**, and **2 spectral public/parser integration tests**. These 765
-executable cases combine fixed examples, differential oracles, and 53 exact source-level
+cohesion**, **2 spectral**, and **2 cycle public/parser integration tests**. These 779
+executable cases combine fixed examples, differential oracles, and 54 exact source-level
 `proptest!` blocks. The feature-free matrix remains
 independently runnable and exercises the exact graph/data-flow substrate
-without compiling any grammar. Twelve active Criterion targets supplement
-correctness with nineteen feature-free operation groups and a twentieth when
+without compiling any grammar. Thirteen active Criterion targets supplement
+correctness with twenty-two feature-free operation groups and a twenty-third when
 `algorithm-detection` is enabled; see
 [Testing](../engineering/02-testing.md) for the census and [04](04-measurement-methodology.md)
 for the measurement contract.
@@ -87,6 +87,7 @@ Because `default = []`, many tests are **feature-gated**. The end-to-end reachin
 | [13 — Community validation](13-community-validation.md) | Planted partitions, independent generalized modularity, true aggregation, exact repeat/permutation bytes, connected refinement, caps, malformed numerics/CSR, parser integration | community unit/property tests, `community_integration`, robustness harness | feature-free / `serde` / `lang-rust` parser case |
 | [14 — Cohesion validation](14-cohesion-validation.md) | Independent core/truss peeling, brute cut removal, exhaustive minimum cuts, attack BFS/AUC, exact repeat/permutation, caps, malformed CSR/numerics/orders, stack safety, parser integration | cohesion unit/property tests, `cohesion_integration`, robustness harness, benchmark oracles | feature-free / `serde` / `lang-rust` parser case |
 | [15 — Spectral validation](15-spectral-validation.md) | Independent dense Jacobi spectra, graph-family closed forms, exact disconnected certificates, vector/residual invariants, repeat/permutation, caps, malformed options/CSR, stack safety, parser integration | spectral unit/property tests, `spectral_integration`, robustness harness, benchmark oracles | feature-free / `serde` / `lang-rust` parser case |
+| [16 — Cycle-enumeration validation](16-cycle-enumeration-validation.md) | Independent exhaustive permutations, exact cycle/prefix equality, edge/simple/canonical invariants, insertion-order determinism, explicit caps, malformed CSR, stack safety, parser integration | cycle unit/property tests, `cycles_integration`, robustness harness, benchmark oracles | feature-free / `serde` / `lang-rust` parser case |
 
 ## 5. What is proven, and what is advisory
 
@@ -138,7 +139,7 @@ Scientific honesty requires separating the two:
 - **Empirically bounded.** Performance results apply only to a target's named
   fixture, size, and controlled environment. DFG/PDG
   construction, whole-corpus analysis, and GNN propagation remain measurement gaps; no result
-  from the twelve active targets (or twenty enabled operation groups) may be
+  from the thirteen active targets (or twenty-three enabled operation groups) may be
   generalized to them.
 
 ## 6. Reproducing the experiments

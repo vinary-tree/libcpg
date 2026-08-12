@@ -133,7 +133,7 @@ commit, as required by the repository engineering protocol.
 
 ## Measured coverage
 
-A clean stable maximal-matrix run executed **714 library tests** and **51
+At the T2.4 spectral checkpoint, a clean stable maximal-matrix run executed **714 library tests** and **51
 integration/robustness tests**, for **765 executable cases**. A separate clean
 nightly run executed the same matrix with LLVM branch instrumentation. The
 measured results are:
