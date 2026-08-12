@@ -93,7 +93,9 @@ visibility/core analysis ([Theory 10](10-design-structure-matrix-analysis.md)), 
 structural-clone refinement
 ([Theory 11](11-weisfeiler-lehman-structural-clones.md)), and deterministic
 [centrality](../GLOSSARY.md#centrality) over projection topology
-([Theory 12](12-centrality-and-structural-importance.md)). Each consumes the same
+([Theory 12](12-centrality-and-structural-importance.md)), and deterministic
+[community detection](../GLOSSARY.md#community-detection) by generalized
+modularity ([Theory 13](13-community-structure-and-modularity.md)). Each consumes the same
 `CodePropertyGraph`; none needs its own bespoke intermediate representation.
 
 ## 4. The four overlays at a glance

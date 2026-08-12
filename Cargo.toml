@@ -233,3 +233,7 @@ harness = false
 [[bench]]
 name = "centrality"
 harness = false
+
+[[bench]]
+name = "community"
+harness = false

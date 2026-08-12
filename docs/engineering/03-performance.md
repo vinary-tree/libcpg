@@ -56,8 +56,10 @@ The table gives *expected* costs. Symbols: $`n`$ = number of tree-sitter /
 AST nodes, $`V`$ and $`E`$ = node and edge counts of the (sub)graph an
 operation touches, $`L`$ = GNN layers (`num_layers`), $`d`$ = embedding
 dimension, $`k`$ = whole-graph similarity WL iterations (3), and
-$`q=\min(\mathtt{iterations},16)`$ = projection-WL rounds, and
-$`c=\min(\mathtt{max\_iterations},10{,}000)`$ = centrality rounds.
+$`q=\min(\mathtt{iterations},16)`$ = projection-WL rounds,
+$`c=\min(\mathtt{max\_iterations},10{,}000)`$ = centrality rounds,
+$`p=\min(\mathtt{max\_passes},50)`$ = Louvain sweeps per level, and
+$`h=\min(\mathtt{max\_levels},10)`$ = Louvain aggregation levels.
 
 | Operation | Expected cost | Notes |
 | --- | --- | --- |
@@ -83,6 +85,8 @@ $`c=\min(\mathtt{max\_iterations},10{,}000)`$ = centrality rounds.
 | Eigenvector / Katz / HITS | $`O(c(V+E))`$ time, $`O(V+E)`$ working space | Shifted spectral iteration, sufficient Katz row-sum bound, and paired HITS vectors. |
 | Closeness / harmonic | $`O(V(V+E))`$ time, $`O(V+E)`$ working space | One undirected BFS per vertex with an explicit adjacency-visit budget. |
 | Burt constraint | $`O(E+\sum_v d(v)^2)`$ time, $`O(V+E)`$ working space | Nonnegative weighted undirected adjacency; exact modeled-neighborhood budget. |
+| Multi-level Louvain | worst case $`O(h[p(V+E\log V)+E\log E])`$ time, $`O(V+E)`$ working space | Dense-order local moving sorts touched community ids; deterministic aggregation groups canonical weighted edges. Graph sizes do not increase across levels. |
+| Connected-community refinement | $`O(V+E)`$ time, $`O(V)`$ working space after projection validation | Breadth-first search is restricted to each input community; components and output labels are canonicalized by smallest member. |
 | GNN `propagate` | $`O(L \cdot (V + E) \cdot d)`$ | Each layer means neighbour vectors over the AST/CFG/DFG overlays, then ReLU. |
 
 Two of these deserve emphasis. VF2 is worst-case super-exponential, which is why
@@ -93,8 +97,8 @@ once, loop bodies twice, and a path set cuts malformed AST cycles.
 
 ## Benchmark coverage and remaining gaps
 
-Nine Criterion targets are active. Their thirteen baseline operation groups are
-feature-free; `induction_analysis` also registers a fourteenth,
+Ten Criterion targets are active. Their fifteen baseline operation groups are
+feature-free; `induction_analysis` also registers a sixteenth,
 `algorithm-detection`-gated operation. Every active group constructs and checks a deterministic oracle
 before Criterion enters the timed loop:
 
@@ -127,6 +131,11 @@ before Criterion enters the timed loop:
   and undirected closeness over the same shapes at 128 and 256 vertices. Its
   pre-timing oracles also exercise HITS, edge betweenness, harmonic centrality,
   and Burt constraint.
+- `community` measures multi-level Louvain on 256- and 1,024-vertex rings of
+  eight-vertex cliques and connected refinement on 512- and 2,048-vertex
+  disconnected path families. Independent modularity, exact repeatability,
+  canonical labels, component counts, and induced connectivity are checked
+  before timing.
 
 ```toml
 [[bench]]
@@ -164,6 +173,10 @@ harness = false
 [[bench]]
 name = "centrality"
 harness = false
+
+[[bench]]
+name = "community"
+harness = false
 ```
 
 Run it directly, or save and compare named baselines:
@@ -180,6 +193,7 @@ cargo bench --bench scc_analysis --no-default-features -- --baseline before
 cargo bench --bench dsm --no-default-features
 cargo bench --bench wl --no-default-features
 cargo bench --bench centrality --no-default-features
+cargo bench --bench community --no-default-features
 cargo bench --no-default-features --features algorithm-detection \
   --bench induction_analysis -- --test
 ```

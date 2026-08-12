@@ -379,6 +379,15 @@ fn exercise_every_analysis(cpg: &CodePropertyGraph, func: NodeId) {
     let edge_centrality = libcpg::edge_betweenness(&call_projection, budget)
         .expect("call projection fits the default edge-betweenness budget");
     assert_eq!(edge_centrality.edges.len(), edge_centrality.scores.len());
+    let communities = libcpg::louvain(&call_projection, libcpg::LouvainOptions::default())
+        .expect("call projection has finite nonnegative weights");
+    assert_eq!(communities.nodes, call_projection.nodes);
+    assert_eq!(communities.community.len(), call_projection.node_count());
+    assert!(communities.modularity.is_finite());
+    let refined = libcpg::refine_connected(&call_projection, &communities);
+    assert_eq!(refined.nodes, call_projection.nodes);
+    assert_eq!(refined.community.len(), call_projection.node_count());
+    assert!(refined.modularity.is_finite());
 
     // --- extractors ---
     let mut work = cpg.clone();

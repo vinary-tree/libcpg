@@ -1,0 +1,49 @@
+@startuml
+title libcpg deterministic multi-level community analysis
+skinparam backgroundColor #FFFFFF
+skinparam shadowing false
+skinparam defaultFontName DejaVu Sans
+skinparam ArrowColor #495057
+skinparam ArrowThickness 1.2
+
+rectangle "GraphProjection\nsorted NodeId + CSR" as INPUT #E7F5FF
+rectangle "Validate\nCSR + finite resolution\nnonnegative finite weights" as VALIDATE #FFF3BF
+rectangle "Undirected weighted level\nreciprocal sums + loop convention" as LEVEL #D3F9D8
+rectangle "Dense local moving\nascending vertices + candidates\nsmallest-id exact ties" as MOVE #E5DBFF
+rectangle "Contraction decision\npartition has fewer groups?" as CONTRACT #FFE8CC
+rectangle "Aggregate communities\nsorted compensated sums\ninternal edges -> loops" as AGG #C3FAE8
+rectangle "Continuation decision\nlevel < 10 and groups > 1?" as CAP #FFE8CC
+rectangle "Compose original labels\ncanonical ids by smallest member" as COMPOSE #D0EBFF
+rectangle "Recompute\n<latex>Q_\gamma=\sum_C[L_C/m-\gamma(D_C/2m)^2]</latex>" as SCORE #F3D9FA
+rectangle "CommunityAssignment\nnode-aligned, immutable" as RESULT #D3F9D8
+rectangle "Optional checked refinement\nBFS inside each assigned group" as REFINE #FFDEEB
+rectangle "ConnectedRefinement\ncanonical components + recomputed Q" as CONNECTED #C3FAE8
+rectangle "AnalysisError\nmalformed CSR/options/weights" as ERROR #FFE3E3
+
+INPUT --> VALIDATE
+VALIDATE --> ERROR : invalid
+VALIDATE --> LEVEL : valid
+LEVEL --> MOVE
+MOVE --> CONTRACT
+CONTRACT --> COMPOSE : no
+CONTRACT --> AGG : yes
+AGG --> CAP
+CAP --> MOVE : yes, next level
+CAP --> COMPOSE : cap or one group
+COMPOSE --> SCORE
+SCORE --> RESULT
+RESULT --> REFINE : caller requests guarantee
+REFINE --> ERROR : checked input invalid
+REFINE --> CONNECTED : split disconnected groups
+
+legend right
+  |= Color |= Meaning |
+  |<#E7F5FF>| immutable projection input |
+  |<#FFF3BF>| validation and bounds |
+  |<#E5DBFF>| deterministic local search |
+  |<#C3FAE8>| aggregation / guaranteed output |
+  |<#F3D9FA>| mathematical score boundary |
+  |<#FFDEEB>| optional connectivity refinement |
+  |<#FFE3E3>| typed rejection |
+endlegend
+@enduml

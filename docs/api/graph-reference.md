@@ -400,6 +400,30 @@ See the complete [centrality component guide](../components/graph/centrality-ana
 for formulas, direction and weight policy, literate pseudocode, examples,
 complexity, validation, and interpretation limits.
 
+### Community detection
+
+The feature-free community family consumes a validated `GraphProjection` as a
+weighted undirected graph. Reciprocal directed weights are summed; negative,
+non-finite, or overflowing weights are rejected.
+
+| Function | Signature | Result |
+|---|---|---|
+| `louvain` | `fn(&GraphProjection, LouvainOptions) -> Result<CommunityAssignment, AnalysisError>` | Deterministic multi-level Louvain partition aligned with the original projection. |
+| `try_refine_connected` | `fn(&GraphProjection, &CommunityAssignment) -> Result<CommunityAssignment, AnalysisError>` | Checked split of every assigned group into induced connected components. |
+| `refine_connected` | `fn(&GraphProjection, &CommunityAssignment) -> CommunityAssignment` | Total convenience boundary; malformed public input yields a canonical singleton fallback. |
+
+`CommunityAssignment` exposes `kind`, aligned `nodes` and `community`,
+`num_communities`, and generalized `modularity`. Community identifiers are
+contiguous and ordered by smallest stable member. `LouvainOptions` controls
+nonnegative finite `resolution`, `max_passes`, and `max_levels`; requests are
+clamped to `MAX_LOUVAIN_PASSES = 50` and `MAX_LOUVAIN_LEVELS = 10`.
+
+The checked refinement requires exact node alignment and canonical input
+labels, inherits the resolution stored in `CommunityKind`, and recomputes the
+score of the refined partition. See the [community component
+guide](../components/graph/community-detection.md) for formulas, pseudocode,
+examples, complexity, and evidence boundaries.
+
 ### Natural loops and nesting
 
 The feature-free loop API uses the shared reachable function CFG and dominator

@@ -134,8 +134,9 @@ and its build pipeline.
 | Non-terminating data flow | Structural AST sweep, two loop passes, and a malformed-cycle path guard | [hardening §DFG](01-input-and-resource-hardening.md#data-flow-structural-sweep-bounds) |
 | Unbounded slice | `backward_slice` / `forward_slice` `max_nodes` cap | [hardening §slicing](01-input-and-resource-hardening.md#slicing-max_nodes) |
 | Expensive or divergent centrality | hard iteration ceiling, explicit traversal budgets, finite-option validation, and complete projection validation | [hardening §centrality](01-input-and-resource-hardening.md#centrality-iteration-ceilings-traversal-budgets-and-safe-numerics) |
+| Adversarial community search or weights | 50-pass/10-level ceilings plus complete CSR, resolution, weight, and overflow validation | [hardening §community detection](01-input-and-resource-hardening.md#community-detection-pass-level-and-numeric-bounds) |
 | Untrusted serialized graph | Deserialize only trusted bytes | [`usage/05-serialization.md`](../usage/05-serialization.md) |
-| Over-trusting heuristics or rankings | Treat pattern/algorithm/GNN and centrality output as advisory | this page |
+| Over-trusting heuristics, rankings, or partitions | Treat pattern/algorithm/GNN, centrality, and community output as advisory | this page |
 
 ## References
 

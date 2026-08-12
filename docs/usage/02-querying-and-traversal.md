@@ -403,11 +403,44 @@ for the measure-selection table, formulas, budgets, and examples.
 
 ---
 
+## Partitioning a projection into communities
+
+When the question concerns cohesive groups rather than individual importance,
+run deterministic multi-level Louvain on the relevant projection. This
+feature-free example partitions the resolved call graph and then guarantees
+that each returned group is internally connected:
+
+```rust
+use libcpg::{
+    call_graph_projection, louvain, try_refine_connected, AnalysisError,
+    CodePropertyGraph, CommunityAssignment, LouvainOptions,
+};
+
+fn function_communities(
+    cpg: &CodePropertyGraph,
+) -> Result<CommunityAssignment, AnalysisError> {
+    let graph = call_graph_projection(cpg);
+    let partition = louvain(&graph, LouvainOptions::default())?;
+    let connected = try_refine_connected(&graph, &partition)?;
+    assert_eq!(connected.nodes, graph.nodes);
+    Ok(connected)
+}
+```
+
+Persist the projection provenance, `CommunityKind`, and resolution alongside a
+partition. Community identifiers are canonical labels, not durable subsystem
+identities. See [community detection](../components/graph/community-detection.md)
+for weight semantics, the modularity formula, work ceilings, and interpretation
+limits.
+
+---
+
 ## Next steps
 
 - Detect design patterns over the graph you just queried: [Pattern Detection](03-pattern-detection.md).
 - Turn "affects" into a precise slice: [Program Slicing](04-program-slicing.md).
 - Rank a projected relation: [Projection Centrality](../components/graph/centrality-analysis.md).
+- Partition a projected relation: [Community Detection](../components/graph/community-detection.md).
 - The complete method tables (construction, AST, CFG, DFG, call, query, metrics, subgraph) are in the [graph reference](../api/graph-reference.md); traversal internals are in [Graph Traversal](../components/graph/traversal.md).
 
 ---

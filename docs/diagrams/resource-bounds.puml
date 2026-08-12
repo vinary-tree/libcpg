@@ -65,7 +65,17 @@ preflight Brandes, distance, edge-betweenness,
 and Burt neighborhood operations before traversal.;
 ***[#F1F3F5]:projection + numeric validation
 rejects malformed CSR, non-finite options,
-and unsafe Katz attenuation without partial rankings.;
+    and unsafe Katz attenuation without partial rankings.;
+**[#FFE3E3] Community detection
+***[#F1F3F5]:MAX_LOUVAIN_PASSES = 50
+clamps dense local-moving sweeps independently
+at every aggregation level.;
+***[#F1F3F5]:MAX_LOUVAIN_LEVELS = 10
+clamps graph contractions and defines zero levels
+as a canonical no-work singleton result.;
+***[#F1F3F5]:projection + numeric validation
+rejects malformed CSR, invalid resolution, negative or
+non-finite weights, and overflowing reciprocal sums.;
 **[#FFE3E3] Slicing
 ***[#F1F3F5]:max_nodes on backward_slice / forward_slice
 bounds the PDG reverse/forward BFS —

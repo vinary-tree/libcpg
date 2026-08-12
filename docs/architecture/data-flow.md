@@ -3,7 +3,7 @@
 This page traces how information moves through libcpg in two phases:
 
 1. the **construction pipeline** — source text becomes a [Code Property Graph](../GLOSSARY.md#code-property-graph-cpg) (Yamaguchi et al. [[1]](#references)) with AST, [CFG](../GLOSSARY.md#control-flow-graph-cfg), and [DFG](../GLOSSARY.md#data-flow-graph-dfg) overlays; and
-2. the **analysis pipeline** — a constructed CPG is queried by exact [dominator/post-dominator](../components/graph/dominator-analysis.md), [natural-loop](../components/graph/loop-analysis.md), [loop-induction](../components/graph/induction-analysis.md), [liveness](../components/graph/liveness-analysis.md), [available/very-busy expression](../components/graph/expression-analysis.md), [SCCP](../components/graph/sccp-analysis.md), [interval value-range](../components/graph/interval-analysis.md), [SCC](../GLOSSARY.md#strongly-connected-component-scc), [DSM visibility](../components/graph/dsm-analysis.md), [WL structural-clone](../components/graph/wl-analysis.md), and [centrality](../components/graph/centrality-analysis.md) analyses, the [PDG](../GLOSSARY.md#program-dependence-graph-pdg)/slicer, the [VF2](../GLOSSARY.md#vf2) and [GoF](../GLOSSARY.md#gang-of-four-gof) detectors, the algorithm/complexity heuristics, and the [GNN](../GLOSSARY.md#graph-neural-network-gnn).
+2. the **analysis pipeline** — a constructed CPG is queried by exact [dominator/post-dominator](../components/graph/dominator-analysis.md), [natural-loop](../components/graph/loop-analysis.md), [loop-induction](../components/graph/induction-analysis.md), [liveness](../components/graph/liveness-analysis.md), [available/very-busy expression](../components/graph/expression-analysis.md), [SCCP](../components/graph/sccp-analysis.md), [interval value-range](../components/graph/interval-analysis.md), [SCC](../GLOSSARY.md#strongly-connected-component-scc), [DSM visibility](../components/graph/dsm-analysis.md), [WL structural-clone](../components/graph/wl-analysis.md), [centrality](../components/graph/centrality-analysis.md), and [community](../components/graph/community-detection.md) analyses, the [PDG](../GLOSSARY.md#program-dependence-graph-pdg)/slicer, the [VF2](../GLOSSARY.md#vf2) and [GoF](../GLOSSARY.md#gang-of-four-gof) detectors, the algorithm/complexity heuristics, and the [GNN](../GLOSSARY.md#graph-neural-network-gnn).
 
 "Data flow" here means both the program's own data-flow overlay *and* the flow of data through libcpg's stages. This is a rewrite of an earlier draft that invented `BranchTrue`/`UseUse`/`Phi` edge kinds, an SSA-based DFG, a parse/embedding cache, and a bincode format — none of which exist. The real edge model is [`CpgEdgeKind::ControlFlow(CfgEdgeKind)`](../GLOSSARY.md#control-flow-graph-cfg) / [`DataFlow(DfgEdgeKind)`](../GLOSSARY.md#data-flow-graph-dfg), the DFG is [AST-ordered reaching definitions](../GLOSSARY.md#ast-ordered-reaching-definitions), and persistence is plain derive-based serde.
 
@@ -167,7 +167,7 @@ Public helpers expose the same information as [def-use chains](../GLOSSARY.md#de
 
 A constructed CPG is the substrate for several independent analyses. Each consumes the overlays built above; none of them run during construction.
 
-![Activity diagram fanning a CPG out to block, data-flow, liveness, induction, dominance, loop/SCC/DSM, PDG/slice, VF2/GoF, algorithm, and GNN analyses](../diagrams/analysis-pipeline.svg)
+![Activity diagram fanning a CPG out to block, data-flow, liveness, induction, dominance, loop/SCC/DSM/WL/centrality/community, PDG/slice, VF2/GoF, algorithm, and GNN analyses](../diagrams/analysis-pipeline.svg)
 
 *Figure — a constructed CPG fans out to exact structural and data-flow analysis, the on-demand PDG/slicer, the VF2 and GoF pattern detectors, the algorithm/complexity heuristics, and the GNN. Source: [`diagrams/analysis-pipeline.puml`](../diagrams/analysis-pipeline.puml).*
 
@@ -261,6 +261,14 @@ undirected view drives edge Brandes, distance, spectral, Katz, and Burt
 measures. Results retain stable node alignment or canonical edge order,
 iterative algorithms record convergence, and all-sources algorithms check an
 explicit work budget before traversal.
+
+`louvain(&projection, options)` derives the same canonical weighted-undirected
+view, performs bounded dense-order local moving, and contracts communities
+between levels. Its immutable result remains aligned with the original stable
+nodes and stores modularity recomputed on the original projection.
+`try_refine_connected` can then split any internally disconnected assigned
+group without mutating the projection. See [deterministic community
+detection](../components/graph/community-detection.md).
 
 ### Natural loops and nesting (feature-free)
 

@@ -1,6 +1,6 @@
 # Measurement methodology
 
-`libcpg` ships nine runnable Criterion targets. Their baseline groups are
+`libcpg` ships ten runnable Criterion targets. Their baseline groups are
 feature-free; the `induction_analysis` target also registers an
 `algorithm-detection`-gated complexity-evidence group. Each active group
 asserts a deterministic correctness oracle **before** entering the timed loop.
@@ -19,7 +19,7 @@ the source transformation under study does not [[1]](#references).
 
 ## 1. Current evidence
 
-All nine targets use `harness = false`, which hands execution to Criterion
+All ten targets use `harness = false`, which hands execution to Criterion
 rather than Rust's test harness:
 
 ```toml
@@ -61,6 +61,10 @@ harness = false
 [[bench]]
 name = "centrality"
 harness = false
+
+[[bench]]
+name = "community"
+harness = false
 ```
 
 | Target | Public operation | Families and sizes | Pre-timing oracle |
@@ -75,6 +79,7 @@ harness = false
 | `dsm` | `analyze_dsm`, `classify_core_periphery` | directed paths and rings at 256 and 1,024 vertices | exact visibility vectors, propagation cost, roles, completion, and cyclic core |
 | `wl` | `wl_labels`, `structural_clone_classes` | four-round directed rings and outward stars at 1,024 and 8,192 vertices | exact label symmetry/distinction and exact ordered clone membership |
 | `centrality` | PageRank, eigenvector, Brandes, and closeness | paths, rings, and clustered projections at 256/1,024 vertices for iterative kernels and 128/256 vertices for all-sources kernels | alignment, convergence/mass or finiteness/normalization, shape symmetry/order, canonical edge output, bridge maximality, and auxiliary HITS/harmonic/Burt checks |
+| `community` | `louvain`, `try_refine_connected` | rings of eight-vertex cliques at 256/1,024 vertices; disconnected eight-vertex paths at 512/2,048 vertices | exact repeatability, canonical labels, positive independently recomputed modularity, expected component count, and independent induced-connectivity traversal |
 
 The evidence is deliberately local: a result for one named family, size,
 machine, toolchain, and environment is not a universal speed claim. DFG/PDG
@@ -123,6 +128,7 @@ tees Criterion output to one timestamped log:
 ./scripts/bench.sh condensation --save-baseline before
 ./scripts/bench.sh induction_analysis --save-baseline before
 ./scripts/bench.sh centrality --save-baseline before
+./scripts/bench.sh community --save-baseline before
 cargo bench --no-default-features --features algorithm-detection \
   --bench induction_analysis -- --test
 ```
@@ -240,6 +246,8 @@ $`H \le F`$ is lattice height, and $`d`$ is embedding dimension.
 | variable liveness | $`O(H(B + E_b)W + NW)`$ conventional bound | active chain/diamond/nested-loop target |
 | DSM visibility / classification | $`O(V(V+E))`$ visibility plus SCC and median classification | active path/ring target |
 | projection WL labels / clones | $`O(q(V\log V+E+\sum_v d(v)\log d(v)))`$ for $`q\le16`$, plus clone sorting | active four-round ring/star target |
+| multi-level Louvain | $`O(h[p(V+E\log V)+E\log E])`$ for $`p\le50`$ and $`h\le10`$ | active ring-of-cliques target |
+| connected-community refinement | $`O(V+E)`$ after validation | active disconnected-path target |
 | DFG/PDG construction | analysis-specific; must separate extraction from slicing | benchmark gap |
 | GNN propagation | $`O(\text{layers}\cdot(V+E)\cdot d)`$ | benchmark gap |
 

@@ -73,7 +73,8 @@ feature is on (`#[cfg(feature = "…")]` on the `pub mod` in `lib.rs`); the `gra
 `analysis`, `builder`, and [`pattern`](../GLOSSARY.md#vf2) modules are always compiled. The
 feature-free `analysis` module supplies deterministic dominator/post-dominator
 trees, exact CFG and call-graph SCC decomposition, and deterministic
-condensation-DAG critical-path and width-bounded layering analytics. Note the
+condensation-DAG critical-path and width-bounded layering analytics, projection
+centrality, and bounded multi-level community detection. Note the
 deliberate distinction between the always-on `pattern` module (VF2 / similarity) and
 the feature-gated `patterns` module (Gang-of-Four detection) — they are different
 modules, not a typo.

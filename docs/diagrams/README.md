@@ -39,9 +39,9 @@ Grouped by subject. Each row: the source (its `.svg` sibling is embedded by the 
 |---|---|---|---|
 | `cpg-overlay.dot` | graph | AST⊕CFG⊕DFG overlays on one shared node set (hero figure) | README, docs/README, theory/00–01, architecture/graph-data-model, api/graph-reference, components/graph/overview, design/0001 |
 | `cpg-vs-traditional.dot` | graph | Three separate views vs one unified CPG | theory/00, architecture/overview |
-| `module-architecture.puml` | component | Crate modules, always-on projections/block-CFG/data-flow/liveness/induction/reachability/dominator/loop/SCC/DSM/WL/centrality analysis, and feature gates | architecture/overview, design/00 |
+| `module-architecture.puml` | component | Crate modules, always-on projections/block-CFG/data-flow/liveness/induction/reachability/dominator/loop/SCC/DSM/WL/centrality/community analysis, and feature gates | architecture/overview, design/00 |
 | `construction-pipeline.puml` | activity | parse → AST → CFG → optional definite-call resolution → DFG | architecture/data-flow, components/builder/overview, api/builder-reference, usage/01 |
-| `analysis-pipeline.puml` | activity | CPG → blocks/data-flow/liveness/induction/reachability/dominance/loops/SCC/DSM/WL/centrality, PDG/slice, VF2/GoF, algorithm, GNN | architecture/data-flow |
+| `analysis-pipeline.puml` | activity | CPG → blocks/data-flow/liveness/induction/reachability/dominance/loops/SCC/DSM/WL/centrality/community, PDG/slice, VF2/GoF, algorithm, GNN | architecture/data-flow |
 | `feature-flag-map.puml` | mindmap | Cargo feature taxonomy (`default = []`) | design/0005, engineering/01, usage/00 |
 
 ### Graph data model
@@ -51,6 +51,7 @@ Grouped by subject. Each row: the source (its `.svg` sibling is embedded by the 
 | `edge-kind-taxonomy.puml` | mindmap | `CpgEdgeKind` grouped (AST/CFG/DFG/PDG/…) | theory/01, architecture/graph-data-model, api/graph-reference, components/graph/edges |
 | `projection-csr.puml` | component | CPG overlay selection and deterministic forward/reverse CSR construction | components/graph/projections |
 | `centrality-pipeline.puml` | component/algorithm flow | validated projection → bounded directed/undirected centrality kernels → aligned node/edge scores | components/graph/centrality-analysis, theory/12, design/0017 |
+| `community-pipeline.puml` | component/algorithm flow | validated projection → deterministic local moving and bounded aggregation → canonical assignment → optional connected refinement | components/graph/community-detection, theory/13, design/0018 |
 | `dominator-analysis.puml` | component | Shared CHK engine for forward dominance, reversed-CFG post-dominance, and PDG control edges | components/graph/dominator-analysis |
 | `loop-analysis.puml` | activity/component flow | Shared CFG scope and dominance evidence → natural/irreducible regions → strict nesting; builder continuation → `LoopExit` | components/graph/loop-analysis |
 | `reachability-analysis.puml` | component/decision flow | Function scope and iterative DFS → reachable/unreachable partition → structural dead branches; builder terminators → disconnected islands | components/graph/reachability-analysis |
@@ -131,4 +132,4 @@ Grouped by subject. Each row: the source (its `.svg` sibling is embedded by the 
 | `build-equivalence.puml` | activity | `build` ≡ `build_from_tree` node/edge equality | scientific/01, engineering/02 |
 | `measurement-methodology.puml` | activity | Rigorous benchmarking method (a documented gap) | scientific/04, engineering/03 |
 | `threat-model-dataflow.puml` | activity | Untrusted input flow & trust boundaries | security/00 |
-| `resource-bounds.puml` | mindmap | Construction/analysis caps, including DSM's 50,000-node ceiling and centrality's iteration/work limits | security/01 |
+| `resource-bounds.puml` | mindmap | Construction/analysis caps, including DSM's node ceiling, centrality's iteration/work limits, and Louvain's pass/level ceilings | security/01 |

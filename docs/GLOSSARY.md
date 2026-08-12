@@ -84,6 +84,17 @@ brokerage. Each definition has different direction and weight semantics
 [`theory/12-centrality-and-structural-importance.md`](theory/12-centrality-and-structural-importance.md)
 and [`components/graph/centrality-analysis.md`](components/graph/centrality-analysis.md).
 
+### Community detection
+
+The task of partitioning a graph into groups whose internal association is
+strong relative to a stated baseline. `libcpg::louvain` optimizes
+[generalized modularity](#modularity--resolution) over the canonical weighted
+undirected view of a `GraphProjection`; it returns stable-node-aligned labels,
+not a new graph or an ownership fact. `try_refine_connected` subsequently
+splits any assigned group whose induced subgraph is disconnected. See
+[`theory/13-community-structure-and-modularity.md`](theory/13-community-structure-and-modularity.md)
+and [`components/graph/community-detection.md`](components/graph/community-detection.md).
+
 ### Code Property Graph (CPG)
 
 A single directed graph that merges several program views onto **one shared node set**: the [AST](#abstract-syntax-tree-ast), the [CFG](#control-flow-graph-cfg), the [DFG](#data-flow-graph-dfg), and — on demand — the [PDG](#program-dependence-graph-pdg). Introduced by Yamaguchi et al. [[1]](#references) to express vulnerability queries that need syntax, control, and data flow simultaneously. In `libcpg` the CPG is the type `CodePropertyGraph`, backed by a [petgraph](#petgraph) `DiGraph<CpgNode, CpgEdge>`. See [`theory/01-code-property-graphs.md`](theory/01-code-property-graphs.md).
@@ -385,6 +396,16 @@ requires `join` and `leq`; built-in may and must bit domains use union/subset an
 intersection/reverse-subset respectively. See
 [`theory/03-data-flow-and-reaching-definitions.md`](theory/03-data-flow-and-reaching-definitions.md).
 
+### Leiden algorithm / Leiden-style refinement
+
+The Leiden algorithm improves [Louvain](#louvain-algorithm) by interleaving
+local moving, a probabilistic refinement phase, and aggregation, with stronger
+community-connectivity guarantees [[30]](#references). libcpg does not
+implement the complete Leiden algorithm. Its separately callable
+`try_refine_connected` operation is **Leiden-style** only in the narrow sense
+that it repairs disconnected assigned groups; it guarantees ordinary induced
+connectivity and claims none of Leiden's stronger optimality properties.
+
 ### Liveness
 
 A variable is **live** at a program point when some future control-flow path
@@ -393,6 +414,15 @@ backward may analysis: successor inputs meet by union, and a node removes its
 definitions before adding its uses. `libcpg::liveness` returns deterministic
 per-node `live_in` and `live_out` sets. See
 [`components/graph/liveness-analysis.md`](components/graph/liveness-analysis.md).
+
+### Louvain algorithm
+
+A multi-level [community-detection](#community-detection) heuristic introduced
+by Blondel et al. [[29]](#references). Each level repeatedly moves vertices to
+neighboring communities when that improves generalized modularity, then
+contracts the resulting communities into weighted vertices. libcpg fixes
+vertex order, candidate order, exact ties, aggregation reductions, and output
+numbering so the bounded heuristic is reproducible.
 
 ### Loop-invariant code motion (LICM)
 
@@ -428,6 +458,17 @@ A language for the [F1R3FLY.io](#rholang) / Hyperon ecosystem based on rewriting
 ### Mode B / `build_from_tree`
 
 The construction path where the **caller supplies an already-parsed** `tree_sitter::Tree` and `libcpg` builds the CPG from it: `TreeSitterCpgBuilder::build_from_tree(&tree, source, language)`. It needs no `lang-*` feature (the caller owns the grammar), skips the `max_file_size` check, and is the only path for [Rholang](#rholang) and [MeTTa](#metta). "Mode A" is the internal-parse path (`build`). See [`design/0002-mode-b-build-from-tree.md`](design/0002-mode-b-build-from-tree.md).
+
+### Modularity / Resolution
+
+**Modularity** $`Q`$ compares the observed edge weight inside assigned
+communities with the expected internal weight under a degree-preserving null
+model. Generalized modularity introduces a nonnegative **resolution parameter**
+$`\gamma`$: larger values usually favor smaller communities, while
+$`\gamma=1`$ is standard modularity. The score is comparative evidence for one
+projection and resolution; it is neither a probability nor proof of a correct
+architecture. See [community structure
+theory](theory/13-community-structure-and-modularity.md).
 
 ### Natural loop / Loop forest
 
@@ -635,3 +676,5 @@ used by the complexity analyzer to classify recursive functions (e.g. $`a = b = 
 26. MacCormack, A., Rusnak, J., Baldwin, C. Y. (2006). *Exploring the Structure of Complex Software Designs: An Empirical Study of Open Source and Proprietary Code.* Management Science 52(7), 1015–1030. DOI: [10.1287/mnsc.1060.0552](https://doi.org/10.1287/mnsc.1060.0552)
 27. Baldwin, C. Y., MacCormack, A., Rusnak, J. (2014). *Hidden Structure: Using Network Methods to Map System Architecture.* Research Policy 43(8), 1381–1397. DOI: [10.1016/j.respol.2014.05.004](https://doi.org/10.1016/j.respol.2014.05.004)
 28. Centrality foundations: (**28a**) Brin, S., Page, L. (1998). *The Anatomy of a Large-Scale Hypertextual Web Search Engine.* DOI: [10.1016/S0169-7552(98)00110-X](https://doi.org/10.1016/S0169-7552(98)00110-X). (**28b**) Brandes, U. (2001). *A Faster Algorithm for Betweenness Centrality.* DOI: [10.1080/0022250X.2001.9990249](https://doi.org/10.1080/0022250X.2001.9990249). (**28c**) Bonacich, P. (1987). *Power and Centrality: A Family of Measures.* DOI: [10.1086/228631](https://doi.org/10.1086/228631). (**28d**) Katz, L. (1953). *A New Status Index Derived from Sociometric Analysis.* DOI: [10.1007/BF02289026](https://doi.org/10.1007/BF02289026). (**28e**) Sabidussi, G. (1966). *The Centrality Index of a Graph.* DOI: [10.1007/BF02289527](https://doi.org/10.1007/BF02289527). (**28f**) Kleinberg, J. M. (1999). *Authoritative Sources in a Hyperlinked Environment.* DOI: [10.1145/324133.324140](https://doi.org/10.1145/324133.324140). (**28g**) Burt, R. S. (1992). *Structural Holes: The Social Structure of Competition.* Harvard University Press. ISBN 978-0-674-84371-4.
+29. Blondel, V. D., Guillaume, J.-L., Lambiotte, R., Lefebvre, E. (2008). *Fast Unfolding of Communities in Large Networks.* Journal of Statistical Mechanics: Theory and Experiment, P10008. DOI: [10.1088/1742-5468/2008/10/P10008](https://doi.org/10.1088/1742-5468/2008/10/P10008)
+30. Traag, V. A., Waltman, L., van Eck, N. J. (2019). *From Louvain to Leiden: Guaranteeing Well-Connected Communities.* Scientific Reports 9, 5233. DOI: [10.1038/s41598-019-41695-z](https://doi.org/10.1038/s41598-019-41695-z)

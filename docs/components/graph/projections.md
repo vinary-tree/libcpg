@@ -77,8 +77,10 @@ clone candidates. The same validated view feeds the
 [`centrality family`](centrality-analysis.md): directed PageRank, Brandes and
 HITS kernels use its forward/reverse CSR directly, while spectral, distance,
 edge-betweenness, and structural-hole measures request its canonical
-undirected view. These consumers are read-only. DSM and WL treat weights as
-binary adjacency; centrality documents weight semantics per measure.
+undirected view. [`louvain`](community-detection.md) uses that same view for
+deterministic multi-level modularity optimization and connected refinement.
+These consumers are read-only. DSM and WL treat weights as binary adjacency;
+centrality and community detection document weight semantics per measure.
 
 ### The shared function CFG view
 

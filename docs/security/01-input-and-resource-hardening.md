@@ -38,6 +38,7 @@ Source: [`diagrams/resource-bounds.puml`](../diagrams/resource-bounds.puml).*
 | `MAX_CENTRALITY_ITERATIONS` | `10_000` hard maximum | PageRank, eigenvector, Katz, and HITS | clamps every requested round count; invalid numerical options return a non-converged result without iteration |
 | `CentralityBudget::max_work` | `2_000_000_000` default | edge betweenness, closeness, harmonic, and Burt constraint | rejects before all-sources/neighborhood traversal with `AnalysisError::BudgetExceeded` |
 | `BetweennessOptions::max_work` | `2_000_000_000` default | directed vertex betweenness and `accumulate_for_sources` | rejects before Brandes traversal when `source_count * edge_count` exceeds the cap |
+| `MAX_LOUVAIN_PASSES` / `MAX_LOUVAIN_LEVELS` | `50` / `10` hard maxima | `louvain` | clamps both repetition dimensions; zero requests return the singleton partition without local moving |
 | Loop-induction structural bounds | at most `candidate_count + 1` invariant rounds per loop; affine depth `3` | `loop_induction` | reaches a finite fixed point; malformed AST cycles are cut by visited sets and arithmetic overflow becomes unknown evidence |
 | Complexity-evidence bounds | validated finite function scope plus loop/induction provider bounds | `estimate_time_complexity_with_evidence` (feature `algorithm-detection`) | provider failure or absent CFG evidence returns the exact legacy total estimate; justification grows with loop count |
 
@@ -308,6 +309,32 @@ access control, deletion, or automated refactoring. Call-graph results inherit
 the call resolver's evidence boundary, and every ranking inherits the selected
 projection's semantic completeness.
 
+## Community detection: pass, level, and numeric bounds
+
+[Community detection](../components/graph/community-detection.md) validates the
+complete projection contract before indexed work. `louvain` rejects a
+non-finite or negative resolution, every negative or non-finite directed edge
+weight, a non-finite reciprocal sum, and any degree or total-weight overflow.
+It never returns a partial plausible partition after one of those failures.
+
+`max_passes` is clamped to `MAX_LOUVAIN_PASSES = 50` independently at every
+level. `max_levels` is clamped to `MAX_LOUVAIN_LEVELS = 10`. A zero value for
+either option is a defined no-work request that returns the canonical singleton
+partition. Aggregation cannot increase the number of vertices or canonical
+edges, so these two ceilings bound every repeated phase even on a graph whose
+local moves keep changing through exact-score ties.
+
+`try_refine_connected` checks projection structure, exact node alignment,
+canonical contiguous labels, and stored resolution before breadth-first search.
+The total `refine_connected` wrapper converts malformed caller-controlled public
+fields to an aligned singleton partition rather than panicking or presenting an
+unchecked grouping as refined.
+
+The limits bound algorithmic repetition, not input size. Hosts processing
+hostile projections should also cap node and edge counts to their latency and
+memory budgets. A community assignment is advisory structural evidence; it
+must not authorize access, ownership, deletion, or automatic refactoring.
+
 ## Loop induction: finite structural bounds
 
 [`loop_induction`](../components/graph/induction-analysis.md) computes each
@@ -501,6 +528,9 @@ over each one — see
 12. **Tighten centrality budgets and iteration requests** for interactive or
     hostile graphs, and require `converged` before presenting an iterative
     ranking as complete.
+13. **Cap projection size before community detection** for hostile workloads;
+    the 50-pass and 10-level ceilings bound repetition but not one sweep's edge
+    volume. Treat every partition as advisory.
 
 ## Related pages
 

@@ -6,6 +6,7 @@
 mod basic_blocks;
 mod centrality;
 pub(crate) mod cfg_scope;
+mod community;
 mod condensation;
 pub mod dataflow;
 mod dominators;
@@ -28,6 +29,11 @@ pub use centrality::{
     personalized_pagerank, reverse_pagerank, BetweennessOptions, CentralityBudget, CentralityKind,
     CentralityScores, EdgeCentralityScores, HitsScores, IterationOptions, KatzOptions,
     PageRankOptions, DEFAULT_CENTRALITY_WORK_LIMIT, MAX_CENTRALITY_ITERATIONS,
+};
+
+pub use community::{
+    louvain, refine_connected, try_refine_connected, CommunityAssignment, CommunityKind,
+    LouvainOptions, MAX_LOUVAIN_LEVELS, MAX_LOUVAIN_PASSES,
 };
 
 pub use condensation::{

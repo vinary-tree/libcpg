@@ -61,8 +61,9 @@ alternatives is folklore, and a decision without its costs is marketing.
 | [0015 — Bounded DSM visibility analysis](0015-bounded-dsm-visibility-analysis.md) | Compute transitive visibility and median roles over validated projections, reuse the shared SCC engine for cyclic core, and expose cap/malformed states explicitly. | Accepted |
 | [0016 — Stable WL projection labels](0016-stable-wl-projection-labels.md) | Refine directed-degree labels with a fixed mixer, sorted round canonicalization, a hard iteration ceiling, and deterministic stable-id clone classes. | Accepted |
 | [0017 — Deterministic bounded centrality](0017-deterministic-bounded-centrality.md) | Port centrality onto dense projections with aligned results, explicit numerical/traversal bounds, stable reductions, and a serial source-partition seam. | Accepted |
+| [0018 — Deterministic multi-level community detection](0018-deterministic-multilevel-community-detection.md) | Port Louvain onto validated projections, add deterministic aggregation, canonical tie/label rules, bounded work, and a separate checked connected-component refinement. | Accepted |
 
-These seventeen are not independent. ADR-0001 fixes the substrate that all analyses
+These eighteen are not independent. ADR-0001 fixes the substrate that all analyses
 write onto; ADR-0002 and ADR-0005 together explain how a language reaches that
 substrate and what you must switch on to get there; ADR-0003 and ADR-0004 are
 two analyses *over* the substrate (one always-on, one feature-gated) that each
@@ -92,6 +93,9 @@ validation for DSM and WL, and adds a separately bounded structural-clone view.
 ADR-0017 consumes the same validated forward/reverse CSR, fixes direction and
 weight semantics for the centrality family, and exposes ordered source
 partitions rather than introducing a core-owned thread pool.
+ADR-0018 consumes the canonical undirected projection view, fixes weighted
+modularity and deterministic local-moving semantics, adds true multi-level
+aggregation, and keeps connected refinement as an explicit separate guarantee.
 
 ![Module architecture of libcpg, showing the graph core and the analysis modules layered over it](../diagrams/module-architecture.svg)
 
