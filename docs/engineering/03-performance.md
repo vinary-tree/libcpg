@@ -60,6 +60,7 @@ $`q=\min(\mathtt{iterations},16)`$ = projection-WL rounds,
 $`c=\min(\mathtt{max\_iterations},10{,}000)`$ = centrality rounds,
 $`p=\min(\mathtt{max\_passes},50)`$ = Louvain sweeps per level, and
 $`h=\min(\mathtt{max\_levels},10)`$ = Louvain aggregation levels.
+For graph edit distance, $`N=V_1+V_2`$ is the square assignment dimension.
 
 | Operation | Expected cost | Notes |
 | --- | --- | --- |
@@ -79,6 +80,7 @@ $`h=\min(\mathtt{max\_levels},10)`$ = Louvain aggregation levels.
 | [VF2](../GLOSSARY.md#vf2) `find_matches` | worst case $`O(N!\,N)`$; pruned in practice | Feasibility rules and `max_matches` cut the state space dramatically; see [`theory/05-subgraph-isomorphism-vf2.md`](../theory/05-subgraph-isomorphism-vf2.md). |
 | [Jaccard](../GLOSSARY.md#jaccard-similarity) similarity | $`O(V_1 + V_2)`$ | Over the two graphs' node-kind multisets. |
 | Weisfeiler-Lehman similarity | $`O(k(V + E))`$ | $`k = 3`$ label-refinement rounds. |
+| Bipartite GED upper bound | $`O(N^3+E_1+E_2)`$ time, $`O(N^2+E_1+E_2)`$ space | Two deterministic Hungarian solves plus concrete typed-edge script evaluation; each input is capped at 512 nodes, beyond which a flagged linear surrogate is returned. |
 | Projection WL labels / clone classes | $`O(q(V\log V+E+\sum_v d(v)\log d(v)))`$ time, $`O(V+d_{max})`$ temporary space | Directed-degree seeds; sorted incident-label multisets; sorted raw-label ranks each round; clone grouping adds $`O(V\log V)`$ time and $`O(V)`$ space. |
 | PageRank / reverse / personalized | $`O(c(V+E))`$ time, $`O(V)`$ working space | Dense forward/reverse CSR and stable floating reduction; hard 10,000-round ceiling. |
 | Vertex/edge betweenness | $`O(V(V+E))`$ time, $`O(V+E)`$ working space | Directed vertex Brandes or undirected canonical edge Brandes; preflight work budgets; serial source partitions are public. |
@@ -106,8 +108,8 @@ once, loop bodies twice, and a path set cuts malformed AST cycles.
 
 ## Benchmark coverage and remaining gaps
 
-Fourteen Criterion targets are active. Their twenty-five baseline operation groups are
-feature-free; `induction_analysis` also registers a twenty-sixth,
+Fifteen Criterion targets are active. Their twenty-six baseline operation groups are
+feature-free; `induction_analysis` also registers a twenty-seventh,
 `algorithm-detection`-gated operation. Every active group constructs and checks a deterministic oracle
 before Criterion enters the timed loop:
 
@@ -165,6 +167,9 @@ before Criterion enters the timed loop:
   paths and out-stars at 24/50 vertices and complete bidirected graphs at 16/30
   vertices. Exact binomial class/graphlet counts, conservation, and repeated
   evaluation are asserted before timing.
+- `ged` measures identical paths, fully relabeled isolates, and paths whose
+  complete edge kind changes at 16 and 48 nodes. Exact costs `0`, `n`, and
+  `n - 1` are asserted before timing.
 
 ```toml
 [[bench]]
@@ -222,6 +227,10 @@ harness = false
 [[bench]]
 name = "motifs"
 harness = false
+
+[[bench]]
+name = "ged"
+harness = false
 ```
 
 Run it directly, or save and compare named baselines:
@@ -243,6 +252,7 @@ cargo bench --bench cohesion --no-default-features
 cargo bench --bench spectral --no-default-features
 cargo bench --bench cycles --no-default-features
 cargo bench --bench motifs --no-default-features
+cargo bench --bench ged --no-default-features
 cargo bench --no-default-features --features algorithm-detection \
   --bench induction_analysis -- --test
 ```

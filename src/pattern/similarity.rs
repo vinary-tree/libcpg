@@ -5,7 +5,9 @@
 
 use rustc_hash::{FxHashMap, FxHashSet};
 
-use super::NodeKindTag;
+use super::ged::legacy_graph_edit_similarity;
+use super::{ged_upper_bound, GedOptions, NodeKindTag};
+use crate::analysis::wl::stable_wl_mix;
 use crate::{CodePropertyGraph, NodeId};
 
 /// Graph similarity calculator.
@@ -35,13 +37,19 @@ impl GraphSimilarity {
         self
     }
 
-    /// Sets the structural weight.
+    /// Sets the structural weight of the capped compatibility fallback.
+    ///
+    /// This value does not affect an uncapped [`SimilarityMetric::GraphEdit`]
+    /// result or any other metric.
     pub fn with_structural_weight(mut self, weight: f64) -> Self {
         self.structural_weight = weight;
         self
     }
 
-    /// Sets the label weight.
+    /// Sets the label weight of the capped compatibility fallback.
+    ///
+    /// This value does not affect an uncapped [`SimilarityMetric::GraphEdit`]
+    /// result or any other metric.
     pub fn with_label_weight(mut self, weight: f64) -> Self {
         self.label_weight = weight;
         self
@@ -148,27 +156,14 @@ impl GraphSimilarity {
         }
     }
 
-    /// Approximate graph edit distance similarity.
+    /// Bipartite graph-edit-distance similarity.
     fn graph_edit_similarity(&self, g1: &CodePropertyGraph, g2: &CodePropertyGraph) -> f64 {
-        // Use a simple approximation based on node/edge differences
-        let n1 = g1.node_count();
-        let n2 = g2.node_count();
-        let e1 = g1.edge_count();
-        let e2 = g2.edge_count();
-
-        let node_diff = (n1 as i64 - n2 as i64).unsigned_abs() as f64;
-        let edge_diff = (e1 as i64 - e2 as i64).unsigned_abs() as f64;
-
-        let max_nodes = n1.max(n2) as f64;
-        let max_edges = e1.max(e2).max(1) as f64;
-
-        // Combine structural similarity with label similarity
-        let node_sim = 1.0 - (node_diff / max_nodes.max(1.0));
-        let edge_sim = 1.0 - (edge_diff / max_edges);
-
-        // Weight structural similarity more
-        self.structural_weight * (0.6 * node_sim + 0.4 * edge_sim)
-            + self.label_weight * self.jaccard_similarity(g1, g2)
+        match ged_upper_bound(g1, g2, &GedOptions::default()) {
+            Ok(bound) if !bound.capped => 1.0 - bound.normalized,
+            Ok(_) | Err(_) => {
+                legacy_graph_edit_similarity(g1, g2, self.structural_weight, self.label_weight)
+            }
+        }
     }
 }
 
@@ -182,7 +177,7 @@ pub enum SimilarityMetric {
     Cosine,
     /// Weisfeiler-Lehman graph kernel.
     WeisfeilerLehman,
-    /// Approximate graph edit distance.
+    /// Deterministic bipartite graph-edit-distance upper-bound similarity.
     GraphEdit,
 }
 
@@ -250,16 +245,14 @@ fn graph_feature_vector(graph: &CodePropertyGraph) -> Vec<f64> {
 
 /// Computes Weisfeiler-Lehman labels for a graph.
 fn wl_labels(graph: &CodePropertyGraph, iterations: usize) -> FxHashMap<u64, usize> {
-    use std::collections::hash_map::DefaultHasher;
-    use std::hash::{Hash, Hasher};
-
-    // Initialize labels with node kind hashes
+    // Initialize labels with stable node-kind tags.
     let mut labels: FxHashMap<NodeId, u64> = graph
         .nodes()
         .map(|n| {
-            let mut hasher = DefaultHasher::new();
-            NodeKindTag::from_kind(&n.kind).hash(&mut hasher);
-            (n.id, hasher.finish())
+            (
+                n.id,
+                stable_wl_mix(0xABCD, NodeKindTag::from_kind(&n.kind) as u64),
+            )
         })
         .collect();
 
@@ -284,14 +277,12 @@ fn wl_labels(graph: &CodePropertyGraph, iterations: usize) -> FxHashMap<u64, usi
 
             neighbor_labels.sort_unstable();
 
-            // Hash current label + sorted neighbor labels
-            let mut hasher = DefaultHasher::new();
-            labels.get(&node.id).hash(&mut hasher);
+            // Combine current and sorted neighbor labels with the shared stable
+            // SplitMix-style kernel.
+            let mut new_label = stable_wl_mix(0x1234, labels[&node.id]);
             for nl in neighbor_labels {
-                nl.hash(&mut hasher);
+                new_label = stable_wl_mix(new_label, nl);
             }
-
-            let new_label = hasher.finish();
             new_labels.insert(node.id, new_label);
 
             *all_counts.entry(new_label).or_insert(0) += 1;
@@ -454,6 +445,34 @@ mod tests {
         assert!(wl > 0.9, "WL: {}", wl);
     }
 
+    #[test]
+    fn wl_histogram_has_cross_release_splitmix_regression_values() {
+        let mut graph = CodePropertyGraph::new(Language::Rust);
+        let root = graph.add_node(CpgNode::new(
+            NodeId::new(0),
+            CpgNodeKind::Root,
+            SourceRange::default(),
+        ));
+        let branch = graph.add_node(CpgNode::new(
+            NodeId::new(0),
+            CpgNodeKind::If,
+            SourceRange::default(),
+        ));
+        graph.connect(root, branch, CpgEdgeKind::AstChild);
+
+        assert_eq!(
+            wl_labels(&graph, 3),
+            FxHashMap::from_iter([
+                (0x51dc_f6dd_20e8_f9ad, 1),
+                (0xa2a8_a270_cfc3_7173, 1),
+                (0xddc4_179d_5787_02ca, 1),
+                (0xe84f_d257_a33d_2e24, 1),
+                (0x957e_a949_8ba7_aaf1, 2),
+                (0xc099_9937_bbac_32b5, 2),
+            ])
+        );
+    }
+
     // ==================== added coverage: example-based ====================
 
     /// The `GraphEdit` metric (the 4th metric) scores identical graphs as 1.0.
@@ -480,11 +499,10 @@ mod tests {
         );
     }
 
-    /// `with_structural_weight` / `with_label_weight` genuinely reshape the
-    /// `GraphEdit` score: the label term is exactly the Jaccard component, the
-    /// structural term is the node/edge-count blend, and the two disagree.
+    /// The edit bound supersedes legacy weights within its budget; retained
+    /// weights still control the explicitly capped compatibility fallback.
     #[test]
-    fn test_graph_edit_weights_affect_score() {
+    fn test_graph_edit_weights_only_affect_capped_fallback() {
         // g1: 2 nodes, 1 edge.
         let mut g1 = CodePropertyGraph::new(Language::Rust);
         let a = g1.add_node(CpgNode::new(
@@ -519,36 +537,48 @@ mod tests {
         g2.connect(c, d, CpgEdgeKind::AstChild);
         g2.connect(c, e, CpgEdgeKind::AstChild);
 
-        let jaccard = GraphSimilarity::new()
-            .with_metric(SimilarityMetric::Jaccard)
+        let default = GraphSimilarity::new()
+            .with_metric(SimilarityMetric::GraphEdit)
             .similarity(&g1, &g2);
-
-        // Label-only GraphEdit collapses to the Jaccard term.
-        let label_only = GraphSimilarity::new()
+        let altered = GraphSimilarity::new()
             .with_metric(SimilarityMetric::GraphEdit)
             .with_structural_weight(0.0)
             .with_label_weight(1.0)
             .similarity(&g1, &g2);
-        assert!(
-            (label_only - jaccard).abs() < 1e-9,
-            "label-only GraphEdit ({label_only}) should equal Jaccard ({jaccard})"
-        );
+        let bound = ged_upper_bound(&g1, &g2, &GedOptions::default()).expect("small GED");
+        assert!(!bound.capped);
+        assert_eq!(default, 1.0 - bound.normalized);
+        assert_eq!(altered, default, "uncapped GED ignores legacy weights");
 
-        // Structural-only GraphEdit = 0.6*node_sim + 0.4*edge_sim.
-        // node_sim = 1 - |2-3|/3 = 2/3 ; edge_sim = 1 - |1-2|/2 = 1/2.
-        let struct_only = GraphSimilarity::new()
+        let mut large_first = CodePropertyGraph::new(Language::Rust);
+        let mut large_second = CodePropertyGraph::new(Language::Rust);
+        for _ in 0..513 {
+            large_first.add_node(CpgNode::new(
+                NodeId::new(0),
+                CpgNodeKind::If,
+                SourceRange::default(),
+            ));
+        }
+        for _ in 0..514 {
+            large_second.add_node(CpgNode::new(
+                NodeId::new(0),
+                CpgNodeKind::While,
+                SourceRange::default(),
+            ));
+        }
+
+        let label_only = GraphSimilarity::new()
+            .with_metric(SimilarityMetric::GraphEdit)
+            .with_structural_weight(0.0)
+            .with_label_weight(1.0)
+            .similarity(&large_first, &large_second);
+        let structural_only = GraphSimilarity::new()
             .with_metric(SimilarityMetric::GraphEdit)
             .with_structural_weight(1.0)
             .with_label_weight(0.0)
-            .similarity(&g1, &g2);
-        let expected_struct = 0.6 * (2.0 / 3.0) + 0.4 * 0.5;
-        assert!(
-            (struct_only - expected_struct).abs() < 1e-9,
-            "structural-only GraphEdit ({struct_only}) != expected ({expected_struct})"
-        );
-
-        // The two weightings disagree, so the weights genuinely matter.
-        assert!((struct_only - label_only).abs() > 1e-9);
+            .similarity(&large_first, &large_second);
+        assert_eq!(label_only, 0.0, "disjoint label bags");
+        assert!(structural_only > 0.99, "near-equal node counts");
     }
 
     /// All four metrics are reflexive (1.0) on a non-empty graph and stay within

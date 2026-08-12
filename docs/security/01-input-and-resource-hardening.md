@@ -44,6 +44,7 @@ Source: [`diagrams/resource-bounds.puml`](../diagrams/resource-bounds.puml).*
 | `MAX_ATTACK_STEPS` | `10_000` hard maximum | `attack_simulation` | rejects an excessive step request; an intentional shorter prefix is explicitly marked `truncated` |
 | `MAX_CYCLE_LENGTH` / `MAX_SIMPLE_CYCLES` | `32` / `100_000` hard maxima | `simple_cycles` | clamps path depth and retained count; stops inside DFS at the first over-cap unique cycle and returns that omitted witness |
 | `MAX_TRIAD_NODES` / `MAX_GRAPHLET_NODES` | `512` / `50` hard maxima | `motif_census` | rejects before cubic/quartic enumeration with `AnalysisError::BudgetExceeded`; never returns a partial census |
+| `MAX_GED_NODES` | `512` hard maximum | `ged_upper_bound`; `SimilarityMetric::GraphEdit` | bounds the cubic Hungarian matrix; direct results set `capped = true` and clearly label the linear compatibility fallback |
 | Loop-induction structural bounds | at most `candidate_count + 1` invariant rounds per loop; affine depth `3` | `loop_induction` | reaches a finite fixed point; malformed AST cycles are cut by visited sets and arithmetic overflow becomes unknown evidence |
 | Complexity-evidence bounds | validated finite function scope plus loop/induction provider bounds | `estimate_time_complexity_with_evidence` (feature `algorithm-detection`) | provider failure or absent CFG evidence returns the exact legacy total estimate; justification grows with loop count |
 
@@ -419,6 +420,28 @@ input-dependent recursion. Hosts should still choose smaller limits when their
 latency budget cannot tolerate exhaustive `O(n³ + n⁴)` work. Motif frequencies
 are advisory structural evidence and must not independently authorize code
 changes, isolation, or access-control decisions.
+
+## Graph-edit distance: cubic assignment cap
+
+[`ged_upper_bound`](../components/patterns/ged-analysis.md) constructs a square
+matrix of side $`|V_1|+|V_2|`$ and runs cubic Hungarian assignment twice. The
+effective per-input limit is `min(GedOptions::max_nodes, MAX_GED_NODES)`, where
+`MAX_GED_NODES = 512`. This limit prevents an untrusted caller from requesting
+an arbitrarily large quadratic allocation or cubic solve. Hosts with tighter
+latency or memory budgets should choose a smaller `max_nodes`.
+
+When either input exceeds the effective limit, the API does not allocate the
+matrix. It returns the linear legacy size/Jaccard compatibility distance and
+sets `GedBound::capped = true`. The facade `SimilarityMetric::GraphEdit`
+remains total, but it does not expose that bit; security-sensitive callers must
+use `ged_upper_bound` directly and reject capped evidence.
+
+All costs are checked for finiteness and nonnegativity, and derived
+normalization/matrix arithmetic is checked before assignment. This prevents
+NaN, infinity, negative-cost cycles, and overflow from masquerading as valid
+distances. An uncapped GED upper bound remains advisory: node equality uses
+coarse `NodeKindTag` labels, and the bipartite mapping is approximate. It must
+not independently authorize a code change or suppress a security finding.
 
 ## Loop induction: finite structural bounds
 

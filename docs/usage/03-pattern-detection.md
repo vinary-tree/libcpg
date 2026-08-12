@@ -2,7 +2,7 @@
 
 libcpg finds recurring structures in a CPG in three complementary ways. Before any code, fix one distinction that the API makes and the documentation never blurs:
 
-- **`pattern`** (singular, module `libcpg::pattern`) is **always compiled**. It provides the general [VF2](../GLOSSARY.md#vf2) [subgraph-isomorphism](../GLOSSARY.md#isomorphism--subgraph-isomorphism) matcher and the [graph-similarity](../GLOSSARY.md#similarity-metric) metrics. No feature flag required.
+- **`pattern`** (singular, module `libcpg::pattern`) is **always compiled**. It provides the general [VF2](../GLOSSARY.md#vf2) [subgraph-isomorphism](../GLOSSARY.md#isomorphism--subgraph-isomorphism) matcher, [graph-similarity](../GLOSSARY.md#similarity-metric) metrics, and configurable bipartite [GED](../GLOSSARY.md#graph-edit-distance). No feature flag required.
 - **`patterns`** (plural, module `libcpg::patterns`) is **gated behind the `design-patterns` feature**. It provides the [Gang-of-Four](../GLOSSARY.md#gang-of-four-gof) detector, the DPML template language, and the feature-vector classifier.
 
 They are different modules for different jobs. The three approaches, from most general to most specialised:
@@ -10,6 +10,7 @@ They are different modules for different jobs. The three approaches, from most g
 | Approach | Module | Feature | Best for |
 |----------|--------|---------|----------|
 | VF2 subgraph isomorphism | `pattern::Vf2Matcher` | none (always on) | Any structural motif you can express as a small graph |
+| Graph-edit upper bound | `pattern::ged_upper_bound` | none (always on) | Typed whole-graph change cost with explicit budget evidence |
 | GoF template detection | `patterns::GofPatternDetector` | `design-patterns` | The 23 classic [design patterns](../GLOSSARY.md#design-pattern) |
 | Feature-vector classifier | `patterns::PatternClassifier` | `design-patterns` (+ `ml-linfa` for ML mode) | Class-level pattern labelling from numeric features |
 
@@ -131,6 +132,43 @@ fn find_class_with_field(target: &CodePropertyGraph) -> usize {
 ```
 
 The constraint vocabulary (`NodeKindMatcher`, `NodeKindTag`, `EdgeKindMatcher`) and the [similarity](../GLOSSARY.md#similarity-metric) metrics that complement VF2 are documented in [VF2 Matching](../components/patterns/vf2-matching.md).
+
+---
+
+## Comparing whole graphs with GED (feature-free)
+
+Use `ged_upper_bound` when you need inspectable edit costs rather than an exact
+subgraph occurrence. `GraphEdit` uses the same default bound as a score, but
+the direct call exposes whether the 512-node resource cap selected the legacy
+compatibility fallback.
+
+```rust
+use libcpg::pattern::{ged_upper_bound, GedOptions};
+use libcpg::CodePropertyGraph;
+
+fn compare(
+    first: &CodePropertyGraph,
+    second: &CodePropertyGraph,
+) -> Result<f64, libcpg::AnalysisError> {
+    let options = GedOptions {
+        node_sub: 2.0,
+        node_ins_del: 1.0,
+        edge_ins_del: 0.25,
+        max_nodes: 256,
+    };
+    let result = ged_upper_bound(first, second, &options)?;
+    if result.capped {
+        eprintln!("GED budget exceeded; compatibility distance returned");
+    }
+    Ok(result.normalized)
+}
+```
+
+Within the budget, the result prices a concrete edit script over node-kind
+tags and typed directed edges. Parallel edges count independently. The result
+is deterministic and symmetric. For scientific or security decisions, require
+`capped == false`; a capped value is not a proven GED upper bound. See
+[bipartite GED](../components/patterns/ged-analysis.md) for the full contract.
 
 ---
 

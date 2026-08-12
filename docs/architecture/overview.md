@@ -102,7 +102,7 @@ libcpg is a small set of modules; four are always compiled, the rest are feature
 
 These are two different modules with confusingly close names:
 
-- **`pattern`** (singular, **always compiled**) is *generic subgraph isomorphism and graph similarity*. It knows nothing about design patterns — it matches an arbitrary pattern graph against a target graph with VF2, and scores graph likeness with Jaccard/cosine/Weisfeiler-Lehman/graph-edit metrics.
+- **`pattern`** (singular, **always compiled**) is *generic subgraph isomorphism and graph similarity*. It knows nothing about design patterns — it matches arbitrary pattern graphs with VF2 and scores whole graphs with Jaccard/cosine/stable Weisfeiler-Lehman or a configurable bounded bipartite GED upper bound.
 - **`patterns`** (plural, gated by `design-patterns`) is *Gang-of-Four design-pattern detection*. It builds on `pattern`: `GofPatternDetector` runs a **relaxed** `Vf2Matcher` (category-level kind/edge matching) against each GoF template and scores [confidence](../GLOSSARY.md#confidence-pattern-match) by template completeness.
 
 So VF2 matching is available with `default = []`; GoF detection requires `--features design-patterns`. The full detection surface is documented in [`../components/patterns/overview.md`](../components/patterns/overview.md) and [`../api/pattern-reference.md`](../api/pattern-reference.md).

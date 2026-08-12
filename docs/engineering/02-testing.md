@@ -22,7 +22,7 @@ think to write down.
 
 | Kind | Count | Where |
 | --- | ---: | --- |
-| Maximal-matrix library tests | 736 | inline `#[cfg(test)] mod …` next to the code; includes examples and properties |
+| Maximal-matrix library tests | 745 | inline `#[cfg(test)] mod …` next to the code; includes examples and properties |
 | Public-API integration tests | 21 | `tests/integration.rs` |
 | Malformed-input robustness tests | 5 | `tests/robustness.rs` |
 | SCCP public/parser integration tests | 3 | `tests/sccp_integration.rs` |
@@ -38,8 +38,9 @@ think to write down.
 | Spectral public/parser integration tests | 2 | `tests/spectral_integration.rs` |
 | Cycle public/parser integration tests | 2 | `tests/cycles_integration.rs` |
 | Motif public/parser integration tests | 2 | `tests/motifs_integration.rs` |
-| **Executable test cases** | **791** | excludes three ignored rustdoc examples |
-| `proptest!` blocks (subset of the library/robustness rows) | 55 | exact source-level macro count in `src/` and `tests/` |
+| GED public/parser integration tests | 2 | `tests/ged_integration.rs` |
+| **Executable test cases** | **802** | excludes three ignored rustdoc examples |
+| `proptest!` blocks (subset of the library/robustness rows) | 56 | exact source-level macro count in `src/` and `tests/` |
 
 The maximal-matrix library count is up from **99** inline tests and **zero**
 property tests before this work.
@@ -57,16 +58,16 @@ on the features enabled:
 
 | Command | Lib tests | Notes |
 | --- | ---: | --- |
-| `cargo test` | 429 | `default = []`: the feature-free surface only |
-| `cargo test --features "full rholang metta"` | 736 | the maximal matrix, including the Mode-B mappers and evidence-aware complexity |
+| `cargo test` | 436 | `default = []`: the feature-free surface only |
+| `cargo test --features "full rholang metta"` | 745 | the maximal matrix, including the Mode-B mappers and evidence-aware complexity |
 
 The feature-free 429 exercise the graph model, exact dominator/post-dominator,
 natural-loop, monotone data-flow, variable-liveness/dead-store,
 available/very-busy-expression, SCCP, interval value-range, CFG/call-graph
 SCC analyses, condensation-DAG analytics, DSM visibility/core–periphery, WL
 structural-clone, centrality, community, cohesion/robustness,
-spectral-connectivity classification, bounded simple cycles, directed motifs, the CFG/DFG/PDG
-extractors, VF2, and similarity by building CPGs
+spectral-connectivity classification, bounded simple cycles, directed motifs,
+bipartite GED, the CFG/DFG/PDG extractors, VF2, and similarity by building CPGs
 **by hand** — no grammar required. This is what
 the [`arb_well_formed_cpg`](#the-generators) generator exists for.
 
@@ -154,7 +155,7 @@ The invariants fall into complementary families.
 | **Call resolution** | resolution records and call edges are invariant under node/edge insertion permutations; duplicate names add zero call topology and preserve the SCC partition; repeated resolution is idempotent; candidate/call caps preserve the evidence boundary |
 | **Idempotency** | a second `CfgExtractor::extract` / `DfgExtractor::extract` / `PdgBuilder::build` adds no edges |
 | **Slicing** | $`\lvert S\rvert \le \mathit{max\_nodes}`$; the criterion is in its own backward slice; $`\mathit{max\_nodes} = 0 \Rightarrow S = \varnothing`$; $`S`$ is monotone in $`\mathit{max\_nodes}`$; every sliced id is a real node |
-| **Matching & similarity** | VF2 embeddings are injective, kind-consistent, and edge-preserving; relaxed matching $`\supseteq`$ strict; all four metrics land in $`[0,1]`$, are symmetric, and are maximal on self-comparison |
+| **Matching, similarity, and GED** | VF2 embeddings are injective, kind-consistent, and edge-preserving; relaxed matching $`\supseteq`$ strict; all four metrics land in $`[0,1]`$, are symmetric, and are maximal on self-comparison; Hungarian assignments equal brute-force permutations through order seven; 128 generated graph pairs through six nodes produce deterministic symmetric concrete-script bounds no smaller than exhaustive exact GED; examples cover typed multiedges, stable ids, caps, invalid numerics, serde, public/parser composition, robustness, stable WL hash vectors, and non-mutation |
 | **Ordering & confidence** | `ComplexityClass::is_better_than` is a strict order (irreflexive, asymmetric, transitive); complexity is monotone in loop nesting; every detector's results are sorted by descending confidence and clear its `min_confidence` |
 | **Complexity evidence** | fully counted reducible depth maps to the exact polynomial degree; opposite storage orders produce identical class/confidence/justification; every generated CFG-free function returns the exact legacy estimate; fixed examples decide unknown-trip and irreducible confidence precedence, provenance, recursion composition, public parsing, and graph non-mutation |
 | **DSM visibility / architecture roles** | repeated-BFS VFO/VFI vectors and propagation cost equal an independent Floyd–Warshall closure; the largest multi-vertex SCC equals an independent mutual-reachability partition; reversed enumeration and duplicate edges preserve reports; examples cover chain/cycle/hub/isolates, equal-core ties, caps, malformed CSR/reverse data, cross-projection provenance, serde, public construction, parser integration, and graph non-mutation |
@@ -286,12 +287,12 @@ cargo +nightly cov-branch           # branch coverage needs nightly
 
 | Metric | Coverage | Lowest file |
 | --- | ---: | --- |
-| Lines | **98.10 %** | 91.67 % (`language.rs`) |
-| Regions | **98.02 %** | — |
-| Functions | **98.33 %** | — |
-| Branches | **86.30 %** | see below |
+| Lines | **98.14 %** | 91.67 % (`language.rs`) |
+| Regions | **98.06 %** | — |
+| Functions | **98.38 %** | — |
+| Branches | **86.55 %** | see below |
 
-Every source file is above 90 % line coverage; twenty are at 100 %.
+Every source file is above 90 % line coverage; twenty-one are at 100 %.
 The `analysis/dominators.rs` module measures **97.50 %** line and
 **81.25 %** branch coverage, above the epic's 90 % / 80 % thresholds.
 The new `analysis/resolve.rs` module measures **98.99 %** line and
@@ -387,6 +388,12 @@ graphlet fixtures, public/parser boundaries, and six benchmark cases; see
 [`scientific/17-motif-census-validation.md`](../scientific/17-motif-census-validation.md).
 It measures **100.00%** line, **100.00%** region, **100.00%** function, and
 **100.00%** branch coverage in the clean maximal matrix.
+The GED module is evaluated against exhaustive assignment and exact-edit
+oracles, named typed-edit/cap/numeric fixtures, public/parser boundaries, the
+malformed-input harness, stable WL vectors, and six benchmark cases; see
+[`scientific/18-ged-validation.md`](../scientific/18-ged-validation.md).
+It measures **99.83%** line, **99.28%** region, **100.00%** function, and
+**93.33%** branch coverage in the clean maximal matrix.
 All figures come from clean maximal-matrix coverage runs; no focused-test
 figure is substituted for the repository gate.
 
@@ -421,7 +428,7 @@ dependencies and are not part of the `full` feature set.
 | --- | --- |
 | `examples/` directory | present but **empty** — no runnable `cargo run --example …` programs. |
 | Doctests | none run — every code fence in a doc comment is marked `ignore` / `rust,ignore`, so `cargo test --doc` executes nothing. Feature-gating individual doctests in a `default = []` crate is awkward; the snippets are instead validated by the documentation snippet-check harness. |
-| Benchmarks | Fourteen active Criterion targets cover SCC paths/rings/clusters, condensation paths/independent chains with and without CG layering, graph-arena paths, bounded VF2 paths, liveness chains/diamond ladders/nested loops, counted-loop induction regions, DSM paths/rings, WL rings/stars, centrality paths/rings/clusters, Louvain rings of cliques, disconnected-community refinement, cohesion lattices/clique chains/weighted seams/star attacks, spectral stars/complete-bipartite/disconnected-star families, bounded cycles over acyclic paths/disjoint triangles/dense digraphs, motif censuses over paths/bidirected cliques/out-stars, and—under `algorithm-detection`—complexity evidence on the counted-loop fixtures. Each active group asserts a deterministic oracle before timing; see [performance](03-performance.md). |
+| Benchmarks | Fifteen active Criterion targets cover SCC paths/rings/clusters, condensation paths/independent chains with and without CG layering, graph-arena paths, bounded VF2 paths, liveness chains/diamond ladders/nested loops, counted-loop induction regions, DSM paths/rings, WL rings/stars, centrality paths/rings/clusters, Louvain rings of cliques, disconnected-community refinement, cohesion lattices/clique chains/weighted seams/star attacks, spectral stars/complete-bipartite/disconnected-star families, bounded cycles over acyclic paths/disjoint triangles/dense digraphs, motif censuses over paths/bidirected cliques/out-stars, GED over identical/relabelled/retyped graphs, and—under `algorithm-detection`—complexity evidence on the counted-loop fixtures. Each active group asserts a deterministic oracle before timing; see [performance](03-performance.md). |
 | `ml-linfa`, `gpu` | not exercised: optional heavy dependencies outside the `full` feature set. |
 
 ## Related pages

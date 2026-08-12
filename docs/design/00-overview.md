@@ -66,8 +66,9 @@ alternatives is folklore, and a decision without its costs is marketing.
 | [0020 — Deterministic bounded spectral analysis](0020-deterministic-bounded-spectral-analysis.md) | Compute combinatorial-Laplacian algebraic connectivity and a stable Fiedler sign split with exact disconnected handling, bounded sparse iteration, and explicit residual evidence. | Accepted |
 | [0021 — Deterministic bounded cycle enumeration](0021-deterministic-bounded-cycle-enumeration.md) | Reuse projection SCCs for canonical directed cycle witnesses with hard length/count ceilings and a concrete first-omission boundary. | Accepted |
 | [0022 — Complete bounded directed-motif census](0022-deterministic-motif-census.md) | Classify all sixteen directed triads with dense bit rows and return typed errors instead of silently omitted graphlets. | Accepted |
+| [0023 — Deterministic bounded bipartite GED](0023-deterministic-bipartite-ged.md) | Select a stable node correspondence with Hungarian assignment, price a concrete typed edit script, and expose the hard-cap fallback. | Accepted |
 
-These twenty-two are not independent. ADR-0001 fixes the substrate that all analyses
+These twenty-three are not independent. ADR-0001 fixes the substrate that all analyses
 write onto; ADR-0002 and ADR-0005 together explain how a language reaches that
 substrate and what you must switch on to get there; ADR-0003 and ADR-0004 are
 two analyses *over* the substrate (one always-on, one feature-gated) that each
@@ -110,6 +111,9 @@ ADR-0021 preserves directed topology and reuses the shared SCC substrate to
 bound canonical concrete cycle evidence. ADR-0022 also preserves direction,
 but fixes a complete tricode taxonomy, dense bounded adjacency, and explicit
 all-or-error semantics for combinatorial motif work.
+ADR-0023 keeps whole-graph similarity feature-free but replaces a count blend
+with a deterministic concrete edit-script upper bound and an explicit capped
+compatibility state.
 
 ![Module architecture of libcpg, showing the graph core and the analysis modules layered over it](../diagrams/module-architecture.svg)
 

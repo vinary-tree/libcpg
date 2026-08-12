@@ -92,6 +92,7 @@ Grouped by subject. Each row: the source (its `.svg` sibling is embedded by the 
 | `vf2-pattern-target.dot` | graph | Pattern vs target with one embedding | theory/05, api/pattern-reference, components/patterns/vf2-matching, scientific/03 |
 | `vf2-diamond.dot` | graph | Diamond target, exactly two embeddings | components/patterns/vf2-matching, scientific/03 |
 | `similarity-metrics.puml` | mindmap | Jaccard / Cosine / WL / GraphEdit | theory/06, components/patterns/vf2-matching |
+| `ged-pipeline.puml` | activity | Budgeted star costs → Hungarian assignment → concrete typed edit scripts → symmetric normalized bound | theory/06, components/patterns/ged-analysis |
 | `wl-kernel.dot` | graph | Weisfeiler-Lehman label refinement | theory/06, components/patterns/vf2-matching |
 | `pattern-detection-pipeline.puml` | activity | GoF detect: template → relaxed VF2 → confidence | theory/07, design/0004, components/patterns/overview, usage/03 |
 | `gof-taxonomy.puml` | mindmap | 23 GoF patterns by category | theory/07, api/pattern-reference, components/patterns/gang-of-four |

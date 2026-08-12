@@ -253,3 +253,7 @@ harness = false
 [[bench]]
 name = "motifs"
 harness = false
+
+[[bench]]
+name = "ged"
+harness = false

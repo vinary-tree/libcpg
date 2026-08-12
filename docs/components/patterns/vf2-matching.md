@@ -281,7 +281,7 @@ let score = GraphSimilarity::new()                  // structural/label weights 
     .similarity(&cpg_a, &cpg_b);
 ```
 
-![Four similarity metrics — Jaccard, Cosine, Weisfeiler-Lehman, and approximate graph edit — each mapping a pair of graphs to a score in the unit interval.](../../diagrams/similarity-metrics.svg)
+![Four similarity metrics — Jaccard, Cosine, Weisfeiler-Lehman, and bounded bipartite graph edit — each mapping a pair of graphs to a score in the unit interval.](../../diagrams/similarity-metrics.svg)
 
 *Figure — the four `SimilarityMetric` strategies and what each compares. Source: [`diagrams/similarity-metrics.puml`](../../diagrams/similarity-metrics.puml).*
 
@@ -292,7 +292,7 @@ The four metrics:
 | `Jaccard` *(default)* | multisets of node kinds | fastest; overlap of node-kind histograms |
 | `Cosine` | a 9-feature graph vector | node/edge counts, AST/CFG/DFG edge ratios, function/class counts, depth, complexity |
 | `WeisfeilerLehman` | refined-label histograms | 3 refinement iterations; cosine over the label counts |
-| `GraphEdit` | node/edge count deltas + Jaccard | approximate; the *only* metric that reads the weights |
+| `GraphEdit` | concrete typed edit script selected by bipartite assignment | cubic through 512 nodes; flagged linear fallback above the cap |
 
 **Jaccard** takes the [Jaccard index](../../GLOSSARY.md#jaccard-similarity) of the two
 node-kind multisets $`A`$ and $`B`$:
@@ -313,18 +313,21 @@ structure that a flat node-kind count misses.
 
 *Figure — one Weisfeiler-Lehman refinement round rewrites every node's label from its neighbourhood. Source: [`diagrams/wl-kernel.dot`](../../diagrams/wl-kernel.dot).*
 
-A precision note on the weights: `GraphSimilarity::new()` sets `structural_weight = 0.7`
-and `label_weight = 0.3`, but these are consulted **only** by the `GraphEdit` metric, which
-blends a structural term (node/edge count agreement) with a label term (Jaccard). The
-`Jaccard`, `Cosine`, and `WeisfeilerLehman` metrics return their score directly and ignore
-the weights. The deeper theory of all four metrics lives in
-[graph similarity](../../theory/06-graph-similarity.md).
+`GraphEdit` computes `1 - normalized` from the deterministic
+[`ged_upper_bound`](ged-analysis.md). Within its budget it prices node-tag
+substitutions and typed directed-edge multiset edits under a Hungarian-selected
+correspondence. Above the effective 512-node cap it preserves the former
+size/Jaccard score as an explicitly flagged compatibility path. The legacy
+`structural_weight = 0.7` and `label_weight = 0.3` builders affect only that
+fallback; all other metrics and uncapped GED ignore them. The deeper theory of
+all four metrics lives in [graph similarity](../../theory/06-graph-similarity.md).
 
 ## See also
 
 - [Pattern detection overview](overview.md) — where VF2 sits among the four approaches.
 - [Gang-of-Four patterns](gang-of-four.md) — relaxed VF2 applied to 23 templates.
 - [DPML templates](dpml.md) — authoring pattern graphs in YAML/TOML.
+- [Bipartite GED](ged-analysis.md) — configurable costs, bounds, and caps.
 - Theory: [subgraph isomorphism & VF2](../../theory/05-subgraph-isomorphism-vf2.md),
   [graph similarity](../../theory/06-graph-similarity.md).
 - API: [pattern reference](../../api/pattern-reference.md).
@@ -333,3 +336,5 @@ the weights. The deeper theory of all four metrics lives in
 
 4. Cordella, L. P., Foggia, P., Sansone, C., Vento, M. (2004). *A (Sub)graph Isomorphism Algorithm for Matching Large Graphs.* IEEE TPAMI 26(10). DOI: [10.1109/TPAMI.2004.75](https://doi.org/10.1109/TPAMI.2004.75)
 9. Shervashidze, N., Schweitzer, P., van Leeuwen, E. J., Mehlhorn, K., Borgwardt, K. M. (2011). *Weisfeiler-Lehman Graph Kernels.* JMLR 12. Open access: <https://jmlr.org/papers/v12/shervashidze11a.html> (no DOI). Original method: Weisfeiler, B., Leman, A. (1968).
+10. Riesen, K., Bunke, H. (2009). *Approximate Graph Edit Distance Computation by Means of Bipartite Graph Matching.* DOI: [10.1016/j.imavis.2008.04.004](https://doi.org/10.1016/j.imavis.2008.04.004)
+11. Kuhn, H. W. (1955). *The Hungarian Method for the Assignment Problem.* DOI: [10.1002/nav.3800020109](https://doi.org/10.1002/nav.3800020109)

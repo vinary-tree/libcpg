@@ -383,7 +383,13 @@ The four authors of *Design Patterns* [[11]](#references) and, by metonymy, the 
 
 ### Graph edit distance
 
-The minimum number of node/edge insertions, deletions, and relabellings that turn one graph into another — a similarity measure `libcpg` approximates in the `GraphEdit` [similarity metric](#similarity-metric). Exact graph edit distance is NP-hard, so an approximate blend is used. See [`theory/06-graph-similarity.md`](theory/06-graph-similarity.md).
+The minimum cost of node/edge insertions, deletions, and substitutions that
+turn one graph into another. `libcpg::pattern::ged_upper_bound` uses
+Riesen–Bunke bipartite node assignment [[35a]](#references) solved by the
+Hungarian method [[35b]](#references), then prices the induced concrete typed
+edit script. Within 512 nodes per input it returns a symmetric upper bound;
+beyond the cap it marks a legacy compatibility distance with `capped = true`.
+See [`components/patterns/ged-analysis.md`](components/patterns/ged-analysis.md).
 
 ### Graph Neural Network (GNN)
 
@@ -616,7 +622,12 @@ A symbolic expression: either an atom or a parenthesised list of S-expressions �
 
 ### Similarity metric
 
-The strategy `GraphSimilarity` uses to score two graphs' likeness: `SimilarityMetric::Jaccard` (default), `Cosine`, `WeisfeilerLehman`, or `GraphEdit`. Scores blend a structural component (weight `0.7`) and a label component (weight `0.3`). See [`theory/06-graph-similarity.md`](theory/06-graph-similarity.md).
+The strategy `GraphSimilarity` uses to score two graphs' likeness:
+`SimilarityMetric::Jaccard` (default), `Cosine`, `WeisfeilerLehman`, or
+`GraphEdit`. The first three use their own direct signals. `GraphEdit` is one
+minus the normalized bipartite [GED](#graph-edit-distance) upper bound within
+its budget; structural/label weights are retained only for its capped legacy
+fallback. See [`theory/06-graph-similarity.md`](theory/06-graph-similarity.md).
 
 ### Sparse conditional constant propagation (SCCP)
 
@@ -765,3 +776,4 @@ used by the complexity analyzer to classify recursive functions (e.g. $`a = b = 
 32. Spectral foundations: (**32a**) Fiedler, M. (1973). *Algebraic Connectivity of Graphs.* DOI: [10.21136/CMJ.1973.101168](https://doi.org/10.21136/CMJ.1973.101168). (**32b**) Shi, J., Malik, J. (2000). *Normalized Cuts and Image Segmentation.* DOI: [10.1109/34.868688](https://doi.org/10.1109/34.868688).
 33. Johnson, D. B. (1975). *Finding All the Elementary Circuits of a Directed Graph.* SIAM Journal on Computing 4(1), 77–84. DOI: [10.1137/0204007](https://doi.org/10.1137/0204007).
 34. Directed-motif foundations: (**34a**) Holland, P. W., Leinhardt, S. (1970). *A Method for Detecting Structure in Sociometric Data.* American Journal of Sociology 76(3), 411–432. DOI: [10.1086/224954](https://doi.org/10.1086/224954). (**34b**) Batagelj, V., Mrvar, A. (2001). *A subquadratic triad census algorithm for large sparse networks with small maximum degree.* DOI: [10.1016/S0378-8733(01)00035-1](https://doi.org/10.1016/S0378-8733(01)00035-1). (**34c**) Milo, R. et al. (2002). *Network Motifs: Simple Building Blocks of Complex Networks.* DOI: [10.1126/science.298.5594.824](https://doi.org/10.1126/science.298.5594.824).
+35. Graph-edit assignment foundations: (**35a**) Riesen, K., Bunke, H. (2009). *Approximate Graph Edit Distance Computation by Means of Bipartite Graph Matching.* DOI: [10.1016/j.imavis.2008.04.004](https://doi.org/10.1016/j.imavis.2008.04.004). (**35b**) Kuhn, H. W. (1955). *The Hungarian Method for the Assignment Problem.* DOI: [10.1002/nav.3800020109](https://doi.org/10.1002/nav.3800020109).

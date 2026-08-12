@@ -1,0 +1,53 @@
+@startuml
+title Bounded bipartite graph-edit-distance upper bound
+
+skinparam backgroundColor #FCFCFC
+skinparam activity {
+  BackgroundColor #E8F1FB
+  BorderColor #28527A
+  FontColor #172B4D
+  DiamondBackgroundColor #FFF3CD
+  DiamondBorderColor #8A6D1D
+}
+skinparam note {
+  BackgroundColor #F2F8F2
+  BorderColor #3D7A4A
+}
+
+start
+:Borrow two CodePropertyGraphs\nand validate finite nonnegative costs;
+:Compute delete-all/insert-all cost\n<latex>U_0=(|V_1|+|V_2|)c_v+(|E_1|+|E_2|)c_e</latex>;
+
+if (Either input exceeds\neffective 512-node cap?) then (yes)
+  :Return legacy size/Jaccard distance;
+  :Set capped = true;
+  note right
+    Compatibility result only:
+    not a proven GED upper bound.
+  end note
+  stop
+else (no)
+endif
+
+fork
+  :Order G1 and G2 nodes by NodeId;
+  :Build star-cost matrix\nwith substitution and dummy slots;
+  :Run deterministic Hungarian assignment;
+  :Price concrete G1 -> G2 script\nover node tags and typed edge multisets;
+fork again
+  :Order G2 and G1 nodes by NodeId;
+  :Build reverse star-cost matrix;
+  :Run deterministic Hungarian assignment;
+  :Price concrete G2 -> G1 script;
+end fork
+
+:Retain minimum of forward, reverse,\nand delete-all/insert-all scripts;
+:Normalize <latex>\hat U=U/U_0</latex> in <latex>[0,1]</latex>;
+:Return upper, normalized, capped = false;
+note right
+  Every candidate is a concrete script:
+  <latex>d^*(G_1,G_2) \le U \le U_0</latex>
+  GraphEdit similarity = <latex>1-\hat U</latex>
+end note
+stop
+@enduml

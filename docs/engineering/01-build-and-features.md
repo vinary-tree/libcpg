@@ -77,8 +77,9 @@ condensation-DAG critical-path and width-bounded layering analytics, projection
 centrality, bounded multi-level community detection, and deterministic bounded
 cohesion/robustness analysis, plus bounded algebraic connectivity and Fiedler
 partitioning, SCC-pruned bounded simple-cycle enumeration, and complete bounded
-directed-motif census. Note the
-deliberate distinction between the always-on `pattern` module (VF2 / similarity) and
+directed-motif census. The always-on `pattern` module additionally supplies
+bounded bipartite GED and its `GraphEdit` facade. Note the deliberate
+distinction between `pattern` (VF2 / similarity / GED) and
 the feature-gated `patterns` module (Gang-of-Four detection) — they are different
 modules, not a typo.
 

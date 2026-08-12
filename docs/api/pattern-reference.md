@@ -26,6 +26,7 @@ use libcpg::{PatternMatch, SubgraphMatcher};
 // …the rest of pattern:: needs the full path:
 use libcpg::pattern::{
     Vf2Matcher, Vf2State, GraphSimilarity, SimilarityMetric,
+    ged_upper_bound, GedBound, GedOptions, MAX_GED_NODES,
     PatternTemplate, NodeConstraint, EdgeConstraint,
     NodeKindMatcher, NodeKindTag, EdgeKindMatcher,
 };
@@ -230,6 +231,39 @@ let template = PatternTemplate::new("Singleton", "class + field")
 let pattern_cpg = template.to_pattern_graph(); // feed to Vf2Matcher::find_matches
 ```
 
+### `ged_upper_bound`, `GedOptions`, and `GedBound`
+
+Feature-free configurable graph-edit-distance (GED) upper bound:
+
+```rust
+pub fn ged_upper_bound(
+    first: &CodePropertyGraph,
+    second: &CodePropertyGraph,
+    options: &GedOptions,
+) -> Result<GedBound, AnalysisError>;
+
+pub struct GedOptions {
+    pub node_sub: f64,       // default 1.0
+    pub node_ins_del: f64,   // default 1.0
+    pub edge_ins_del: f64,   // default 0.5
+    pub max_nodes: usize,    // default MAX_GED_NODES = 512
+}
+
+pub struct GedBound {
+    pub upper: f64,
+    pub normalized: f64,
+    pub capped: bool,
+}
+```
+
+Within the effective node budget, `upper` prices a concrete node/tag and typed
+directed-edge edit script selected by deterministic Hungarian assignment.
+`normalized` is in $`[0,1]`$, and the bound is symmetric. When either input
+exceeds `min(options.max_nodes, MAX_GED_NODES)`, `capped` is `true` and the
+numeric fields carry the legacy compatibility surrogate, not a proven GED
+bound. Costs must be finite and nonnegative. See the
+[GED component guide](../components/patterns/ged-analysis.md).
+
 ### `GraphSimilarity` & `SimilarityMetric`
 
 Whole-graph [similarity](../GLOSSARY.md#similarity-metric) scoring. Fields are
@@ -242,7 +276,7 @@ pub struct GraphSimilarity { /* private: metric, structural_weight, label_weight
 
 | Method | Signature | Notes |
 |--------|-----------|-------|
-| `new` | `fn new() -> Self` | Jaccard, weights `0.7`/`0.3`. |
+| `new` | `fn new() -> Self` | Jaccard; compatibility-fallback weights `0.7`/`0.3`. |
 | `with_metric` | `fn with_metric(self, metric: SimilarityMetric) -> Self` | Choose the metric. |
 | `with_structural_weight` | `fn with_structural_weight(self, weight: f64) -> Self` | Structural weight. |
 | `with_label_weight` | `fn with_label_weight(self, weight: f64) -> Self` | Label weight. |
@@ -256,9 +290,10 @@ node-kind multisets is
 J(A, B) = \frac{|A \cap B|}{|A \cup B|}
 ```
 
-`WeisfeilerLehman` refines node labels over 3 iterations; `GraphEdit`
-approximates edit distance and blends structural (`structural_weight`) and label
-(`label_weight`) components. Only `GraphEdit` currently consults the two weights.
+`WeisfeilerLehman` refines node labels over 3 iterations with a fixed
+SplitMix-style combiner. `GraphEdit` returns one minus the default normalized
+uncapped GED bound. The structural and label weights are retained only for the
+explicitly capped compatibility fallback; they do not change uncapped GED.
 
 ```rust
 // requires: no features

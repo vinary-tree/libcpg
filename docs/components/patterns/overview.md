@@ -10,7 +10,7 @@ because their names differ by one letter and their guarantees differ by a lot:
 
 | Module | What it holds | Feature gate | Availability |
 | :----- | :------------ | :----------- | :----------- |
-| `libcpg::pattern` (singular) | [VF2](../../GLOSSARY.md#vf2) subgraph matching, pattern templates, and [graph similarity](../../GLOSSARY.md#similarity-metric) | none — **always compiled** | every build |
+| `libcpg::pattern` (singular) | [VF2](../../GLOSSARY.md#vf2), templates, graph similarity, and bounded bipartite [GED](../../GLOSSARY.md#graph-edit-distance) | none — **always compiled** | every build |
 | `libcpg::patterns` (plural) | the 23 [Gang-of-Four](../../GLOSSARY.md#gang-of-four-gof) detectors, [DPML](../../GLOSSARY.md#dpml-design-pattern-markup-language) templates, [`PatternMetrics`](../../GLOSSARY.md#feature-vector-classification), and the heuristic classifier | `design-patterns` | opt-in |
 
 Throughout this documentation, **`pattern`** means the always-on matching engine and
@@ -149,7 +149,9 @@ let score = GraphSimilarity::new()
 ```
 
 Use it when you want a fuzzy, whole-graph resemblance signal rather than an exact
-sub-structure. Similarity is covered alongside VF2 in [VF2 subgraph matching](vf2-matching.md).
+sub-structure. Similarity is covered alongside VF2 in [VF2 subgraph matching](vf2-matching.md);
+configurable edit costs and the flagged resource boundary are in
+[bipartite GED](ged-analysis.md).
 
 ### 4. Heuristic classification — `patterns::classification::PatternClassifier`
 
@@ -243,6 +245,7 @@ let all: Vec<PatternMatch> = wanted
 ## See also
 
 - [VF2 subgraph matching](vf2-matching.md) — the matching engine and graph similarity.
+- [Bipartite GED](ged-analysis.md) — deterministic typed edit-script bounds.
 - [Gang-of-Four patterns](gang-of-four.md) — the 23-pattern catalogue.
 - [DPML templates](dpml.md) — declaring patterns in YAML/TOML.
 - [Pattern classification](classification.md) — the heuristic classifier and metrics.

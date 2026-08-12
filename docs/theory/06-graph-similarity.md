@@ -10,16 +10,14 @@ All of this lives in the always‑on `pattern` module, in the `GraphSimilarity` 
 use libcpg::pattern::{GraphSimilarity, SimilarityMetric};
 
 let sim = GraphSimilarity::new()                       // metric = Jaccard by default
-    .with_metric(SimilarityMetric::WeisfeilerLehman)   // pick a metric
-    .with_structural_weight(0.7)                        // used only by GraphEdit (Section 5)
-    .with_label_weight(0.3);
+    .with_metric(SimilarityMetric::WeisfeilerLehman);  // pick a metric
 
 let score: f64 = sim.similarity(&graph_a, &graph_b);   // in [0, 1]
 ```
 
 `SimilarityMetric` selects the strategy; `similarity(&g1, &g2)` dispatches to it and returns the score. The default is `Jaccard`.
 
-![Four similarity metrics side by side — Jaccard multiset overlap, cosine of feature vectors, Weisfeiler‑Lehman label histograms, and approximate graph‑edit distance — each mapping a pair of graphs to a score in [0,1].](../diagrams/similarity-metrics.svg)
+![Four similarity metrics side by side — Jaccard multiset overlap, cosine of feature vectors, Weisfeiler‑Lehman label histograms, and a bounded bipartite graph-edit upper bound — each mapping a pair of graphs to a score in the unit interval.](../diagrams/similarity-metrics.svg)
 
 *Figure — the four `SimilarityMetric` strategies and the graph signal each one consumes. Source: [`diagrams/similarity-metrics.puml`](../diagrams/similarity-metrics.puml).*
 
@@ -83,7 +81,16 @@ Start every node with a label equal to (a hash of) its node‑kind tag. Then rep
 \ell^{(i)}(v) = \operatorname{hash}\Big(\ell^{(i-1)}(v),\ \operatorname{sort}\big(\{\, \ell^{(i-1)}(u) : u \in \mathcal{N}(v) \,\}\big)\Big).
 ```
 
-Sorting makes the label **order‑independent** (a canonical fingerprint of the neighbourhood); hashing compresses it back to a single token so the next round is cheap. After $`i`$ rounds, a node's label is a fingerprint of its entire $`i`$‑hop neighbourhood — so two nodes share a label at round $`i`$ only if their $`i`$‑hop surroundings are structurally identical.
+Sorting makes the label **order‑independent** (a canonical fingerprint of the
+neighbourhood); hashing compresses it back to a single token so the next round
+is cheap. After $`i`$ rounds, a node's label fingerprints its entire $`i`$‑hop
+neighbourhood. Equal labels are structural-candidate evidence, not a proof:
+one-dimensional WL can fail to distinguish graphs, and finite hashes can
+collide.
+
+The hash combiner is the same fixed SplitMix-style wrapping sequence used by
+projection WL. It does not use `DefaultHasher`, so its constants and output are
+stable across Rust releases; an exact-vector regression fixes that contract.
 
 In `libcpg` the neighbourhood $`\mathcal N(v)`$ is **undirected**: it pools the labels reachable along both outgoing and incoming edges, across all overlays. As literate pseudocode:
 
@@ -120,7 +127,10 @@ Two graphs are then scored by the **cosine of their label histograms**. Treat ea
 \operatorname{sim}_{\text{WL}}(A, B) = \frac{\sum_\ell c^A_\ell\, c^B_\ell}{\sqrt{\sum_\ell (c^A_\ell)^2}\ \sqrt{\sum_\ell (c^B_\ell)^2}},
 ```
 
-where $`c^A_\ell`$ is the count of label $`\ell`$ in graph $`A`$. Because a shared label certifies a shared local structure, WL is the most **structure‑aware** of the four metrics: it distinguishes graphs that Jaccard and cosine would call identical, at the cost of the three refinement passes.
+where $`c^A_\ell`$ is the count of label $`\ell`$ in graph $`A`$. Shared labels
+provide local-structure evidence, so WL distinguishes graphs that Jaccard and
+cosine may call identical at the cost of three refinement passes. `GraphEdit`
+goes further by pricing typed wiring changes, at cubic assignment cost.
 
 ![Weisfeiler‑Lehman label refinement: node labels start as kind tags and, over successive rounds, absorb sorted neighbour labels, producing a histogram used as a graph fingerprint.](../diagrams/wl-kernel.svg)
 
@@ -128,41 +138,117 @@ where $`c^A_\ell`$ is the count of label $`\ell`$ in graph $`A`$. Because a shar
 
 ---
 
-## 4. Approximate graph‑edit distance
+## 4. Bounded bipartite graph-edit distance
 
-The [graph‑edit distance](../GLOSSARY.md#graph-edit-distance) is the minimum number of node/edge insertions, deletions, and relabellings that turn one graph into the other — an intuitive dissimilarity, but **NP‑hard** to compute exactly. `libcpg`'s `GraphEdit` metric therefore uses a cheap surrogate built from size differences and node‑kind overlap.
+The **graph-edit distance (GED)** is the minimum cost of a script of node and
+edge insertions, deletions, and substitutions that transforms one attributed
+graph into another. Exact GED requires a global correspondence search and is
+practical only for small graphs. Riesen and Bunke instead reduce local
+node-star correspondences to a linear assignment problem, obtaining a fast
+suboptimal edit script [[2]](#references). `libcpg` follows that bipartite
+strategy, but evaluates the chosen correspondence as a concrete edit script so
+the returned value is a genuine **upper bound** on exact GED.
 
-Let $`N_1, N_2`$ be node counts and $`E_1, E_2`$ edge counts. Define per‑axis similarities from the normalised differences
+Let $`G_1=(V_1,E_1)`$ and $`G_2=(V_2,E_2)`$. The default edit costs are
+$`c_s=1`$ for substituting unequal `NodeKindTag` values, $`c_v=1`$ for a node
+insertion or deletion, and $`c_e=0.5`$ for a typed directed-edge insertion or
+deletion. Parallel edges count with multiplicity; self-loops and edge kinds
+are preserved.
+
+### Star-cost assignment
+
+Stable `NodeId` order fixes rows and columns. For a source node $`u`$ and
+target node $`v`$, the substitution entry is
 
 ```math
-\text{node\_sim} = 1 - \frac{|N_1 - N_2|}{\max(N_1, N_2)}, \qquad
-\text{edge\_sim} = 1 - \frac{|E_1 - E_2|}{\max(E_1, E_2, 1)},
+C(u,v) = c_s [\operatorname{tag}(u) \ne \operatorname{tag}(v)]
+       + \frac{c_e}{2}\left|\deg(u)-\deg(v)\right|,
 ```
 
-and combine a **structural** term (a 60/40 blend of node‑ and edge‑size agreement) with a **label** term (the Jaccard node‑kind score of Section 1):
+where $`[P]`$ is $`1`$ when predicate $`P`$ holds and $`0`$ otherwise, and
+$`\deg`$ is total incoming plus outgoing degree. Dedicated dummy rows and
+columns encode deletion and insertion:
 
 ```math
-\operatorname{sim}_{\text{GE}}(A,B) = w_{\text{struct}} \big(0.6\,\text{node\_sim} + 0.4\,\text{edge\_sim}\big) + w_{\text{label}}\, J(A, B).
+C(u,\epsilon)=c_v+\frac{c_e}{2}\deg(u), \qquad
+C(\epsilon,v)=c_v+\frac{c_e}{2}\deg(v).
 ```
 
-This is a fast approximation, not a true edit distance: it reads graph *size* and *composition*, not the specific rewrites that would align them. It is useful as a forgiving "roughly the same magnitude and make‑up" score.
+The resulting square matrix has side $`|V_1|+|V_2|`$. The deterministic
+primal-dual Hungarian algorithm minimizes its assignment cost [[3]](#references).
+Ascending column scans and strict improvements fix ties to the smallest
+available column.
+
+### From a local assignment to a global bound
+
+The star objective is only a correspondence heuristic: it sees degree
+differences, not the complete edge alignment. `libcpg` therefore discards that
+objective value after assignment and prices the induced concrete script:
+
+```text
+Algorithm GED-Upper-Bound(G1, G2, options):
+  validate that every edit cost is finite and nonnegative
+  if either graph exceeds the effective node budget:
+    return the explicitly flagged compatibility surrogate
+  for each orientation (G1 → G2 and G2 → G1):
+    order nodes by stable NodeId
+    build the square node/substitution/dummy cost matrix
+    mapping ← deterministic Hungarian assignment(matrix)
+    node_cost ← unmatched nodes + unequal mapped NodeKindTag values
+    edge_cost ← multiset difference of mapped typed directed edges
+    script_cost ← node_cost + edge_cost
+  return min(forward script, reverse script, delete-all/insert-all script)
+```
+
+Every retained candidate is an executable edit script, so if $`d^*`$ is exact
+GED and $`U`$ is the returned uncapped value, then
+
+```math
+d^*(G_1,G_2) \le U(G_1,G_2) \le
+U_0=(|V_1|+|V_2|)c_v+(|E_1|+|E_2|)c_e.
+```
+
+Running both orientations and retaining the cheaper script makes the result
+symmetric. Division by the delete-all/insert-all cost $`U_0`$ gives
+`GedBound::normalized` in $`[0,1]`$; when $`U_0=0`$, the normalized bound is
+defined as $`0`$. `SimilarityMetric::GraphEdit` reports
+
+```math
+\operatorname{sim}_{\mathrm{GE}}(G_1,G_2)=1-\frac{U(G_1,G_2)}{U_0}.
+```
+
+![End-to-end GED flow from validated CPGs through the budget decision, star-cost matrix, deterministic Hungarian assignment, concrete edit-script evaluation, symmetric minimum, and normalized result.](../diagrams/ged-pipeline.svg)
+
+*Figure — the bounded bipartite GED pipeline. Source: [`diagrams/ged-pipeline.puml`](../diagrams/ged-pipeline.puml).*
+
+### Budget and compatibility fallback
+
+Hungarian assignment is cubic and its matrix is quadratic. `GedOptions` admits
+at most `min(max_nodes, MAX_GED_NODES)` nodes per input, where
+`MAX_GED_NODES = 512`. Beyond that boundary, `ged_upper_bound` sets
+`GedBound::capped = true` and returns the former size/Jaccard surrogate. A
+capped value is deliberately documented as a compatibility distance, **not a
+proven GED upper bound**.
+
+`GraphSimilarity` preserves its `structural_weight` and `label_weight`
+builders only for this capped fallback. Within the GED budget, those legacy
+weights have no effect; callers tune real edit semantics with `GedOptions` and
+call `ged_upper_bound` directly.
+
+The admitted complexity, with $`N=|V_1|+|V_2|`$, is $`O(N^3+|E_1|+|E_2|)`$
+time and $`O(N^2+|E_1|+|E_2|)`$ auxiliary space. The fallback is linear in
+the input size.
 
 ---
 
-## 5. Structural vs. label weighting
-
-`GraphSimilarity` carries two weights, `structural_weight` (default $`0.7`$) and `label_weight` (default $`0.3`$). It is important to be precise about their reach: **only the `GraphEdit` metric consumes them** — they are the $`w_{\text{struct}}`$ and $`w_{\text{label}}`$ of the equation in Section 4. `Jaccard`, `Cosine`, and `WeisfeilerLehman` are single‑signal metrics and ignore the weights entirely. So the `0.7 / 0.3` split expresses one design choice — *when blending, trust graph structure roughly twice as much as the node‑kind bag* — and it takes effect only when you select `SimilarityMetric::GraphEdit`.
-
----
-
-## 6. Choosing a metric
+## 5. Choosing a metric
 
 | Metric | Signal it reads | Cost | Best for |
 |---|---|---|---|
 | `Jaccard` (default) | multiset of node kinds | $`O(V)`$ | quick "same mix of constructs?" triage |
 | `Cosine` | 9‑D graph feature vector | $`O(V + E)`$ | scale‑robust clustering by overall composition |
 | `WeisfeilerLehman` | 3‑round neighbourhood label histograms | $`O(3\,(V + E))`$ | structure‑aware comparison; distinguishing look‑alikes |
-| `GraphEdit` | size deltas + Jaccard, weighted | $`O(V + E)`$ | forgiving "roughly the same graph" score |
+| `GraphEdit` | typed concrete edit script selected by bipartite assignment | cubic within 512 nodes; linear flagged fallback | interpretable structural change cost |
 
 A practical progression: filter cheaply with `Jaccard` or `Cosine`, then confirm survivors with `WeisfeilerLehman` when local structure matters. When you need a *precise* embedding rather than a score, drop back to exact [VF2 matching](05-subgraph-isomorphism-vf2.md); when you want a *learned* notion of similarity trained to a task, use the [GNN embeddings](09-graph-neural-networks.md) and compare them with the same cosine formula of Section 2 (see [`components/gnn/embeddings.md`](../components/gnn/embeddings.md)).
 
@@ -172,12 +258,19 @@ Two functions that both consist of a loop, a comparison, and an assignment but w
 
 - **Jaccard ≈ 1** — identical node‑kind bags;
 - **Cosine ≈ 1** — near‑identical feature vectors (same counts and ratios);
-- **WL < 1** — the differing edges give different refined‑label histograms.
+- **WL < 1** — the differing edges give different refined‑label histograms;
+- **GraphEdit < 1** — the concrete script charges for the typed edges that must
+  be removed and inserted.
 
-That spread is the whole point: each metric is a different lens, and the WL disagreement is precisely the structural information the cheaper metrics discard. The runnable API and further examples live in [`components/patterns/vf2-matching.md`](../components/patterns/vf2-matching.md).
+That spread is the whole point: each metric is a different lens. The runnable
+GED API is in the [component guide](../components/patterns/ged-analysis.md),
+and the four-metric facade is in
+[`components/patterns/vf2-matching.md`](../components/patterns/vf2-matching.md).
 
 ---
 
 ## References
 
 1. Shervashidze, N., et al. (2011). *Weisfeiler-Lehman Graph Kernels.* JMLR 12. <https://jmlr.org/papers/v12/shervashidze11a.html> (no DOI). Orig.: Weisfeiler & Leman (1968).
+2. Riesen, K., Bunke, H. (2009). *Approximate Graph Edit Distance Computation by Means of Bipartite Graph Matching.* Image and Vision Computing 27(7), 950–959. DOI: [10.1016/j.imavis.2008.04.004](https://doi.org/10.1016/j.imavis.2008.04.004)
+3. Kuhn, H. W. (1955). *The Hungarian Method for the Assignment Problem.* Naval Research Logistics Quarterly 2(1–2), 83–97. DOI: [10.1002/nav.3800020109](https://doi.org/10.1002/nav.3800020109)

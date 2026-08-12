@@ -139,8 +139,9 @@ and its build pipeline.
 | Expensive or slow-converging spectral topology | 1,000-iteration ceiling, iterative sparse traversal, complete CSR/options validation, and explicit convergence/residual evidence | [hardening §spectral analysis](01-input-and-resource-hardening.md#spectral-analysis-iteration-and-numerical-evidence) |
 | Exponential directed-cycle family | length 32 and retained-count 100,000 hard ceilings, SCC pruning, iterative reusable DFS state, and a concrete first-omission witness | [hardening §simple cycles](01-input-and-resource-hardening.md#simple-cycles-exponential-output-boundaries) |
 | Combinatorial motif enumeration | 512-node triad and 50-node graphlet hard ceilings, complete CSR validation, dense bounded bit rows, and all-or-error results | [hardening §motifs](01-input-and-resource-hardening.md#directed-motifs-combinatorial-bounds) |
+| Cubic graph-edit assignment | caller-selectable node budget with a 512 hard ceiling, finite-cost validation, and an explicit `capped` compatibility result | [hardening §GED](01-input-and-resource-hardening.md#graph-edit-distance-cubic-assignment-cap) |
 | Untrusted serialized graph | Deserialize only trusted bytes | [`usage/05-serialization.md`](../usage/05-serialization.md) |
-| Over-trusting heuristics, rankings, partitions, cut/robustness evidence, bounded cycle prefixes, or motif frequencies | Treat pattern/algorithm/GNN, centrality, community, cohesion, spectral, truncated-cycle, and motif output as advisory | this page |
+| Over-trusting heuristics, rankings, partitions, edit bounds, cut/robustness evidence, bounded cycle prefixes, or motif frequencies | Treat pattern/algorithm/GNN, GED, centrality, community, cohesion, spectral, truncated-cycle, and motif output as advisory | this page |
 
 ## References
 

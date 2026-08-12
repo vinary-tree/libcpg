@@ -20,7 +20,8 @@ end note
 VF2 max_matches, DFG max_iterations,
 slice max_nodes, spectral iterations + starts,
 cycle length + count + first omission,
-motif triad + graphlet node ceilings;<<#E5DBFF>>
+motif triad + graphlet node ceilings,
+GED 512-node cap + flagged fallback;<<#E5DBFF>>
 :results;<<#C3FAE8>>
 stop
 

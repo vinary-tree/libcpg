@@ -30,7 +30,8 @@ fork again
   → backward_slice / forward_slice;<<#E5DBFF>>
 fork again
   :Vf2Matcher subgraph match
-  → GoF detection;<<#FFE3E3>>
+  + bipartite GED upper bound
+  → GoF detection / whole-graph similarity;<<#FFE3E3>>
 fork again
   :per-function algorithm
   + complexity detection;<<#FFF3BF>>
@@ -44,7 +45,7 @@ legend right
   |= colour |= analysis (module) |
   |<#C3FAE8>| structural — blocks / data flow / liveness / expressions / SCCP / intervals / induction / reachability / dominance / loops / SCCs / condensation / DSM / WL / centrality / communities / cohesion / spectral connectivity / simple cycles / directed motifs |
   |<#E5DBFF>| PDG — program slicing |
-  |<#FFE3E3>| VF2 — subgraph iso / GoF |
+  |<#FFE3E3>| pattern — VF2 / GED / similarity / GoF |
   |<#FFF3BF>| algorithm + complexity |
   |<#FCC2D7>| GNN — embeddings |
 endlegend

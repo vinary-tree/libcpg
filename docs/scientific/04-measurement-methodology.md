@@ -1,6 +1,6 @@
 # Measurement methodology
 
-`libcpg` ships eleven runnable Criterion targets. Their baseline groups are
+`libcpg` ships fifteen runnable Criterion targets. Their baseline groups are
 feature-free; the `induction_analysis` target also registers an
 `algorithm-detection`-gated complexity-evidence group. Each active group
 asserts a deterministic correctness oracle **before** entering the timed loop.
@@ -19,7 +19,7 @@ the source transformation under study does not [[1]](#references).
 
 ## 1. Current evidence
 
-All eleven targets use `harness = false`, which hands execution to Criterion
+All fifteen targets use `harness = false`, which hands execution to Criterion
 rather than Rust's test harness:
 
 ```toml
@@ -69,6 +69,22 @@ harness = false
 [[bench]]
 name = "cohesion"
 harness = false
+
+[[bench]]
+name = "spectral"
+harness = false
+
+[[bench]]
+name = "cycles"
+harness = false
+
+[[bench]]
+name = "motifs"
+harness = false
+
+[[bench]]
+name = "ged"
+harness = false
 ```
 
 | Target | Public operation | Families and sizes | Pre-timing oracle |
@@ -85,6 +101,10 @@ harness = false
 | `centrality` | PageRank, eigenvector, Brandes, and closeness | paths, rings, and clustered projections at 256/1,024 vertices for iterative kernels and 128/256 vertices for all-sources kernels | alignment, convergence/mass or finiteness/normalization, shape symmetry/order, canonical edge output, bridge maximality, and auxiliary HITS/harmonic/Burt checks |
 | `community` | `louvain`, `try_refine_connected` | rings of eight-vertex cliques at 256/1,024 vertices; disconnected eight-vertex paths at 512/2,048 vertices | exact repeatability, canonical labels, positive independently recomputed modularity, expected component count, and independent induced-connectivity traversal |
 | `cohesion` | core, truss, cut structure, two-edge components, minimum cut, assortativity, attack simulation | ring lattices at 1,024/8,192; clique chains at 512/2,048; weighted seams at 64/128; stars at 1,024/8,192, including truss under degree skew | exact repeatability plus analytic core, truss, bridge, component, cut-weight, endpoint-correlation, and fragmentation invariants |
+| `spectral` | `try_algebraic_connectivity` | stars at 1,024/8,192 vertices, complete bipartite graphs at 64/128 vertices, and disconnected star pairs at 1,024/8,192 total vertices | closed-form connectivity, convergence/residual, alignment, sign, partition, exact disconnected certificate, and repeatability |
+| `cycles` | `simple_cycles` | acyclic paths at 1,024/8,192 vertices, disjoint triangles at 1,023/8,190 vertices, and complete digraphs at 8/10 vertices | exact counts, edge closure, canonical starts, repeatability, caps, and first omitted witness |
+| `motifs` | `motif_census` | paths and out-stars at 24/50 vertices; complete bidirected graphs at 16/30 vertices | exact class/graphlet binomial counts, conservation, and repeatability |
+| `ged` | `ged_upper_bound` | identical paths, relabeled isolates, and retyped paths at 16/48 vertices | exact edit costs $`0`$, $`n`$, and $`n-1`$, uncapped result |
 
 The evidence is deliberately local: a result for one named family, size,
 machine, toolchain, and environment is not a universal speed claim. DFG/PDG
@@ -259,6 +279,10 @@ $`H \le F`$ is lattice height, and $`d`$ is embedding dimension.
 | global minimum cut | $`O(V^3)`$ time and $`O(V^2)`$ space | active weighted-seam target |
 | assortativity | $`O(V+E)`$ | active star target |
 | attack simulation | $`O(s(V+E))`$ for $`s\le10{,}000`$ | active center-first star target |
+| algebraic connectivity | $`O(sc(V+E))`$ for at most eight starts and 1,000 iterations | active star/complete-bipartite/disconnected target |
+| bounded simple cycles | output-sensitive exponential worst case after linear SCC preprocessing | active acyclic/triangle/dense target with explicit output cap |
+| directed motif census | $`O(V^3+V^4)`$ within 512/50-node family caps | active path/out-star/bidirected-clique target |
+| bipartite GED upper bound | $`O(N^3+E_1+E_2)`$ for $`N=V_1+V_2`$ | active identical/relabel/retype target within 512 nodes per input |
 | DFG/PDG construction | analysis-specific; must separate extraction from slicing | benchmark gap |
 | GNN propagation | $`O(\text{layers}\cdot(V+E)\cdot d)`$ | benchmark gap |
 

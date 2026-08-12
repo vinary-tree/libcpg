@@ -228,7 +228,7 @@ VF2 is the exact, all‑or‑nothing end of `libcpg`'s pattern facilities. It un
 
 - **Design‑pattern detection** ([file 07](07-design-pattern-detection.md)) runs `Vf2Matcher` in relaxed mode against a library of Gang‑of‑Four template graphs, then scores each embedding by template completeness — trading precision for recall.
 - **Pattern templates** (`PatternTemplate` → `to_pattern_graph`) let callers describe a pattern declaratively (node/edge constraints) and compile it to a pattern CPG that VF2 consumes; see the API in [`components/patterns/vf2-matching.md`](../components/patterns/vf2-matching.md).
-- **[Graph similarity](06-graph-similarity.md)** ([file 06](06-graph-similarity.md)) answers the *fuzzy* version of the same question — "how alike are these two graphs?" — with scores in $`[0,1]`$ (Jaccard, cosine, Weisfeiler‑Lehman, approximate graph‑edit distance) when an exact embedding is too rigid.
+- **[Graph similarity](06-graph-similarity.md)** ([file 06](06-graph-similarity.md)) answers the *fuzzy* version of the same question — "how alike are these two graphs?" — with scores in $`[0,1]`$ (Jaccard, cosine, Weisfeiler‑Lehman, or a bounded bipartite graph-edit upper bound) when an exact embedding is too rigid.
 
 When you need certainty about a precise shape, use VF2; when you need a tolerance dial, use similarity; when you need a named catalogue, use the GoF detectors.
 

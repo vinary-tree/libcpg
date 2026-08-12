@@ -83,7 +83,8 @@ PDG). A query can therefore mix syntax, control flow, and data flow freely.
   data-dependence edges, with bounded backward/forward Weiser slices
   (`PdgBuilder`, `backward_slice`, `forward_slice`).
 - **Subgraph isomorphism** — VF2 pattern matching (`pattern::Vf2Matcher`) and
-  graph similarity (Jaccard, cosine, Weisfeiler-Lehman, graph-edit).
+  graph similarity (Jaccard, cosine, stable Weisfeiler-Lehman, and bounded
+  bipartite graph-edit upper bounds with explicit cap evidence).
 - **Design-pattern detection** (23 Gang-of-Four patterns) and **algorithm /
   complexity analysis**, behind the `design-patterns` and `algorithm-detection`
   features. The default algorithm detector grounds loop cost in validated CFG

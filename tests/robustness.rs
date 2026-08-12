@@ -619,9 +619,17 @@ fn exercise_every_analysis(cpg: &CodePropertyGraph, func: NodeId) {
     // --- matching and similarity ---
     #[cfg(feature = "lang-rust")]
     {
-        use libcpg::pattern::{GraphSimilarity, SimilarityMetric, SubgraphMatcher, Vf2Matcher};
+        use libcpg::pattern::{
+            ged_upper_bound, GedOptions, GraphSimilarity, SimilarityMetric, SubgraphMatcher,
+            Vf2Matcher,
+        };
         let matches = Vf2Matcher::new().find_matches_limited(cpg, cpg, 4);
         assert!(matches.len() <= 4);
+        let ged = ged_upper_bound(cpg, cpg, &GedOptions::default())
+            .expect("GED remains total on the malformed CPG");
+        assert_eq!(ged.upper, 0.0);
+        assert_eq!(ged.normalized, 0.0);
+        assert!(!ged.capped);
         for metric in [
             SimilarityMetric::Jaccard,
             SimilarityMetric::Cosine,

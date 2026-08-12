@@ -3,9 +3,11 @@
 //! This module provides algorithms for detecting patterns in Code Property Graphs
 //! using subgraph isomorphism (VF2/VF3 algorithms) and similarity metrics.
 
+mod ged;
 mod similarity;
 mod vf2;
 
+pub use ged::{ged_upper_bound, GedBound, GedOptions, MAX_GED_NODES};
 pub use similarity::{GraphSimilarity, SimilarityMetric};
 pub use vf2::{Vf2Matcher, Vf2State};
 

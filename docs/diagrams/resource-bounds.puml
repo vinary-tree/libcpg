@@ -117,6 +117,16 @@ success always means a complete census.;
 ***[#F1F3F5]:validated dense bit rows
 predictable bounded adjacency storage,
 no recursion, loops/weights ignored.;
+**[#FFE3E3] Graph-edit distance
+***[#F1F3F5]:MAX_GED_NODES = 512
+bounds each input before quadratic matrix allocation
+and cubic Hungarian assignment.;
+***[#F1F3F5]:caller max_nodes + capped evidence
+honors a smaller limit and returns the linear
+compatibility distance with capped = true.;
+***[#F1F3F5]:numeric validation
+rejects negative or non-finite costs and
+non-finite normalization/matrix arithmetic.;
 **[#FFE3E3] Slicing
 ***[#F1F3F5]:max_nodes on backward_slice / forward_slice
 bounds the PDG reverse/forward BFS —

@@ -26,6 +26,8 @@
 //!   length and result-count bounds
 //! - **Motif Census**: Count all 16 directed triads and bounded four-node
 //!   cliques/out-stars
+//! - **Graph Edit Distance**: Compute deterministic bipartite typed edit-script
+//!   upper bounds with an explicit 512-node compatibility boundary
 //! - **Structural Clones**: Refine bounded Weisfeiler-Lehman projection labels
 //! - **Pattern Detection**: Detect design patterns using subgraph isomorphism (VF2/VF3)
 //! - **Algorithm Analysis**: Extract algorithm signatures and estimate complexity
