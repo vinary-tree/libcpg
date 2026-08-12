@@ -1,0 +1,57 @@
+@startuml
+!include _libcpg-theme.iuml
+title Deterministic reflexion-model conformance
+
+skinparam component {
+  BackgroundColor #F1F3F5
+  BorderColor #495057
+}
+skinparam note {
+  BackgroundColor #FFF9DB
+  BorderColor #F08C00
+}
+
+component "ReflexionRules\nordered layers + allowed pairs" as RULES #FFE8CC
+component "Observed dependency multiset\n(source path, target path)" as EDGES #C3FAE8
+component "First textual\nprefix mapping" as MAP #DBE4FF
+component "Edge classification" as CLASSIFY #FFF3BF
+component "Convergences" as CONVERGE #D3F9D8
+component "Divergences\npaths + owning layers" as DIVERGE #FFE3E3
+component "Unlayered count" as UNLAYERED #E9ECEF
+component "Ordered realized pairs" as REALIZED #E5DBFF
+component "Absences\nallow minus realized" as ABSENT #FCC2D7
+
+RULES --> MAP : first layer order\nmatching starts_with prefix
+EDGES --> MAP : opaque UTF-8 paths
+MAP --> CLASSIFY : mapped layer pair\nor uncovered endpoint
+RULES --> CLASSIFY : directed allow relation
+CLASSIFY --> CONVERGE : same-layer or allowed
+CLASSIFY --> DIVERGE : covered but forbidden
+CLASSIFY --> UNLAYERED : endpoint uncovered
+CLASSIFY --> REALIZED : allowed cross-layer pair
+RULES --> ABSENT : declared allowed pairs
+REALIZED --> ABSENT : ordered set difference
+
+note bottom of DIVERGE
+  Sorted by source path, then target path
+  Duplicate observations retain multiplicity
+end note
+
+note bottom of ABSENT
+  Feature-free, pure, and read-only
+  No filesystem or graph access
+end note
+
+legend bottom
+|= Color |= Concept |
+|<#FFE8CC>| declared architecture policy |
+|<#C3FAE8>| observed implementation dependencies |
+|<#DBE4FF>| low-level to high-level mapping |
+|<#FFF3BF>| four-way verdict decision |
+|<#D3F9D8>| conforming observations |
+|<#FFE3E3>| concrete violations |
+|<#E9ECEF>| uncovered observations |
+|<#E5DBFF>| deterministic realized relation |
+|<#FCC2D7>| declared but unrealized relation |
+endlegend
+@enduml

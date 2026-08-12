@@ -110,7 +110,10 @@ with selected bounded four-node graphlets
 ([Theory 17](17-directed-motif-census.md)), and
 [Martin package metrics](../GLOSSARY.md#martin-package-metrics) over explicit
 architectural module assignments
-([Theory 18](18-martin-package-metrics.md)). Each consumes the same
+([Theory 18](18-martin-package-metrics.md)), and pure
+[reflexion-model conformance](../GLOSSARY.md#reflexion-model) over a declared
+path-to-layer policy ([Theory 19](19-reflexion-model-conformance.md)). Each
+graph analysis consumes the same
 `CodePropertyGraph`; none needs its own bespoke intermediate representation.
 
 ## 4. The four overlays at a glance

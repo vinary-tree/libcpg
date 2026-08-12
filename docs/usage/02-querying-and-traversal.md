@@ -631,6 +631,52 @@ assignments, exact formulae, and interpretation boundaries.
 
 ---
 
+## Comparing intended and observed layers
+
+Use the reflexion model when your dependency producer already emits path
+pairs and you want to compare them with an explicit layered policy:
+
+```rust
+use libcpg::{reflexion, LayerSpec, ReflexionRules};
+
+fn inspect_architecture() {
+    let rules = ReflexionRules {
+        layers: vec![
+            LayerSpec {
+                name: "api".into(),
+                prefixes: vec!["src/api/".into()],
+            },
+            LayerSpec {
+                name: "domain".into(),
+                prefixes: vec!["src/domain/".into()],
+            },
+        ],
+        allow: vec![("api".into(), "domain".into())],
+    };
+    let result = reflexion(
+        &rules,
+        [
+            ("src/api/http.rs".into(), "src/domain/model.rs".into()),
+            ("src/domain/model.rs".into(), "src/api/http.rs".into()),
+        ],
+    );
+
+    for violation in result.divergences {
+        println!("{} -> {}", violation.src_path, violation.dst_path);
+    }
+    for (source, target) in rules.absences(&result.realized_pairs) {
+        println!("declared but absent: {source} -> {target}");
+    }
+}
+```
+
+Normalize all paths into the same caller-defined namespace before comparing.
+Layer order controls overlapping-prefix precedence, and dependency direction is
+semantic. See [reflexion-model conformance](../components/graph/reflexion-model.md)
+for complete edge categories, duplicate semantics, and security boundaries.
+
+---
+
 ## Next steps
 
 - Detect design patterns over the graph you just queried: [Pattern Detection](03-pattern-detection.md).
@@ -642,6 +688,7 @@ assignments, exact formulae, and interpretation boundaries.
 - Enumerate concrete recursion/dependency witnesses: [Bounded Simple Cycles](../components/graph/cycle-analysis.md).
 - Profile local directed topology: [Directed Motif Census](../components/graph/motif-analysis.md).
 - Measure architectural coupling and stable dependencies: [Martin Package Metrics](../components/graph/martin-metrics.md).
+- Compare declared and observed dependency layers: [Reflexion-model Conformance](../components/graph/reflexion-model.md).
 - The complete method tables (construction, AST, CFG, DFG, call, query, metrics, subgraph) are in the [graph reference](../api/graph-reference.md); traversal internals are in [Graph Traversal](../components/graph/traversal.md).
 
 ---

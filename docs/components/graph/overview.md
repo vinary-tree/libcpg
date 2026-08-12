@@ -4,7 +4,7 @@ The `graph` module holds the data structures at the heart of `libcpg`: the
 [Code Property Graph](../../GLOSSARY.md#code-property-graph-cpg) (CPG) and the
 node, edge, and identifier types it is built from. Everything else in the crate
 — the builders, graph projections, centrality, community, cohesion, dominator,
-SCC, condensation, DSM, and Martin-metrics analyses, the pattern matchers, the slicer, the GNN — reads
+SCC, condensation, DSM, Martin-metrics, and reflexion analyses, the pattern matchers, the slicer, the GNN — reads
 from or writes to this one structure. This page explains what a CPG is, why `libcpg` merges
 several program views into a single graph, how that graph is stored, and how you
 create and inspect one.
@@ -142,6 +142,11 @@ dependency projection with an explicit node-to-module assignment. They report
 afferent/efferent coupling, instability, CPG-backed type abstractness,
 main-sequence distance, and concrete Stable Dependencies Principle witnesses
 without changing the graph or guessing an architectural boundary.
+
+[Reflexion-model conformance](reflexion-model.md) compares an ordered declared
+path-layer model with caller-supplied dependency paths. Its pure, feature-free
+summary separates convergences, divergences, uncovered edges, realized allowed
+pairs, and declared absences without parsing or filesystem access.
 
 ### Creating a CPG
 
@@ -337,6 +342,8 @@ So the safe pattern is: build (single-threaded, `&mut`), then analyse
 - [Martin package metrics](martin-metrics.md) — explicit module assignment,
   afferent/efferent coupling, instability/abstractness/distance, and witnessed
   stable-dependency violations.
+- [Reflexion-model conformance](reflexion-model.md) — ordered path layers,
+  deterministic edge verdicts, realized pairs, and declared absences.
 - [WL labels and structural clones](wl-analysis.md) — bounded deterministic
   directed-degree refinement and ordered stable-id clone-candidate classes over
   any valid directed projection.

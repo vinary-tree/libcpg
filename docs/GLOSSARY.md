@@ -769,6 +769,16 @@ exact for a supplied dependency projection and explicit module assignment, but
 their architectural interpretation is advisory. See
 [`theory/18-martin-package-metrics.md`](theory/18-martin-package-metrics.md).
 
+### Reflexion model
+
+A comparison between a declared high-level architecture and dependencies
+observed in a low-level implementation, introduced by Murphy, Notkin, and
+Sullivan [[37]](#references). A **convergence** is observed and permitted, a
+**divergence** is observed but forbidden, and an **absence** is permitted but
+not observed. `libcpg` maps opaque paths to layers by first textual prefix
+match and reports ordered evidence; “reflexion” is unrelated to runtime
+reflection. See [`theory/19-reflexion-model-conformance.md`](theory/19-reflexion-model-conformance.md).
+
 ---
 
 ## References
@@ -809,3 +819,4 @@ their architectural interpretation is advisory. See
 34. Directed-motif foundations: (**34a**) Holland, P. W., Leinhardt, S. (1970). *A Method for Detecting Structure in Sociometric Data.* American Journal of Sociology 76(3), 411–432. DOI: [10.1086/224954](https://doi.org/10.1086/224954). (**34b**) Batagelj, V., Mrvar, A. (2001). *A subquadratic triad census algorithm for large sparse networks with small maximum degree.* DOI: [10.1016/S0378-8733(01)00035-1](https://doi.org/10.1016/S0378-8733(01)00035-1). (**34c**) Milo, R. et al. (2002). *Network Motifs: Simple Building Blocks of Complex Networks.* DOI: [10.1126/science.298.5594.824](https://doi.org/10.1126/science.298.5594.824).
 35. Graph-edit assignment foundations: (**35a**) Riesen, K., Bunke, H. (2009). *Approximate Graph Edit Distance Computation by Means of Bipartite Graph Matching.* DOI: [10.1016/j.imavis.2008.04.004](https://doi.org/10.1016/j.imavis.2008.04.004). (**35b**) Kuhn, H. W. (1955). *The Hungarian Method for the Assignment Problem.* DOI: [10.1002/nav.3800020109](https://doi.org/10.1002/nav.3800020109).
 36. Martin package-metric foundations: (**36a**) Martin, R. C. (1994). *OO Design Quality Metrics: An Analysis of Dependencies.* Object Mentor technical report. [Archived report PDF](https://condor.depaul.edu/dmumaugh/OOT/Design-Principles/oodmetrc.pdf). No DOI assigned. (**36b**) Martin, R. C. (2003). *Agile Software Development: Principles, Patterns, and Practices.* Prentice Hall/Pearson. ISBN 978-0-13-597444-5. [Publisher record](https://www.informit.com/store/agile-software-development-principles-patterns-and-9780135974445).
+37. Murphy, G. C., Notkin, D., Sullivan, K. J. (2001). *Software Reflexion Models: Bridging the Gap between Design and Implementation.* IEEE Transactions on Software Engineering 27(4), 364–380. DOI: [10.1109/32.917525](https://doi.org/10.1109/32.917525).

@@ -20,6 +20,7 @@ mod martin;
 mod motifs;
 mod projection;
 mod reachability;
+mod reflexion;
 mod resolve;
 mod scc;
 mod spectral;
@@ -91,6 +92,10 @@ pub use motifs::{
 };
 
 pub use reachability::{unreachable_code, DeadBranch, ReachabilityReport};
+
+pub use reflexion::{
+    reflexion, LayerSpec, ReflexionDivergence, ReflexionRules, ReflexionSummary, ReflexionVerdict,
+};
 
 pub use resolve::{
     build_symbol_table, resolve_calls, CallGraphResolution, CallResolution, Confidence,

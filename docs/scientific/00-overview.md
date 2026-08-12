@@ -50,15 +50,15 @@ Two properties of the suite make this rigorous rather than merely suggestive:
 
 ## 3. The evidence base
 
-The maximal matrix contains **750 library tests**, **21 general public-API
+The maximal matrix contains **755 library tests**, **21 general public-API
 integration tests**, **5 malformed-input robustness tests**, **3 SCCP
 public/parser integration tests**, and **3 interval public/parser integration
 tests**, plus **3 loop-induction** and **3 complexity-evidence public/parser
 integration tests**, plus **2 condensation** and **2 DSM public/parser
 integration tests**, plus **1 WL**, **2 centrality**, **2 community**, **2
-cohesion**, **2 spectral**, **2 cycle**, **2 motif**, **2 GED**, and **2 Martin
-public/parser integration tests**. These 809 executable cases combine fixed
-examples, differential oracles, and 57 exact source-level
+cohesion**, **2 spectral**, **2 cycle**, **2 motif**, **2 GED**, **2 Martin**, and
+**2 reflexion public/serialization integration tests**. These 816 executable
+cases combine fixed examples, differential oracles, and 58 exact source-level
 `proptest!` blocks. The feature-free matrix remains
 independently runnable and exercises the exact graph/data-flow substrate
 without compiling any grammar. Fifteen active Criterion targets supplement
@@ -92,6 +92,7 @@ Because `default = []`, many tests are **feature-gated**. The end-to-end reachin
 | [17 — Motif-census validation](17-motif-census-validation.md) | Complete sixteen-class taxonomy, all 64 labeled tricodes, exact generated-graph census, `C(n,3)` conservation, graphlet semantics, insertion-order determinism, explicit budgets, malformed CSR, parser integration | motif unit/property tests, `motifs_integration`, robustness harness, benchmark oracles | feature-free / `serde` / `lang-rust` parser case |
 | [18 — GED validation](18-ged-validation.md) | Hungarian optimality, concrete-script upper bound versus exhaustive exact GED, symmetry, normalization, typed multiedges, caps/numerics, stable WL migration, parser integration | GED unit/property tests, `ged_integration`, robustness harness, benchmark oracles | feature-free / `serde` / `lang-rust` parser case |
 | [19 — Martin-metrics validation](19-martin-metrics-validation.md) | Distinct external coupling, CPG-backed abstractness, exact instability/distance, strict stable-dependency witnesses, assignment/projection order invariance, malformed values, parser integration | exact three-module oracle, 256-case property, `martin_integration`, robustness harness | feature-free / `serde` / `lang-rust` parser case |
+| [20 — Reflexion-model validation](20-reflexion-model-validation.md) | First-prefix mapping, exhaustive verdicts, exact realized pairs/absences, multiset reversal, duplicates, uncovered paths, serialization | exact layered oracle, 256-case property, `reflexion_integration` | feature-free / `serde` |
 
 ## 5. What is proven, and what is advisory
 
@@ -148,12 +149,15 @@ Scientific honesty requires separating the two:
   Martin coupling and scalar arithmetic are exact for the supplied projection,
   assignment, and CPG type taxonomy; the boundary policy, dependency semantics,
   and resulting SDP recommendation remain advisory.
+  Reflexion categories are exact for the declared prefix policy and observed
+  path edges; the policy, dependency extractor, and remediation remain advisory.
 - **Empirically bounded.** Performance results apply only to a target's named
   fixture, size, and controlled environment. DFG/PDG
   construction, whole-corpus analysis, and GNN propagation remain measurement gaps; no result
   from the fifteen active targets (or twenty-seven enabled operation groups) may be
-  generalized to them. Martin metrics are also benchmark-deferred, so their
-  validation supports correctness but makes no timing claim.
+  generalized to them. Martin metrics and reflexion conformance are also
+  benchmark-deferred, so their validation supports correctness but makes no
+  timing claim.
 
 ## 6. Reproducing the experiments
 

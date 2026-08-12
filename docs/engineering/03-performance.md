@@ -62,6 +62,8 @@ $`p=\min(\mathtt{max\_passes},50)`$ = Louvain sweeps per level, and
 $`h=\min(\mathtt{max\_levels},10)`$ = Louvain aggregation levels. For Martin
 metrics, $`T`$ is CPG nodes and $`K`$ is unique module names.
 For graph edit distance, $`N=V_1+V_2`$ is the square assignment dimension.
+For reflexion conformance, $`R`$ is observed path edges, $`H`$ layers, $`P`$
+prefixes per layer, and $`A`$ allowed pairs.
 
 | Operation | Expected cost | Notes |
 | --- | --- | --- |
@@ -75,6 +77,7 @@ For graph edit distance, $`N=V_1+V_2`$ is the square assignment dimension.
 | Coffman–Graham layering | worst case $`O(M + E\log E + C^2\log C)`$ time, $`O(C+E)`$ auxiliary space | Predecessor-label vectors make heap comparison linear in $`C`$ in the worst case; ordered available layers enforce the requested width. The component cap is $`10^6`$. |
 | DSM visibility and core–periphery | $`O(V(V+E))`$ time and $`O(V+E)`$ working space after $`O(V+E\log d_{max})`$ validation | One iterative BFS per vertex computes non-reflexive fan-out/fan-in; shared iterative SCC analysis supplies the cyclic core. Inputs above 50,000 vertices return a total capped result before traversal. |
 | Martin package metrics / SDP | $`O(E\log V+T\log K)`$ metrics and $`O(E\log K)`$ SDP time; $`O(V+K)`$ auxiliary space | Ordered sets count distinct external vertices; CPG type declarations supply abstractness; malformed projections and invalid comparison metrics return no verdict. |
+| Reflexion-model conformance | $`O(RHP+R\log R+A\log A)`$ time and $`O(R+A)`$ output/auxiliary space | First textual prefix mapping, ordered allowed/realized pairs, and path-sorted divergences; no parser, graph search, or I/O. |
 | Variable liveness | conventional $`O(H(B + E_b)W)`$ solve plus $`O(NW)`$ report replay | $`B`$ blocks, $`E_b`$ block edges, $`N`$ reachable CFG nodes, lattice height $`H \le F`$ for $`F`$ variables, and $`W = \lceil F/64 \rceil`$ machine words per state. |
 | Available / very-busy expressions | each has conventional $`O(H(B + E_b)W)`$ solve plus $`O(NW)`$ report replay; advisory candidate filtering adds dominance and bounded kill-reachability checks | $`F`$ structural expressions, $`H \le F`$, and $`W = \lceil F/64 \rceil`$; kill indexing is linear in operand memberships and definitions. |
 | Evidence-aware complexity | provider cost plus $`O(L + R)`$ composition | Computes the legacy AST fallback, validated function scope, loop forest/dominance, and induction report; then formats $`L`$ loops and combines $`R`$ recursion sites. Provider worst cases are documented with loop and induction analysis. |
@@ -259,9 +262,9 @@ cargo bench --no-default-features --features algorithm-detection \
   --bench induction_analysis -- --test
 ```
 
-Martin metrics are intentionally benchmark-deferred by their implementation
-task: their exact example/property/integration suite establishes correctness,
-but no timing claim is made. DFG/PDG construction, whole-corpus analysis, and
+Martin metrics and reflexion conformance are intentionally benchmark-deferred
+by their implementation tasks: exact example/property/integration suites
+establish correctness, but no timing claim is made. DFG/PDG construction, whole-corpus analysis, and
 GNN propagation remain the broader runnable-benchmark gaps. Every other
 implemented architecture-analysis operation in this epic has an oracle-guarded
 target before optimization work begins.

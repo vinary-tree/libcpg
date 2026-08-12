@@ -35,6 +35,7 @@ Source: [`diagrams/resource-bounds.puml`](../diagrams/resource-bounds.puml).*
 | `CondensationOptions::max_components` | `1_000_000` hard maximum | `condensation_metrics`; `coffman_graham` always uses the hard maximum | the total metrics API returns an incomplete capped report; the direct CG API returns `AnalysisError::BudgetExceeded` |
 | `MAX_DSM_NODES` | `50_000` hard maximum | `analyze_dsm`; independently rechecked by `classify_core_periphery` | returns an incomplete capped result with the stable node universe and no partial visibility/class vectors |
 | Martin structural validation | always on | `martin_metrics`; `sdp_violations` | malformed projections return no result; invalid assignment entries are inert; duplicate/non-finite/out-of-range instability values suppress all SDP verdicts |
+| Reflexion input admission | caller-selected | `reflexion` | pure finite iteration, but callers must normalize path identity and cap layers, prefixes, path bytes, allowed pairs, and observations at ingress |
 | `MAX_WL_ITERATIONS` | `16` hard maximum | `wl_labels`; inherited by `structural_clone_classes` | clamps the request before refinement; malformed projections return empty vectors before indexed traversal |
 | `MAX_CENTRALITY_ITERATIONS` | `10_000` hard maximum | PageRank, eigenvector, Katz, and HITS | clamps every requested round count; invalid numerical options return a non-converged result without iteration |
 | `CentralityBudget::max_work` | `2_000_000_000` default | edge betweenness, closeness, harmonic, and Burt constraint | rejects before all-sources/neighborhood traversal with `AnalysisError::BudgetExceeded` |
@@ -278,6 +279,23 @@ CPG/projection size and module-name bytes at its ingress. Treat the assignment
 policy and dependency-edge semantics as untrusted metadata when they cross a
 serialization or service boundary; validation guarantees total execution, not
 architectural truth.
+
+## Reflexion model: path policy and input bounds
+
+[`reflexion`](../components/graph/reflexion-model.md) performs no parsing,
+graph traversal, recursion, I/O, or filesystem lookup. It treats every path as
+an opaque UTF-8 string and assigns it to the first declared layer with a
+`starts_with` prefix match. Consequently it remains total for empty, duplicate,
+unknown, and overlapping public values, but it must not be used as a path
+authorization check. Normalize separators, relative roots, `.`/`..`, and any
+symlink policy before the call when path identity has security consequences.
+
+Work is finite and bounded by supplied collections, but the fixed signature has
+no hard admission cap. A hostile-input service should bound the number of
+layers, prefixes per layer, `allow` pairs, observed edges, and bytes per name or
+path before allocating `Arc<str>` values. Persist the dependency extractor and
+normalization policy with results; deterministic output does not establish the
+truth or completeness of caller metadata.
 
 ## WL refinement: round cap and total projection validation
 

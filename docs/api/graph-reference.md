@@ -362,6 +362,25 @@ or invalid metric values suppress SDP verdicts. See the [Martin component
 guide](../components/graph/martin-metrics.md) for formulae, assignment policy,
 pseudocode, examples, complexity, and interpretation limits.
 
+### Reflexion-model conformance
+
+This feature-free path API compares a declared layered architecture with an
+observed directed dependency multiset:
+
+| Function | Signature | Result |
+|---|---|---|
+| `reflexion` | `fn(&ReflexionRules, impl IntoIterator<Item=(Arc<str>, Arc<str>)>) -> ReflexionSummary` | Input-order-invariant convergence/unlayered counts, path-sorted divergences, and ordered realized allowed pairs. |
+| `ReflexionRules::layer_of` | `fn(&self, &str) -> Option<&str>` | First layer whose textual prefix matches the path. |
+| `ReflexionRules::classify` | `fn(&self, &str, &str) -> ReflexionVerdict` | `SameLayer`, `Allowed`, `Divergence`, or `Unlayered`. |
+| `ReflexionRules::absences` | `fn(&self, &BTreeSet<(Arc<str>, Arc<str>)>) -> Vec<(Arc<str>, Arc<str>)>` | Sorted, deduplicated declared pairs not realized by observed edges. |
+
+`LayerSpec` exposes `name` and ordered `prefixes`; `ReflexionRules` exposes
+ordered `layers` and directed `allow` pairs. `ReflexionDivergence` preserves
+both paths plus their mapped layers. Paths are opaque strings: the API performs
+no filesystem lookup or normalization, and duplicate observations preserve
+multiplicity. See the [reflexion component guide](../components/graph/reflexion-model.md)
+for syntax, semantics, pseudocode, security limits, examples, and evidence.
+
 ### Weisfeiler–Lehman labels and structural clones
 
 These feature-free functions consume a valid `GraphProjection` without
