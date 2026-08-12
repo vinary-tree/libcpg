@@ -39,6 +39,9 @@ Source: [`diagrams/resource-bounds.puml`](../diagrams/resource-bounds.puml).*
 | `CentralityBudget::max_work` | `2_000_000_000` default | edge betweenness, closeness, harmonic, and Burt constraint | rejects before all-sources/neighborhood traversal with `AnalysisError::BudgetExceeded` |
 | `BetweennessOptions::max_work` | `2_000_000_000` default | directed vertex betweenness and `accumulate_for_sources` | rejects before Brandes traversal when `source_count * edge_count` exceeds the cap |
 | `MAX_LOUVAIN_PASSES` / `MAX_LOUVAIN_LEVELS` | `50` / `10` hard maxima | `louvain` | clamps both repetition dimensions; zero requests return the singleton partition without local moving |
+| `MAX_K_TRUSS_EDGES` | `200_000` hard maximum | `k_truss_decomposition` | rejects before triangle-support peeling with `AnalysisError::BudgetExceeded` |
+| `MAX_MIN_CUT_NODES` | `1_024` hard maximum | `global_min_cut` | rejects before allocating the dense Stoer–Wagner matrix |
+| `MAX_ATTACK_STEPS` | `10_000` hard maximum | `attack_simulation` | rejects an excessive step request; an intentional shorter prefix is explicitly marked `truncated` |
 | Loop-induction structural bounds | at most `candidate_count + 1` invariant rounds per loop; affine depth `3` | `loop_induction` | reaches a finite fixed point; malformed AST cycles are cut by visited sets and arithmetic overflow becomes unknown evidence |
 | Complexity-evidence bounds | validated finite function scope plus loop/induction provider bounds | `estimate_time_complexity_with_evidence` (feature `algorithm-detection`) | provider failure or absent CFG evidence returns the exact legacy total estimate; justification grows with loop count |
 
@@ -334,6 +337,32 @@ The limits bound algorithmic repetition, not input size. Hosts processing
 hostile projections should also cap node and edge counts to their latency and
 memory budgets. A community assignment is advisory structural evidence; it
 must not authorize access, ownership, deletion, or automatic refactoring.
+
+## Cohesion: edge, matrix, traversal, and numeric bounds
+
+[Cohesion and structural robustness](../components/graph/cohesion-analysis.md)
+validates the complete projection contract before indexed traversal. Core,
+truss, low-link, component, assortativity, and attack operations derive simple
+undirected topology: direction and numeric weights do not affect reachability.
+Minimum cut separately rejects negative, non-finite, or overflowing weights.
+
+K-truss checks `MAX_K_TRUSS_EDGES = 200_000` before triangle-support work. Its
+storage remains proportional to nodes and simple edges; it does not materialize
+an attacker-controlled list of every triangle. Global minimum cut checks
+`MAX_MIN_CUT_NODES = 1_024` before allocating its quadratic matrix or entering
+the cubic Stoer–Wagner phases. These are safety ceilings, not latency targets;
+interactive services should select smaller caller-side graph limits.
+
+Attack simulation requires a distinct, fully projected `NodeId` order and
+rejects `max_steps > MAX_ATTACK_STEPS = 10_000`. It performs bounded iterative
+breadth-first traversal after each processed removal. `truncated = true` means
+the caller deliberately requested a prefix shorter than the validated order;
+it never disguises a library-enforced cap. Low-link DFS is iterative, so even a
+deep valid path cannot consume unbounded native stack.
+
+Every result is advisory structural evidence. A high core/truss value, light
+cut, articulation, bridge, assortativity value, or attack area must not by
+itself authorize deletion, isolation, access control, or automated refactoring.
 
 ## Loop induction: finite structural bounds
 

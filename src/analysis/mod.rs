@@ -6,6 +6,7 @@
 mod basic_blocks;
 mod centrality;
 pub(crate) mod cfg_scope;
+mod cohesion;
 mod community;
 mod condensation;
 pub mod dataflow;
@@ -29,6 +30,13 @@ pub use centrality::{
     personalized_pagerank, reverse_pagerank, BetweennessOptions, CentralityBudget, CentralityKind,
     CentralityScores, EdgeCentralityScores, HitsScores, IterationOptions, KatzOptions,
     PageRankOptions, DEFAULT_CENTRALITY_WORK_LIMIT, MAX_CENTRALITY_ITERATIONS,
+};
+
+pub use cohesion::{
+    attack_simulation, cut_vertices_and_bridges, degree_assortativity, global_min_cut,
+    k_core_decomposition, k_truss_decomposition, two_edge_connected_components, AttackResult,
+    AttackStep, CutStructure, GlobalMinCut, KCoreDecomposition, KTrussDecomposition, TrussEdge,
+    TwoEdgeConnectedComponents, MAX_ATTACK_STEPS, MAX_K_TRUSS_EDGES, MAX_MIN_CUT_NODES,
 };
 
 pub use community::{

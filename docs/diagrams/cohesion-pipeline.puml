@@ -1,0 +1,68 @@
+@startuml
+title libcpg deterministic cohesion and robustness analysis
+skinparam backgroundColor #FFFFFF
+skinparam shadowing false
+skinparam defaultFontName DejaVu Sans
+skinparam ArrowColor #495057
+skinparam ArrowThickness 1.2
+
+rectangle "GraphProjection\nsorted NodeId + forward/reverse CSR" as INPUT #E7F5FF
+rectangle "Validate complete public CSR shape" as VALIDATE #FFF3BF
+rectangle "Simple undirected topology\nforget direction · deduplicate reciprocals\nignore loops · sorted adjacency" as SIMPLE #D3F9D8
+rectangle "Weighted undirected matrix\ndeterministic reciprocal sums\nfinite nonnegative weights" as WEIGHTED #D0EBFF
+
+rectangle "Vertex peeling\nBatagelj-Zaversnik bins" as CORE #E5DBFF
+rectangle "Edge peeling\ntriangle-support bins\n<latex>\operatorname{supp}(e)\ge k-2</latex>" as TRUSS #E5DBFF
+rectangle "Iterative low-link DFS\n<latex>\ell(w)>d(v)</latex> bridge test" as LOWLINK #C3FAE8
+rectangle "Delete bridges + BFS" as BLOCKS #C3FAE8
+rectangle "Stoer-Wagner phases\n<latex>\lambda(G)=\min_S w(\delta(S))</latex>" as MINCUT #F3D9FA
+rectangle "Endpoint-degree correlation\n<latex>r\in[-1,1]</latex>" as ASSORT #FFE8CC
+rectangle "Ordered removals + BFS per step\n<latex>\operatorname{AUC}=s^{-1}\sum_i(L_{i-1}+L_i)/(2|V|)</latex>" as ATTACK #FFDEEB
+
+rectangle "KCoreDecomposition\nnode-aligned coreness" as CORERESULT #D3F9D8
+rectangle "KTrussDecomposition\ncanonical edge trussness" as TRUSSRESULT #D3F9D8
+rectangle "CutStructure\narticulations + bridges" as CUTRESULT #D3F9D8
+rectangle "TwoEdgeConnectedComponents\ncanonical robust blocks" as BLOCKRESULT #D3F9D8
+rectangle "GlobalMinCut\nweight + canonical side" as MINRESULT #D3F9D8
+rectangle "f64 assortativity" as ASSORTRESULT #D3F9D8
+rectangle "AttackResult\ntrace + normalized area" as ATTACKRESULT #D3F9D8
+rectangle "AnalysisError\nmalformed CSR · cap · numeric error" as ERROR #FFE3E3
+
+INPUT --> VALIDATE
+VALIDATE --> ERROR : invalid
+VALIDATE --> SIMPLE : topological operations
+VALIDATE --> WEIGHTED : minimum cut
+
+SIMPLE --> CORE
+SIMPLE --> TRUSS
+SIMPLE --> LOWLINK
+SIMPLE --> ASSORT
+SIMPLE --> ATTACK : explicit NodeId order
+WEIGHTED --> ERROR : invalid or overflow
+WEIGHTED --> MINCUT
+
+CORE --> CORERESULT
+TRUSS --> ERROR : more than 200,000 edges
+TRUSS --> TRUSSRESULT
+LOWLINK --> CUTRESULT
+LOWLINK --> BLOCKS : certified bridges
+BLOCKS --> BLOCKRESULT
+MINCUT --> ERROR : more than 1,024 nodes
+MINCUT --> MINRESULT
+ASSORT --> ASSORTRESULT
+ATTACK --> ERROR : invalid order or more than 10,000 steps
+ATTACK --> ATTACKRESULT
+
+legend right
+  |= Color |= Meaning |
+  |<#E7F5FF>| immutable projection input |
+  |<#FFF3BF>| complete validation boundary |
+  |<#D3F9D8>| canonical topology / public result |
+  |<#E5DBFF>| core and truss peeling |
+  |<#C3FAE8>| low-link connectivity proof |
+  |<#F3D9FA>| weighted global optimization |
+  |<#FFE8CC>| graph-wide correlation |
+  |<#FFDEEB>| ordered robustness experiment |
+  |<#FFE3E3>| typed rejection |
+endlegend
+@enduml

@@ -237,3 +237,7 @@ harness = false
 [[bench]]
 name = "community"
 harness = false
+
+[[bench]]
+name = "cohesion"
+harness = false

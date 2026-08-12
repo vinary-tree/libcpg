@@ -79,8 +79,11 @@ HITS kernels use its forward/reverse CSR directly, while spectral, distance,
 edge-betweenness, and structural-hole measures request its canonical
 undirected view. [`louvain`](community-detection.md) uses that same view for
 deterministic multi-level modularity optimization and connected refinement.
-These consumers are read-only. DSM and WL treat weights as binary adjacency;
-centrality and community detection document weight semantics per measure.
+The [`cohesion family`](cohesion-analysis.md) also consumes this view:
+topological operations deduplicate direction and ignore weights, while global
+minimum cut validates and sums finite nonnegative reciprocal weights. These
+consumers are read-only. DSM and WL treat weights as binary adjacency;
+centrality, community, and cohesion document weight semantics per measure.
 
 ### The shared function CFG view
 

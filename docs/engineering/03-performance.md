@@ -87,6 +87,12 @@ $`h=\min(\mathtt{max\_levels},10)`$ = Louvain aggregation levels.
 | Burt constraint | $`O(E+\sum_v d(v)^2)`$ time, $`O(V+E)`$ working space | Nonnegative weighted undirected adjacency; exact modeled-neighborhood budget. |
 | Multi-level Louvain | worst case $`O(h[p(V+E\log V)+E\log E])`$ time, $`O(V+E)`$ working space | Dense-order local moving sorts touched community ids; deterministic aggregation groups canonical weighted edges. Graph sizes do not increase across levels. |
 | Connected-community refinement | $`O(V+E)`$ time, $`O(V)`$ working space after projection validation | Breadth-first search is restricted to each input community; components and output labels are canonicalized by smallest member. |
+| K-core decomposition | $`O(V+E)`$ time, $`O(V+E)`$ working space | Batagelj–Zaversnik degree bins with constant-time moves. |
+| K-truss decomposition | $`O(E^{3/2})`$ simple-graph neighborhood work, $`O(V+E)`$ space | Support bins and smaller-endpoint triangle discovery; hard 200,000-edge ceiling. |
+| Articulation/bridges and two-edge components | $`O(V+E)`$ time, $`O(V+E)`$ space | Iterative low-link DFS; bridge-deletion BFS adds another linear pass. |
+| Global minimum cut | $`O(V^3)`$ time, $`O(V^2)`$ space | Dense Stoer–Wagner matrix; hard 1,024-node ceiling and checked finite sums. |
+| Degree assortativity | $`O(V+E)`$ time and space including simple projection | One canonical edge pass after degree construction. |
+| Attack simulation | $`O(s(V+E))`$ time, $`O(V+E)`$ space | One iterative component traversal after each of at most 10,000 requested removals. |
 | GNN `propagate` | $`O(L \cdot (V + E) \cdot d)`$ | Each layer means neighbour vectors over the AST/CFG/DFG overlays, then ReLU. |
 
 Two of these deserve emphasis. VF2 is worst-case super-exponential, which is why
@@ -97,8 +103,8 @@ once, loop bodies twice, and a path set cuts malformed AST cycles.
 
 ## Benchmark coverage and remaining gaps
 
-Ten Criterion targets are active. Their fifteen baseline operation groups are
-feature-free; `induction_analysis` also registers a sixteenth,
+Eleven Criterion targets are active. Their eighteen baseline operation groups are
+feature-free; `induction_analysis` also registers a nineteenth,
 `algorithm-detection`-gated operation. Every active group constructs and checks a deterministic oracle
 before Criterion enters the timed loop:
 
@@ -136,6 +142,12 @@ before Criterion enters the timed loop:
   disconnected path families. Independent modularity, exact repeatability,
   canonical labels, component counts, and induced connectivity are checked
   before timing.
+- `cohesion` measures k-core on 1,024- and 8,192-vertex ring lattices, k-truss
+  on those sizes of high-degree stars, k-truss and iterative connectivity on
+  512- and 2,048-vertex clique chains, weighted
+  minimum cut on 64- and 128-vertex seams, and attack/assortativity on 1,024-
+  and 8,192-vertex stars. Analytic core, truss, bridge, component, cut,
+  correlation, fragmentation, and repeatability oracles run before timing.
 
 ```toml
 [[bench]]
@@ -177,6 +189,10 @@ harness = false
 [[bench]]
 name = "community"
 harness = false
+
+[[bench]]
+name = "cohesion"
+harness = false
 ```
 
 Run it directly, or save and compare named baselines:
@@ -194,6 +210,7 @@ cargo bench --bench dsm --no-default-features
 cargo bench --bench wl --no-default-features
 cargo bench --bench centrality --no-default-features
 cargo bench --bench community --no-default-features
+cargo bench --bench cohesion --no-default-features
 cargo bench --no-default-features --features algorithm-detection \
   --bench induction_analysis -- --test
 ```

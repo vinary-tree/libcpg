@@ -44,6 +44,9 @@ PDG). A query can therefore mix syntax, control flow, and data flow freely.
 - **Community detection** — deterministic multi-level Louvain over weighted
   undirected projection views, canonical node-aligned partitions, and checked
   connected-community refinement with explicit pass and level ceilings.
+- **Cohesion and robustness** — deterministic k-core and k-truss peeling,
+  iterative articulation/bridge analysis, two-edge-connected blocks, bounded
+  weighted global minimum cut, degree assortativity, and ordered attack traces.
 - **CFG reachability** — feature-free, deterministic reachable/unreachable
   partitions and structural dead-branch evidence without graph mutation.
 - **Basic-block CFGs** — deterministic, id-preserving block partitions, typed
@@ -138,8 +141,8 @@ Comprehensive documentation lives under [`docs/`](docs/README.md):
 - **[Theory](docs/theory/00-overview.md)** — the CPG model, control/data flow, program dependence & slicing, subgraph isomorphism, similarity, pattern detection, complexity, and GNNs, with proofs, math, and citations.
 - **[Architecture](docs/architecture/overview.md)** — module map, the graph data model, construction & analysis pipelines, and language frontends.
 - **[Design decisions](docs/design/00-overview.md)** — ADR-style records for load-bearing graph, construction, analysis, and feature choices.
-- **[API reference](docs/api/graph-reference.md)** — graph/projection/block-CFG/SCC/condensation/DSM/centrality/community/reachability, builder, and pattern/algorithm/GNN reference.
-- **[Components](docs/README.md#components)** — graph projections, basic blocks, dominators, SCC/condensation/DSM/centrality/community analytics, reachability, builders, patterns, algorithms, and GNN internals.
+- **[API reference](docs/api/graph-reference.md)** — graph/projection/block-CFG/SCC/condensation/DSM/centrality/community/cohesion/reachability, builder, and pattern/algorithm/GNN reference.
+- **[Components](docs/README.md#components)** — graph projections, basic blocks, dominators, SCC/condensation/DSM/centrality/community/cohesion analytics, reachability, builders, patterns, algorithms, and GNN internals.
 - **[Usage guides](docs/usage/00-getting-started.md)** — task-oriented how-tos.
 - **[Engineering](docs/engineering/00-overview.md)** · **[Scientific validation](docs/scientific/00-overview.md)** · **[Security](docs/security/00-threat-model.md)**.
 - **[Glossary](docs/GLOSSARY.md)** and the **[diagram catalog](docs/diagrams/README.md)**.

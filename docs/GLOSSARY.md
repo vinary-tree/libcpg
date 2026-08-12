@@ -29,9 +29,24 @@ The step in a [Graph Neural Network](#graph-neural-network-gnn) that combines a 
 
 A structural category of algorithm (sorting, searching, graph traversal, dynamic programming, …) that the `algorithm-detection` feature recognises from a function's control-flow and recursion shape via **heuristics** (e.g. "has a midpoint calculation", "has a visited set", "has a memoization table"). Exposed as `AlgorithmFamily`. Detection is heuristic, not a proof of identity. See [`components/algorithms/families.md`](components/algorithms/families.md).
 
+### Articulation vertex / Bridge / Two-edge-connected component
+
+An **articulation vertex** is a vertex whose deletion increases connected-
+component count. A **bridge** is an edge with the same property. A
+**two-edge-connected component** is a maximal vertex region left after every
+bridge is deleted; no single remaining edge can disconnect that region.
+libcpg derives all three from iterative depth-first low links [[31d–31e]](#references).
+
 ### AST-ordered reaching definitions
 
 `libcpg`'s [data-flow](#data-flow-graph-dfg) analysis strategy: a single **flow-sensitive** sweep over AST nodes *in source order*, maintaining an environment `ReachingEnv` mapping each variable name to the set of definitions currently reaching it. It applies a [strong update](#strong-update--weak-update) in straight-line context and a weak update inside conditional regions, and sweeps loop bodies twice for loop-carried dependencies. It is **not** [SSA](#static-single-assignment-ssa) and **not** classic CFG-fixed-point propagation; it is chosen for simplicity and for threading definitions into deeply nested expression uses. See [`theory/03-data-flow-and-reaching-definitions.md`](theory/03-data-flow-and-reaching-definitions.md) and [`design/0003-ast-ordered-reaching-defs.md`](design/0003-ast-ordered-reaching-defs.md).
+
+### Attack simulation
+
+An explicit robustness experiment that removes distinct vertices in a caller-
+supplied order and records the largest connected component after each step.
+libcpg also reports normalized trapezoidal area under that trace; lower area
+means faster fragmentation under that particular order [[31h]](#references).
 
 ### Available expression
 
@@ -94,6 +109,17 @@ not a new graph or an ownership fact. `try_refine_connected` subsequently
 splits any assigned group whose induced subgraph is disconnected. See
 [`theory/13-community-structure-and-modularity.md`](theory/13-community-structure-and-modularity.md)
 and [`components/graph/community-detection.md`](components/graph/community-detection.md).
+
+### Cohesion / Structural robustness
+
+**Cohesion** describes how persistently vertices or edges remain in mutually
+supporting subgraphs; libcpg measures it with [k-core](#k-core) and
+[k-truss](#k-truss) decompositions. **Structural robustness** describes how
+connectivity responds to deletion or separation; articulation vertices,
+bridges, two-edge-connected components, global minimum cut, and ordered attack
+traces expose complementary failure scales [[31]](#references). See
+[`theory/14-graph-cohesion-and-robustness.md`](theory/14-graph-cohesion-and-robustness.md)
+and [`components/graph/cohesion-analysis.md`](components/graph/cohesion-analysis.md).
 
 ### Code Property Graph (CPG)
 
@@ -240,6 +266,12 @@ The overlay whose edges track how values move from definitions to uses, typed by
 
 A **definition** is a program point that assigns a variable a value; a **use** is a point that reads it. A **def-use chain** links a definition to every use it reaches. `libcpg` models these with `Definition` / `DefinitionKind`, `Use` / `UseKind`, and `DefUseChain`, built by `build_def_use_chains`. See [`components/builder/dfg.md`](components/builder/dfg.md).
 
+### Degree assortativity
+
+Newman's Pearson correlation between degrees at the two ends of an undirected
+edge. Positive values indicate like-degree attachment; negative values indicate
+high-to-low-degree attachment; a star has coefficient `-1` [[31g]](#references).
+
 ### Design pattern
 
 A reusable solution to a recurring design problem. `libcpg` detects the 23 [Gang-of-Four](#gang-of-four-gof) patterns structurally, by matching each pattern's template graph against the CPG with a relaxed [VF2](#vf2) matcher. See [`components/patterns/gang-of-four.md`](components/patterns/gang-of-four.md).
@@ -383,6 +415,20 @@ J(A, B) = \frac{|A \cap B|}{|A \cup B|}
 
 `libcpg`'s default [similarity metric](#similarity-metric) applies it to the multisets of node kinds of two graphs. See [`theory/06-graph-similarity.md`](theory/06-graph-similarity.md).
 
+### K-core
+
+The unique maximal induced subgraph in which every retained vertex has degree
+at least $`k`$. A vertex's **coreness** is the greatest threshold whose core
+still contains it. libcpg computes every core number simultaneously using
+deterministic bin-sort peeling [[31a–31b]](#references).
+
+### K-truss
+
+A maximal subgraph in which every retained edge participates in at least
+$`k-2`$ triangles within that same subgraph. An edge's **trussness** is the
+greatest threshold whose truss contains it. Unlike one-time triangle count,
+truss decomposition repeatedly updates support as edges are peeled [[31c]](#references).
+
 ### Kill / Gen (data-flow)
 
 In [reaching-definitions](#reaching-definition) analysis, processing a definition of variable $`x`$ **generates** (`gen`) the new definition and **kills** (`kill`) prior definitions of $`x`$. A [strong update](#strong-update--weak-update) does both; a weak update only generates. See [`theory/03-data-flow-and-reaching-definitions.md`](theory/03-data-flow-and-reaching-definitions.md).
@@ -454,6 +500,12 @@ where $`\mathcal{N}(v)`$ is $`v`$'s neighbourhood across the three overlays and 
 ### MeTTa
 
 A language for the [F1R3FLY.io](#rholang) / Hyperon ecosystem based on rewriting over symbolic [S-expressions](#s-expression). `libcpg` maps MeTTa to CPG nodes through [Mode B](#mode-b--build_from_tree) (`map_metta`): e.g. `(= (double $x) (* $x 2))` becomes a `Function` "double" with `$x` as a `Parameter` flowing to its use. See [`usage/06-f1r3fly-rholang-metta.md`](usage/06-f1r3fly-rholang-metta.md).
+
+### Minimum cut
+
+A nontrivial vertex bipartition whose crossing edges have minimum total
+weight. `global_min_cut` uses deterministic bounded Stoer–Wagner phases and
+returns the smaller, lexicographically canonical side [[31f]](#references).
 
 ### Mode B / `build_from_tree`
 
@@ -678,3 +730,4 @@ used by the complexity analyzer to classify recursive functions (e.g. $`a = b = 
 28. Centrality foundations: (**28a**) Brin, S., Page, L. (1998). *The Anatomy of a Large-Scale Hypertextual Web Search Engine.* DOI: [10.1016/S0169-7552(98)00110-X](https://doi.org/10.1016/S0169-7552(98)00110-X). (**28b**) Brandes, U. (2001). *A Faster Algorithm for Betweenness Centrality.* DOI: [10.1080/0022250X.2001.9990249](https://doi.org/10.1080/0022250X.2001.9990249). (**28c**) Bonacich, P. (1987). *Power and Centrality: A Family of Measures.* DOI: [10.1086/228631](https://doi.org/10.1086/228631). (**28d**) Katz, L. (1953). *A New Status Index Derived from Sociometric Analysis.* DOI: [10.1007/BF02289026](https://doi.org/10.1007/BF02289026). (**28e**) Sabidussi, G. (1966). *The Centrality Index of a Graph.* DOI: [10.1007/BF02289527](https://doi.org/10.1007/BF02289527). (**28f**) Kleinberg, J. M. (1999). *Authoritative Sources in a Hyperlinked Environment.* DOI: [10.1145/324133.324140](https://doi.org/10.1145/324133.324140). (**28g**) Burt, R. S. (1992). *Structural Holes: The Social Structure of Competition.* Harvard University Press. ISBN 978-0-674-84371-4.
 29. Blondel, V. D., Guillaume, J.-L., Lambiotte, R., Lefebvre, E. (2008). *Fast Unfolding of Communities in Large Networks.* Journal of Statistical Mechanics: Theory and Experiment, P10008. DOI: [10.1088/1742-5468/2008/10/P10008](https://doi.org/10.1088/1742-5468/2008/10/P10008)
 30. Traag, V. A., Waltman, L., van Eck, N. J. (2019). *From Louvain to Leiden: Guaranteeing Well-Connected Communities.* Scientific Reports 9, 5233. DOI: [10.1038/s41598-019-41695-z](https://doi.org/10.1038/s41598-019-41695-z)
+31. Cohesion and robustness foundations: (**31a**) Seidman, S. B. (1983). *Network Structure and Minimum Degree.* DOI: [10.1016/0378-8733(83)90028-X](https://doi.org/10.1016/0378-8733(83)90028-X). (**31b**) Batagelj, V., Zaveršnik, M. (2003). *An O(m) Algorithm for Cores Decomposition of Networks.* [arXiv:cs/0310049](https://arxiv.org/abs/cs/0310049). (**31c**) Cohen, J. (2008). *Trusses: Cohesive Subgraphs for Social Network Analysis.* NSA Technical Report (no DOI assigned). (**31d**) Hopcroft, J., Tarjan, R. (1973). *Algorithm 447: Efficient Algorithms for Graph Manipulation.* DOI: [10.1145/362248.362272](https://doi.org/10.1145/362248.362272). (**31e**) Tarjan, R. (1972). *Depth-First Search and Linear Graph Algorithms.* DOI: [10.1137/0201010](https://doi.org/10.1137/0201010). (**31f**) Stoer, M., Wagner, F. (1997). *A Simple Min-Cut Algorithm.* DOI: [10.1145/263867.263872](https://doi.org/10.1145/263867.263872). (**31g**) Newman, M. E. J. (2003). *Mixing Patterns in Networks.* DOI: [10.1103/PhysRevE.67.026126](https://doi.org/10.1103/PhysRevE.67.026126). (**31h**) Holme, P., Kim, B. J., Yoon, C. N., Han, S. K. (2002). *Attack Vulnerability of Complex Networks.* DOI: [10.1103/PhysRevE.65.056109](https://doi.org/10.1103/PhysRevE.65.056109).

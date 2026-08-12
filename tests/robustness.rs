@@ -388,6 +388,59 @@ fn exercise_every_analysis(cpg: &CodePropertyGraph, func: NodeId) {
     assert_eq!(refined.nodes, call_projection.nodes);
     assert_eq!(refined.community.len(), call_projection.node_count());
     assert!(refined.modularity.is_finite());
+    let core = libcpg::k_core_decomposition(&call_projection)
+        .expect("call projection is structurally valid");
+    assert_eq!(core.nodes, call_projection.nodes);
+    assert_eq!(core.coreness.len(), call_projection.node_count());
+    let truss = libcpg::k_truss_decomposition(&call_projection)
+        .expect("corrupt fixture call graph stays below the edge cap");
+    assert!(truss.edges.iter().all(|edge| {
+        call_projection.dense_index(edge.source).is_some()
+            && call_projection.dense_index(edge.target).is_some()
+            && edge.source < edge.target
+    }));
+    let cuts = libcpg::cut_vertices_and_bridges(&call_projection)
+        .expect("call projection is structurally valid");
+    assert!(cuts
+        .articulation_points
+        .iter()
+        .all(|&node| call_projection.dense_index(node).is_some()));
+    assert!(cuts.bridges.iter().all(|&(left, right)| {
+        left < right
+            && call_projection.dense_index(left).is_some()
+            && call_projection.dense_index(right).is_some()
+    }));
+    let edge_components = libcpg::two_edge_connected_components(&call_projection)
+        .expect("call projection is structurally valid");
+    assert_eq!(edge_components.nodes, call_projection.nodes);
+    assert_eq!(
+        edge_components.component.len(),
+        call_projection.node_count()
+    );
+    assert_eq!(
+        edge_components
+            .components
+            .iter()
+            .map(Vec::len)
+            .sum::<usize>(),
+        call_projection.node_count()
+    );
+    let minimum_cut =
+        libcpg::global_min_cut(&call_projection).expect("call projection has finite unit weights");
+    assert!(minimum_cut
+        .as_ref()
+        .is_none_or(|cut| cut.weight.is_finite() && cut.weight >= 0.0));
+    let assortativity = libcpg::degree_assortativity(&call_projection)
+        .expect("call projection is structurally valid");
+    assert!((-1.0..=1.0).contains(&assortativity));
+    let attack = libcpg::attack_simulation(
+        &call_projection,
+        &call_projection.nodes,
+        call_projection.node_count(),
+    )
+    .expect("call nodes form a unique projected removal order");
+    assert_eq!(attack.trace.len(), call_projection.node_count());
+    assert!(attack.auc.is_finite() && (0.0..=1.0).contains(&attack.auc));
 
     // --- extractors ---
     let mut work = cpg.clone();

@@ -7,7 +7,7 @@ rectangle "node + edge filters\nover one overlay" as FILTER #FFE8CC
 rectangle "canonical normalization\nsort nodes and edges\nmerge parallel weights" as NORMALIZE #FFF3BF
 database "forward CSR\noffsets + targets\n+ optional weights" as FORWARD #D3F9D8
 database "reverse CSR\nrev_offsets + rev_targets" as REVERSE #C3FAE8
-rectangle "exact analyses\ndominance · centrality\ncommunities · paths" as ANALYSES #E5DBFF
+rectangle "exact analyses\ndominance · centrality · communities\ncohesion · cuts · paths" as ANALYSES #E5DBFF
 
 CPG --> FILTER : immutable traversal
 FILTER --> NORMALIZE : NodeId endpoint triples

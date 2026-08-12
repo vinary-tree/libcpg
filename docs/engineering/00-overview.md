@@ -12,7 +12,8 @@ overlays a program's [AST](../GLOSSARY.md#abstract-syntax-tree-ast),
 [CFG](../GLOSSARY.md#control-flow-graph-cfg),
 [DFG](../GLOSSARY.md#data-flow-graph-dfg), and, on demand, its
 [PDG](../GLOSSARY.md#program-dependence-graph-pdg) — plus exact SCC decomposition,
-pattern detection, algorithm/complexity heuristics, and graph-neural embeddings on top of that
+deterministic projected graph analyses, pattern detection, algorithm/complexity
+heuristics, and graph-neural embeddings on top of that
 substrate. The conceptual "why" lives in [`theory/`](../theory/00-overview.md);
 the "what/where" of the code lives in
 [`architecture/`](../architecture/overview.md); this pillar is the "how to work
@@ -48,6 +49,7 @@ analytics](../GLOSSARY.md#condensation-graph--condensation-metrics),
 [WL structural-clone analysis](../GLOSSARY.md#weisfeilerleman-wl-refinement),
 [projection centrality](../GLOSSARY.md#centrality),
 [community detection](../GLOSSARY.md#community-detection),
+[cohesion and structural-robustness analysis](../GLOSSARY.md#cohesion--structural-robustness),
 [VF2](../GLOSSARY.md#vf2) matching, and PDG slicing — works out of the box. The
 [build and features](01-build-and-features.md) page explains how to turn on what
 you need.
@@ -75,8 +77,8 @@ directly from that relationship, and both are visible in `Cargo.toml`:
 | Page | What it covers |
 | --- | --- |
 | [01 — Build and features](01-build-and-features.md) | The full feature matrix: 16 `lang-*` grammars, the language groups, the analysis features, the Mode-B toggles, `serde`, the reserved `gpu` flag, and the `full` umbrella; the pgmcp grammar-pin table; how to enable a language. |
-| [02 — Testing](02-testing.md) | The 736-test suite: example-based and `proptest` coverage plus the general, robustness, SCCP, interval, loop-induction, complexity-evidence, condensation, DSM, WL, centrality, and community public-API suites; the `arb_*` generators; how to run each feature subset; measured coverage; the defects the suite found; and the active Criterion benchmark substrate. |
-| [03 — Performance](03-performance.md) | The data-structure rationale, asymptotic costs, ten active oracle-guarded Criterion targets with sixteen enabled operation groups, controlled-measurement protocol, and explicit remaining benchmark gaps. |
+| [02 — Testing](02-testing.md) | The 752-test suite: example-based and `proptest` coverage plus the general, robustness, SCCP, interval, loop-induction, complexity-evidence, condensation, DSM, WL, centrality, community, and cohesion public-API suites; the `arb_*` generators; how to run each feature subset; measured coverage; the defects the suite found; and the active Criterion benchmark substrate. |
+| [03 — Performance](03-performance.md) | The data-structure rationale, asymptotic costs, eleven active oracle-guarded Criterion targets with eighteen feature-free operation groups plus one gated group, controlled-measurement protocol, and explicit remaining benchmark gaps. |
 | [04 — Contributing](04-contributing.md) | Step-by-step recipes: add a language mapper, add a Gang-of-Four template, add a similarity metric; plus the coding conventions the crate follows. |
 
 ## Map of the security pillar
@@ -84,7 +86,7 @@ directly from that relationship, and both are visible in `Cargo.toml`:
 | Page | What it covers |
 | --- | --- |
 | [`security/00` — Threat model](../security/00-threat-model.md) | Assets, attackers, and the two trust boundaries (untrusted source bytes; untrusted serialized graphs); why tree-sitter parsing executes no analyzed code; why detection results are advisory. |
-| [`security/01` — Input and resource hardening](../security/01-input-and-resource-hardening.md) | The concrete bounds — `max_file_size`, DFG structural passes, DSM `MAX_DSM_NODES`, WL `MAX_WL_ITERATIONS`, centrality work limits, Louvain pass/level ceilings, VF2 `max_matches` and strict toggles, slice `max_nodes` — with recommended caps for hostile input and where caller-side parser timeouts belong. |
+| [`security/01` — Input and resource hardening](../security/01-input-and-resource-hardening.md) | The concrete bounds — `max_file_size`, DFG structural passes, DSM/WL/centrality/community limits, k-truss/min-cut/attack ceilings, VF2 `max_matches`, and slice `max_nodes` — with recommended caps for hostile input and where caller-side parser timeouts belong. |
 
 ## Honest project status
 
@@ -96,7 +98,7 @@ maturity than exists. The most consequential items:
 | --- | --- | --- |
 | Default build | `default = []`; `build` fails without a `lang-*` feature | [01](01-build-and-features.md) |
 | `examples/` directory | present but **empty** — no runnable examples (`tests/` now holds the integration and robustness suites) | [02](02-testing.md) |
-| Benchmarks | eight oracle-guarded Criterion targets are active; baseline groups are feature-free and the complexity-evidence group is `algorithm-detection`-gated; DFG/PDG construction, whole-corpus analysis, and GNN propagation remain gaps | [02](02-testing.md), [03](03-performance.md) |
+| Benchmarks | eleven oracle-guarded Criterion targets are active; eighteen operation groups are feature-free and the nineteenth, complexity evidence, is `algorithm-detection`-gated; DFG/PDG construction, whole-corpus analysis, and GNN propagation remain gaps | [02](02-testing.md), [03](03-performance.md) |
 | `rayon`, `ahash`, `string_cache`, `regex` | declared in `Cargo.toml` but **not yet wired** into `src/` (`proptest` is now used throughout the test suite) | [02](02-testing.md), [03](03-performance.md) |
 | `gpu` feature | **reserved** — enables `wgpu`/`pollster` but no GPU code is written | [01](01-build-and-features.md) |
 | Detection results | pattern/algorithm/complexity outputs are **heuristics**, not proofs | [`security/00`](../security/00-threat-model.md) |

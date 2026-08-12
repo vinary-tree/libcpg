@@ -435,12 +435,54 @@ limits.
 
 ---
 
+## Inspecting cohesion and failure seams
+
+When the question concerns structural persistence or fragmentation, compose
+the feature-free cohesion functions over the relevant projection. This example
+finds resilient call-graph blocks, single-edge seams, and a degree-first attack
+trace:
+
+```rust
+use libcpg::{
+    attack_simulation, call_graph_projection, cut_vertices_and_bridges,
+    k_core_decomposition, two_edge_connected_components, AnalysisError,
+    CodePropertyGraph,
+};
+
+fn inspect_call_robustness(cpg: &CodePropertyGraph) -> Result<(), AnalysisError> {
+    let graph = call_graph_projection(cpg);
+    let core = k_core_decomposition(&graph)?;
+    let cuts = cut_vertices_and_bridges(&graph)?;
+    let blocks = two_edge_connected_components(&graph)?;
+
+    let mut removal_order = graph.nodes.clone();
+    removal_order.sort_by_key(|node| {
+        let dense = graph.dense_index(*node).expect("node came from projection") as usize;
+        (std::cmp::Reverse(core.coreness[dense]), *node)
+    });
+    let attack = attack_simulation(&graph, &removal_order, removal_order.len())?;
+
+    println!("{} bridges", cuts.bridges.len());
+    println!("{} robust blocks", blocks.components.len());
+    println!("degree-first robustness area: {:.3}", attack.auc);
+    Ok(())
+}
+```
+
+Persist the projection provenance and the exact removal order with an attack
+trace. Compare minimum-cut weights only when weight semantics match. See
+[cohesion and structural robustness](../components/graph/cohesion-analysis.md)
+for the k-truss, minimum-cut, assortativity, cap, and interpretation contracts.
+
+---
+
 ## Next steps
 
 - Detect design patterns over the graph you just queried: [Pattern Detection](03-pattern-detection.md).
 - Turn "affects" into a precise slice: [Program Slicing](04-program-slicing.md).
 - Rank a projected relation: [Projection Centrality](../components/graph/centrality-analysis.md).
 - Partition a projected relation: [Community Detection](../components/graph/community-detection.md).
+- Inspect cohesive regions and failure seams: [Cohesion and Structural Robustness](../components/graph/cohesion-analysis.md).
 - The complete method tables (construction, AST, CFG, DFG, call, query, metrics, subgraph) are in the [graph reference](../api/graph-reference.md); traversal internals are in [Graph Traversal](../components/graph/traversal.md).
 
 ---

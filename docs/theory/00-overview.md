@@ -95,7 +95,10 @@ structural-clone refinement
 [centrality](../GLOSSARY.md#centrality) over projection topology
 ([Theory 12](12-centrality-and-structural-importance.md)), and deterministic
 [community detection](../GLOSSARY.md#community-detection) by generalized
-modularity ([Theory 13](13-community-structure-and-modularity.md)). Each consumes the same
+modularity ([Theory 13](13-community-structure-and-modularity.md)), and
+[cohesion and structural robustness](../GLOSSARY.md#cohesion--structural-robustness)
+from core/truss persistence, low links, weighted cuts, assortativity, and attack
+traces ([Theory 14](14-graph-cohesion-and-robustness.md)). Each consumes the same
 `CodePropertyGraph`; none needs its own bespoke intermediate representation.
 
 ## 4. The four overlays at a glance

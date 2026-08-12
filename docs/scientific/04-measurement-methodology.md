@@ -1,6 +1,6 @@
 # Measurement methodology
 
-`libcpg` ships ten runnable Criterion targets. Their baseline groups are
+`libcpg` ships eleven runnable Criterion targets. Their baseline groups are
 feature-free; the `induction_analysis` target also registers an
 `algorithm-detection`-gated complexity-evidence group. Each active group
 asserts a deterministic correctness oracle **before** entering the timed loop.
@@ -19,7 +19,7 @@ the source transformation under study does not [[1]](#references).
 
 ## 1. Current evidence
 
-All ten targets use `harness = false`, which hands execution to Criterion
+All eleven targets use `harness = false`, which hands execution to Criterion
 rather than Rust's test harness:
 
 ```toml
@@ -65,6 +65,10 @@ harness = false
 [[bench]]
 name = "community"
 harness = false
+
+[[bench]]
+name = "cohesion"
+harness = false
 ```
 
 | Target | Public operation | Families and sizes | Pre-timing oracle |
@@ -80,6 +84,7 @@ harness = false
 | `wl` | `wl_labels`, `structural_clone_classes` | four-round directed rings and outward stars at 1,024 and 8,192 vertices | exact label symmetry/distinction and exact ordered clone membership |
 | `centrality` | PageRank, eigenvector, Brandes, and closeness | paths, rings, and clustered projections at 256/1,024 vertices for iterative kernels and 128/256 vertices for all-sources kernels | alignment, convergence/mass or finiteness/normalization, shape symmetry/order, canonical edge output, bridge maximality, and auxiliary HITS/harmonic/Burt checks |
 | `community` | `louvain`, `try_refine_connected` | rings of eight-vertex cliques at 256/1,024 vertices; disconnected eight-vertex paths at 512/2,048 vertices | exact repeatability, canonical labels, positive independently recomputed modularity, expected component count, and independent induced-connectivity traversal |
+| `cohesion` | core, truss, cut structure, two-edge components, minimum cut, assortativity, attack simulation | ring lattices at 1,024/8,192; clique chains at 512/2,048; weighted seams at 64/128; stars at 1,024/8,192, including truss under degree skew | exact repeatability plus analytic core, truss, bridge, component, cut-weight, endpoint-correlation, and fragmentation invariants |
 
 The evidence is deliberately local: a result for one named family, size,
 machine, toolchain, and environment is not a universal speed claim. DFG/PDG
@@ -248,6 +253,12 @@ $`H \le F`$ is lattice height, and $`d`$ is embedding dimension.
 | projection WL labels / clones | $`O(q(V\log V+E+\sum_v d(v)\log d(v)))`$ for $`q\le16`$, plus clone sorting | active four-round ring/star target |
 | multi-level Louvain | $`O(h[p(V+E\log V)+E\log E])`$ for $`p\le50`$ and $`h\le10`$ | active ring-of-cliques target |
 | connected-community refinement | $`O(V+E)`$ after validation | active disconnected-path target |
+| k-core | $`O(V+E)`$ | active ring-lattice target |
+| k-truss | $`O(E^{3/2})`$ simple-graph neighborhood work | active clique-chain target |
+| cut structure / two-edge components | $`O(V+E)`$ | active clique-chain target |
+| global minimum cut | $`O(V^3)`$ time and $`O(V^2)`$ space | active weighted-seam target |
+| assortativity | $`O(V+E)`$ | active star target |
+| attack simulation | $`O(s(V+E))`$ for $`s\le10{,}000`$ | active center-first star target |
 | DFG/PDG construction | analysis-specific; must separate extraction from slicing | benchmark gap |
 | GNN propagation | $`O(\text{layers}\cdot(V+E)\cdot d)`$ | benchmark gap |
 

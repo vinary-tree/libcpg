@@ -424,6 +424,32 @@ score of the refined partition. See the [community component
 guide](../components/graph/community-detection.md) for formulas, pseudocode,
 examples, complexity, and evidence boundaries.
 
+### Cohesion and structural robustness
+
+The feature-free cohesion family validates a `GraphProjection` and returns
+out-of-graph, canonically ordered evidence. Topological operations forget
+direction, deduplicate reciprocal relations, and ignore self-loops. Weighted
+minimum cut instead sums reciprocal weights and rejects negative, non-finite,
+or overflowing values.
+
+| Function | Signature | Result |
+|---|---|---|
+| `k_core_decomposition` | `fn(&GraphProjection) -> Result<KCoreDecomposition, AnalysisError>` | node-aligned core numbers |
+| `k_truss_decomposition` | `fn(&GraphProjection) -> Result<KTrussDecomposition, AnalysisError>` | canonical edge trussness |
+| `cut_vertices_and_bridges` | `fn(&GraphProjection) -> Result<CutStructure, AnalysisError>` | sorted articulation vertices and bridges |
+| `two_edge_connected_components` | `fn(&GraphProjection) -> Result<TwoEdgeConnectedComponents, AnalysisError>` | smallest-member-ordered robust blocks |
+| `global_min_cut` | `fn(&GraphProjection) -> Result<Option<GlobalMinCut>, AnalysisError>` | minimum weight and canonical cut side, or `None` below two nodes |
+| `degree_assortativity` | `fn(&GraphProjection) -> Result<f64, AnalysisError>` | endpoint-degree correlation in `[-1,1]` |
+| `attack_simulation` | `fn(&GraphProjection, &[NodeId], usize) -> Result<AttackResult, AnalysisError>` | ordered largest-component trace and normalized area |
+
+`MAX_K_TRUSS_EDGES` is 200,000, `MAX_MIN_CUT_NODES` is 1,024, and
+`MAX_ATTACK_STEPS` is 10,000. Excessive work returns
+`AnalysisError::BudgetExceeded`. `AttackResult::truncated` describes a
+caller-requested prefix shorter than the validated removal order; it is not
+silent resource truncation. See the [cohesion component
+guide](../components/graph/cohesion-analysis.md) for definitions, literate
+algorithms, examples, complexity, and interpretation boundaries.
+
 ### Natural loops and nesting
 
 The feature-free loop API uses the shared reachable function CFG and dominator

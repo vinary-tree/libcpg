@@ -16,8 +16,8 @@ A CPG library makes three kinds of assertion, and each demands a different stand
 
 These are distinct from *performance* claims ("construction is fast", "VF2
 prunes well"), which require controlled measurement rather than assertion.
-`libcpg` ships ten oracle-guarded Criterion targets (sixteen operation groups when
-the gated complexity-evidence group is enabled), but their evidence is limited to
+`libcpg` ships eleven oracle-guarded Criterion targets (eighteen feature-free
+operation groups plus the gated complexity-evidence group), but their evidence is limited to
 the named graph families, sizes, environment, and operation. The
 protocol and remaining gaps are specified in [04 — Measurement
 methodology](04-measurement-methodology.md).
@@ -50,18 +50,18 @@ Two properties of the suite make this rigorous rather than merely suggestive:
 
 ## 3. The evidence base
 
-The maximal matrix contains **689 library tests**, **21 general public-API
+The maximal matrix contains **703 library tests**, **21 general public-API
 integration tests**, **5 malformed-input robustness tests**, **3 SCCP
 public/parser integration tests**, and **3 interval public/parser integration
 tests**, plus **3 loop-induction** and **3 complexity-evidence public/parser
 integration tests**, plus **2 condensation** and **2 DSM public/parser
-integration tests**, plus **1 WL**, **2 centrality**, and **2 community
-public/parser integration tests**. These 736 executable cases combine fixed
-examples, differential oracles, and 49 exact source-level
+integration tests**, plus **1 WL**, **2 centrality**, **2 community**, and **2
+cohesion public/parser integration tests**. These 752 executable cases combine
+fixed examples, differential oracles, and 52 exact source-level
 `proptest!` blocks. The feature-free matrix remains
 independently runnable and exercises the exact graph/data-flow substrate
-without compiling any grammar. Ten active Criterion targets supplement
-correctness with fifteen feature-free operation groups and a sixteenth when
+without compiling any grammar. Eleven active Criterion targets supplement
+correctness with eighteen feature-free operation groups and a nineteenth when
 `algorithm-detection` is enabled; see
 [Testing](../engineering/02-testing.md) for the census and [04](04-measurement-methodology.md)
 for the measurement contract.
@@ -75,7 +75,7 @@ Because `default = []`, many tests are **feature-gated**. The end-to-end reachin
 | [01 — Invariants & equivalence](01-cpg-invariants-and-equivalence.md) | Single shared node set; graph-assigned unique IDs; AST child/parent consistency; idempotent extractors; `build` ≡ `build_from_tree` (identical node/edge counts + language) | `test_build_from_tree_matches_build`, `parsed_shadowing_and_idempotent`, `def_use_backward_slice`, `parsed_nested_use_resolves_and_chains` | `lang-rust` (equivalence, DFG) / feature-free (slice) |
 | [02 — Reaching-defs validation](02-reaching-defs-validation.md) | Nested-expression use resolution; latest-definition (strong update); non-flow of unrelated variables; shadowing scope; idempotency | `parsed_nested_use_resolves_and_chains`, `parsed_reassignment_uses_latest_definition`, `parsed_unrelated_variable_does_not_flow`, `parsed_shadowing_and_idempotent` | `lang-rust` |
 | [03 — VF2 completeness](03-vf2-completeness.md) | Soundness floor (empty pattern → no match); kind-feasibility pruning; **all** embeddings found (diamond → exactly 2) with exact backtracking | `test_empty_pattern`, `test_single_node_match`, `test_multi_embedding_backtracking` | feature-free |
-| [04 — Measurement methodology](04-measurement-methodology.md) | Environment control and exact-oracle timing for SCC, condensation analytics, arena construction, bounded VF2, liveness, loop induction, DSM, WL, centrality, and community analysis | ten `benches/*.rs` Criterion targets | feature-free |
+| [04 — Measurement methodology](04-measurement-methodology.md) | Environment control and exact-oracle timing for SCC, condensation analytics, arena construction, bounded VF2, liveness, loop induction, DSM, WL, centrality, community, and cohesion analysis | eleven `benches/*.rs` Criterion targets | feature-free baseline; one `algorithm-detection` group |
 | [05 — SCCP validation](05-sccp-validation.md) | Concrete value soundness, lattice laws, conditional-edge partition, refinement monotonicity, determinism, parser integration | `straight_line_literal_programs_match_the_concrete_interpreter`, SCCP unit/property tests, `sccp_integration` | feature-free / `lang-rust` parser case |
 | [06 — Interval validation](06-interval-analysis-validation.md) | Concrete range soundness, hull/widen/narrow laws, loop convergence, narrowing descent, determinism, SCCP cross-check, parser integration | interval unit/property tests, `intervals_integration` | feature-free / `lang-rust` parser case |
 | [07 — Loop-induction validation](07-induction-analysis-validation.md) | DFG invariant contract, unique latch-dominating recurrences, checked affine steps, comparison direction, determinism, parser integration, malformed/stack safety | induction unit/property tests, `induction_integration`, robustness harness | feature-free / `serde` / `lang-rust` parser case |
@@ -85,6 +85,7 @@ Because `default = []`, many tests are **feature-gated**. The end-to-end reachin
 | [11 — WL validation](11-wl-validation.md) | Directed-degree labels, stable mixing, isomorphic-relabeling invariance, clone ordering, round cap, malformed behavior, public composition | WL unit/property tests, `wl_integration`, robustness harness, benchmark oracles | feature-free |
 | [12 — Centrality validation](12-centrality-validation.md) | Alignment, closed forms, petgraph/naive differentials, Brandes composition, stable-id relabeling, numerical/cap boundaries, non-mutation | centrality unit/property tests, `centrality_integration`, robustness harness, benchmark oracles | feature-free |
 | [13 — Community validation](13-community-validation.md) | Planted partitions, independent generalized modularity, true aggregation, exact repeat/permutation bytes, connected refinement, caps, malformed numerics/CSR, parser integration | community unit/property tests, `community_integration`, robustness harness | feature-free / `serde` / `lang-rust` parser case |
+| [14 — Cohesion validation](14-cohesion-validation.md) | Independent core/truss peeling, brute cut removal, exhaustive minimum cuts, attack BFS/AUC, exact repeat/permutation, caps, malformed CSR/numerics/orders, stack safety, parser integration | cohesion unit/property tests, `cohesion_integration`, robustness harness, benchmark oracles | feature-free / `serde` / `lang-rust` parser case |
 
 ## 5. What is proven, and what is advisory
 
@@ -104,6 +105,9 @@ Scientific honesty requires separating the two:
   Community assignments are exact-repeat and serialization-byte deterministic,
   their scores agree with an independent generalized-modularity formula, and
   every refined group passes an independent induced-connectivity traversal.
+  Cohesion core and truss labels agree with independent fixed-point peelers;
+  articulation/bridge output agrees with brute deletion, minimum-cut weight
+  with exhaustive bipartitions, and every attack trace with independent BFS.
 - **Advisory (policy-sensitive by design).** The available/very-busy states are
   exact for the modeled structural expressions and CFG, while their CSE/PRE
   transformation candidates still require language side-effect policy.
@@ -124,10 +128,13 @@ Scientific honesty requires separating the two:
   proof.
   Centrality is also advisory: a structural score does not prove runtime
   importance, causal defect risk, or architectural quality.
+  Cohesion and robustness output is similarly structural evidence: a bridge,
+  light cut, core/truss value, or attack area does not itself prove a runtime
+  failure or authorize a refactoring.
 - **Empirically bounded.** Performance results apply only to a target's named
   fixture, size, and controlled environment. DFG/PDG
   construction, whole-corpus analysis, and GNN propagation remain measurement gaps; no result
-  from the ten active targets (or sixteen enabled operation groups) may be
+  from the eleven active targets (or nineteen enabled operation groups) may be
   generalized to them.
 
 ## 6. Reproducing the experiments

@@ -3,7 +3,7 @@
 The `graph` module holds the data structures at the heart of `libcpg`: the
 [Code Property Graph](../../GLOSSARY.md#code-property-graph-cpg) (CPG) and the
 node, edge, and identifier types it is built from. Everything else in the crate
-— the builders, graph projections, centrality, community, dominator, SCC, condensation, and DSM
+— the builders, graph projections, centrality, community, cohesion, dominator, SCC, condensation, and DSM
 analyses, the pattern matchers, the slicer, the GNN — reads
 from or writes to this one structure. This page explains what a CPG is, why `libcpg` merges
 several program views into a single graph, how that graph is stored, and how you
@@ -113,6 +113,12 @@ values.
 weighted-undirected projection view. Multi-level Louvain and optional connected
 refinement return node-aligned immutable partitions; neither creates another
 graph store nor changes an overlay.
+
+[Cohesion and robustness](cohesion-analysis.md) consumes the same validated
+projection. Core, truss, low-link, component, assortativity, and attack kernels
+share a canonical simple-undirected topology; bounded global minimum cut uses
+its separately validated finite nonnegative weighted view. Results remain
+out-of-graph and stable-identifier aligned.
 
 ### Creating a CPG
 
@@ -311,6 +317,9 @@ So the safe pattern is: build (single-threaded, `&mut`), then analyse
 - [Community detection](community-detection.md) — deterministic bounded
   multi-level Louvain partitions, modularity scores recomputed on the original
   projection, and checked connected-community refinement.
+- [Cohesion and structural robustness](cohesion-analysis.md) — deterministic
+  k-core/k-truss peeling, iterative articulation/bridge and robust-block
+  analysis, bounded weighted minimum cut, assortativity, and attack traces.
 - [Natural loops and nesting](loop-analysis.md) — dominator-qualified headers,
   shared latches, conservative irreducible regions, strict nesting, and loop
   exits.

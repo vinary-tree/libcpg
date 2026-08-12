@@ -76,6 +76,18 @@ as a canonical no-work singleton result.;
 ***[#F1F3F5]:projection + numeric validation
 rejects malformed CSR, invalid resolution, negative or
 non-finite weights, and overflowing reciprocal sums.;
+**[#FFE3E3] Cohesion and robustness
+***[#F1F3F5]:MAX_K_TRUSS_EDGES = 200,000
+rejects before triangle-support peeling.;
+***[#F1F3F5]:MAX_MIN_CUT_NODES = 1,024
+rejects before quadratic matrix allocation
+and cubic Stoer-Wagner phases.;
+***[#F1F3F5]:MAX_ATTACK_STEPS = 10,000
+rejects excessive requested removals and
+iterative DFS/BFS avoids native-stack growth.;
+***[#F1F3F5]:projection + numeric validation
+rejects malformed CSR and minimum-cut negative,
+non-finite, or overflowing weights.;
 **[#FFE3E3] Slicing
 ***[#F1F3F5]:max_nodes on backward_slice / forward_slice
 bounds the PDG reverse/forward BFS —
