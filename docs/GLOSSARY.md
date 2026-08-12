@@ -21,6 +21,15 @@ value-range analysis follows Cousot and Cousot [[20]](#references). See
 
 The tree that a parser produces from source code: interior nodes are language constructs (functions, `if`, expressions) and children are their syntactic parts. In `libcpg` the AST is the **base layer** of the [Code Property Graph](#code-property-graph-cpg) — every other layer overlays edges on the *same* AST nodes. AST edges are `AstChild` / `AstParent` / `AstNextSibling` / `AstPrevSibling`. See [`architecture/graph-data-model.md`](architecture/graph-data-model.md).
 
+### Afferent coupling / Efferent coupling
+
+For a named module, **afferent coupling** $`C_a`$ counts distinct external
+projection vertices that depend on vertices in the module. **Efferent
+coupling** $`C_e`$ counts distinct external vertices on which module vertices
+depend. An edge points from dependent to dependency; reversing it exchanges
+the two meanings. libcpg ignores weights and intra-module edges. See [Martin
+package metrics](#martin-package-metrics).
+
 ### Aggregation (GNN)
 
 The step in a [Graph Neural Network](#graph-neural-network-gnn) that combines a node's neighbour vectors into one vector. `libcpg`'s `AggregationMethod` enumerates `Mean` (the default and the only one used in message passing), `Sum`, `Max`, `Attention`, and `Hierarchical`; the latter two are **reserved placeholders**, not yet wired. See [Message passing](#message-passing).
@@ -650,6 +659,16 @@ source equality, or behavioral equivalence. See
 
 An IR form in which every variable is assigned exactly once, with $`\phi`$-functions merging values at control-flow joins (Cytron et al. [[3]](#references)). `libcpg` deliberately does **not** use SSA for its DFG (it uses [AST-ordered reaching definitions](#ast-ordered-reaching-definitions)); SSA is defined here to make that contrast precise. See [`design/0003-ast-ordered-reaching-defs.md`](design/0003-ast-ordered-reaching-defs.md).
 
+### Stable Dependencies Principle (SDP)
+
+The architectural rule that dependencies should point toward stability
+[[36]](#references). For a module dependency $`X\to Y`$, libcpg reports an SDP
+violation exactly when $`I(X)<I(Y)`$: the more stable source depends on the less
+stable target. Equal instability is compliant. A report aggregates module
+pairs while retaining a concrete projection-edge witness; it is advisory
+because projection and module boundaries are caller policy. See [Martin
+package metrics](#martin-package-metrics).
+
 ### Weisfeiler–Lehman (WL) refinement
 
 An iterative graph-coloring procedure that replaces each vertex label with a
@@ -738,6 +757,18 @@ T(n) = a \, T(n/b) + f(n), \qquad a \ge 1,\ b > 1
 
 used by the complexity analyzer to classify recursive functions (e.g. $`a = b = 2`$, $`f(n) = O(n)`$ gives $`O(n \log n)`$). Stated in CLRS [[13]](#references). See [`components/algorithms/complexity.md`](components/algorithms/complexity.md).
 
+### Martin package metrics
+
+An architectural metric suite proposed by Robert C. Martin [[36]](#references).
+Given [afferent/efferent coupling](#afferent-coupling--efferent-coupling),
+**instability** is $`I=C_e/(C_a+C_e)`$ with an isolated module defined as zero.
+**Abstractness** is $`A=N_a/N_t`$, where $`N_a`$ is abstract classes plus
+traits and $`N_t`$ is all class/struct/enum/trait declarations. The proposed
+**main sequence** is $`A+I=1`$; **distance** is $`D=|A+I-1|`$. These values are
+exact for a supplied dependency projection and explicit module assignment, but
+their architectural interpretation is advisory. See
+[`theory/18-martin-package-metrics.md`](theory/18-martin-package-metrics.md).
+
 ---
 
 ## References
@@ -777,3 +808,4 @@ used by the complexity analyzer to classify recursive functions (e.g. $`a = b = 
 33. Johnson, D. B. (1975). *Finding All the Elementary Circuits of a Directed Graph.* SIAM Journal on Computing 4(1), 77–84. DOI: [10.1137/0204007](https://doi.org/10.1137/0204007).
 34. Directed-motif foundations: (**34a**) Holland, P. W., Leinhardt, S. (1970). *A Method for Detecting Structure in Sociometric Data.* American Journal of Sociology 76(3), 411–432. DOI: [10.1086/224954](https://doi.org/10.1086/224954). (**34b**) Batagelj, V., Mrvar, A. (2001). *A subquadratic triad census algorithm for large sparse networks with small maximum degree.* DOI: [10.1016/S0378-8733(01)00035-1](https://doi.org/10.1016/S0378-8733(01)00035-1). (**34c**) Milo, R. et al. (2002). *Network Motifs: Simple Building Blocks of Complex Networks.* DOI: [10.1126/science.298.5594.824](https://doi.org/10.1126/science.298.5594.824).
 35. Graph-edit assignment foundations: (**35a**) Riesen, K., Bunke, H. (2009). *Approximate Graph Edit Distance Computation by Means of Bipartite Graph Matching.* DOI: [10.1016/j.imavis.2008.04.004](https://doi.org/10.1016/j.imavis.2008.04.004). (**35b**) Kuhn, H. W. (1955). *The Hungarian Method for the Assignment Problem.* DOI: [10.1002/nav.3800020109](https://doi.org/10.1002/nav.3800020109).
+36. Martin package-metric foundations: (**36a**) Martin, R. C. (1994). *OO Design Quality Metrics: An Analysis of Dependencies.* Object Mentor technical report. [Archived report PDF](https://condor.depaul.edu/dmumaugh/OOT/Design-Principles/oodmetrc.pdf). No DOI assigned. (**36b**) Martin, R. C. (2003). *Agile Software Development: Principles, Patterns, and Practices.* Prentice Hall/Pearson. ISBN 978-0-13-597444-5. [Publisher record](https://www.informit.com/store/agile-software-development-principles-patterns-and-9780135974445).

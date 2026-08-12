@@ -50,15 +50,15 @@ Two properties of the suite make this rigorous rather than merely suggestive:
 
 ## 3. The evidence base
 
-The maximal matrix contains **745 library tests**, **21 general public-API
+The maximal matrix contains **750 library tests**, **21 general public-API
 integration tests**, **5 malformed-input robustness tests**, **3 SCCP
 public/parser integration tests**, and **3 interval public/parser integration
 tests**, plus **3 loop-induction** and **3 complexity-evidence public/parser
 integration tests**, plus **2 condensation** and **2 DSM public/parser
 integration tests**, plus **1 WL**, **2 centrality**, **2 community**, **2
-cohesion**, **2 spectral**, **2 cycle**, **2 motif**, and **2 GED public/parser
-integration tests**. These 802 executable cases combine fixed examples,
-differential oracles, and 56 exact source-level
+cohesion**, **2 spectral**, **2 cycle**, **2 motif**, **2 GED**, and **2 Martin
+public/parser integration tests**. These 809 executable cases combine fixed
+examples, differential oracles, and 57 exact source-level
 `proptest!` blocks. The feature-free matrix remains
 independently runnable and exercises the exact graph/data-flow substrate
 without compiling any grammar. Fifteen active Criterion targets supplement
@@ -91,6 +91,7 @@ Because `default = []`, many tests are **feature-gated**. The end-to-end reachin
 | [16 — Cycle-enumeration validation](16-cycle-enumeration-validation.md) | Independent exhaustive permutations, exact cycle/prefix equality, edge/simple/canonical invariants, insertion-order determinism, explicit caps, malformed CSR, stack safety, parser integration | cycle unit/property tests, `cycles_integration`, robustness harness, benchmark oracles | feature-free / `serde` / `lang-rust` parser case |
 | [17 — Motif-census validation](17-motif-census-validation.md) | Complete sixteen-class taxonomy, all 64 labeled tricodes, exact generated-graph census, `C(n,3)` conservation, graphlet semantics, insertion-order determinism, explicit budgets, malformed CSR, parser integration | motif unit/property tests, `motifs_integration`, robustness harness, benchmark oracles | feature-free / `serde` / `lang-rust` parser case |
 | [18 — GED validation](18-ged-validation.md) | Hungarian optimality, concrete-script upper bound versus exhaustive exact GED, symmetry, normalization, typed multiedges, caps/numerics, stable WL migration, parser integration | GED unit/property tests, `ged_integration`, robustness harness, benchmark oracles | feature-free / `serde` / `lang-rust` parser case |
+| [19 — Martin-metrics validation](19-martin-metrics-validation.md) | Distinct external coupling, CPG-backed abstractness, exact instability/distance, strict stable-dependency witnesses, assignment/projection order invariance, malformed values, parser integration | exact three-module oracle, 256-case property, `martin_integration`, robustness harness | feature-free / `serde` / `lang-rust` parser case |
 
 ## 5. What is proven, and what is advisory
 
@@ -144,11 +145,15 @@ Scientific honesty requires separating the two:
   An uncapped GED value is proven to price one concrete edit script, but its
   bipartite correspondence is heuristic and `NodeKindTag` is coarse; a capped
   compatibility result is not a GED upper bound at all.
+  Martin coupling and scalar arithmetic are exact for the supplied projection,
+  assignment, and CPG type taxonomy; the boundary policy, dependency semantics,
+  and resulting SDP recommendation remain advisory.
 - **Empirically bounded.** Performance results apply only to a target's named
   fixture, size, and controlled environment. DFG/PDG
   construction, whole-corpus analysis, and GNN propagation remain measurement gaps; no result
   from the fifteen active targets (or twenty-seven enabled operation groups) may be
-  generalized to them.
+  generalized to them. Martin metrics are also benchmark-deferred, so their
+  validation supports correctness but makes no timing claim.
 
 ## 6. Reproducing the experiments
 

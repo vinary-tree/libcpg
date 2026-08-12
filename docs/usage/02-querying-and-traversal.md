@@ -588,6 +588,49 @@ full class table and interpretation boundaries.
 
 ---
 
+## Measuring package stability
+
+Use Martin metrics when a directed projection represents dependencies and you
+can state the architectural module boundary explicitly:
+
+```rust
+use libcpg::{
+    martin_metrics, module_graph_projection, sdp_violations,
+    CodePropertyGraph, ModuleAssignment,
+};
+
+fn inspect_module_stability(cpg: &CodePropertyGraph) {
+    let dependencies = module_graph_projection(cpg);
+    let assignment = ModuleAssignment::by_module_nodes(cpg);
+    let metrics = martin_metrics(cpg, &assignment, &dependencies);
+
+    for metric in &metrics {
+        println!(
+            "{}: Ca={}, Ce={}, I={:.3}, A={:.3}, D={:.3}",
+            metric.module, metric.ca, metric.ce, metric.instability,
+            metric.abstractness, metric.distance,
+        );
+    }
+    for violation in sdp_violations(&metrics, &dependencies, &assignment) {
+        println!(
+            "SDP: {} -> {} ({} dependency edges)",
+            violation.source_module,
+            violation.target_module,
+            violation.dependency_count,
+        );
+    }
+}
+```
+
+The projection direction must mean “source depends on target.” Persist that
+meaning and the assignment policy with the output: changing either changes
+afferent/efferent coupling and can reverse a Stable Dependencies Principle
+verdict. See [Martin package metrics and SDP
+analysis](../components/graph/martin-metrics.md) for custom file/service
+assignments, exact formulae, and interpretation boundaries.
+
+---
+
 ## Next steps
 
 - Detect design patterns over the graph you just queried: [Pattern Detection](03-pattern-detection.md).
@@ -598,6 +641,7 @@ full class table and interpretation boundaries.
 - Find a global spectral seam: [Spectral Connectivity](../components/graph/spectral-analysis.md).
 - Enumerate concrete recursion/dependency witnesses: [Bounded Simple Cycles](../components/graph/cycle-analysis.md).
 - Profile local directed topology: [Directed Motif Census](../components/graph/motif-analysis.md).
+- Measure architectural coupling and stable dependencies: [Martin Package Metrics](../components/graph/martin-metrics.md).
 - The complete method tables (construction, AST, CFG, DFG, call, query, metrics, subgraph) are in the [graph reference](../api/graph-reference.md); traversal internals are in [Graph Traversal](../components/graph/traversal.md).
 
 ---

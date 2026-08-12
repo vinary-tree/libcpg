@@ -3,8 +3,8 @@
 The `graph` module holds the data structures at the heart of `libcpg`: the
 [Code Property Graph](../../GLOSSARY.md#code-property-graph-cpg) (CPG) and the
 node, edge, and identifier types it is built from. Everything else in the crate
-— the builders, graph projections, centrality, community, cohesion, dominator, SCC, condensation, and DSM
-analyses, the pattern matchers, the slicer, the GNN — reads
+— the builders, graph projections, centrality, community, cohesion, dominator,
+SCC, condensation, DSM, and Martin-metrics analyses, the pattern matchers, the slicer, the GNN — reads
 from or writes to this one structure. This page explains what a CPG is, why `libcpg` merges
 several program views into a single graph, how that graph is stored, and how you
 create and inspect one.
@@ -136,6 +136,12 @@ classifies every unordered triple into the complete sixteen-class triad
 taxonomy and tests two bounded four-node graphlets. Dense adjacency bit rows,
 explicit 512/50 vertex ceilings, and typed budget errors keep the exhaustive
 census deterministic and complete within its admitted domain.
+
+[Martin package metrics](martin-metrics.md) combine a caller-selected directed
+dependency projection with an explicit node-to-module assignment. They report
+afferent/efferent coupling, instability, CPG-backed type abstractness,
+main-sequence distance, and concrete Stable Dependencies Principle witnesses
+without changing the graph or guessing an architectural boundary.
 
 ### Creating a CPG
 
@@ -328,6 +334,9 @@ So the safe pattern is: build (single-threaded, `&mut`), then analyse
 - [DSM visibility and core–periphery](dsm-analysis.md) — transitive visibility
   fan-in/fan-out, propagation cost, median roles, and the largest
   multi-vertex cyclic group over any directed projection.
+- [Martin package metrics](martin-metrics.md) — explicit module assignment,
+  afferent/efferent coupling, instability/abstractness/distance, and witnessed
+  stable-dependency violations.
 - [WL labels and structural clones](wl-analysis.md) — bounded deterministic
   directed-degree refinement and ordered stable-id clone-candidate classes over
   any valid directed projection.

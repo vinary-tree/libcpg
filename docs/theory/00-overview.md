@@ -107,7 +107,10 @@ with canonical rotations and explicit truncation
 ([Theory 16](16-bounded-simple-cycle-enumeration.md)), and a complete
 [directed-triad motif census](../GLOSSARY.md#directed-triad--motif-census)
 with selected bounded four-node graphlets
-([Theory 17](17-directed-motif-census.md)). Each consumes the same
+([Theory 17](17-directed-motif-census.md)), and
+[Martin package metrics](../GLOSSARY.md#martin-package-metrics) over explicit
+architectural module assignments
+([Theory 18](18-martin-package-metrics.md)). Each consumes the same
 `CodePropertyGraph`; none needs its own bespoke intermediate representation.
 
 ## 4. The four overlays at a glance

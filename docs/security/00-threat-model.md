@@ -102,6 +102,10 @@ security guarantees:
   [`components/algorithms/complexity.md`](../components/algorithms/complexity.md)).
 - [GNN](../GLOSSARY.md#graph-neural-network-gnn) embeddings summarise structure;
   similarity is a soft signal.
+- [Martin package metrics](../GLOSSARY.md#martin-package-metrics) are exact for
+  the supplied dependency projection and module assignment, but those inputs
+  are architectural policy. A stable-dependency violation is evidence for
+  review, not authorization to remove or invert a dependency.
 
 Use these to *prioritise* human attention, not to *gate* a security decision on
 their own. Exact structural analyses are exact with respect to their input
@@ -140,8 +144,9 @@ and its build pipeline.
 | Exponential directed-cycle family | length 32 and retained-count 100,000 hard ceilings, SCC pruning, iterative reusable DFS state, and a concrete first-omission witness | [hardening §simple cycles](01-input-and-resource-hardening.md#simple-cycles-exponential-output-boundaries) |
 | Combinatorial motif enumeration | 512-node triad and 50-node graphlet hard ceilings, complete CSR validation, dense bounded bit rows, and all-or-error results | [hardening §motifs](01-input-and-resource-hardening.md#directed-motifs-combinatorial-bounds) |
 | Cubic graph-edit assignment | caller-selectable node budget with a 512 hard ceiling, finite-cost validation, and an explicit `capped` compatibility result | [hardening §GED](01-input-and-resource-hardening.md#graph-edit-distance-cubic-assignment-cap) |
+| Forged module assignment or instability values | projection validation, inert invalid bucket indices, canonical assignments, and all-or-none SDP metric validation | [hardening §Martin metrics](01-input-and-resource-hardening.md#martin-metrics-assignment-and-comparison-validation) |
 | Untrusted serialized graph | Deserialize only trusted bytes | [`usage/05-serialization.md`](../usage/05-serialization.md) |
-| Over-trusting heuristics, rankings, partitions, edit bounds, cut/robustness evidence, bounded cycle prefixes, or motif frequencies | Treat pattern/algorithm/GNN, GED, centrality, community, cohesion, spectral, truncated-cycle, and motif output as advisory | this page |
+| Over-trusting heuristics, rankings, partitions, edit bounds, architecture metrics, cut/robustness evidence, bounded cycle prefixes, or motif frequencies | Treat pattern/algorithm/GNN, GED, Martin, centrality, community, cohesion, spectral, truncated-cycle, and motif output as advisory | this page |
 
 ## References
 

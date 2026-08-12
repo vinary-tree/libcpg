@@ -74,7 +74,8 @@ feature is on (`#[cfg(feature = "…")]` on the `pub mod` in `lib.rs`); the `gra
 feature-free `analysis` module supplies deterministic dominator/post-dominator
 trees, exact CFG and call-graph SCC decomposition, and deterministic
 condensation-DAG critical-path and width-bounded layering analytics, projection
-centrality, bounded multi-level community detection, and deterministic bounded
+centrality, Martin package metrics and stable-dependency witnesses over explicit
+module assignments, bounded multi-level community detection, and deterministic bounded
 cohesion/robustness analysis, plus bounded algebraic connectivity and Fiedler
 partitioning, SCC-pruned bounded simple-cycle enumeration, and complete bounded
 directed-motif census. The always-on `pattern` module additionally supplies

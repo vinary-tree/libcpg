@@ -1,0 +1,59 @@
+@startuml
+!include _libcpg-theme.iuml
+title Martin package metrics and stable-dependency evidence
+
+skinparam component {
+  BackgroundColor #F1F3F5
+  BorderColor #495057
+}
+skinparam note {
+  BackgroundColor #FFF9DB
+  BorderColor #F08C00
+}
+
+component "CodePropertyGraph" as CPG #DBE4FF
+component "ModuleAssignment" as ASSIGN #FFE8CC
+component "GraphProjection\nsource depends on target" as VIEW #C3FAE8
+component "Cross-module sets" as SETS #D3F9D8
+component "Type-declaration counts" as TYPES #E9ECEF
+component "MartinMetrics" as METRICS #E5DBFF
+component "SDP comparison" as SDP #FFF3BF
+component "SdpViolation witnesses" as WITNESS #FFE3E3
+
+CPG --> ASSIGN : Module ancestors / source path\n/ caller pairs
+VIEW --> SETS : canonical edges\nweights ignored
+ASSIGN --> SETS : <latex>\mu:V\rightharpoonup M</latex>
+CPG --> TYPES : abstract Class + Trait\nover Class + Struct + Enum + Trait
+ASSIGN --> TYPES : bucket each declaration
+
+SETS --> METRICS : <latex>C_a, C_e, I=\frac{C_e}{C_a+C_e}</latex>
+TYPES --> METRICS : <latex>A=\frac{N_a}{N_t}</latex>\n<latex>D=|A+I-1|</latex>
+METRICS --> SDP : compare module-edge endpoints
+VIEW --> SDP : retain concrete edge evidence
+ASSIGN --> SDP : aggregate by module pair
+SDP --> WITNESS : <latex>I(X) < I(Y)</latex>
+
+note bottom of METRICS
+  Lexical module order
+  Feature-free and read-only
+  All scalars in <latex>[0,1]</latex>
+end note
+
+note bottom of WITNESS
+  One row per violating module pair
+  smallest NodeId edge + dependency count
+  advisory structural evidence
+end note
+
+legend bottom
+|= Color |= Concept |
+|<#DBE4FF>| CPG/type syntax evidence |
+|<#FFE8CC>| explicit module boundary policy |
+|<#C3FAE8>| directed dependency projection |
+|<#D3F9D8>| coupling-set aggregation |
+|<#E9ECEF>| abstraction counts |
+|<#E5DBFF>| scalar metric report |
+|<#FFF3BF>| Stable Dependencies Principle decision |
+|<#FFE3E3>| concrete violation evidence |
+endlegend
+@enduml

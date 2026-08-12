@@ -10,7 +10,7 @@ timeout).
 ![Resource bounds that keep libcpg finite on large or untrusted input](../diagrams/resource-bounds.svg)
 
 *Figure — finite-work safeguards for construction, call resolution, VF2
-matching, monotone solving, condensation/DSM/centrality analytics, the structural DFG
+matching, monotone solving, condensation/DSM/Martin/centrality analytics, the structural DFG
 sweep, and slicing.
 Source: [`diagrams/resource-bounds.puml`](../diagrams/resource-bounds.puml).*
 
@@ -34,6 +34,7 @@ Source: [`diagrams/resource-bounds.puml`](../diagrams/resource-bounds.puml).*
 | SCCP event cap | `4 * (scope nodes + DefUse edges)` | `sccp` | returns `AnalysisError::IterationLimitExceeded` if malformed dependencies exceed the finite-lattice schedule bound |
 | `CondensationOptions::max_components` | `1_000_000` hard maximum | `condensation_metrics`; `coffman_graham` always uses the hard maximum | the total metrics API returns an incomplete capped report; the direct CG API returns `AnalysisError::BudgetExceeded` |
 | `MAX_DSM_NODES` | `50_000` hard maximum | `analyze_dsm`; independently rechecked by `classify_core_periphery` | returns an incomplete capped result with the stable node universe and no partial visibility/class vectors |
+| Martin structural validation | always on | `martin_metrics`; `sdp_violations` | malformed projections return no result; invalid assignment entries are inert; duplicate/non-finite/out-of-range instability values suppress all SDP verdicts |
 | `MAX_WL_ITERATIONS` | `16` hard maximum | `wl_labels`; inherited by `structural_clone_classes` | clamps the request before refinement; malformed projections return empty vectors before indexed traversal |
 | `MAX_CENTRALITY_ITERATIONS` | `10_000` hard maximum | PageRank, eigenvector, Katz, and HITS | clamps every requested round count; invalid numerical options return a non-converged result without iteration |
 | `CentralityBudget::max_work` | `2_000_000_000` default | edge betweenness, closeness, harmonic, and Burt constraint | rejects before all-sources/neighborhood traversal with `AnalysisError::BudgetExceeded` |
@@ -257,6 +258,26 @@ hostile or interactive workloads should enforce a tighter input-specific node
 limit before calling the fixed-signature API. Edge weights and payload sizes do
 not affect visibility topology, but the source projection and returned SCC
 decomposition still occupy $`O(n+m)`$ storage.
+
+## Martin metrics: assignment and comparison validation
+
+[Martin package metrics](../components/graph/martin-metrics.md) validate the
+complete forward/reverse `GraphProjection` before any indexed edge traversal.
+`ModuleAssignment::module_of` treats absent nodes and bucket indices outside
+`buckets` as unassigned; caller-supplied pairs are canonicalized by sorted name
+and stable node ID. `sdp_violations` rejects the complete metric slice if module
+names repeat or an instability is non-finite or outside $`[0,1]`$, rather than
+selecting a contradictory value and fabricating a policy verdict.
+
+The passes have no independent hard cap because their work is bounded by the
+supplied graph and CPG: metrics take
+$`O(m\log n+t\log k)`$ time and SDP aggregation takes
+$`O(m\log k)`$, where $`n`$ is projection vertices, $`m`$ is edges, $`t`$ is
+CPG nodes, and $`k`$ is module names. A hostile-input service must still bound
+CPG/projection size and module-name bytes at its ingress. Treat the assignment
+policy and dependency-edge semantics as untrusted metadata when they cross a
+serialization or service boundary; validation guarantees total execution, not
+architectural truth.
 
 ## WL refinement: round cap and total projection validation
 
@@ -591,6 +612,7 @@ correctness**: an analysis may return a meaningless answer, but it must
 | `ast_ancestors` | additionally stops at a parent pointer that names a node not in the graph, rather than returning an id `node()` cannot resolve |
 | `control_flow_sccs` / `call_graph_sccs` | a visited set guards AST scope discovery; dense discovery/low-link arrays and explicit DFS/component stacks make iterative Tarjan visit every projected vertex and normalized edge without consuming native stack per path element |
 | `analyze_dsm` / `classify_core_periphery` | validates public CSR and exact result provenance, caps vertices before work, and uses iterative queues plus the iterative shared SCC engine; no path depth consumes native stack |
+| `martin_metrics` / `sdp_violations` | validate projection CSR before indexed traversal; invalid assignment indices are inert; enclosing-module walks inherit bounded `ast_ancestors`; invalid metric slices produce no verdict |
 | `loop_forest` | the shared visited function scope, iterative dominator/SCC/DFS walks, iterative reverse-body closure, and iterative nesting walk avoid recursion; a 25,000-node natural loop is regression-tested |
 | `unreachable_code` | visited function-scope and dense CFG sets bound discovery; iterative DFS is stack-safe on a 25,000-node reachable/disconnected graph |
 | `block_cfg` / `solve` | iterative CFG traversal and work queues avoid native-stack growth; `solve` also caps extractions per block and ignores inconsistent public loop-header mappings |
@@ -633,10 +655,13 @@ over each one — see
 11. **Preflight DSM latency below its hard cap** for interactive or hostile
     workloads; 50,000 prevents unbounded input but does not make
     $`O(n(n+m))`$ work inexpensive.
-12. **Tighten centrality budgets and iteration requests** for interactive or
+12. **Bound Martin projection/assignment size at ingress** and retain its
+    boundary policy with every result; structural validation is not a latency
+    cap or proof that the selected modules represent the intended architecture.
+13. **Tighten centrality budgets and iteration requests** for interactive or
     hostile graphs, and require `converged` before presenting an iterative
     ranking as complete.
-13. **Cap projection size before community detection** for hostile workloads;
+14. **Cap projection size before community detection** for hostile workloads;
     the 50-pass and 10-level ceilings bound repetition but not one sweep's edge
     volume. Treat every partition as advisory.
 

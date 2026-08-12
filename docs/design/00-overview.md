@@ -67,8 +67,9 @@ alternatives is folklore, and a decision without its costs is marketing.
 | [0021 — Deterministic bounded cycle enumeration](0021-deterministic-bounded-cycle-enumeration.md) | Reuse projection SCCs for canonical directed cycle witnesses with hard length/count ceilings and a concrete first-omission boundary. | Accepted |
 | [0022 — Complete bounded directed-motif census](0022-deterministic-motif-census.md) | Classify all sixteen directed triads with dense bit rows and return typed errors instead of silently omitted graphlets. | Accepted |
 | [0023 — Deterministic bounded bipartite GED](0023-deterministic-bipartite-ged.md) | Select a stable node correspondence with Hungarian assignment, price a concrete typed edit script, and expose the hard-cap fallback. | Accepted |
+| [0024 — Explicit Martin module assignments](0024-explicit-martin-module-assignments.md) | Keep dependency topology and module boundaries explicit, count distinct external vertices, derive abstractness from CPG types, and retain stable-dependency witnesses. | Accepted |
 
-These twenty-three are not independent. ADR-0001 fixes the substrate that all analyses
+These twenty-four are not independent. ADR-0001 fixes the substrate that all analyses
 write onto; ADR-0002 and ADR-0005 together explain how a language reaches that
 substrate and what you must switch on to get there; ADR-0003 and ADR-0004 are
 two analyses *over* the substrate (one always-on, one feature-gated) that each
@@ -114,6 +115,9 @@ all-or-error semantics for combinatorial motif work.
 ADR-0023 keeps whole-graph similarity feature-free but replaces a count blend
 with a deterministic concrete edit-script upper bound and an explicit capped
 compatibility state.
+ADR-0024 returns to the projection substrate: it composes caller-selected
+dependency direction with a first-class module assignment so Martin metrics
+and Stable Dependencies Principle findings remain reproducible and auditable.
 
 ![Module architecture of libcpg, showing the graph core and the analysis modules layered over it](../diagrams/module-architecture.svg)
 
@@ -125,7 +129,7 @@ compatibility state.
   (`0001`…). Numbers are never reused; a reversed decision is marked
   *Superseded* and a new record supersedes it, so history stays legible.
 - **Status lifecycle.** `Proposed → Accepted → (Superseded by NNNN | Deprecated)`.
-  All twenty-two current records are **Accepted** and reflect the shipped `v0.1.1`
+  All twenty-four current records are **Accepted** and reflect the shipped `v0.1.1`
   code.
 - **Grounding.** Every claim here is traceable to source: the
   [`Cargo.toml`](../engineering/01-build-and-features.md) feature block, the

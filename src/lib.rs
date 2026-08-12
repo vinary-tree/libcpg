@@ -10,6 +10,9 @@
 //! - **SCC Analysis**: Decompose per-function CFGs and resolved call graphs
 //! - **Condensation Analytics**: Measure SCC-DAG depth, width, critical paths,
 //!   and bounded Coffman-Graham layers
+//! - **Martin Package Metrics**: Measure afferent/efferent coupling,
+//!   instability, abstractness, main-sequence distance, and stable-dependency
+//!   violations over explicit module assignments
 //! - **CFG Reachability**: Report unreachable nodes and structural dead branches
 //! - **Basic-block CFGs**: Group reachable CFG nodes without losing CPG ids
 //! - **Monotone Data Flow**: Solve forward/backward analyses over block CFGs
@@ -93,12 +96,12 @@ pub use analysis::{
     cut_vertices_and_bridges, dead_stores, degree_assortativity, dfg_projection, dominator_tree,
     edge_betweenness, eigenvector_centrality, expression_facts, global_min_cut,
     harmonic_centrality, hits, k_core_decomposition, k_truss_decomposition, katz_centrality,
-    liveness, loop_forest, loop_induction, louvain, module_graph_projection, motif_census,
-    pagerank, pdg_projection, personalized_pagerank, post_dominator_tree, projection_of,
-    projection_sccs, refine_connected, resolve_calls, reverse_pagerank, sccp, simple_cycles, solve,
-    structural_clone_classes, try_algebraic_connectivity, try_refine_connected,
-    two_edge_connected_components, unreachable_code, value_ranges, variable_facts,
-    very_busy_expressions, wl_labels, AnalysisError, AttackResult, AttackStep,
+    liveness, loop_forest, loop_induction, louvain, martin_metrics, module_graph_projection,
+    motif_census, pagerank, pdg_projection, personalized_pagerank, post_dominator_tree,
+    projection_of, projection_sccs, refine_connected, resolve_calls, reverse_pagerank, sccp,
+    sdp_violations, simple_cycles, solve, structural_clone_classes, try_algebraic_connectivity,
+    try_refine_connected, two_edge_connected_components, unreachable_code, value_ranges,
+    variable_facts, very_busy_expressions, wl_labels, AnalysisError, AttackResult, AttackStep,
     AvailableExpressions, BasicBlock, BetweennessOptions, BitSetDomain, BlockCfg, BlockEdge,
     BlockId, Bound, CallGraphResolution, CallResolution, CentralityBudget, CentralityKind,
     CentralityScores, CgLayering, CommunityAssignment, CommunityKind, CondensationMetrics,
@@ -109,14 +112,15 @@ pub use analysis::{
     GraphProjection, HitsScores, InductionAnalysis, InductionVariable, Interval, IntervalEnv,
     IntervalReport, IterationOptions, IvDirection, KCoreDecomposition, KTrussDecomposition,
     KatzOptions, Lattice, LivenessResult, LoopBoundEvidence, LoopExitEdge, LoopForest,
-    LoopInvariants, LouvainOptions, MotifCensus, MotifOptions, MustBits, NaturalLoop,
-    PageRankOptions, PostDominatorTree, ProjectionError, ProjectionKind, ReachabilityReport,
-    ResolveConfig, SccAnalysisError, SccComponent, SccCondensationEdge, SccDecomposition,
-    SccProjection, SccpResult, SolverConfig, Spectral, SpectralOptions, SymbolCandidates,
-    SymbolTable, TripEvidence, TrussEdge, TwoEdgeConnectedComponents, UndirectedProjection,
-    VarFacts, VariableDefinition, VeryBusyExpressions, DEFAULT_CENTRALITY_WORK_LIMIT,
-    MAX_ATTACK_STEPS, MAX_CENTRALITY_ITERATIONS, MAX_CONDENSATION_COMPONENTS, MAX_CYCLE_LENGTH,
-    MAX_DSM_NODES, MAX_GRAPHLET_NODES, MAX_K_TRUSS_EDGES, MAX_LOUVAIN_LEVELS, MAX_LOUVAIN_PASSES,
+    LoopInvariants, LouvainOptions, MartinMetrics, ModuleAssignment, MotifCensus, MotifOptions,
+    MustBits, NaturalLoop, PageRankOptions, PostDominatorTree, ProjectionError, ProjectionKind,
+    ReachabilityReport, ResolveConfig, SccAnalysisError, SccComponent, SccCondensationEdge,
+    SccDecomposition, SccProjection, SccpResult, SdpViolation, SolverConfig, Spectral,
+    SpectralOptions, SymbolCandidates, SymbolTable, TripEvidence, TrussEdge,
+    TwoEdgeConnectedComponents, UndirectedProjection, VarFacts, VariableDefinition,
+    VeryBusyExpressions, DEFAULT_CENTRALITY_WORK_LIMIT, MAX_ATTACK_STEPS,
+    MAX_CENTRALITY_ITERATIONS, MAX_CONDENSATION_COMPONENTS, MAX_CYCLE_LENGTH, MAX_DSM_NODES,
+    MAX_GRAPHLET_NODES, MAX_K_TRUSS_EDGES, MAX_LOUVAIN_LEVELS, MAX_LOUVAIN_PASSES,
     MAX_MIN_CUT_NODES, MAX_SIMPLE_CYCLES, MAX_SPECTRAL_ITERATIONS, MAX_SPECTRAL_STARTS,
     MAX_TRIAD_NODES, MAX_WL_ITERATIONS, TRIAD_NAMES,
 };

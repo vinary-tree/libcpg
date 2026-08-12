@@ -260,7 +260,8 @@ Symbols are defined before use: $`V`$ is graph vertices, $`E`$ is graph edges,
 $`C`$ is condensation components, $`M`$ is their total SCC members,
 $`N`$ is reachable CFG nodes, $`B`$ is basic blocks, $`E_b`$ is block edges,
 $`F`$ is variable facts, $`W = \lceil F/64 \rceil`$ is words per bit state,
-$`H \le F`$ is lattice height, and $`d`$ is embedding dimension.
+$`H \le F`$ is lattice height, $`T`$ is CPG nodes, $`K`$ is module names, and
+$`d`$ is embedding dimension.
 
 | Operation | Analytical expectation | Evidence state |
 |---|---|---|
@@ -270,6 +271,7 @@ $`H \le F`$ is lattice height, and $`d`$ is embedding dimension.
 | bounded VF2 | factorial worst case; pruning-dependent [[3]](#references) | active bounded path target |
 | variable liveness | $`O(H(B + E_b)W + NW)`$ conventional bound | active chain/diamond/nested-loop target |
 | DSM visibility / classification | $`O(V(V+E))`$ visibility plus SCC and median classification | active path/ring target |
+| Martin package metrics / SDP | $`O(E\log V+T\log K)`$ metrics plus $`O(E\log K)`$ SDP aggregation | benchmark deliberately deferred; exact oracle/property/integration validation is active |
 | projection WL labels / clones | $`O(q(V\log V+E+\sum_v d(v)\log d(v)))`$ for $`q\le16`$, plus clone sorting | active four-round ring/star target |
 | multi-level Louvain | $`O(h[p(V+E\log V)+E\log E])`$ for $`p\le50`$ and $`h\le10`$ | active ring-of-cliques target |
 | connected-community refinement | $`O(V+E)`$ after validation | active disconnected-path target |

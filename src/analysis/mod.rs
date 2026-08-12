@@ -16,6 +16,7 @@ mod dominators;
 mod dsm;
 mod induction;
 mod loops;
+mod martin;
 mod motifs;
 mod projection;
 mod reachability;
@@ -82,6 +83,8 @@ pub use induction::{
 };
 
 pub use loops::{loop_forest, LoopExitEdge, LoopForest, NaturalLoop};
+
+pub use martin::{martin_metrics, sdp_violations, MartinMetrics, ModuleAssignment, SdpViolation};
 
 pub use motifs::{
     motif_census, MotifCensus, MotifOptions, MAX_GRAPHLET_NODES, MAX_TRIAD_NODES, TRIAD_NAMES,

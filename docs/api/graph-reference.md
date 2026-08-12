@@ -336,6 +336,32 @@ guide](../components/graph/dsm-analysis.md) for formulae, edge direction,
 literate BFS/SCC composition, degenerate median semantics, examples, tests,
 and interpretation limits.
 
+### Martin package metrics and stable dependencies
+
+These feature-free functions combine a caller-selected dependency projection
+with an explicit assignment of stable node IDs to architectural modules:
+
+| Function | Signature | Result |
+|---|---|---|
+| `martin_metrics` | `fn(&CodePropertyGraph, &ModuleAssignment, &GraphProjection) -> Vec<MartinMetrics>` | Lexically ordered module coupling, instability, abstractness, and main-sequence distance. |
+| `sdp_violations` | `fn(&[MartinMetrics], &GraphProjection, &ModuleAssignment) -> Vec<SdpViolation>` | Ordered violating module pairs with dependency multiplicity and one stable edge witness. |
+
+`ModuleAssignment` exposes canonical `buckets: Vec<Arc<str>>` and
+`of_node: BTreeMap<NodeId, u32>`. `from_pairs` accepts caller policy;
+`by_module_nodes` uses the nearest enclosing CPG module and
+`by_source_path` uses retained graph provenance. `MartinMetrics` exposes
+`module`, `ca`, `ce`, `instability`, `abstractness`, and `distance`.
+`SdpViolation` exposes the module pair, smallest stable source/target witness,
+dependency count, and both instability values.
+
+Coupling counts distinct external projection vertices and ignores weights and
+intra-module edges. Abstractness counts abstract classes plus traits over all
+class/struct/enum/trait declarations assigned to a module. Malformed
+projections return no results; invalid assignment indices are inert; duplicate
+or invalid metric values suppress SDP verdicts. See the [Martin component
+guide](../components/graph/martin-metrics.md) for formulae, assignment policy,
+pseudocode, examples, complexity, and interpretation limits.
+
 ### Weisfeiler–Lehman labels and structural clones
 
 These feature-free functions consume a valid `GraphProjection` without
@@ -1227,6 +1253,7 @@ and `add_edge_with_id` rather than `add_node`/`add_edge`.
   [nodes](../components/graph/nodes.md), [edges](../components/graph/edges.md),
   [traversal](../components/graph/traversal.md),
   [deterministic projections](../components/graph/projections.md),
+  [Martin package metrics](../components/graph/martin-metrics.md),
   [dominator analysis](../components/graph/dominator-analysis.md), and
   [SCC analysis](../components/graph/scc-analysis.md).
 
@@ -1236,3 +1263,4 @@ and `add_edge_with_id` rather than `add_node`/`add_edge`.
 
 1. Yamaguchi, F., Golde, N., Arp, D., Rieck, K. (2014). *Modeling and Discovering Vulnerabilities with Code Property Graphs.* 2014 IEEE Symposium on Security and Privacy. DOI: [10.1109/SP.2014.44](https://doi.org/10.1109/SP.2014.44)
 2. McCabe, T. J. (1976). *A Complexity Measure.* IEEE Transactions on Software Engineering SE-2(4). DOI: [10.1109/TSE.1976.233837](https://doi.org/10.1109/TSE.1976.233837)
+3. Martin, R. C. (1994). *OO Design Quality Metrics: An Analysis of Dependencies.* Object Mentor technical report. [Archived report PDF](https://condor.depaul.edu/dmumaugh/OOT/Design-Principles/oodmetrc.pdf). No DOI assigned.

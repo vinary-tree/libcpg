@@ -102,8 +102,8 @@ Repository coverage is measured after the semantic oracles pass and recorded
 in the [testing guide](../engineering/02-testing.md). In the clean maximal
 matrix, `src/pattern/ged.rs` measures **99.83%** line, **99.28%** region,
 **100.00%** function, and **93.33%** branch coverage. The corresponding
-repository totals are **98.14%** line, **98.06%** region, **98.38%** function,
-and **86.55%** branch coverage. Coverage demonstrates that implementation paths
+repository totals are **98.17%** line, **98.08%** region, **98.39%** function,
+and **86.71%** branch coverage. Coverage demonstrates that implementation paths
 ran; exhaustive assignment and exact-GED comparison provide the stronger
 correctness evidence.
 

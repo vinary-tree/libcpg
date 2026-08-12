@@ -50,6 +50,16 @@ returns a capped incomplete result with no partial vectors.;
 ***[#F1F3F5]:public projection + provenance validation
 rejects malformed forward/reverse CSR, mismatched nodes,
 vector lengths, and incomplete source analyses.;
+**[#FFE3E3] Martin metrics
+***[#F1F3F5]:projection + assignment validation
+rejects malformed CSR before traversal and treats
+absent nodes or invalid bucket indices as unassigned.;
+***[#F1F3F5]:all-or-none SDP metric validation
+duplicate modules, non-finite instability, or values outside
+<latex>[0,1]</latex> suppress the comparison rather than fabricate a verdict.;
+***[#F1F3F5]:input-sized work
+no independent cap — hosts bound projection, CPG,
+module count, and name bytes at ingress.;
 **[#FFE3E3] WL refinement
 ***[#F1F3F5]:MAX_WL_ITERATIONS = 16
 clamps every requested round count before work,

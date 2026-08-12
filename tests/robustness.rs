@@ -616,6 +616,30 @@ fn exercise_every_analysis(cpg: &CodePropertyGraph, func: NodeId) {
         }
     }
 
+    // --- package metrics ---
+    let architecture_view = libcpg::projection_of(
+        cpg,
+        libcpg::ProjectionKind::External,
+        |_| true,
+        |_| true,
+        |_| 1.0,
+    );
+    let module_assignment = libcpg::ModuleAssignment::by_module_nodes(cpg);
+    let martin = libcpg::martin_metrics(cpg, &module_assignment, &architecture_view);
+    assert!(martin
+        .windows(2)
+        .all(|pair| pair[0].module < pair[1].module));
+    assert!(martin.iter().all(|metric| {
+        (0.0..=1.0).contains(&metric.instability)
+            && (0.0..=1.0).contains(&metric.abstractness)
+            && (0.0..=1.0).contains(&metric.distance)
+    }));
+    assert!(
+        libcpg::sdp_violations(&martin, &architecture_view, &module_assignment)
+            .iter()
+            .all(|violation| violation.source_instability < violation.target_instability)
+    );
+
     // --- matching and similarity ---
     #[cfg(feature = "lang-rust")]
     {

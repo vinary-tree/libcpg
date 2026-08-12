@@ -3,7 +3,7 @@
 This page traces how information moves through libcpg in two phases:
 
 1. the **construction pipeline** — source text becomes a [Code Property Graph](../GLOSSARY.md#code-property-graph-cpg) (Yamaguchi et al. [[1]](#references)) with AST, [CFG](../GLOSSARY.md#control-flow-graph-cfg), and [DFG](../GLOSSARY.md#data-flow-graph-dfg) overlays; and
-2. the **analysis pipeline** — a constructed CPG is queried by exact [dominator/post-dominator](../components/graph/dominator-analysis.md), [natural-loop](../components/graph/loop-analysis.md), [loop-induction](../components/graph/induction-analysis.md), [liveness](../components/graph/liveness-analysis.md), [available/very-busy expression](../components/graph/expression-analysis.md), [SCCP](../components/graph/sccp-analysis.md), [interval value-range](../components/graph/interval-analysis.md), [SCC](../GLOSSARY.md#strongly-connected-component-scc), [DSM visibility](../components/graph/dsm-analysis.md), [WL structural-clone](../components/graph/wl-analysis.md), [centrality](../components/graph/centrality-analysis.md), [community](../components/graph/community-detection.md), [cohesion/robustness](../components/graph/cohesion-analysis.md), [spectral connectivity](../components/graph/spectral-analysis.md), [bounded simple-cycle](../components/graph/cycle-analysis.md), and [directed-motif](../components/graph/motif-analysis.md) analyses, the [PDG](../GLOSSARY.md#program-dependence-graph-pdg)/slicer, [VF2](../GLOSSARY.md#vf2), bounded bipartite [GED](../components/patterns/ged-analysis.md), and [GoF](../GLOSSARY.md#gang-of-four-gof) detectors, the algorithm/complexity heuristics, and the [GNN](../GLOSSARY.md#graph-neural-network-gnn).
+2. the **analysis pipeline** — a constructed CPG is queried by exact [dominator/post-dominator](../components/graph/dominator-analysis.md), [natural-loop](../components/graph/loop-analysis.md), [loop-induction](../components/graph/induction-analysis.md), [liveness](../components/graph/liveness-analysis.md), [available/very-busy expression](../components/graph/expression-analysis.md), [SCCP](../components/graph/sccp-analysis.md), [interval value-range](../components/graph/interval-analysis.md), [SCC](../GLOSSARY.md#strongly-connected-component-scc), [DSM visibility](../components/graph/dsm-analysis.md), [Martin package-metric](../components/graph/martin-metrics.md), [WL structural-clone](../components/graph/wl-analysis.md), [centrality](../components/graph/centrality-analysis.md), [community](../components/graph/community-detection.md), [cohesion/robustness](../components/graph/cohesion-analysis.md), [spectral connectivity](../components/graph/spectral-analysis.md), [bounded simple-cycle](../components/graph/cycle-analysis.md), and [directed-motif](../components/graph/motif-analysis.md) analyses, the [PDG](../GLOSSARY.md#program-dependence-graph-pdg)/slicer, [VF2](../GLOSSARY.md#vf2), bounded bipartite [GED](../components/patterns/ged-analysis.md), and [GoF](../GLOSSARY.md#gang-of-four-gof) detectors, the algorithm/complexity heuristics, and the [GNN](../GLOSSARY.md#graph-neural-network-gnn).
 
 "Data flow" here means both the program's own data-flow overlay *and* the flow of data through libcpg's stages. This is a rewrite of an earlier draft that invented `BranchTrue`/`UseUse`/`Phi` edge kinds, an SSA-based DFG, a parse/embedding cache, and a bincode format — none of which exist. The real edge model is [`CpgEdgeKind::ControlFlow(CfgEdgeKind)`](../GLOSSARY.md#control-flow-graph-cfg) / [`DataFlow(DfgEdgeKind)`](../GLOSSARY.md#data-flow-graph-dfg), the DFG is [AST-ordered reaching definitions](../GLOSSARY.md#ast-ordered-reaching-definitions), and persistence is plain derive-based serde.
 
@@ -167,7 +167,7 @@ Public helpers expose the same information as [def-use chains](../GLOSSARY.md#de
 
 A constructed CPG is the substrate for several independent analyses. Each consumes the overlays built above; none of them run during construction.
 
-![Activity diagram fanning a CPG out to block, data-flow, liveness, induction, dominance, loop/SCC/DSM/WL/centrality/community/cohesion/spectral/cycle/motif, PDG/slice, VF2/GoF, algorithm, and GNN analyses](../diagrams/analysis-pipeline.svg)
+![Activity diagram fanning a CPG out to block, data-flow, liveness, induction, dominance, loop/SCC/DSM/Martin/WL/centrality/community/cohesion/spectral/cycle/motif, PDG/slice, VF2/GoF, algorithm, and GNN analyses](../diagrams/analysis-pipeline.svg)
 
 *Figure — a constructed CPG fans out to exact structural and data-flow analysis, the on-demand PDG/slicer, the VF2 and GoF pattern detectors, the algorithm/complexity heuristics, and the GNN. Source: [`diagrams/analysis-pipeline.puml`](../diagrams/analysis-pipeline.puml).*
 
@@ -245,6 +245,15 @@ the largest multi-vertex cyclic group. The two total reports retain exact
 stable-node provenance and reject malformed, mismatched, or over-50,000-node
 inputs explicitly. See [DSM visibility and core–periphery
 analysis](../components/graph/dsm-analysis.md).
+
+`martin_metrics(&cpg, &assignment, &projection)` combines that validated
+directed topology with an explicit node-to-module boundary. It counts distinct
+external afferent/efferent vertices, derives abstractness from assigned CPG
+type declarations, and returns instability and main-sequence distance in
+lexical module order. `sdp_violations` then retains one concrete stable-node
+edge for every module dependency that points from a more stable source to a
+less stable target. See [Martin package metrics and SDP
+analysis](../components/graph/martin-metrics.md).
 
 `wl_labels(&projection, rounds)` validates the same projection contract, seeds
 directed in/out degrees, and performs at most 16 incident-neighborhood
