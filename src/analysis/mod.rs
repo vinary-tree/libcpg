@@ -1,7 +1,8 @@
 //! Exact structural analyses over Code Property Graph projections.
 //!
 //! Unlike the feature-gated algorithm-family detector, analyses in this module
-//! compute graph properties exactly. They are available with `default = []`.
+//! compute exact structural properties or explicitly qualified bounded
+//! numerical approximations. They are available with `default = []`.
 
 mod basic_blocks;
 mod centrality;
@@ -18,6 +19,7 @@ mod projection;
 mod reachability;
 mod resolve;
 mod scc;
+mod spectral;
 pub(crate) mod wl;
 
 use crate::NodeId;
@@ -88,6 +90,11 @@ pub(crate) use scc::function_scope_nodes;
 pub use scc::{
     call_graph_sccs, control_flow_sccs, projection_sccs, SccAnalysisError, SccComponent,
     SccCondensationEdge, SccDecomposition, SccProjection,
+};
+
+pub use spectral::{
+    algebraic_connectivity, try_algebraic_connectivity, Spectral, SpectralOptions,
+    MAX_SPECTRAL_ITERATIONS, MAX_SPECTRAL_STARTS,
 };
 
 pub use wl::{structural_clone_classes, wl_labels, MAX_WL_ITERATIONS};

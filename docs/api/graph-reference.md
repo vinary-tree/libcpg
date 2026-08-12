@@ -450,6 +450,24 @@ silent resource truncation. See the [cohesion component
 guide](../components/graph/cohesion-analysis.md) for definitions, literate
 algorithms, examples, complexity, and interpretation boundaries.
 
+### Spectral connectivity and Fiedler partitioning
+
+The feature-free spectral family validates a `GraphProjection`, derives its
+simple undirected unweighted topology, and returns immutable node-aligned
+numerical evidence.
+
+| Function | Signature | Result |
+|---|---|---|
+| `algebraic_connectivity` | `fn(&GraphProjection, &SpectralOptions) -> Option<Spectral>` | total convenience result, or `None` below two nodes/on invalid input |
+| `try_algebraic_connectivity` | `fn(&GraphProjection, &SpectralOptions) -> Result<Option<Spectral>, AnalysisError>` | checked algebraic connectivity, Fiedler vector/sign partition, iterations, convergence, and residual |
+
+`MAX_SPECTRAL_ITERATIONS` is 1,000 per start and `MAX_SPECTRAL_STARTS` is eight;
+larger requests are deterministically clamped. Disconnected graphs return exact zero with a canonical component
+contrast and no iteration. Connected graphs use bounded sparse deflated power
+iteration over the combinatorial Laplacian. See the [spectral component
+guide](../components/graph/spectral-analysis.md) for formulas, pseudocode,
+closed forms, convergence policy, and interpretation boundaries.
+
 ### Natural loops and nesting
 
 The feature-free loop API uses the shared reachable function CFG and dominator

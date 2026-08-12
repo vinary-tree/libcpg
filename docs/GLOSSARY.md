@@ -25,6 +25,17 @@ The tree that a parser produces from source code: interior nodes are language co
 
 The step in a [Graph Neural Network](#graph-neural-network-gnn) that combines a node's neighbour vectors into one vector. `libcpg`'s `AggregationMethod` enumerates `Mean` (the default and the only one used in message passing), `Sum`, `Max`, `Attention`, and `Hierarchical`; the latter two are **reserved placeholders**, not yet wired. See [Message passing](#message-passing).
 
+### Algebraic connectivity / Fiedler vector
+
+For the combinatorial graph Laplacian $`L=D-A`$, **algebraic connectivity** is
+its second-smallest eigenvalue $`\lambda_2`$. It is zero exactly when the
+undirected graph is disconnected. A corresponding unit, zero-mean eigenvector
+is a **Fiedler vector**; splitting vertices by its sign gives a spectral
+partition heuristic [[32]](#references). libcpg uses an unweighted simple
+projection topology and bounded deterministic sparse iteration. See
+[`theory/15-spectral-connectivity-and-bisection.md`](theory/15-spectral-connectivity-and-bisection.md)
+and [`components/graph/spectral-analysis.md`](components/graph/spectral-analysis.md).
+
 ### Algorithm family
 
 A structural category of algorithm (sorting, searching, graph traversal, dynamic programming, …) that the `algorithm-detection` feature recognises from a function's control-flow and recursion shape via **heuristics** (e.g. "has a midpoint calculation", "has a visited set", "has a memoization table"). Exposed as `AlgorithmFamily`. Detection is heuristic, not a proof of identity. See [`components/algorithms/families.md`](components/algorithms/families.md).
@@ -731,3 +742,4 @@ used by the complexity analyzer to classify recursive functions (e.g. $`a = b = 
 29. Blondel, V. D., Guillaume, J.-L., Lambiotte, R., Lefebvre, E. (2008). *Fast Unfolding of Communities in Large Networks.* Journal of Statistical Mechanics: Theory and Experiment, P10008. DOI: [10.1088/1742-5468/2008/10/P10008](https://doi.org/10.1088/1742-5468/2008/10/P10008)
 30. Traag, V. A., Waltman, L., van Eck, N. J. (2019). *From Louvain to Leiden: Guaranteeing Well-Connected Communities.* Scientific Reports 9, 5233. DOI: [10.1038/s41598-019-41695-z](https://doi.org/10.1038/s41598-019-41695-z)
 31. Cohesion and robustness foundations: (**31a**) Seidman, S. B. (1983). *Network Structure and Minimum Degree.* DOI: [10.1016/0378-8733(83)90028-X](https://doi.org/10.1016/0378-8733(83)90028-X). (**31b**) Batagelj, V., Zaveršnik, M. (2003). *An O(m) Algorithm for Cores Decomposition of Networks.* [arXiv:cs/0310049](https://arxiv.org/abs/cs/0310049). (**31c**) Cohen, J. (2008). *Trusses: Cohesive Subgraphs for Social Network Analysis.* NSA Technical Report (no DOI assigned). (**31d**) Hopcroft, J., Tarjan, R. (1973). *Algorithm 447: Efficient Algorithms for Graph Manipulation.* DOI: [10.1145/362248.362272](https://doi.org/10.1145/362248.362272). (**31e**) Tarjan, R. (1972). *Depth-First Search and Linear Graph Algorithms.* DOI: [10.1137/0201010](https://doi.org/10.1137/0201010). (**31f**) Stoer, M., Wagner, F. (1997). *A Simple Min-Cut Algorithm.* DOI: [10.1145/263867.263872](https://doi.org/10.1145/263867.263872). (**31g**) Newman, M. E. J. (2003). *Mixing Patterns in Networks.* DOI: [10.1103/PhysRevE.67.026126](https://doi.org/10.1103/PhysRevE.67.026126). (**31h**) Holme, P., Kim, B. J., Yoon, C. N., Han, S. K. (2002). *Attack Vulnerability of Complex Networks.* DOI: [10.1103/PhysRevE.65.056109](https://doi.org/10.1103/PhysRevE.65.056109).
+32. Spectral foundations: (**32a**) Fiedler, M. (1973). *Algebraic Connectivity of Graphs.* DOI: [10.21136/CMJ.1973.101168](https://doi.org/10.21136/CMJ.1973.101168). (**32b**) Shi, J., Malik, J. (2000). *Normalized Cuts and Image Segmentation.* DOI: [10.1109/34.868688](https://doi.org/10.1109/34.868688).

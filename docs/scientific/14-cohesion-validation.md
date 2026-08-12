@@ -162,10 +162,10 @@ commit, as required by the repository engineering protocol.
 
 ## Measured coverage
 
-A clean stable maximal-matrix run executed **703 library tests** and **49
-integration/robustness tests**, for **752 executable cases**. A separate clean
-nightly run executed the same matrix with LLVM branch instrumentation. The
-measured results are:
+At the T2.3 cohesion checkpoint, a clean stable maximal-matrix run executed
+**703 library tests** and **49 integration/robustness tests**, for **752
+executable cases**. A separate clean nightly run executed that same checkpoint
+with LLVM branch instrumentation. The measured results are:
 
 | Scope | Lines | Regions | Functions | Branches |
 | --- | ---: | ---: | ---: | ---: |

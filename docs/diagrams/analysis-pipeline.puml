@@ -21,6 +21,7 @@ fork
   + PageRank / Brandes / spectral / distance / HITS / Burt
   + multi-level Louvain / connected refinement
   + core / truss / cuts / robust blocks / attack
+  + algebraic connectivity / Fiedler sign partition
   → exact structural relations + fixed points;<<#C3FAE8>>
 fork again
   :PdgBuilder.build
@@ -39,7 +40,7 @@ end fork
 stop
 legend right
   |= colour |= analysis (module) |
-  |<#C3FAE8>| structural — blocks / data flow / liveness / expressions / SCCP / intervals / induction / reachability / dominance / loops / SCCs / condensation / DSM / WL / centrality / communities / cohesion |
+  |<#C3FAE8>| structural — blocks / data flow / liveness / expressions / SCCP / intervals / induction / reachability / dominance / loops / SCCs / condensation / DSM / WL / centrality / communities / cohesion / spectral connectivity |
   |<#E5DBFF>| PDG — program slicing |
   |<#FFE3E3>| VF2 — subgraph iso / GoF |
   |<#FFF3BF>| algorithm + complexity |

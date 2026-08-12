@@ -63,8 +63,9 @@ alternatives is folklore, and a decision without its costs is marketing.
 | [0017 — Deterministic bounded centrality](0017-deterministic-bounded-centrality.md) | Port centrality onto dense projections with aligned results, explicit numerical/traversal bounds, stable reductions, and a serial source-partition seam. | Accepted |
 | [0018 — Deterministic multi-level community detection](0018-deterministic-multilevel-community-detection.md) | Port Louvain onto validated projections, add deterministic aggregation, canonical tie/label rules, bounded work, and a separate checked connected-component refinement. | Accepted |
 | [0019 — Deterministic bounded cohesion analysis](0019-deterministic-bounded-cohesion-analysis.md) | Share one simple-undirected topology across deterministic core/truss/connectivity/assortativity/attack kernels, while bounding and validating weighted Stoer–Wagner separately. | Accepted |
+| [0020 — Deterministic bounded spectral analysis](0020-deterministic-bounded-spectral-analysis.md) | Compute combinatorial-Laplacian algebraic connectivity and a stable Fiedler sign split with exact disconnected handling, bounded sparse iteration, and explicit residual evidence. | Accepted |
 
-These nineteen are not independent. ADR-0001 fixes the substrate that all analyses
+These twenty are not independent. ADR-0001 fixes the substrate that all analyses
 write onto; ADR-0002 and ADR-0005 together explain how a language reaches that
 substrate and what you must switch on to get there; ADR-0003 and ADR-0004 are
 two analyses *over* the substrate (one always-on, one feature-gated) that each
@@ -100,6 +101,9 @@ aggregation, and keeps connected refinement as an explicit separate guarantee.
 ADR-0019 consumes the same validation and projection seam, fixes shared simple-
 topology semantics, deterministic peeling/low-link/cut choices, and explicit
 edge, node, and attack-step budgets for cohesion and robustness experiments.
+ADR-0020 consumes the same simple-projection seam, selects the combinatorial
+Laplacian, and fixes exact disconnected behavior, deterministic numerical
+choices, a hard iteration cap, and explicit convergence/residual evidence.
 
 ![Module architecture of libcpg, showing the graph core and the analysis modules layered over it](../diagrams/module-architecture.svg)
 
@@ -111,7 +115,7 @@ edge, node, and attack-step budgets for cohesion and robustness experiments.
   (`0001`…). Numbers are never reused; a reversed decision is marked
   *Superseded* and a new record supersedes it, so history stays legible.
 - **Status lifecycle.** `Proposed → Accepted → (Superseded by NNNN | Deprecated)`.
-  All nineteen current records are **Accepted** and reflect the shipped `v0.1.1`
+  All twenty current records are **Accepted** and reflect the shipped `v0.1.1`
   code.
 - **Grounding.** Every claim here is traceable to source: the
   [`Cargo.toml`](../engineering/01-build-and-features.md) feature block, the

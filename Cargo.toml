@@ -241,3 +241,7 @@ harness = false
 [[bench]]
 name = "cohesion"
 harness = false
+
+[[bench]]
+name = "spectral"
+harness = false

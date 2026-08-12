@@ -476,6 +476,46 @@ for the k-truss, minimum-cut, assortativity, cap, and interpretation contracts.
 
 ---
 
+## Finding a weak spectral seam
+
+Use algebraic connectivity when you need a graph-wide connectivity signal and
+a candidate two-way seam. The checked API keeps malformed input distinct from
+a projection with fewer than two nodes:
+
+```rust
+use libcpg::{
+    call_graph_projection, try_algebraic_connectivity, AnalysisError,
+    CodePropertyGraph, SpectralOptions,
+};
+
+fn inspect_call_spectrum(cpg: &CodePropertyGraph) -> Result<(), AnalysisError> {
+    let graph = call_graph_projection(cpg);
+    let Some(spectral) =
+        try_algebraic_connectivity(&graph, &SpectralOptions::default())?
+    else {
+        println!("fewer than two projected functions");
+        return Ok(());
+    };
+
+    println!("algebraic connectivity: {:.6}", spectral.algebraic_connectivity);
+    println!("converged: {}", spectral.converged);
+    println!("residual: {:.3e}", spectral.residual_norm);
+    for (node, side) in spectral.nodes.iter().zip(&spectral.partition) {
+        let side_number = if *side { 1 } else { 0 };
+        println!("{node:?}: side {side_number}");
+    }
+    Ok(())
+}
+```
+
+Persist projection provenance, options, convergence, residual, and the aligned
+vector—not only the boolean partition. The sign split is an unnormalized
+Fiedler heuristic and can be non-unique under repeated eigenvalues. See
+[spectral connectivity and Fiedler partitioning](../components/graph/spectral-analysis.md)
+for topology semantics and numerical limits.
+
+---
+
 ## Next steps
 
 - Detect design patterns over the graph you just queried: [Pattern Detection](03-pattern-detection.md).
@@ -483,6 +523,7 @@ for the k-truss, minimum-cut, assortativity, cap, and interpretation contracts.
 - Rank a projected relation: [Projection Centrality](../components/graph/centrality-analysis.md).
 - Partition a projected relation: [Community Detection](../components/graph/community-detection.md).
 - Inspect cohesive regions and failure seams: [Cohesion and Structural Robustness](../components/graph/cohesion-analysis.md).
+- Find a global spectral seam: [Spectral Connectivity](../components/graph/spectral-analysis.md).
 - The complete method tables (construction, AST, CFG, DFG, call, query, metrics, subgraph) are in the [graph reference](../api/graph-reference.md); traversal internals are in [Graph Traversal](../components/graph/traversal.md).
 
 ---

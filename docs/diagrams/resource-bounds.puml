@@ -88,6 +88,17 @@ iterative DFS/BFS avoids native-stack growth.;
 ***[#F1F3F5]:projection + numeric validation
 rejects malformed CSR and minimum-cut negative,
 non-finite, or overflowing weights.;
+**[#FFE3E3] Spectral connectivity
+***[#F1F3F5]:MAX_SPECTRAL_ITERATIONS = 1,000
+clamps every connected-graph start and
+returns selected convergence plus residual evidence.;
+***[#F1F3F5]:MAX_SPECTRAL_STARTS = 8
+bounds cyclic linear starts used to avoid
+symmetry-induced higher-eigenpair convergence.;
+***[#F1F3F5]:iterative sparse topology
+component BFS and matrix-vector steps avoid recursion
+complete CSR and finite nonnegative tolerance
+are validated before indexed numerical work.;
 **[#FFE3E3] Slicing
 ***[#F1F3F5]:max_nodes on backward_slice / forward_slice
 bounds the PDG reverse/forward BFS —

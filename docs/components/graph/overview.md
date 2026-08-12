@@ -120,6 +120,12 @@ share a canonical simple-undirected topology; bounded global minimum cut uses
 its separately validated finite nonnegative weighted view. Results remain
 out-of-graph and stable-identifier aligned.
 
+[Spectral connectivity](spectral-analysis.md) consumes that canonical simple
+topology and computes combinatorial-Laplacian algebraic connectivity, a
+node-aligned Fiedler vector, and its sign split. Exact disconnected handling and
+a bounded sparse iteration keep results deterministic, out-of-graph, and
+numerically qualified by convergence and residual evidence.
+
 ### Creating a CPG
 
 With **no cargo features enabled** (`default = []`), `libcpg` links no grammars,

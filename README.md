@@ -47,6 +47,9 @@ PDG). A query can therefore mix syntax, control flow, and data flow freely.
 - **Cohesion and robustness** — deterministic k-core and k-truss peeling,
   iterative articulation/bridge analysis, two-edge-connected blocks, bounded
   weighted global minimum cut, degree assortativity, and ordered attack traces.
+- **Spectral connectivity** — deterministic combinatorial-Laplacian algebraic
+  connectivity, aligned Fiedler vectors, sign partitions, exact disconnected
+  certificates, and bounded sparse iteration with residual evidence.
 - **CFG reachability** — feature-free, deterministic reachable/unreachable
   partitions and structural dead-branch evidence without graph mutation.
 - **Basic-block CFGs** — deterministic, id-preserving block partitions, typed

@@ -18,7 +18,7 @@ end note
 (AST + CFG + DFG);<<#F1F3F5>>
 :bounded analyses —
 VF2 max_matches, DFG max_iterations,
-slice max_nodes;<<#E5DBFF>>
+slice max_nodes, spectral iterations + starts;<<#E5DBFF>>
 :results;<<#C3FAE8>>
 stop
 

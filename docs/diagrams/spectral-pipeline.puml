@@ -1,0 +1,53 @@
+@startuml
+title libcpg deterministic bounded spectral analysis
+skinparam backgroundColor #FFFFFF
+skinparam shadowing false
+skinparam defaultFontName DejaVu Sans
+skinparam ArrowColor #495057
+skinparam ArrowThickness 1.2
+
+rectangle "GraphProjection\nsorted NodeId + forward/reverse CSR" as INPUT #E7F5FF
+rectangle "Validate full CSR + options\nfinite nonnegative tolerance" as VALIDATE #FFF3BF
+rectangle "Simple undirected topology\nforget direction and weights\ndeduplicate reciprocals · ignore loops" as SIMPLE #D3F9D8
+rectangle "Breadth-first components" as COMPONENTS #C3FAE8
+rectangle "Decision: at least\ntwo nodes?" as HAS_PAIR #FFF3BF
+rectangle "Decision: connected?" as CONNECTED #FFF3BF
+rectangle "Canonical component contrast\n<latex>Lx=0</latex> · zero iterations" as EXACT #C3FAE8
+rectangle "Centered linear initialization\n<latex>x\perp\mathbf{1},\;\lVert x\rVert_2=1</latex>" as INIT #E5DBFF
+rectangle "Sparse deflated iteration\n<latex>y=((2\Delta+1)I-L)x</latex>\nmean-project · normalize · sign-pin" as ITERATE #E5DBFF
+rectangle "Up to 8 cyclic linear starts\nselect minimum Rayleigh value\nthen residual + vector ties" as SELECT #FFE8CC
+rectangle "Rayleigh edge energy + residual\n<latex>\lambda_2=\sum_{\{u,v\}\in E}(x_u-x_v)^2</latex>\n<latex>r=\lVert Lx-\lambda_2x\rVert_2</latex>" as MEASURE #F3D9FA
+rectangle "Spectral\naligned vector + sign partition\niterations · convergence · residual" as RESULT #D3F9D8
+rectangle "None\nfewer than two nodes" as NONE #F1F3F5
+rectangle "AnalysisError\nmalformed CSR · invalid tolerance" as ERROR #FFE3E3
+
+INPUT --> VALIDATE
+VALIDATE --> ERROR : invalid
+VALIDATE --> HAS_PAIR : valid
+HAS_PAIR --> NONE : no
+HAS_PAIR --> SIMPLE : yes
+SIMPLE --> COMPONENTS
+COMPONENTS --> CONNECTED
+CONNECTED --> EXACT : no
+CONNECTED --> INIT : yes
+EXACT --> RESULT : <latex>\lambda_2=0</latex>
+INIT --> ITERATE
+ITERATE --> ITERATE : until tolerance or 1,000 steps
+ITERATE --> SELECT : one candidate
+SELECT --> INIT : next cyclic shift, at most 8
+SELECT --> MEASURE : selected candidate
+MEASURE --> RESULT
+
+legend right
+  |= Color |= Meaning |
+  |<#E7F5FF>| immutable projection input |
+  |<#FFF3BF>| validation / decision boundary |
+  |<#D3F9D8>| canonical topology / public result |
+  |<#C3FAE8>| exact connectivity reasoning |
+  |<#E5DBFF>| bounded numerical iteration |
+  |<#FFE8CC>| bounded multi-start selection |
+  |<#F3D9FA>| numerical evidence |
+  |<#F1F3F5>| mathematically absent result |
+  |<#FFE3E3>| typed rejection |
+endlegend
+@enduml

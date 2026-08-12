@@ -93,6 +93,7 @@ $`h=\min(\mathtt{max\_levels},10)`$ = Louvain aggregation levels.
 | Global minimum cut | $`O(V^3)`$ time, $`O(V^2)`$ space | Dense Stoer–Wagner matrix; hard 1,024-node ceiling and checked finite sums. |
 | Degree assortativity | $`O(V+E)`$ time and space including simple projection | One canonical edge pass after degree construction. |
 | Attack simulation | $`O(s(V+E))`$ time, $`O(V+E)`$ space | One iterative component traversal after each of at most 10,000 requested removals. |
+| Algebraic connectivity / Fiedler vector | $`O(sc(V+E))`$ time, $`O(V+E)`$ space | Exact component pre-pass; at most $`s\le8`$ deterministic linear starts each have hard $`c\le1000`$ ceiling and expose selected convergence plus residual. |
 | GNN `propagate` | $`O(L \cdot (V + E) \cdot d)`$ | Each layer means neighbour vectors over the AST/CFG/DFG overlays, then ReLU. |
 
 Two of these deserve emphasis. VF2 is worst-case super-exponential, which is why
@@ -103,8 +104,8 @@ once, loop bodies twice, and a path set cuts malformed AST cycles.
 
 ## Benchmark coverage and remaining gaps
 
-Eleven Criterion targets are active. Their eighteen baseline operation groups are
-feature-free; `induction_analysis` also registers a nineteenth,
+Twelve Criterion targets are active. Their nineteen baseline operation groups are
+feature-free; `induction_analysis` also registers a twentieth,
 `algorithm-detection`-gated operation. Every active group constructs and checks a deterministic oracle
 before Criterion enters the timed loop:
 
@@ -148,6 +149,11 @@ before Criterion enters the timed loop:
   minimum cut on 64- and 128-vertex seams, and attack/assortativity on 1,024-
   and 8,192-vertex stars. Analytic core, truss, bridge, component, cut,
   correlation, fragmentation, and repeatability oracles run before timing.
+- `spectral` measures sparse iteration over 1,024- and 8,192-vertex stars,
+  $`K_{32,32}`$ and $`K_{64,64}`$, plus exact disconnected handling over pairs
+  of stars with 1,024 and 8,192 total vertices. Closed-form connectivity,
+  convergence/residual, alignment, sign, partition, and repeatability oracles
+  run before timing.
 
 ```toml
 [[bench]]
@@ -193,6 +199,10 @@ harness = false
 [[bench]]
 name = "cohesion"
 harness = false
+
+[[bench]]
+name = "spectral"
+harness = false
 ```
 
 Run it directly, or save and compare named baselines:
@@ -211,6 +221,7 @@ cargo bench --bench wl --no-default-features
 cargo bench --bench centrality --no-default-features
 cargo bench --bench community --no-default-features
 cargo bench --bench cohesion --no-default-features
+cargo bench --bench spectral --no-default-features
 cargo bench --no-default-features --features algorithm-detection \
   --bench induction_analysis -- --test
 ```

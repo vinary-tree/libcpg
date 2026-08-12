@@ -441,6 +441,19 @@ fn exercise_every_analysis(cpg: &CodePropertyGraph, func: NodeId) {
     .expect("call nodes form a unique projected removal order");
     assert_eq!(attack.trace.len(), call_projection.node_count());
     assert!(attack.auc.is_finite() && (0.0..=1.0).contains(&attack.auc));
+    let spectral =
+        libcpg::try_algebraic_connectivity(&call_projection, &libcpg::SpectralOptions::default())
+            .expect("call projection is structurally valid");
+    if let Some(spectral) = spectral {
+        assert_eq!(spectral.nodes, call_projection.nodes);
+        assert_eq!(spectral.fiedler.len(), call_projection.node_count());
+        assert_eq!(spectral.partition.len(), call_projection.node_count());
+        assert!(spectral.algebraic_connectivity.is_finite());
+        assert!(spectral.algebraic_connectivity >= 0.0);
+        assert!(spectral.residual_norm.is_finite());
+        assert!(spectral.iterations <= libcpg::MAX_SPECTRAL_ITERATIONS);
+        assert!(spectral.starts <= libcpg::MAX_SPECTRAL_STARTS);
+    }
 
     // --- extractors ---
     let mut work = cpg.clone();

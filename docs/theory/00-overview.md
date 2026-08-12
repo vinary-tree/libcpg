@@ -98,7 +98,10 @@ structural-clone refinement
 modularity ([Theory 13](13-community-structure-and-modularity.md)), and
 [cohesion and structural robustness](../GLOSSARY.md#cohesion--structural-robustness)
 from core/truss persistence, low links, weighted cuts, assortativity, and attack
-traces ([Theory 14](14-graph-cohesion-and-robustness.md)). Each consumes the same
+traces ([Theory 14](14-graph-cohesion-and-robustness.md)), and
+[algebraic connectivity](../GLOSSARY.md#algebraic-connectivity--fiedler-vector)
+with deterministic Fiedler bisection
+([Theory 15](15-spectral-connectivity-and-bisection.md)). Each consumes the same
 `CodePropertyGraph`; none needs its own bespoke intermediate representation.
 
 ## 4. The four overlays at a glance

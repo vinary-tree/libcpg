@@ -82,8 +82,11 @@ deterministic multi-level modularity optimization and connected refinement.
 The [`cohesion family`](cohesion-analysis.md) also consumes this view:
 topological operations deduplicate direction and ignore weights, while global
 minimum cut validates and sums finite nonnegative reciprocal weights. These
-consumers are read-only. DSM and WL treat weights as binary adjacency;
-centrality, community, and cohesion document weight semantics per measure.
+The [`spectral connectivity family`](spectral-analysis.md) derives the same
+simple undirected topology, ignores numeric weights, and returns an aligned
+combinatorial-Laplacian Fiedler eigenpair. These consumers are read-only. DSM
+and WL treat weights as binary adjacency; centrality, community, cohesion, and
+spectral analysis document weight semantics per measure.
 
 ### The shared function CFG view
 

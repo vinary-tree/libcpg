@@ -364,6 +364,24 @@ Every result is advisory structural evidence. A high core/truss value, light
 cut, articulation, bridge, assortativity value, or attack area must not by
 itself authorize deletion, isolation, access control, or automated refactoring.
 
+## Spectral analysis: iteration and numerical evidence
+
+[Spectral connectivity](../components/graph/spectral-analysis.md) validates the
+complete projection contract and finite nonnegative tolerance before indexed
+work. It treats direction and numeric edge values as metadata, deduplicates
+topology, and ignores self-loops; non-finite weights therefore never enter
+floating arithmetic.
+
+The component pre-pass and every matrix-vector multiply are iterative and use
+sparse storage. `MAX_SPECTRAL_ITERATIONS = 1_000` clamps each start even for a
+request of the machine maximum, while `MAX_SPECTRAL_STARTS = 8` bounds the
+deterministic cyclic linear family. Numerical repetition is therefore bounded
+by $`O(8000(|V|+|E|))`$. Hosts must still cap projection node/edge counts to their
+own memory and latency budget. A capped result declares `converged == false`
+and includes $`\lVert Lx-\lambda x\rVert_2`$; consumers must not interpret an
+unchecked approximation or sign partition as an authorization, isolation
+boundary, or exact minimum cut.
+
 ## Loop induction: finite structural bounds
 
 [`loop_induction`](../components/graph/induction-analysis.md) computes each
