@@ -485,6 +485,25 @@ cycles remain valid witnesses. See the [cycle component
 guide](../components/graph/cycle-analysis.md) for directed semantics,
 canonicalization, literate pseudocode, complexity, and validation boundaries.
 
+### Directed motif census
+
+The feature-free motif API validates directed CSR topology, ignores weights and
+self-loops, and returns the complete sixteen-class triad census plus two
+selected four-node graphlet counts.
+
+| Function | Signature | Result |
+|---|---|---|
+| `motif_census` | `fn(&GraphProjection, &MotifOptions) -> Result<MotifCensus, AnalysisError>` | `triads: [u64; 16]` in `TRIAD_NAMES` order and `graphlets_4: [u64; 2]` |
+
+`MotifOptions` defaults to `max_nodes_triads = 512` and
+`max_nodes_graphlets = 50`; requests above the corresponding hard ceilings are
+clamped. Because one call requests both families, exceeding either effective
+limit returns `AnalysisError::BudgetExceeded` rather than a partial census.
+`graphlets_4[0]` is the complete bidirected four-clique count and index one is
+the source-compatible out-star count. See the [motif component
+guide](../components/graph/motif-analysis.md) for the complete index table,
+conservation law, pseudocode, and interpretation boundaries.
+
 ### Natural loops and nesting
 
 The feature-free loop API uses the shared reachable function CFG and dominator

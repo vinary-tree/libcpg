@@ -65,8 +65,9 @@ alternatives is folklore, and a decision without its costs is marketing.
 | [0019 — Deterministic bounded cohesion analysis](0019-deterministic-bounded-cohesion-analysis.md) | Share one simple-undirected topology across deterministic core/truss/connectivity/assortativity/attack kernels, while bounding and validating weighted Stoer–Wagner separately. | Accepted |
 | [0020 — Deterministic bounded spectral analysis](0020-deterministic-bounded-spectral-analysis.md) | Compute combinatorial-Laplacian algebraic connectivity and a stable Fiedler sign split with exact disconnected handling, bounded sparse iteration, and explicit residual evidence. | Accepted |
 | [0021 — Deterministic bounded cycle enumeration](0021-deterministic-bounded-cycle-enumeration.md) | Reuse projection SCCs for canonical directed cycle witnesses with hard length/count ceilings and a concrete first-omission boundary. | Accepted |
+| [0022 — Complete bounded directed-motif census](0022-deterministic-motif-census.md) | Classify all sixteen directed triads with dense bit rows and return typed errors instead of silently omitted graphlets. | Accepted |
 
-These twenty-one are not independent. ADR-0001 fixes the substrate that all analyses
+These twenty-two are not independent. ADR-0001 fixes the substrate that all analyses
 write onto; ADR-0002 and ADR-0005 together explain how a language reaches that
 substrate and what you must switch on to get there; ADR-0003 and ADR-0004 are
 two analyses *over* the substrate (one always-on, one feature-gated) that each
@@ -105,6 +106,10 @@ edge, node, and attack-step budgets for cohesion and robustness experiments.
 ADR-0020 consumes the same simple-projection seam, selects the combinatorial
 Laplacian, and fixes exact disconnected behavior, deterministic numerical
 choices, a hard iteration cap, and explicit convergence/residual evidence.
+ADR-0021 preserves directed topology and reuses the shared SCC substrate to
+bound canonical concrete cycle evidence. ADR-0022 also preserves direction,
+but fixes a complete tricode taxonomy, dense bounded adjacency, and explicit
+all-or-error semantics for combinatorial motif work.
 
 ![Module architecture of libcpg, showing the graph core and the analysis modules layered over it](../diagrams/module-architecture.svg)
 
@@ -116,7 +121,7 @@ choices, a hard iteration cap, and explicit convergence/residual evidence.
   (`0001`…). Numbers are never reused; a reversed decision is marked
   *Superseded* and a new record supersedes it, so history stays legible.
 - **Status lifecycle.** `Proposed → Accepted → (Superseded by NNNN | Deprecated)`.
-  All twenty current records are **Accepted** and reflect the shipped `v0.1.1`
+  All twenty-two current records are **Accepted** and reflect the shipped `v0.1.1`
   code.
 - **Grounding.** Every claim here is traceable to source: the
   [`Cargo.toml`](../engineering/01-build-and-features.md) feature block, the

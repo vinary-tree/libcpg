@@ -43,6 +43,7 @@ Source: [`diagrams/resource-bounds.puml`](../diagrams/resource-bounds.puml).*
 | `MAX_MIN_CUT_NODES` | `1_024` hard maximum | `global_min_cut` | rejects before allocating the dense Stoer–Wagner matrix |
 | `MAX_ATTACK_STEPS` | `10_000` hard maximum | `attack_simulation` | rejects an excessive step request; an intentional shorter prefix is explicitly marked `truncated` |
 | `MAX_CYCLE_LENGTH` / `MAX_SIMPLE_CYCLES` | `32` / `100_000` hard maxima | `simple_cycles` | clamps path depth and retained count; stops inside DFS at the first over-cap unique cycle and returns that omitted witness |
+| `MAX_TRIAD_NODES` / `MAX_GRAPHLET_NODES` | `512` / `50` hard maxima | `motif_census` | rejects before cubic/quartic enumeration with `AnalysisError::BudgetExceeded`; never returns a partial census |
 | Loop-induction structural bounds | at most `candidate_count + 1` invariant rounds per loop; affine depth `3` | `loop_induction` | reaches a finite fixed point; malformed AST cycles are cut by visited sets and arithmetic overflow becomes unknown evidence |
 | Complexity-evidence bounds | validated finite function scope plus loop/induction provider bounds | `estimate_time_complexity_with_evidence` (feature `algorithm-detection`) | provider failure or absent CFG evidence returns the exact legacy total estimate; justification grows with loop count |
 
@@ -400,6 +401,24 @@ bound stack and output memory, but hosts must still cap input node/edge counts
 and latency: the family of simple cycles is exponential even at bounded depth.
 A truncated `CycleSet` contains valid witnesses but is not evidence that no
 other cycles exist.
+
+## Directed motifs: combinatorial bounds
+
+[Directed motif analysis](../components/graph/motif-analysis.md) validates the
+complete forward/reverse CSR contract before allocating its adjacency bit rows.
+`MAX_TRIAD_NODES = 512` bounds cubic enumeration and
+`MAX_GRAPHLET_NODES = 50` bounds quartic enumeration. Smaller caller limits are
+honored and larger values clamp to the hard ceilings. Because one call requests
+both families, exceeding either effective limit returns
+`AnalysisError::BudgetExceeded`; zero counts therefore always mean a complete
+admitted census, not skipped work.
+
+The dense topology uses a predictable
+`O(n ceil(n/64))` words, ignores loops and numeric weights, and has no
+input-dependent recursion. Hosts should still choose smaller limits when their
+latency budget cannot tolerate exhaustive `O(n³ + n⁴)` work. Motif frequencies
+are advisory structural evidence and must not independently authorize code
+changes, isolation, or access-control decisions.
 
 ## Loop induction: finite structural bounds
 

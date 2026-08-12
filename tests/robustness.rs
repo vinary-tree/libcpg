@@ -343,6 +343,17 @@ fn exercise_every_analysis(cpg: &CodePropertyGraph, func: NodeId) {
                 .all(|node| call_projection.dense_index(*node).is_some())
     }));
     assert_eq!(cycles.truncated, cycles.first_dropped_cycle.is_some());
+    let motifs = libcpg::motif_census(&call_projection, &libcpg::MotifOptions::default())
+        .expect("corrupt fixture call graph remains within motif caps");
+    assert_eq!(
+        motifs.triads.iter().sum::<u64>(),
+        match call_projection.node_count() {
+            node_count if node_count >= 3 => {
+                (node_count * (node_count - 1) * (node_count - 2) / 6) as u64
+            }
+            _ => 0,
+        }
+    );
     let dsm = libcpg::analyze_dsm(&call_projection);
     assert!(dsm.complete);
     assert_eq!(dsm.visibility_fan_in.len(), call_projection.node_count());

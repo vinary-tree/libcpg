@@ -19,7 +19,8 @@ end note
 :bounded analyses —
 VF2 max_matches, DFG max_iterations,
 slice max_nodes, spectral iterations + starts,
-cycle length + count + first omission;<<#E5DBFF>>
+cycle length + count + first omission,
+motif triad + graphlet node ceilings;<<#E5DBFF>>
 :results;<<#C3FAE8>>
 stop
 

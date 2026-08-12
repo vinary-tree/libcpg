@@ -104,7 +104,10 @@ with deterministic Fiedler bisection
 ([Theory 15](15-spectral-connectivity-and-bisection.md)), and bounded
 [elementary-cycle](../GLOSSARY.md#elementary-cycle--simple-cycle) enumeration
 with canonical rotations and explicit truncation
-([Theory 16](16-bounded-simple-cycle-enumeration.md)). Each consumes the same
+([Theory 16](16-bounded-simple-cycle-enumeration.md)), and a complete
+[directed-triad motif census](../GLOSSARY.md#directed-triad--motif-census)
+with selected bounded four-node graphlets
+([Theory 17](17-directed-motif-census.md)). Each consumes the same
 `CodePropertyGraph`; none needs its own bespoke intermediate representation.
 
 ## 4. The four overlays at a glance

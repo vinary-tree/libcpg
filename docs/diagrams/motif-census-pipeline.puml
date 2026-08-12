@@ -1,0 +1,57 @@
+@startuml
+title Directed motif census — complete taxonomy with explicit budgets
+
+skinparam backgroundColor #FCFCFC
+skinparam activity {
+  BackgroundColor #E8F1FB
+  BorderColor #28527A
+  FontColor #172B4D
+  DiamondBackgroundColor #FFF3CD
+  DiamondBorderColor #8A6D1D
+}
+skinparam note {
+  BackgroundColor #F2F8F2
+  BorderColor #3D7A4A
+}
+
+start
+:Borrow directed GraphProjection;
+if (Forward/reverse CSR valid?) then (yes)
+else (no)
+  :Return InvalidInput;
+  stop
+endif
+
+if (<latex>n \le L_3 \le 512</latex>?) then (yes)
+else (no)
+  :Return triad BudgetExceeded;
+  stop
+endif
+
+if (<latex>n \le L_4 \le 50</latex>?) then (yes)
+else (no)
+  :Return graphlet BudgetExceeded;
+  stop
+endif
+
+:Encode non-loop adjacency as dense bit rows;
+
+fork
+  :Enumerate every a < b < c;
+  :Pack six directed arcs into tricode;
+  :Map through complete 64-entry table;
+  :Increment one of 16 triad classes;
+fork again
+  :Enumerate every a < b < c < d;
+  :Test complete bidirected clique;
+  :Test each source-compatible out-star center;
+end fork
+
+:Return complete fixed-array census;
+note right
+  Conservation:
+  <latex>\sum_{i=0}^{15} c_i = {n \choose 3}</latex>
+  No silent partial result.
+end note
+stop
+@enduml

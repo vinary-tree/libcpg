@@ -108,6 +108,15 @@ and returns the first omitted canonical witness.;
 ***[#F1F3F5]:SCC pruning + explicit stack
 skip acyclic regions, reuse graph-sized scratch once,
 and reject malformed CSR before indexed traversal.;
+**[#FFE3E3] Directed motifs
+***[#F1F3F5]:MAX_TRIAD_NODES = 512
+rejects before complete cubic triad enumeration.;
+***[#F1F3F5]:MAX_GRAPHLET_NODES = 50
+rejects before selected quartic graphlet enumeration
+success always means a complete census.;
+***[#F1F3F5]:validated dense bit rows
+predictable bounded adjacency storage,
+no recursion, loops/weights ignored.;
 **[#FFE3E3] Slicing
 ***[#F1F3F5]:max_nodes on backward_slice / forward_slice
 bounds the PDG reverse/forward BFS —

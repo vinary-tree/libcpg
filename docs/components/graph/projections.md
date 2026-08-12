@@ -88,9 +88,12 @@ simple undirected topology, ignores numeric weights, and returns an aligned
 combinatorial-Laplacian Fiedler eigenpair. The [bounded cycle
 family](cycle-analysis.md) instead preserves edge direction, ignores numeric
 weights, reuses projection SCCs, and emits canonical concrete cycle witnesses.
-These consumers are read-only. DSM, WL, and cycle enumeration treat weights as
-binary adjacency; centrality, community, cohesion, and spectral analysis
-document weight semantics per measure.
+The [directed motif family](motif-analysis.md) preserves the same directed
+binary topology, packs it into dense adjacency bit rows, and exhaustively
+classifies triads and selected graphlets within explicit vertex ceilings.
+These consumers are read-only. DSM, WL, cycle enumeration, and motif analysis
+treat weights as binary adjacency; centrality, community, cohesion, and
+spectral analysis document weight semantics per measure.
 
 ### The shared function CFG view
 

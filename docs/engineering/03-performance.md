@@ -94,6 +94,8 @@ $`h=\min(\mathtt{max\_levels},10)`$ = Louvain aggregation levels.
 | Degree assortativity | $`O(V+E)`$ time and space including simple projection | One canonical edge pass after degree construction. |
 | Attack simulation | $`O(s(V+E))`$ time, $`O(V+E)`$ space | One iterative component traversal after each of at most 10,000 requested removals. |
 | Algebraic connectivity / Fiedler vector | $`O(sc(V+E))`$ time, $`O(V+E)`$ space | Exact component pre-pass; at most $`s\le8`$ deterministic linear starts each have hard $`c\le1000`$ ceiling and expose selected convergence plus residual. |
+| Bounded simple-cycle enumeration | output-sensitive exponential worst case, with `O(V+E)` SCC preprocessing | Iterative canonical DFS is limited to length 32 and 100,000 retained cycles and reports its first omitted witness. |
+| Directed motif census | `O(V³ + V⁴)` time, $`O(V\lceil V/64\rceil)`$ words | Complete triple/quadruple enumeration uses dense directed bit rows; hard ceilings are 512 triad vertices and 50 graphlet vertices. |
 | GNN `propagate` | $`O(L \cdot (V + E) \cdot d)`$ | Each layer means neighbour vectors over the AST/CFG/DFG overlays, then ReLU. |
 
 Two of these deserve emphasis. VF2 is worst-case super-exponential, which is why
@@ -104,8 +106,8 @@ once, loop bodies twice, and a path set cuts malformed AST cycles.
 
 ## Benchmark coverage and remaining gaps
 
-Thirteen Criterion targets are active. Their twenty-two baseline operation groups are
-feature-free; `induction_analysis` also registers a twenty-third,
+Fourteen Criterion targets are active. Their twenty-five baseline operation groups are
+feature-free; `induction_analysis` also registers a twenty-sixth,
 `algorithm-detection`-gated operation. Every active group constructs and checks a deterministic oracle
 before Criterion enters the timed loop:
 
@@ -159,6 +161,10 @@ before Criterion enters the timed loop:
   and explicit 1,000-cycle truncation on complete directed graphs of 8 and 10
   vertices. Exact counts, edge closure, canonical starts, repeatability, caps,
   and first-omission evidence are asserted before timing.
+- `motifs` measures complete triad and selected graphlet censuses over directed
+  paths and out-stars at 24/50 vertices and complete bidirected graphs at 16/30
+  vertices. Exact binomial class/graphlet counts, conservation, and repeated
+  evaluation are asserted before timing.
 
 ```toml
 [[bench]]
@@ -212,6 +218,10 @@ harness = false
 [[bench]]
 name = "cycles"
 harness = false
+
+[[bench]]
+name = "motifs"
+harness = false
 ```
 
 Run it directly, or save and compare named baselines:
@@ -232,6 +242,7 @@ cargo bench --bench community --no-default-features
 cargo bench --bench cohesion --no-default-features
 cargo bench --bench spectral --no-default-features
 cargo bench --bench cycles --no-default-features
+cargo bench --bench motifs --no-default-features
 cargo bench --no-default-features --features algorithm-detection \
   --bench induction_analysis -- --test
 ```

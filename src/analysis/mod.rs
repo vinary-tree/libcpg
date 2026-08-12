@@ -16,6 +16,7 @@ mod dominators;
 mod dsm;
 mod induction;
 mod loops;
+mod motifs;
 mod projection;
 mod reachability;
 mod resolve;
@@ -81,6 +82,10 @@ pub use induction::{
 };
 
 pub use loops::{loop_forest, LoopExitEdge, LoopForest, NaturalLoop};
+
+pub use motifs::{
+    motif_census, MotifCensus, MotifOptions, MAX_GRAPHLET_NODES, MAX_TRIAD_NODES, TRIAD_NAMES,
+};
 
 pub use reachability::{unreachable_code, DeadBranch, ReachabilityReport};
 

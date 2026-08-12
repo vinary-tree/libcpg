@@ -22,7 +22,7 @@ think to write down.
 
 | Kind | Count | Where |
 | --- | ---: | --- |
-| Maximal-matrix library tests | 726 | inline `#[cfg(test)] mod …` next to the code; includes examples and properties |
+| Maximal-matrix library tests | 736 | inline `#[cfg(test)] mod …` next to the code; includes examples and properties |
 | Public-API integration tests | 21 | `tests/integration.rs` |
 | Malformed-input robustness tests | 5 | `tests/robustness.rs` |
 | SCCP public/parser integration tests | 3 | `tests/sccp_integration.rs` |
@@ -37,8 +37,9 @@ think to write down.
 | Cohesion public/parser integration tests | 2 | `tests/cohesion_integration.rs` |
 | Spectral public/parser integration tests | 2 | `tests/spectral_integration.rs` |
 | Cycle public/parser integration tests | 2 | `tests/cycles_integration.rs` |
-| **Executable test cases** | **779** | excludes three ignored rustdoc examples |
-| `proptest!` blocks (subset of the library/robustness rows) | 54 | exact source-level macro count in `src/` and `tests/` |
+| Motif public/parser integration tests | 2 | `tests/motifs_integration.rs` |
+| **Executable test cases** | **791** | excludes three ignored rustdoc examples |
+| `proptest!` blocks (subset of the library/robustness rows) | 55 | exact source-level macro count in `src/` and `tests/` |
 
 The maximal-matrix library count is up from **99** inline tests and **zero**
 property tests before this work.
@@ -56,15 +57,15 @@ on the features enabled:
 
 | Command | Lib tests | Notes |
 | --- | ---: | --- |
-| `cargo test` | 420 | `default = []`: the feature-free surface only |
-| `cargo test --features "full rholang metta"` | 726 | the maximal matrix, including the Mode-B mappers and evidence-aware complexity |
+| `cargo test` | 429 | `default = []`: the feature-free surface only |
+| `cargo test --features "full rholang metta"` | 736 | the maximal matrix, including the Mode-B mappers and evidence-aware complexity |
 
-The feature-free 420 exercise the graph model, exact dominator/post-dominator,
+The feature-free 429 exercise the graph model, exact dominator/post-dominator,
 natural-loop, monotone data-flow, variable-liveness/dead-store,
 available/very-busy-expression, SCCP, interval value-range, CFG/call-graph
 SCC analyses, condensation-DAG analytics, DSM visibility/core–periphery, WL
 structural-clone, centrality, community, cohesion/robustness,
-spectral-connectivity classification, bounded simple cycles, the CFG/DFG/PDG
+spectral-connectivity classification, bounded simple cycles, directed motifs, the CFG/DFG/PDG
 extractors, VF2, and similarity by building CPGs
 **by hand** — no grammar required. This is what
 the [`arb_well_formed_cpg`](#the-generators) generator exists for.
@@ -163,6 +164,7 @@ The invariants fall into complementary families.
 | **Cohesion and robustness** | 96 generated graphs through 20 vertices compare k-core to naïve threshold peeling; 96 simple graphs through 12 vertices compare k-truss to independent fixed-point triangle peeling, cuts to brute vertex/edge removal, and robust blocks to independent bridge-deletion BFS; 96 weighted graphs through 10 vertices compare Stoer–Wagner to exhaustive bipartitions; 64 attack cases compare every LCC/AUC step to independent BFS and bound assortativity; every order-insensitive family is repeated over reversed edge insertion; examples cover cliques, paths, triangles, bridges, weighted seams, degree-skew stars, deep stack-safe paths, exact caps, malformed CSR/numerics/orders, serde bytes, public/parser composition, and graph non-mutation |
 | **Spectral connectivity** | 96 generated graphs through nine vertices compare algebraic connectivity to an independent dense symmetric Jacobi eigensolver, require exact repeat/reversed-input results, and verify norm/mean/sign/residual/cap invariants; examples cover complete/path/cycle closed forms, exact disconnected component contrasts, duplicate/reciprocal/loop topology, arbitrary weights, zero and excessive iterations, invalid tolerance/CSR, serde bytes, a 25,000-node stack-safe path, public/parser composition, and graph non-mutation |
 | **Bounded simple cycles** | 96 generated directed graphs through eight vertices equal an independent exhaustive-permutation oracle and exact reversed-input repeats; another 96 random count caps equal the canonical sorted prefix and first omitted witness; examples cover self-loops, reciprocal pairs, opposite orientations, SCC pruning, zero/hard limits, malformed CSR, serde bytes, a 25,000-node ring, public/parser composition, and graph non-mutation |
+| **Directed motif census** | all 64 labeled tricodes equal an independent vertex-permutation isomorphism oracle; 128 generated directed graphs through eight vertices equal an independent brute-force triad/graphlet census, conserve `C(n,3)`, and repeat exactly under reversed insertion; examples cover all sixteen named classes, both graphlets, reciprocal spokes, weights/loops, explicit 512/50 budgets, malformed CSR, serde bytes, public/parser composition, robustness composition, and graph non-mutation |
 
 ### Two invariants worth singling out
 
@@ -379,6 +381,12 @@ stack safety, and six oracle-guarded benchmark cases; see
 [`scientific/16-cycle-enumeration-validation.md`](../scientific/16-cycle-enumeration-validation.md).
 It measures **100.00%** line, **100.00%** region, **100.00%** function, and
 **100.00%** branch coverage in the clean maximal matrix.
+The directed-motif module is evaluated against all 64 labeled tricodes, an
+independent isomorphism partition, a generated brute-force census, exact
+graphlet fixtures, public/parser boundaries, and six benchmark cases; see
+[`scientific/17-motif-census-validation.md`](../scientific/17-motif-census-validation.md).
+It measures **100.00%** line, **100.00%** region, **100.00%** function, and
+**100.00%** branch coverage in the clean maximal matrix.
 All figures come from clean maximal-matrix coverage runs; no focused-test
 figure is substituted for the repository gate.
 
@@ -413,7 +421,7 @@ dependencies and are not part of the `full` feature set.
 | --- | --- |
 | `examples/` directory | present but **empty** — no runnable `cargo run --example …` programs. |
 | Doctests | none run — every code fence in a doc comment is marked `ignore` / `rust,ignore`, so `cargo test --doc` executes nothing. Feature-gating individual doctests in a `default = []` crate is awkward; the snippets are instead validated by the documentation snippet-check harness. |
-| Benchmarks | Thirteen active Criterion targets cover SCC paths/rings/clusters, condensation paths/independent chains with and without CG layering, graph-arena paths, bounded VF2 paths, liveness chains/diamond ladders/nested loops, counted-loop induction regions, DSM paths/rings, WL rings/stars, centrality paths/rings/clusters, Louvain rings of cliques, disconnected-community refinement, cohesion lattices/clique chains/weighted seams/star attacks, spectral stars/complete-bipartite/disconnected-star families, bounded cycles over acyclic paths/disjoint triangles/dense digraphs, and—under `algorithm-detection`—complexity evidence on the counted-loop fixtures. Each active group asserts a deterministic oracle before timing; see [performance](03-performance.md). |
+| Benchmarks | Fourteen active Criterion targets cover SCC paths/rings/clusters, condensation paths/independent chains with and without CG layering, graph-arena paths, bounded VF2 paths, liveness chains/diamond ladders/nested loops, counted-loop induction regions, DSM paths/rings, WL rings/stars, centrality paths/rings/clusters, Louvain rings of cliques, disconnected-community refinement, cohesion lattices/clique chains/weighted seams/star attacks, spectral stars/complete-bipartite/disconnected-star families, bounded cycles over acyclic paths/disjoint triangles/dense digraphs, motif censuses over paths/bidirected cliques/out-stars, and—under `algorithm-detection`—complexity evidence on the counted-loop fixtures. Each active group asserts a deterministic oracle before timing; see [performance](03-performance.md). |
 | `ml-linfa`, `gpu` | not exercised: optional heavy dependencies outside the `full` feature set. |
 
 ## Related pages

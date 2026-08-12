@@ -24,6 +24,8 @@
 //!   aligned Fiedler vectors, and sign partitions
 //! - **Simple Cycles**: Enumerate canonical directed cycles with explicit
 //!   length and result-count bounds
+//! - **Motif Census**: Count all 16 directed triads and bounded four-node
+//!   cliques/out-stars
 //! - **Structural Clones**: Refine bounded Weisfeiler-Lehman projection labels
 //! - **Pattern Detection**: Detect design patterns using subgraph isomorphism (VF2/VF3)
 //! - **Algorithm Analysis**: Extract algorithm signatures and estimate complexity
@@ -89,9 +91,9 @@ pub use analysis::{
     cut_vertices_and_bridges, dead_stores, degree_assortativity, dfg_projection, dominator_tree,
     edge_betweenness, eigenvector_centrality, expression_facts, global_min_cut,
     harmonic_centrality, hits, k_core_decomposition, k_truss_decomposition, katz_centrality,
-    liveness, loop_forest, loop_induction, louvain, module_graph_projection, pagerank,
-    pdg_projection, personalized_pagerank, post_dominator_tree, projection_of, projection_sccs,
-    refine_connected, resolve_calls, reverse_pagerank, sccp, simple_cycles, solve,
+    liveness, loop_forest, loop_induction, louvain, module_graph_projection, motif_census,
+    pagerank, pdg_projection, personalized_pagerank, post_dominator_tree, projection_of,
+    projection_sccs, refine_connected, resolve_calls, reverse_pagerank, sccp, simple_cycles, solve,
     structural_clone_classes, try_algebraic_connectivity, try_refine_connected,
     two_edge_connected_components, unreachable_code, value_ranges, variable_facts,
     very_busy_expressions, wl_labels, AnalysisError, AttackResult, AttackStep,
@@ -105,15 +107,16 @@ pub use analysis::{
     GraphProjection, HitsScores, InductionAnalysis, InductionVariable, Interval, IntervalEnv,
     IntervalReport, IterationOptions, IvDirection, KCoreDecomposition, KTrussDecomposition,
     KatzOptions, Lattice, LivenessResult, LoopBoundEvidence, LoopExitEdge, LoopForest,
-    LoopInvariants, LouvainOptions, MustBits, NaturalLoop, PageRankOptions, PostDominatorTree,
-    ProjectionError, ProjectionKind, ReachabilityReport, ResolveConfig, SccAnalysisError,
-    SccComponent, SccCondensationEdge, SccDecomposition, SccProjection, SccpResult, SolverConfig,
-    Spectral, SpectralOptions, SymbolCandidates, SymbolTable, TripEvidence, TrussEdge,
-    TwoEdgeConnectedComponents, UndirectedProjection, VarFacts, VariableDefinition,
-    VeryBusyExpressions, DEFAULT_CENTRALITY_WORK_LIMIT, MAX_ATTACK_STEPS,
-    MAX_CENTRALITY_ITERATIONS, MAX_CONDENSATION_COMPONENTS, MAX_CYCLE_LENGTH, MAX_DSM_NODES,
-    MAX_K_TRUSS_EDGES, MAX_LOUVAIN_LEVELS, MAX_LOUVAIN_PASSES, MAX_MIN_CUT_NODES,
-    MAX_SIMPLE_CYCLES, MAX_SPECTRAL_ITERATIONS, MAX_SPECTRAL_STARTS, MAX_WL_ITERATIONS,
+    LoopInvariants, LouvainOptions, MotifCensus, MotifOptions, MustBits, NaturalLoop,
+    PageRankOptions, PostDominatorTree, ProjectionError, ProjectionKind, ReachabilityReport,
+    ResolveConfig, SccAnalysisError, SccComponent, SccCondensationEdge, SccDecomposition,
+    SccProjection, SccpResult, SolverConfig, Spectral, SpectralOptions, SymbolCandidates,
+    SymbolTable, TripEvidence, TrussEdge, TwoEdgeConnectedComponents, UndirectedProjection,
+    VarFacts, VariableDefinition, VeryBusyExpressions, DEFAULT_CENTRALITY_WORK_LIMIT,
+    MAX_ATTACK_STEPS, MAX_CENTRALITY_ITERATIONS, MAX_CONDENSATION_COMPONENTS, MAX_CYCLE_LENGTH,
+    MAX_DSM_NODES, MAX_GRAPHLET_NODES, MAX_K_TRUSS_EDGES, MAX_LOUVAIN_LEVELS, MAX_LOUVAIN_PASSES,
+    MAX_MIN_CUT_NODES, MAX_SIMPLE_CYCLES, MAX_SPECTRAL_ITERATIONS, MAX_SPECTRAL_STARTS,
+    MAX_TRIAD_NODES, MAX_WL_ITERATIONS, TRIAD_NAMES,
 };
 
 pub use builder::{

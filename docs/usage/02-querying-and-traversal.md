@@ -555,6 +555,39 @@ acyclicity test, use `projection_sccs`; for concrete bounded witnesses, see
 
 ---
 
+## Counting local directed motifs
+
+Use `motif_census` when you need a complete local-topology profile rather than
+individual cycle witnesses:
+
+```rust
+use libcpg::{
+    call_graph_projection, motif_census, AnalysisError, CodePropertyGraph,
+    MotifOptions, TRIAD_NAMES,
+};
+
+fn inspect_call_motifs(cpg: &CodePropertyGraph) -> Result<(), AnalysisError> {
+    let graph = call_graph_projection(cpg);
+    let census = motif_census(&graph, &MotifOptions::default())?;
+    for (name, count) in TRIAD_NAMES.iter().zip(census.triads) {
+        if count > 0 {
+            println!("{name}: {count}");
+        }
+    }
+    println!("bidirected K4: {}", census.graphlets_4[0]);
+    println!("out-star embeddings: {}", census.graphlets_4[1]);
+    Ok(())
+}
+```
+
+Persist projection provenance and the options with the counts. Motif labels
+describe induced topology, not source intent, and the combined call requires
+the projection to fit both the 512-node triad and 50-node graphlet budgets.
+See the [directed motif census](../components/graph/motif-analysis.md) for the
+full class table and interpretation boundaries.
+
+---
+
 ## Next steps
 
 - Detect design patterns over the graph you just queried: [Pattern Detection](03-pattern-detection.md).
@@ -564,6 +597,7 @@ acyclicity test, use `projection_sccs`; for concrete bounded witnesses, see
 - Inspect cohesive regions and failure seams: [Cohesion and Structural Robustness](../components/graph/cohesion-analysis.md).
 - Find a global spectral seam: [Spectral Connectivity](../components/graph/spectral-analysis.md).
 - Enumerate concrete recursion/dependency witnesses: [Bounded Simple Cycles](../components/graph/cycle-analysis.md).
+- Profile local directed topology: [Directed Motif Census](../components/graph/motif-analysis.md).
 - The complete method tables (construction, AST, CFG, DFG, call, query, metrics, subgraph) are in the [graph reference](../api/graph-reference.md); traversal internals are in [Graph Traversal](../components/graph/traversal.md).
 
 ---

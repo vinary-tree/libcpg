@@ -76,7 +76,8 @@ trees, exact CFG and call-graph SCC decomposition, and deterministic
 condensation-DAG critical-path and width-bounded layering analytics, projection
 centrality, bounded multi-level community detection, and deterministic bounded
 cohesion/robustness analysis, plus bounded algebraic connectivity and Fiedler
-partitioning and SCC-pruned bounded simple-cycle enumeration. Note the
+partitioning, SCC-pruned bounded simple-cycle enumeration, and complete bounded
+directed-motif census. Note the
 deliberate distinction between the always-on `pattern` module (VF2 / similarity) and
 the feature-gated `patterns` module (Gang-of-Four detection) — they are different
 modules, not a typo.

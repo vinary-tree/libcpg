@@ -131,6 +131,12 @@ direction and returns concrete elementary-cycle witnesses. It reuses the shared
 SCC engine, canonicalizes rotations, and exposes the first omitted cycle when
 the result-count cap binds.
 
+[Directed motif analysis](motif-analysis.md) also preserves direction, but
+classifies every unordered triple into the complete sixteen-class triad
+taxonomy and tests two bounded four-node graphlets. Dense adjacency bit rows,
+explicit 512/50 vertex ceilings, and typed budget errors keep the exhaustive
+census deterministic and complete within its admitted domain.
+
 ### Creating a CPG
 
 With **no cargo features enabled** (`default = []`), `libcpg` links no grammars,
@@ -333,6 +339,9 @@ So the safe pattern is: build (single-threaded, `&mut`), then analyse
   analysis, bounded weighted minimum cut, assortativity, and attack traces.
 - [Bounded simple cycles](cycle-analysis.md) — SCC-pruned directed witnesses,
   canonical rotations, hard length/count ceilings, and explicit truncation.
+- [Directed motif census](motif-analysis.md) — all sixteen induced directed
+  triads, selected four-node graphlets, conservation checks, and explicit
+  combinatorial budgets.
 - [Natural loops and nesting](loop-analysis.md) — dominator-qualified headers,
   shared latches, conservative irreducible regions, strict nesting, and loop
   exits.

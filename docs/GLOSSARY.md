@@ -349,6 +349,15 @@ length and count [[33]](#references). See
 [`theory/16-bounded-simple-cycle-enumeration.md`](theory/16-bounded-simple-cycle-enumeration.md)
 and [`components/graph/cycle-analysis.md`](components/graph/cycle-analysis.md).
 
+### Directed triad / motif census
+
+A **directed triad** is the induced topology on three vertices. Its three dyads
+are mutual, asymmetric, or null; the complete Davis–Leinhardt taxonomy has
+sixteen isomorphism classes. A **motif census** counts each unordered triple in
+exactly one class, so the counts sum to `C(n,3)` [[34]](#references). See
+[`theory/17-directed-motif-census.md`](theory/17-directed-motif-census.md) and
+[`components/graph/motif-analysis.md`](components/graph/motif-analysis.md).
+
 ### Embedding
 
 A dense real-valued vector that summarises a node (`NodeEmbedding`) or a subgraph (`SubgraphEmbedding`) so that structurally/semantically similar code lands nearby in vector space. Produced by the [GNN](#graph-neural-network-gnn) and compared with [cosine similarity](#cosine-similarity). See [`components/gnn/embeddings.md`](components/gnn/embeddings.md).
@@ -755,3 +764,4 @@ used by the complexity analyzer to classify recursive functions (e.g. $`a = b = 
 31. Cohesion and robustness foundations: (**31a**) Seidman, S. B. (1983). *Network Structure and Minimum Degree.* DOI: [10.1016/0378-8733(83)90028-X](https://doi.org/10.1016/0378-8733(83)90028-X). (**31b**) Batagelj, V., Zaveršnik, M. (2003). *An O(m) Algorithm for Cores Decomposition of Networks.* [arXiv:cs/0310049](https://arxiv.org/abs/cs/0310049). (**31c**) Cohen, J. (2008). *Trusses: Cohesive Subgraphs for Social Network Analysis.* NSA Technical Report (no DOI assigned). (**31d**) Hopcroft, J., Tarjan, R. (1973). *Algorithm 447: Efficient Algorithms for Graph Manipulation.* DOI: [10.1145/362248.362272](https://doi.org/10.1145/362248.362272). (**31e**) Tarjan, R. (1972). *Depth-First Search and Linear Graph Algorithms.* DOI: [10.1137/0201010](https://doi.org/10.1137/0201010). (**31f**) Stoer, M., Wagner, F. (1997). *A Simple Min-Cut Algorithm.* DOI: [10.1145/263867.263872](https://doi.org/10.1145/263867.263872). (**31g**) Newman, M. E. J. (2003). *Mixing Patterns in Networks.* DOI: [10.1103/PhysRevE.67.026126](https://doi.org/10.1103/PhysRevE.67.026126). (**31h**) Holme, P., Kim, B. J., Yoon, C. N., Han, S. K. (2002). *Attack Vulnerability of Complex Networks.* DOI: [10.1103/PhysRevE.65.056109](https://doi.org/10.1103/PhysRevE.65.056109).
 32. Spectral foundations: (**32a**) Fiedler, M. (1973). *Algebraic Connectivity of Graphs.* DOI: [10.21136/CMJ.1973.101168](https://doi.org/10.21136/CMJ.1973.101168). (**32b**) Shi, J., Malik, J. (2000). *Normalized Cuts and Image Segmentation.* DOI: [10.1109/34.868688](https://doi.org/10.1109/34.868688).
 33. Johnson, D. B. (1975). *Finding All the Elementary Circuits of a Directed Graph.* SIAM Journal on Computing 4(1), 77–84. DOI: [10.1137/0204007](https://doi.org/10.1137/0204007).
+34. Directed-motif foundations: (**34a**) Holland, P. W., Leinhardt, S. (1970). *A Method for Detecting Structure in Sociometric Data.* American Journal of Sociology 76(3), 411–432. DOI: [10.1086/224954](https://doi.org/10.1086/224954). (**34b**) Batagelj, V., Mrvar, A. (2001). *A subquadratic triad census algorithm for large sparse networks with small maximum degree.* DOI: [10.1016/S0378-8733(01)00035-1](https://doi.org/10.1016/S0378-8733(01)00035-1). (**34c**) Milo, R. et al. (2002). *Network Motifs: Simple Building Blocks of Complex Networks.* DOI: [10.1126/science.298.5594.824](https://doi.org/10.1126/science.298.5594.824).

@@ -53,6 +53,9 @@ PDG). A query can therefore mix syntax, control flow, and data flow freely.
 - **Bounded simple cycles** — feature-free SCC-pruned enumeration of canonical
   directed cycle witnesses with explicit length/count ceilings and a concrete
   first-omission witness when the result cap binds.
+- **Directed motif census** — the complete sixteen-class Davis–Leinhardt triad
+  taxonomy plus bounded bidirected-clique and out-star graphlets, with explicit
+  size budgets and no silently partial results.
 - **CFG reachability** — feature-free, deterministic reachable/unreachable
   partitions and structural dead-branch evidence without graph mutation.
 - **Basic-block CFGs** — deterministic, id-preserving block partitions, typed

@@ -249,3 +249,7 @@ harness = false
 [[bench]]
 name = "cycles"
 harness = false
+
+[[bench]]
+name = "motifs"
+harness = false
