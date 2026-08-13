@@ -122,12 +122,15 @@ This is the pillar's central structural claim. `libcpg` offers two construction 
 
 Consumers pick the mode for operational reasons (who owns the grammar, whether the input was pre-parsed), and they must be able to do so **without changing the resulting analysis.** That is only true if both paths build the *same graph*.
 
-**Hypothesis.** For the same source and grammar, `build_from_tree` and `build` produce graphs with identical node counts, identical edge counts, and the same language tag.
+**Hypothesis.** For the same source and grammar, `build_from_tree` and `build`
+produce identical node payloads and typed edges, as well as the same language
+tag.
 
 **Experiment.** `test_build_from_tree_matches_build` (in `src/builder/tree_sitter.rs`) parses the source *externally* — exactly as a Mode-B caller such as `pgmcp` would — then builds both ways and compares:
 
 ```rust
-let source = "fn main() { let x = 1; let y = x; }";
+let source =
+    "struct S { x: i32 } impl S { fn set(&mut self) { self.x = 1; } }";
 
 // Parse externally, exactly as a Mode-B caller (e.g. pgmcp) would.
 let ts_language = ParserRegistry::global()
@@ -145,21 +148,38 @@ let from_source = builder
     .build(source, Language::Rust)
     .expect("build should succeed");
 
-// The caller-supplied-tree path must produce a graph identical in shape
-// to the internal-parse path (same nodes, same edges, same language).
+// The caller-supplied-tree path must produce the same counts and language.
 assert!(from_tree.node_count() > 1);
 assert_eq!(from_tree.node_count(), from_source.node_count());
 assert_eq!(from_tree.edge_count(), from_source.edge_count());
 assert_eq!(from_tree.language(), Language::Rust);
+
+// The example test also compares the canonical sorted set of
+// (source NodeId, target NodeId, typed edge kind) triples and requires the
+// discriminating FieldWrite and Reference edges. Its companion property
+// compares every node payload and complete typed edge record over 64 sources.
 ```
 
-**Why this input is well-chosen.** `fn main() { let x = 1; let y = x; }` is not a trivial one-node program: it forces all three overlays to be exercised, so the counts being compared are non-degenerate. It contains a function (an AST subtree and a CFG entry), two `let` bindings, and — crucially — `let y = x`, which creates a [reaching definition](../GLOSSARY.md#reaching-definition) from the binding of `x` to its use in the initializer of `y`, i.e. a real [DFG](../GLOSSARY.md#data-flow-graph-dfg) def-use edge. The `assert!(from_tree.node_count() > 1)` guards against the vacuous case where both paths agree only because both produced nothing.
+**Why this input is well-chosen.** The fixture is
+`struct S { x: i32 } impl S { fn set(&mut self) { self.x = 1; } }`. It is not a
+trivial one-node program: it forces an AST type/implementation/method hierarchy,
+CFG entry/body construction, `FieldRead`/`FieldWrite` data flow, and a
+member-to-declaration `Reference`. The `assert!(from_tree.node_count() > 1)`
+guards against a vacuous empty agreement.
 
-**Result.** The two paths agree on `node_count()`, on `edge_count()`, and on `language()`. Because the CPG builder is a **pure function of the parse tree** (it walks the tree and emits nodes/edges deterministically; the only difference between the modes is *who* produced the tree and whether the size guard ran), agreeing cardinalities across the AST+CFG+DFG overlays are exactly the observable signature of identical structure. The test asserts the *necessary* cardinality-and-language condition rather than a node-by-node isomorphism, and determinism of the walk supplies the rest.
+**Result.** The two paths agree on `node_count()`, `edge_count()`, `language()`,
+and the complete sorted set of `(source NodeId, target NodeId, typed edge kind)`
+triples. The test also requires a `FieldWrite` and `Reference`, so equivalence
+cannot pass while silently omitting the new topology. Because Mode A delegates
+its parsed tree to the same Mode-B post-parse pipeline, the result establishes
+observable typed-shape identity for this discriminating fixture.
 
 ![Mode A and Mode B converge on one identical CPG](../diagrams/build-equivalence.svg)
 
-*Figure — `build` (internal parse) and `build_from_tree` (caller-supplied tree) as two entry points onto one deterministic tree-walk, yielding graphs of identical node/edge count and language. Source: [`diagrams/build-equivalence.puml`](../diagrams/build-equivalence.puml).*
+*Figure — `build` (internal parse) and `build_from_tree` (caller-supplied tree)
+as two entry points onto one deterministic tree-walk, yielding identical node
+payloads, typed edges, and language. Source:
+[`diagrams/build-equivalence.puml`](../diagrams/build-equivalence.puml).*
 
 **Consequence.** Everything validated for Mode A transfers to Mode B, and vice versa. The reaching-defs corpus in [02](02-reaching-defs-validation.md) is written against `build` (Mode A) for convenience; this equivalence is what licenses trusting the same guarantees for the Rholang/MeTTa/`pgmcp` Mode-B path, which cannot use `build` at all. See [`design/0002-mode-b-build-from-tree.md`](../design/0002-mode-b-build-from-tree.md) for the decision record and [`components/builder/overview.md`](../components/builder/overview.md) for the construction stages.
 
@@ -170,7 +190,7 @@ assert_eq!(from_tree.language(), Language::Rust);
 | I1 (shared node set) | Graph-assigned unique IDs; all overlays index one node set | `test_multi_embedding_backtracking`; `def_use_backward_slice` | distinct-node reliance; `slice.contains(&def_x)` |
 | I2 (AST consistency) | `AstChild` edges and parent pointers agree | `parsed_nested_use_resolves_and_chains` | `ast_descendants(out_def).contains(&buf_use)` |
 | I3 (idempotency) | Re-running an extractor adds no edge | `parsed_shadowing_and_idempotent` | `assert_eq!(before, cpg.stats().dfg_edges, …)` |
-| E (equivalence) | `build` ≡ `build_from_tree` in shape | `test_build_from_tree_matches_build` | equal `node_count`/`edge_count`/`language` |
+| E (equivalence) | `build` ≡ `build_from_tree` in typed shape | example + property `build_from_tree_matches_build` tests | equal node payloads, typed edges, and language |
 
 See also: [`theory/01-code-property-graphs.md`](../theory/01-code-property-graphs.md) for the formal overlay model, and [`components/builder/overview.md`](../components/builder/overview.md) for how `convert_node` emits the AST edges and CFG entry points these invariants govern.
 

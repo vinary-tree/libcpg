@@ -1,6 +1,6 @@
 # Diagram catalog
 
-Every figure in the `libcpg` documentation is a **committed source** (`.puml` for PlantUML, `.dot` for Graphviz) rendered to a **committed `.svg`** that the Markdown pages embed. Sources are version-controlled so figures are reproducible and reviewable; SVGs are committed so they render on GitHub (which does not render PlantUML/Graphviz inline). This directory holds all 75 figures plus the shared theme.
+Every figure in the `libcpg` documentation is a **committed source** (`.puml` for PlantUML, `.dot` for Graphviz) rendered to a **committed `.svg`** that the Markdown pages embed. Sources are version-controlled so figures are reproducible and reviewable; SVGs are committed so they render on GitHub (which does not render PlantUML/Graphviz inline). This directory holds all 78 figures plus the shared theme.
 
 ## Conventions
 
@@ -83,6 +83,7 @@ Grouped by subject. Each row: the source (its `.svg` sibling is embedded by the 
 | `cfg-example.dot` | graph | CFG of a small function with `CfgEdgeKind` labels | theory/02, components/builder/cfg |
 | `cfg-control-constructs.dot` | graph | if / while / try CFG shapes | theory/02, components/graph/edges, components/builder/cfg |
 | `reaching-defs-sweep.puml` | activity | AST-ordered reaching-defs sweep (strong/weak/loop) | theory/03, design/0003, components/builder/dfg, scientific/02 |
+| `member-field-flow.puml` | typed topology | member/index reads and writes plus evidence-bounded member-to-field resolution | theory/03, design/0028, components/builder/dfg, components/graph/edges, architecture/data-flow, scientific/23 |
 | `def-use-example.dot` | graph | Def-use / reaching-def edges | theory/03, components/graph/edges, components/builder/dfg, scientific/02 |
 | `pdg-construction.puml` | activity | PDG build via reverse dominance frontier | theory/04, components/builder/pdg-and-slicing |
 | `dominance-frontier.dot` | graph | Control dependence = reverse dominance frontier | theory/04, components/builder/pdg-and-slicing |
@@ -138,7 +139,7 @@ Grouped by subject. Each row: the source (its `.svg` sibling is embedded by the 
 ### Engineering, science, security
 | Source | Type | Depicts | Embedded by |
 |---|---|---|---|
-| `build-equivalence.puml` | activity | `build` ≡ `build_from_tree` node/edge equality | scientific/01, engineering/02 |
+| `build-equivalence.puml` | activity | `build` ≡ `build_from_tree` node-payload and typed-edge equality | scientific/01, engineering/02 |
 | `measurement-methodology.puml` | activity | Rigorous benchmarking method (a documented gap) | scientific/04, engineering/03 |
 | `threat-model-dataflow.puml` | activity | Untrusted input flow & trust boundaries | security/00 |
 | `resource-bounds.puml` | mindmap | Construction/analysis caps and validation, including condensation/layering, DSM, Martin metrics, architectural smells, centrality, Louvain, k-truss, minimum-cut, and attack ceilings | security/01 |

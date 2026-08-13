@@ -1,0 +1,42 @@
+@startuml
+!include _libcpg-theme.iuml
+title Resolved field and index flow under include_field_access
+
+left to right direction
+
+rectangle "receiver\nself / this" as Receiver #DBE4FF
+rectangle "MemberAccess\nmember = x" as Member #FFF3BF
+rectangle "Assignment\nfirst child = member" as FieldAssignment #DBE4FF
+rectangle "Field declaration\nowner::x" as Field #E9ECEF
+
+rectangle "array receiver" as Array #DBE4FF
+rectangle "index expression" as Subscript #DBE4FF
+rectangle "IndexAccess" as Index #FFF3BF
+rectangle "Assignment\nfirst child = index" as IndexAssignment #DBE4FF
+
+Receiver -[#F08C00,bold]-> Member : DataFlow(FieldRead)
+FieldAssignment -[#F08C00,bold]-> Member : DataFlow(FieldWrite)
+Member -[#868E96,bold]-> Field : Reference
+
+Array -[#F08C00,bold]-> Index : DataFlow(IndexRead)
+Subscript -[#F08C00,bold]-> Index : DataFlow(DataDependency)
+IndexAssignment -[#F08C00,bold]-> Index : DataFlow(IndexWrite)
+
+note bottom of Member
+  Reference is emitted only when:
+  * the receiver is self or this;
+  * a Function ancestor has a Class or Impl owner;
+  * the owner/type and field name are unique
+    in the same lexical declaration scope.
+  Missing or ambiguous evidence emits no edge.
+end note
+
+legend right
+  |= colour / line |= role |
+  |<#DBE4FF>| AST expression / assignment node |
+  |<#FFF3BF>| DFG access node |
+  |<#E9ECEF>| nominal field declaration |
+  |<#FFFFFF><color:#F08C00>orange edge</color>| DataFlow edge |
+  |<#FFFFFF><color:#868E96>grey edge</color>| declaration Reference |
+endlegend
+@enduml

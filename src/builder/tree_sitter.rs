@@ -276,6 +276,97 @@ impl TreeSitterCpgBuilder {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[cfg(any(
+        feature = "lang-rust",
+        feature = "lang-javascript",
+        feature = "lang-typescript",
+        feature = "lang-java",
+        feature = "lang-cpp"
+    ))]
+    use crate::DfgEdgeKind;
+
+    #[cfg(any(
+        feature = "lang-rust",
+        feature = "lang-javascript",
+        feature = "lang-typescript",
+        feature = "lang-go",
+        feature = "lang-java",
+        feature = "lang-c",
+        feature = "lang-cpp"
+    ))]
+    fn assert_mode_a_declared_field(language: Language, source: &str, expected_name: &str) {
+        let cpg = TreeSitterCpgBuilder::new()
+            .build(source, language)
+            .expect("Mode-A parse/build should succeed");
+        let fields: Vec<_> = cpg
+            .nodes()
+            .filter(|node| {
+                matches!(
+                    &node.kind,
+                    CpgNodeKind::Field { name, .. } if name.as_ref() == expected_name
+                )
+            })
+            .collect();
+        assert_eq!(
+            fields.len(),
+            1,
+            "{language:?} must emit one named Field({expected_name:?}) for the declaration"
+        );
+        assert!(cpg.ast_ancestors(fields[0].id).into_iter().any(|id| {
+            matches!(
+                cpg.node(id).map(|node| &node.kind),
+                Some(CpgNodeKind::Class { .. } | CpgNodeKind::Struct { .. })
+            )
+        }));
+    }
+
+    #[cfg(any(
+        feature = "lang-javascript",
+        feature = "lang-typescript",
+        feature = "lang-java",
+        feature = "lang-cpp"
+    ))]
+    fn assert_mode_a_member_write_resolves(language: Language, source: &str, expected_name: &str) {
+        let cpg = TreeSitterCpgBuilder::new()
+            .build(source, language)
+            .expect("Mode-A parse/build should succeed");
+        let field = cpg
+            .nodes()
+            .find(|node| {
+                matches!(
+                    &node.kind,
+                    CpgNodeKind::Field { name, .. } if name.as_ref() == expected_name
+                )
+            })
+            .expect("named field")
+            .id;
+        let access = cpg
+            .nodes()
+            .find(|node| {
+                matches!(
+                    &node.kind,
+                    CpgNodeKind::MemberAccess { member } if member.as_ref() == expected_name
+                )
+            })
+            .expect("member access")
+            .id;
+        let assignment = cpg
+            .nodes()
+            .find(|node| {
+                matches!(node.kind, CpgNodeKind::Assignment { .. })
+                    && cpg.ast_children(node.id).first() == Some(&access)
+            })
+            .expect("member assignment")
+            .id;
+        assert!(cpg
+            .edges_between(assignment, access)
+            .iter()
+            .any(|edge| { matches!(edge.kind, CpgEdgeKind::DataFlow(DfgEdgeKind::FieldWrite)) }));
+        assert!(cpg
+            .edges_between(access, field)
+            .iter()
+            .any(|edge| matches!(edge.kind, CpgEdgeKind::Reference)));
+    }
 
     #[test]
     fn test_builder_creation() {
@@ -297,6 +388,91 @@ mod tests {
         // Should have multiple nodes (root, function, block, etc.)
         assert!(cpg.node_count() > 1);
         assert_eq!(cpg.language(), Language::Rust);
+    }
+
+    /// Every Mode-A grammar with declarative struct/class fields must preserve
+    /// the declaration as a named `Field`; the DFG's member resolver consumes
+    /// exactly this shared shape.
+    #[test]
+    #[cfg(feature = "lang-rust")]
+    fn mode_a_rust_emits_named_field() {
+        assert_mode_a_declared_field(Language::Rust, "struct S { x: i32 }", "x");
+    }
+
+    #[test]
+    #[cfg(feature = "lang-javascript")]
+    fn mode_a_javascript_emits_named_field() {
+        assert_mode_a_declared_field(Language::JavaScript, "class S { x = 0; }", "x");
+    }
+
+    #[test]
+    #[cfg(feature = "lang-typescript")]
+    fn mode_a_typescript_emits_named_field() {
+        assert_mode_a_declared_field(Language::TypeScript, "class S { x: number = 0; }", "x");
+    }
+
+    #[test]
+    #[cfg(feature = "lang-go")]
+    fn mode_a_go_emits_named_field() {
+        assert_mode_a_declared_field(Language::Go, "package p\ntype S struct { x int }", "x");
+    }
+
+    #[test]
+    #[cfg(feature = "lang-java")]
+    fn mode_a_java_emits_named_field() {
+        assert_mode_a_declared_field(Language::Java, "class S { int x; }", "x");
+    }
+
+    #[test]
+    #[cfg(feature = "lang-c")]
+    fn mode_a_c_emits_named_field() {
+        assert_mode_a_declared_field(Language::C, "struct S { int x; };", "x");
+    }
+
+    #[test]
+    #[cfg(feature = "lang-cpp")]
+    fn mode_a_cpp_emits_named_field() {
+        assert_mode_a_declared_field(Language::Cpp, "class S { int x; };", "x");
+    }
+
+    #[test]
+    #[cfg(feature = "lang-javascript")]
+    fn mode_a_javascript_this_write_resolves_field() {
+        assert_mode_a_member_write_resolves(
+            Language::JavaScript,
+            "class S { x = 0; set() { this.x = 1; } }",
+            "x",
+        );
+    }
+
+    #[test]
+    #[cfg(feature = "lang-typescript")]
+    fn mode_a_typescript_this_write_resolves_field() {
+        assert_mode_a_member_write_resolves(
+            Language::TypeScript,
+            "class S { x: number = 0; set() { this.x = 1; } }",
+            "x",
+        );
+    }
+
+    #[test]
+    #[cfg(feature = "lang-java")]
+    fn mode_a_java_this_write_resolves_field() {
+        assert_mode_a_member_write_resolves(
+            Language::Java,
+            "class S { int x; void set() { this.x = 1; } }",
+            "x",
+        );
+    }
+
+    #[test]
+    #[cfg(feature = "lang-cpp")]
+    fn mode_a_cpp_this_write_resolves_field() {
+        assert_mode_a_member_write_resolves(
+            Language::Cpp,
+            "class S { int x; void set() { this->x = 1; } };",
+            "x",
+        );
     }
 
     #[test]
@@ -397,7 +573,7 @@ mod tests {
     #[test]
     #[cfg(feature = "lang-rust")]
     fn test_build_from_tree_matches_build() {
-        let source = "fn main() { let x = 1; let y = x; }";
+        let source = "struct S { x: i32 } impl S { fn set(&mut self) { self.x = 1; } }";
 
         // Parse externally, exactly as a Mode-B caller (e.g. pgmcp) would.
         let ts_language = ParserRegistry::global()
@@ -418,11 +594,27 @@ mod tests {
             .expect("build should succeed");
 
         // The caller-supplied-tree path must produce a graph identical in shape
-        // to the internal-parse path (same nodes, same edges, same language).
+        // to the internal-parse path (same nodes, same typed edges, same
+        // language), including the additive field write/reference edges.
         assert!(from_tree.node_count() > 1);
         assert_eq!(from_tree.node_count(), from_source.node_count());
         assert_eq!(from_tree.edge_count(), from_source.edge_count());
         assert_eq!(from_tree.language(), Language::Rust);
+        let edge_set = |cpg: &CodePropertyGraph| {
+            let mut edges: Vec<_> = cpg
+                .edges()
+                .map(|edge| (edge.source.0, edge.target.0, format!("{:?}", edge.kind)))
+                .collect();
+            edges.sort_unstable();
+            edges
+        };
+        assert_eq!(edge_set(&from_tree), edge_set(&from_source));
+        assert!(from_source
+            .edges()
+            .any(|edge| matches!(edge.kind, CpgEdgeKind::DataFlow(DfgEdgeKind::FieldWrite))));
+        assert!(from_source
+            .edges()
+            .any(|edge| matches!(edge.kind, CpgEdgeKind::Reference)));
     }
 
     #[test]
@@ -600,8 +792,8 @@ mod proptests {
         #![proptest_config(ProptestConfig::with_cases(64))]
 
         /// `build` ≡ `build_from_tree`: a caller-supplied tree (parsed with
-        /// `tree_sitter_rust::LANGUAGE`) yields a graph identical in node count,
-        /// edge count, and language to the internal-parse path.
+        /// `tree_sitter_rust::LANGUAGE`) yields the same node payloads and
+        /// typed edges as the internal-parse path.
         #[test]
         fn prop_build_eq_build_from_tree(src in arb_rust_source()) {
             let mut parser = tree_sitter::Parser::new();
@@ -620,6 +812,24 @@ mod proptests {
             prop_assert_eq!(from_tree.edge_count(), from_source.edge_count());
             prop_assert_eq!(from_tree.language(), from_source.language());
             prop_assert_eq!(from_tree.language(), Language::Rust);
+
+            let tree_ids: Vec<_> = from_tree.node_ids().collect();
+            let source_ids: Vec<_> = from_source.node_ids().collect();
+            prop_assert_eq!(&tree_ids, &source_ids);
+            for id in tree_ids {
+                let tree_node = from_tree.node(id).expect("Mode-B node exists");
+                let source_node = from_source.node(id).expect("Mode-A node exists");
+                prop_assert_eq!(&tree_node.kind, &source_node.kind);
+                prop_assert_eq!(tree_node.range, source_node.range);
+                prop_assert_eq!(&tree_node.text, &source_node.text);
+                prop_assert_eq!(&tree_node.properties, &source_node.properties);
+                prop_assert_eq!(&tree_node.children, &source_node.children);
+                prop_assert_eq!(tree_node.parent, source_node.parent);
+            }
+
+            let tree_edges: Vec<_> = from_tree.edges().cloned().collect();
+            let source_edges: Vec<_> = from_source.edges().cloned().collect();
+            prop_assert_eq!(tree_edges, source_edges);
         }
 
         /// Parent ↔ AstChild consistency in a `build`-produced CPG: every

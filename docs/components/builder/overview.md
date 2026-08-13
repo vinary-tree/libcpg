@@ -191,7 +191,7 @@ the [`ParserRegistry`](node-mapper.md#parser-registry), parses, and then **deleg
 Because they share that code, the two paths are guaranteed to produce structurally
 identical graphs — an invariant pinned by the inline test
 `test_build_from_tree_matches_build`, which asserts equal `node_count()`, `edge_count()`,
-and `language()` for the same source (see
+`language()`, and canonical typed edge triples for the same source (see
 [`../../scientific/01-cpg-invariants-and-equivalence.md`](../../scientific/01-cpg-invariants-and-equivalence.md)).
 
 ### When to use which

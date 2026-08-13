@@ -50,7 +50,7 @@ definite callers.
 |-------|---------|--------|
 | `include_parameters` | `true` | Emit `Parameter` edges from call arguments to the matching parameters, and link parameter uses. |
 | `include_return_values` | `true` | Emit `ReturnValue` edges from returned expressions to the callers. |
-| `include_field_access` | `true` | Emit `FieldRead` / `IndexRead` / `DataDependency` edges for member and index access. |
+| `include_field_access` | `true` | Emit member/index reads and writes, index dependencies, and conservative `self`/`this` member-to-`Field` references. |
 | `track_aliases` | `false` | Reserved for alias tracking; off by default (more expensive, not yet modelled). |
 | `max_iterations` | `100` | Iteration cap for the **retired** CFG fixed-point; **not consulted** by the current AST-ordered sweep (which bounds loops at two passes — see below). |
 
@@ -262,16 +262,19 @@ tests `parsed_nested_use_resolves_and_chains`, `parsed_reassignment_uses_latest_
 
 ## Auxiliary edges
 
-Beyond the `DefUse` edges from the sweep, `extract_function_dfg` overlays four more
-`DfgEdgeKind`s, each gated by its config flag:
+Beyond the `DefUse` edges from the sweep, `extract_function_dfg` overlays
+auxiliary edge families under their matching config flag:
 
 | Edge kind | Source → target | Emitted by | Gate |
 |-----------|-----------------|-----------|------|
 | `Parameter` | call argument → matching parameter | `build_parameter_edges` | `include_parameters` |
 | `ReturnValue` | returned expression → each caller | `build_return_edges` | `include_return_values` |
 | `FieldRead` | accessed object → the member-access node | `build_field_access_edges` | `include_field_access` |
+| `FieldWrite` | assignment → its first-child member-access l-value | `build_field_access_edges` | `include_field_access` |
 | `IndexRead` | indexed array → the index-access node | `build_field_access_edges` | `include_field_access` |
 | `DataDependency` | index expression → the index-access node | `build_field_access_edges` | `include_field_access` |
+| `IndexWrite` | assignment → its first-child index-access l-value | `build_field_access_edges` | `include_field_access` |
+| `Reference` | `self`/`this` member access → unique same-name enclosing field | `build_field_access_edges` | `include_field_access` |
 
 `build_parameter_edges` also adds a supplementary `DefUse` edge from a directly-declared
 parameter to each of its uses, deduplicated against the sweep's edges so it never
@@ -283,6 +286,35 @@ the caller either supplies bindings or enables
 [`with_import_resolution(true)`](../graph/call-resolution.md#builder-integration).
 Ambiguous and external calls still create no parameter/return flow because the
 resolver deliberately leaves their targets empty.
+
+### Complex l-values and declaration resolution
+
+An assignment's first AST child is its l-value. If that child is a
+`MemberAccess` or `IndexAccess`, the assignment becomes the write origin; the
+existing receiver-to-access read remains because evaluating a complex l-value
+also reads its base object/array. Indexing additionally reads the subscript.
+
+For `self.x` and `this.x`, the builder can sometimes identify the declaration
+without a language-specific type checker. It first proves that the access is
+inside a function with a `Class` or `Impl` ancestor. A class is the owner
+directly; an `Impl { for_type: T }` resolves only when exactly one class/struct/
+enum named exactly `T` exists in the same lexical declaration scope. The builder
+then descends through grammar wrappers, stopping at nested functions/types, and
+requires one same-name `Field`. Any missing or ambiguous step emits no
+`Reference` edge.
+
+![Resolved member and index read/write topology](../../diagrams/member-field-flow.svg)
+
+*Figure — member and index reads/writes share their access node; only a uniquely
+supported local receiver crosses the grey declaration-reference boundary.
+Source: [`diagrams/member-field-flow.puml`](../../diagrams/member-field-flow.puml).*
+
+This logic is **not a parser**. It consumes the normalized `CpgNodeKind` AST that
+every frontend already produced, and it never interprets source strings beyond
+exact names already stored on type/member nodes. See
+[ADR-0028](../../design/0028-evidence-bounded-member-field-resolution.md) for the
+decision boundary and [Scientific Validation 23](../../scientific/23-member-field-flow-validation.md)
+for its tests.
 
 ---
 
@@ -326,14 +358,13 @@ if let Some(chain) = chains.get("x") {
 
 ## Idempotency
 
-The def-use sweep is **idempotent**. `build_def_use_edges` snapshots the existing `DefUse`
-edges into a set keyed by `(source, target)` and skips any pair already present, so
-re-running `extract` adds no duplicate def-use edge; the parameter-use supplement
-deduplicates the same way. The inline test `parsed_shadowing_and_idempotent` runs `extract`
-twice and asserts `cpg.stats().dfg_edges` is unchanged. (The auxiliary
-`ReturnValue`/`FieldRead` builders emit via `cpg.connect` without their own dedup, so as
-with the [CFG](cfg.md#re-running-the-extractor) the intended usage is a single extraction
-pass during construction.)
+The complete DFG pass is **idempotent**. `build_def_use_edges` snapshots existing
+`DefUse` endpoint pairs; every auxiliary builder uses `connect_unique`, which
+deduplicates by endpoints *and* edge kind. The inline and property tests run the
+full extractor twice and require an unchanged DFG/total edge count, including
+parameter, return, member/index read/write, dependency, and `Reference` edges.
+Re-extraction is therefore safe after a caller mutates the AST, although existing
+edges remain append-only rather than being retracted.
 
 ---
 

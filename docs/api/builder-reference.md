@@ -329,7 +329,7 @@ sweep. Like the CFG extractor, `extract` takes `&self` + `&mut cpg` and returns
 
 ```rust
 pub struct DfgExtractorConfig {
-    pub include_field_access: bool,     // default true
+    pub include_field_access: bool,     // default true: field/index flow + member Reference
     pub include_parameters: bool,       // default true
     pub include_return_values: bool,    // default true
     pub track_aliases: bool,            // default false

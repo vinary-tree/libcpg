@@ -15,7 +15,7 @@ For two distinct vertices, a directed **dyad** is:
 - **null** when neither direction is present.
 
 An unordered set of three vertices contains exactly three dyads. If their
-counts are `$M$`, `$A$`, and `$N$`, then
+counts are $`M`$, $`A`$, and $`N`$, then
 
 ```math
 M + A + N = 3.
@@ -38,22 +38,22 @@ of one mutual and two asymmetric dyads.
 
 ## Six-bit tricodes
 
-Choose dense vertices `$a < b < c$` and let `$I(x,y)$` be one when arc
-`$x \rightarrow y$` exists and zero otherwise. `libcpg` forms the tricode
+Choose dense vertices $`a < b < c`$ and let $`I(x,y)`$ be one when arc
+$`x \rightarrow y`$ exists and zero otherwise. `libcpg` forms the tricode
 
 ```math
 t = I(a,b)2^0 + I(b,a)2^1 + I(a,c)2^2 + I(c,a)2^3
   + I(b,c)2^4 + I(c,b)2^5.
 ```
 
-There are `$2^6 = 64$` labeled tricodes but only sixteen unlabeled isomorphism
+There are $`2^6 = 64`$ labeled tricodes but only sixteen unlabeled isomorphism
 classes. A complete 64-entry table maps each tricode to its class. Vertex
 renaming changes the code but not the mapped class.
 
 ## Census conservation
 
 Every unordered vertex triple has exactly one tricode and exactly one class.
-Consequently, for `$n$` vertices and class counts `$c_i$`,
+Consequently, for $`n`$ vertices and class counts $`c_i`$,
 
 ```math
 \sum_{i=0}^{15} c_i = {n \choose 3} = \frac{n(n-1)(n-2)}{6}.
@@ -67,15 +67,15 @@ keeps this cubic enumeration bounded.
 ## Four-node graphlet predicates
 
 The same induced-adjacency model defines two selected four-node graphlets.
-For a subset `$S$` of four vertices:
+For a subset $`S`$ of four vertices:
 
-1. it is a complete bidirected clique when, for all distinct `$u,v \in S$`,
-   both `$u \rightarrow v$` and `$v \rightarrow u$` exist;
-2. a vertex `$c \in S$` is an out-star center when it points to all other
+1. it is a complete bidirected clique when, for all distinct $`u,v \in S`$,
+   both $`u \rightarrow v`$ and $`v \rightarrow u`$ exist;
+2. a vertex $`c \in S`$ is an out-star center when it points to all other
    vertices and those three leaves have no arcs among themselves.
 
 The out-star predicate does not constrain reverse spoke arcs
-`$\ell \rightarrow c$`. This is a deliberate compatibility property of the
+$`\ell \rightarrow c`$. This is a deliberate compatibility property of the
 ported topology contract, not the conventional strictly induced directed-star
 definition. Consumers requiring the stricter definition should post-filter or
 define a separate graphlet family.

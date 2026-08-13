@@ -105,6 +105,27 @@ to be definitions. The parser-backed loop-induction integration test then
 checks that the shared DFG links a body use to the binder and that the analysis
 recognizes the step-one range.
 
+### Declarative fields for member resolution
+
+The DFG's evidence-bounded `self`/`this` resolver needs a named `Field`
+declaration under the owning nominal type. Every Mode-A frontend with explicit
+struct/class field syntax is parser-fixture tested:
+
+| Frontend | Grammar declaration | Name source | CPG shape |
+|---|---|---|---|
+| Rust | `field_declaration` | `name` | `Struct -> … -> Field` |
+| JavaScript | `field_definition` | `property` | `Class -> … -> Field` |
+| TypeScript | `public_field_definition` / `property_signature` | `name` | `Class`/`Trait -> … -> Field` |
+| Go | `field_declaration` | `name` | `Struct -> … -> Field` |
+| Java | `field_declaration` | identifier below `declarator` | `Class -> … -> Field` |
+| C / C++ | `field_declaration` | identifier below `declarator` | `Struct`/`Class -> … -> Field` |
+
+The extraction helper walks only a declaration's grammar-defined declarator
+subtree, so an identifier in the type or initializer cannot be mistaken for the
+field name. Python and Ruby generally create fields dynamically rather than
+through a distinct declaration rule; the mapper does not invent declarations
+that the common AST cannot support. See [DFG extraction](dfg.md#complex-l-values-and-declaration-resolution).
+
 ---
 
 ## Inclusion filtering: `should_include` vs `should_include_node`

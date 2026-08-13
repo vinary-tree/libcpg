@@ -112,7 +112,7 @@ let cfg = DfgExtractorConfig {
     include_parameters: true,
     include_return_values: true,
     track_aliases: false,   // more expensive; off by default
-    max_iterations: 100,    // bound for the reaching-defs sweep
+    max_iterations: 100,    // compatibility cap for the retired CFG fixed point
 };
 DfgExtractor::with_config(cfg).extract(&mut cpg);
 ```
@@ -141,7 +141,14 @@ visit_reaching(node, env, conditional):
 
 A [strong update](../GLOSSARY.md#strong-update--weak-update) (kill + gen; the latest write wins) applies in straight-line context; inside a [conditional region](../GLOSSARY.md#strong-update--weak-update) a weak update *adds* a definition without killing, so a write on one path cannot erase a write on another — a sound over-approximation (extra edges, never a missing one). This is what threads a definition into a deeply nested use such as `buf` in `decode(buf)` — precisely the case the retired CFG-based passes missed. The pass is intraprocedural, bounded, language-agnostic (it dispatches on `CpgNodeKind`, never grammar specifics), and **idempotent**: an edge is added only if an identical one does not already exist, so re-running `extract` is a no-op.
 
-Beyond the core def-use sweep, three auxiliary builders run under their config switches: `build_parameter_edges` (argument → `Parameter`), `build_return_edges` (returned expression → caller, `ReturnValue`), and `build_field_access_edges` (`FieldRead`/`IndexRead`). The 13 `DfgEdgeKind` variants — replacing the invented `UseUse`/`Phi`:
+Beyond the core def-use sweep, three auxiliary builders run under their config
+switches: `build_parameter_edges` (argument → `Parameter`),
+`build_return_edges` (returned expression → caller, `ReturnValue`), and
+`build_field_access_edges`. The last emits receiver reads, assignment-origin
+`FieldWrite`/`IndexWrite`, index dependencies, and a conservative
+`MemberAccess -> Field` `Reference` for uniquely supported `self`/`this`
+accesses. The 13 `DfgEdgeKind` variants — replacing the invented
+`UseUse`/`Phi`:
 
 | `DfgEdgeKind` | Meaning |
 |---------------|---------|
@@ -156,6 +163,11 @@ Beyond the core def-use sweep, three auxiliary builders run under their config s
 | `Alias` | Aliasing between names (opt-in) |
 | `Dereference` | Pointer dereference |
 | `AddressOf` | Address-of |
+
+![Field and index access topology added by the DFG auxiliary pass](../diagrams/member-field-flow.svg)
+
+*Figure — typed read/write flow and the evidence-bounded declaration reference.
+Source: [`diagrams/member-field-flow.puml`](../diagrams/member-field-flow.puml).*
 
 Public helpers expose the same information as [def-use chains](../GLOSSARY.md#def-use-chain--definition--use): `Definition`/`DefinitionKind`, `Use`/`UseKind`, `DefUseChain`, and `build_def_use_chains(&cpg, function)`. Graph queries read the overlay directly — `reaching_definitions(use_site)`, `uses_of_definition(def)`, `dfg_successors`/`dfg_predecessors`. The DFG builder is dissected in [`../components/builder/dfg.md`](../components/builder/dfg.md); the theory of reaching definitions (Kildall's lattice framing [[5]](#references); the gen/kill formulation of the dragon book [[13]](#references)) is in [`../theory/03-data-flow-and-reaching-definitions.md`](../theory/03-data-flow-and-reaching-definitions.md).
 

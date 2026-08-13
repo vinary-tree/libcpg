@@ -219,6 +219,33 @@ The double sweep of loop bodies is the sweep's nod to the fixed-point theory of 
 two passes suffice here because the environment is monotone and a single back-edge
 re-exposes the body's own late definitions to its early uses.
 
+### Storage accesses are a separate relation
+
+Name-based reaching definitions answer which assignment of local name $`x`$
+reaches a use. A member or indexed l-value names *storage through another
+expression*, so the DFG records a complementary topology around the access node:
+
+```math
+\begin{aligned}
+\mathit{receiver} &\to \mathit{access} && \text{read},\\
+\mathit{assignment} &\to \mathit{access} && \text{write},\\
+\mathit{memberAccess} &\to \mathit{fieldDeclaration} && \text{reference, when unique}.
+\end{aligned}
+```
+
+The shared access node is deliberate: a complex l-value such as `a[i]` must
+evaluate (read) `a` and `i` before it can be written. `FieldWrite`/`IndexWrite`
+therefore do not replace `FieldRead`/`IndexRead`; they add the write origin.
+Declaration resolution is a partial, evidence-bounded relation restricted to
+`self`/`this`, an enclosing method owner, and one same-name field. It does not
+infer arbitrary receiver types. The exact predicate and alternatives are in
+[ADR-0028](../design/0028-evidence-bounded-member-field-resolution.md).
+
+![Member/index reads and writes around their shared access nodes](../diagrams/member-field-flow.svg)
+
+*Figure — the DFG storage-access relation and its conservative declaration
+reference. Source: [`diagrams/member-field-flow.puml`](../diagrams/member-field-flow.puml).*
+
 ![The AST-ordered reaching-definitions sweep: strong updates, weak updates, and the loop double pass](../diagrams/reaching-defs-sweep.svg)
 
 *Figure — the AST-ordered reaching-definitions sweep, showing strong updates in straight-line context, weak updates inside conditional regions, and the two-pass loop-body handling. Source: [`diagrams/reaching-defs-sweep.puml`](../diagrams/reaching-defs-sweep.puml).*

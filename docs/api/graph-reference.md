@@ -1145,16 +1145,24 @@ The 13 [data-flow](../GLOSSARY.md#data-flow-graph-dfg) edge kinds carried by
 | `DataDependency` | Generic data dependency. |
 | `Parameter` | Argument → parameter. |
 | `ReturnValue` | Return expression → caller. |
-| `FieldRead` | Object → member access (read). |
-| `FieldWrite` | Field write. |
-| `IndexRead` | Array/index read. |
-| `IndexWrite` | Array/index write. |
+| `FieldRead` | Receiver → member access (the base-object read). |
+| `FieldWrite` | Assignment → first-child member-access l-value. |
+| `IndexRead` | Array receiver → index access. |
+| `IndexWrite` | Assignment → first-child index-access l-value. |
 | `Alias` | Alias relationship. |
 | `Dereference` | Pointer dereference. |
 | `AddressOf` | Address-of. |
 
 Helpers: `is_read()` (`DefUse`/`FieldRead`/`IndexRead`/`Dereference`),
 `is_write()` (`UseDef`/`FieldWrite`/`IndexWrite`).
+
+With `DfgExtractorConfig::include_field_access` enabled (the default), the same
+pass also emits `Reference` from a `self`/`this` member access to the unique
+same-name `Field` declaration of its enclosing class/implemented type. This is
+not a `DataFlow` edge and therefore is not returned by `dfg_successors`; inspect
+`outgoing_edges(access)` or `edges_between(access, field)` when querying
+declaration identity. Missing or ambiguous owner/type/field evidence emits no
+reference.
 
 ---
 

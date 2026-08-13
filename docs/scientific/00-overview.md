@@ -50,16 +50,16 @@ Two properties of the suite make this rigorous rather than merely suggestive:
 
 ## 3. The evidence base
 
-The maximal matrix contains **769 library tests**, **21 general public-API
+The maximal matrix contains **786 library tests**, **21 general public-API
 integration tests**, **5 malformed-input robustness tests**, **3 SCCP
 public/parser integration tests**, and **3 interval public/parser integration
 tests**, plus **3 loop-induction** and **3 complexity-evidence public/parser
 integration tests**, plus **2 condensation** and **2 DSM public/parser
 integration tests**, plus **1 WL**, **2 centrality**, **2 community**, **2
 cohesion**, **2 spectral**, **2 cycle**, **2 motif**, **2 GED**, **2 Martin**, and
-**2 reflexion**, **2 layering**, and **2 architectural-smell
-public/serialization integration tests**. These 834 executable cases combine
-fixed examples, differential oracles, and 60 exact source-level
+**2 reflexion**, **2 layering**, **2 architectural-smell**, and **2 field-access
+public/parser integration tests**. These 853 executable cases combine
+fixed examples, differential oracles, and 61 exact source-level
 `proptest!` blocks. The feature-free matrix remains
 independently runnable and exercises the exact graph/data-flow substrate
 without compiling any grammar. Fifteen active Criterion targets supplement
@@ -74,7 +74,7 @@ Because `default = []`, many tests are **feature-gated**. The end-to-end reachin
 
 | Page | Property validated | Anchoring inline test(s) | Gate |
 |---|---|---|---|
-| [01 — Invariants & equivalence](01-cpg-invariants-and-equivalence.md) | Single shared node set; graph-assigned unique IDs; AST child/parent consistency; idempotent extractors; `build` ≡ `build_from_tree` (identical node/edge counts + language) | `test_build_from_tree_matches_build`, `parsed_shadowing_and_idempotent`, `def_use_backward_slice`, `parsed_nested_use_resolves_and_chains` | `lang-rust` (equivalence, DFG) / feature-free (slice) |
+| [01 — Invariants & equivalence](01-cpg-invariants-and-equivalence.md) | Single shared node set; graph-assigned unique IDs; AST child/parent consistency; idempotent extractors; `build` ≡ `build_from_tree` (identical node payloads, typed edges, and language) | example + property `build_from_tree_matches_build` tests, `parsed_shadowing_and_idempotent`, `def_use_backward_slice`, `parsed_nested_use_resolves_and_chains` | `lang-rust` (equivalence, DFG) / feature-free (slice) |
 | [02 — Reaching-defs validation](02-reaching-defs-validation.md) | Nested-expression use resolution; latest-definition (strong update); non-flow of unrelated variables; shadowing scope; idempotency | `parsed_nested_use_resolves_and_chains`, `parsed_reassignment_uses_latest_definition`, `parsed_unrelated_variable_does_not_flow`, `parsed_shadowing_and_idempotent` | `lang-rust` |
 | [03 — VF2 completeness](03-vf2-completeness.md) | Soundness floor (empty pattern → no match); kind-feasibility pruning; **all** embeddings found (diamond → exactly 2) with exact backtracking | `test_empty_pattern`, `test_single_node_match`, `test_multi_embedding_backtracking` | feature-free |
 | [04 — Measurement methodology](04-measurement-methodology.md) | Environment control and exact-oracle timing for SCC, condensation analytics, arena construction, bounded VF2, liveness, loop induction, DSM, WL, centrality, community, cohesion, spectral, cycle, motif, and GED analysis | fifteen `benches/*.rs` Criterion targets | feature-free baseline; one `algorithm-detection` group |
@@ -96,12 +96,13 @@ Because `default = []`, many tests are **feature-gated**. The end-to-end reachin
 | [20 — Reflexion-model validation](20-reflexion-model-validation.md) | First-prefix mapping, exhaustive verdicts, exact realized pairs/absences, multiset reversal, duplicates, uncovered paths, serialization | exact layered oracle, 256-case property, `reflexion_integration` | feature-free / `serde` |
 | [21 — Layering validation](21-layering-validation.md) | Bottom-first longest-path reversal, exact cycle/skip/upward witnesses, one-step descent, determinism, hostile public values, serialization | exact layered/stale-level oracles, 256-case DAG property, `layering_integration` | feature-free / `serde` |
 | [22 — Architectural-smell validation](22-architectural-smells-validation.md) | Exact cycle/hub/instability/size findings, clean topology, evidence-bundle rejection, deterministic ordering, serialization | four isolated smell oracles, 256-case property, hostile-value tables, `smells_integration` | feature-free / `serde` |
+| [23 — Member-field flow validation](23-member-field-flow-validation.md) | Field/index writes, conservative member-to-field references, gate/idempotency/append-only behavior, storage determinism, Mode-A/Mode-B parity | exact six-edge oracle, ambiguity counterexamples, 256-case property, seven frontend declaration fixtures, public/parser integration | feature-free / `lang-all` |
 
 ## 5. What is proven, and what is advisory
 
 Scientific honesty requires separating the two:
 
-- **Proven (guarded by the tests above).** The CPG's structural invariants; deterministic graph projection; immediate dominance (differentially checked against `petgraph`); post-dominance and control-dependence equivalence with the former production oracle; natural back edges and loop bodies (checked against independent brute-force dominance and closure oracles); exact SCC partitioning and condensation acyclicity (differentially checked against `petgraph`'s Tarjan implementation); condensation weighted paths (exhaustive path oracle), source levels, CG coverage/precedence/width, and exact/approximate unit-schedule height (exhaustive subset-schedule oracle); liveness fixed points (checked against an independent Gauss–Seidel solver); available/very-busy Must states (checked by exhaustive entry/exit path enumeration on generated acyclic CFGs); SCCP constants on the generated `StmtSpec` language (checked by a concrete mini-interpreter), conditional-edge partitions, and deterministic insertion permutations; interval membership on generated straight-line and bounded-loop programs, widening/narrowing laws, convergence caps, SCCP singleton containment, and deterministic reports; loop-invariant DFG contracts, checked additive/affine IV steps, direction compatibility, insertion-order determinism, and conservative rejection cases; the reaching-definition semantics on the audited corpus; and VF2's completeness on the discriminating diamond. These are deterministic and regression-locked.
+- **Proven (guarded by the tests above).** The CPG's structural invariants; deterministic graph projection; immediate dominance (differentially checked against `petgraph`); post-dominance and control-dependence equivalence with the former production oracle; natural back edges and loop bodies (checked against independent brute-force dominance and closure oracles); exact SCC partitioning and condensation acyclicity (differentially checked against `petgraph`'s Tarjan implementation); condensation weighted paths (exhaustive path oracle), source levels, CG coverage/precedence/width, and exact/approximate unit-schedule height (exhaustive subset-schedule oracle); liveness fixed points (checked against an independent Gauss–Seidel solver); available/very-busy Must states (checked by exhaustive entry/exit path enumeration on generated acyclic CFGs); SCCP constants on the generated `StmtSpec` language (checked by a concrete mini-interpreter), conditional-edge partitions, and deterministic insertion permutations; interval membership on generated straight-line and bounded-loop programs, widening/narrowing laws, convergence caps, SCCP singleton containment, and deterministic reports; loop-invariant DFG contracts, checked additive/affine IV steps, direction compatibility, insertion-order determinism, and conservative rejection cases; the reaching-definition semantics on the audited corpus; exact field/index write directions and uniquely evidenced `self`/`this` field references; and VF2's completeness on the discriminating diamond. These are deterministic and regression-locked.
   DSM visibility vectors and propagation cost are independently checked by
   Floyd–Warshall closure; largest cyclic groups are checked from mutual
   reachability; insertion/duplicate invariance and malformed/provenance states

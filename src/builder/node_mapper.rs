@@ -521,11 +521,13 @@ impl NodeMapper {
                 scope: ScopeId::GLOBAL,
                 is_mutable: true,
             },
-            "public_field_definition" | "field_definition" => CpgNodeKind::Field {
-                name: self.extract_child_text(node, "property", source),
-                field_type: None,
-                visibility: Visibility::Public,
-            },
+            "public_field_definition" | "field_definition" | "property_signature" => {
+                CpgNodeKind::Field {
+                    name: self.extract_field_name(node, source),
+                    field_type: None,
+                    visibility: Visibility::Public,
+                }
+            }
 
             // Control flow
             "if_statement" => CpgNodeKind::If,
@@ -657,6 +659,11 @@ impl NodeMapper {
                 scope: ScopeId::GLOBAL,
                 is_mutable: false,
             },
+            "field_declaration" => CpgNodeKind::Field {
+                name: self.extract_field_name(node, source),
+                field_type: self.extract_type_from_node(node, source),
+                visibility: Visibility::Public,
+            },
             "if_statement" => CpgNodeKind::If,
             "for_statement" => CpgNodeKind::For,
             // tree-sitter-go splits `switch` into `expression_switch_statement`
@@ -761,8 +768,8 @@ impl NodeMapper {
                 is_mutable: !self.has_modifier(node, "final"),
             },
             "field_declaration" => CpgNodeKind::Field {
-                name: Arc::from(""),
-                field_type: None,
+                name: self.extract_field_name(node, source),
+                field_type: self.extract_type_from_node(node, source),
                 visibility: self.extract_java_visibility(node),
             },
             "if_statement" => CpgNodeKind::If,
@@ -880,8 +887,8 @@ impl NodeMapper {
                 is_mutable: true,
             },
             "field_declaration" => CpgNodeKind::Field {
-                name: Arc::from(""),
-                field_type: None,
+                name: self.extract_field_name(node, source),
+                field_type: self.extract_type_from_node(node, source),
                 visibility: Visibility::Public,
             },
             "if_statement" => CpgNodeKind::If,
@@ -1895,6 +1902,35 @@ impl NodeMapper {
         node.child_by_field_name(field)
             .map(|n| Arc::from(self.node_text(&n, source)))
             .unwrap_or_else(|| Arc::from(""))
+    }
+
+    /// Extracts the first declared field name across grammar layouts.
+    ///
+    /// Go exposes `name` directly on `field_declaration`; Java and C/C++ wrap
+    /// it below a `declarator`. Walking only that declared subtree avoids
+    /// confusing a type identifier or initializer identifier for the field.
+    fn extract_field_name(&self, node: &tree_sitter::Node, source: &str) -> Arc<str> {
+        if let Some(name) = node.child_by_field_name("name") {
+            return Arc::from(self.node_text(&name, source));
+        }
+        if let Some(property) = node.child_by_field_name("property") {
+            return Arc::from(self.node_text(&property, source));
+        }
+
+        let Some(declarator) = node.child_by_field_name("declarator") else {
+            return Arc::from("");
+        };
+        let mut stack = vec![declarator];
+        while let Some(candidate) = stack.pop() {
+            if matches!(candidate.kind(), "identifier" | "field_identifier") {
+                return Arc::from(self.node_text(&candidate, source));
+            }
+            let mut cursor = candidate.walk();
+            let mut children: Vec<_> = candidate.named_children(&mut cursor).collect();
+            children.reverse();
+            stack.extend(children);
+        }
+        Arc::from("")
     }
 
     fn has_child_kind(&self, node: &tree_sitter::Node, kind: &str) -> bool {

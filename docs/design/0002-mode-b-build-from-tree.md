@@ -76,8 +76,8 @@ the caller must guarantee `tree` came from a grammar whose node-kind strings tha
 mapper understands, or nodes fall through to the generic mapping.
 
 Because the pipelines are the same, the two paths are provably shape-equivalent.
-The inline test `test_build_from_tree_matches_build` (`src/builder/tree_sitter.rs`)
-parses one source both ways and asserts:
+The inline example and property tests (`src/builder/tree_sitter.rs`) parse
+sources both ways and assert:
 
 ```rust
 // requires: features = ["lang-rust"]  (Mode A parse to obtain a tree, then Mode B)
@@ -85,6 +85,7 @@ assert!(from_tree.node_count() > 1);
 assert_eq!(from_tree.node_count(),  from_source.node_count());
 assert_eq!(from_tree.edge_count(),  from_source.edge_count());
 assert_eq!(from_tree.language(),    Language::Rust);
+// The tests additionally compare every node payload and typed edge.
 ```
 
 ### 2. Empty `rholang` / `metta` features — logical toggles, zero dependencies

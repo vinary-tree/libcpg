@@ -22,7 +22,7 @@ think to write down.
 
 | Kind | Count | Where |
 | --- | ---: | --- |
-| Maximal-matrix library tests | 769 | inline `#[cfg(test)] mod …` next to the code; includes examples and properties |
+| Maximal-matrix library tests | 786 | inline `#[cfg(test)] mod …` next to the code; includes examples and properties |
 | Public-API integration tests | 21 | `tests/integration.rs` |
 | Malformed-input robustness tests | 5 | `tests/robustness.rs` |
 | SCCP public/parser integration tests | 3 | `tests/sccp_integration.rs` |
@@ -43,8 +43,9 @@ think to write down.
 | Martin public/parser integration tests | 2 | `tests/martin_integration.rs` |
 | Reflexion public/serialization integration tests | 2 | `tests/reflexion_integration.rs` |
 | Architectural-smell public/serialization integration tests | 2 | `tests/smells_integration.rs` |
-| **Executable test cases** | **834** | excludes three ignored rustdoc examples |
-| `proptest!` blocks (subset of the library/robustness rows) | 60 | exact source-level macro count in `src/` and `tests/` |
+| Field-access public/parser integration tests | 2 | `tests/field_access_integration.rs` |
+| **Executable test cases** | **853** | excludes three ignored rustdoc examples |
+| `proptest!` blocks (subset of the library/robustness rows) | 61 | exact source-level macro count in `src/` and `tests/` |
 
 The maximal-matrix library count is up from **99** inline tests and **zero**
 property tests before this work.
@@ -62,10 +63,10 @@ on the features enabled:
 
 | Command | Lib tests | Notes |
 | --- | ---: | --- |
-| `cargo test` | 452 | `default = []`: the feature-free surface only |
-| `cargo test --features "full rholang metta"` | 769 | the maximal matrix, including the Mode-B mappers and evidence-aware complexity |
+| `cargo test` | 462 | `default = []`: the feature-free surface only |
+| `cargo test --features "full rholang metta"` | 786 | the maximal matrix, including the Mode-B mappers and evidence-aware complexity |
 
-The feature-free 452 exercise the graph model, exact dominator/post-dominator,
+The feature-free 462 exercise the graph model, exact dominator/post-dominator,
 natural-loop, monotone data-flow, variable-liveness/dead-store,
 available/very-busy-expression, SCCP, interval value-range, CFG/call-graph
 SCC analyses, condensation-DAG analytics, DSM visibility/core–periphery, Martin
@@ -186,11 +187,12 @@ to `build_from_tree`. The two must therefore produce identical graphs.
 ![Mode A / Mode B build-equivalence invariant](../diagrams/build-equivalence.svg)
 
 *Figure — `build(source, Rust)` and `build_from_tree(&tree, source, Rust)` must
-yield the same node and edge counts and the same language. Source:
+yield identical node payloads and typed edges as well as the same language. Source:
 [`diagrams/build-equivalence.puml`](../diagrams/build-equivalence.puml).*
 
 `test_build_from_tree_matches_build` pins it on one input; a property test pins
-it on every source `arb_rust_source` can generate. The same invariant is
+complete node payload and typed-edge identity on every source
+`arb_rust_source` can generate. The same invariant is
 analysed in
 [`scientific/01-cpg-invariants-and-equivalence.md`](../scientific/01-cpg-invariants-and-equivalence.md).
 
@@ -247,7 +249,7 @@ grammars (see [below](#defects-found-by-this-suite)).
 ## Defects found by this suite
 
 Property and robustness tests are worth their cost only if they find real bugs.
-This suite found **eighteen**, each fixed at the source and frozen as a regression
+This suite found **nineteen**, each fixed at the source and frozen as a regression
 test beside the fix:
 
 | # | Defect | Consequence | Found by |
@@ -270,12 +272,19 @@ test beside the fix:
 | 16 | callee-name reconstruction was depth-bounded but had no visited set | a cyclic malformed callee subtree could repeat nodes exponentially before reaching the depth cap | robustness review |
 | 17 | a parser wrapper around `Return` hid the terminator from `process_block` | the return node was wired sequentially into source that must be unreachable | parser-backed integration test |
 | 18 | anonymous tree-sitter keyword/operator tokens were retained as semantic CPG nodes outside Rholang | Rust `+` became a binary operand and `if` became the CFG condition, corrupting expression and branch semantics | parser-backed SCCP integration oracle |
+| 19 | declarative field normalization was incomplete: Go emitted no `Field`, Java/C/C++ discarded its name, and TypeScript read JavaScript's `property` slot instead of its `name` slot | parsed member accesses could not resolve to declarations even when the source declared the field | Mode-A field fixture matrix |
 
 Defects 2, 3 and 7 were found by generated input within seconds of the
 robustness suite first running — none of them is reachable from any
 example-based test that a person would think to write. Defects 12–14 were found
 by turning the mapping tables into executable specifications: each is a claim
 about a grammar that had quietly stopped being true.
+
+The field-access campaign combines an exact six-edge hand oracle, receiver/
+ambiguity counterexamples, a 256-case insertion-order property, a feature-free
+public integration test, a parsed Rust integration test, and eleven real Mode-A
+frontend fixtures. Its complete ledger is
+[`scientific/23-member-field-flow-validation.md`](../scientific/23-member-field-flow-validation.md).
 
 The recursion guards (2, 3) use a **path** set rather than a global visited set,
 so a node legitimately reachable from two disjoint branches is still processed
@@ -296,10 +305,10 @@ cargo +nightly cov-branch           # branch coverage needs nightly
 
 | Metric | Coverage | Lowest file |
 | --- | ---: | --- |
-| Lines | **98.20 %** | 91.67 % (`language.rs`) |
-| Regions | **98.10 %** | — |
-| Functions | **98.41 %** | — |
-| Branches | **86.91 %** | see below |
+| Lines | **98.27 %** | 91.67 % (`language.rs`) |
+| Regions | **98.17 %** | — |
+| Functions | **98.37 %** | — |
+| Branches | **87.16 %** | see below |
 
 Every source file is above 90 % line coverage; twenty-two are at 100 %.
 The `analysis/dominators.rs` module measures **97.50 %** line and
@@ -427,6 +436,16 @@ public integration; see
 [`scientific/22-architectural-smells-validation.md`](../scientific/22-architectural-smells-validation.md).
 It records 100% line, region, and function coverage; the final nightly branch
 figure is recorded in that validation page.
+The extended `builder/dfg.rs` module is evaluated by exact field/index edge
+oracles, receiver/type/field rejection matrices, 256 insertion permutations,
+parser/public integration, full idempotency, and Mode-A/Mode-B graph identity;
+see
+[`scientific/23-member-field-flow-validation.md`](../scientific/23-member-field-flow-validation.md).
+It measures **97.95%** line, **97.89%** region, **94.57%** function, and
+**81.16%** branch coverage, clearing the epic's 90% / 80% thresholds. The
+changed mapper and shared builder-pipeline files measure **94.17%** and
+**98.10%** line coverage respectively, while their new field declarations and
+typed-edge paths are covered by all eleven frontend fixtures.
 All figures come from clean maximal-matrix coverage runs; no focused-test
 figure is substituted for the repository gate.
 

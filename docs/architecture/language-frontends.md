@@ -34,7 +34,7 @@ Under `default = []` the registry is empty, so `supported_languages()` still lis
 
 **Mode A — `build(source, language)`** is the internal-parse path. It enforces `config.max_file_size`, looks the grammar up in the registry (erroring if absent), parses, and then *delegates to Mode B* for the post-parse pipeline. It therefore needs the matching `lang-*` feature.
 
-**Mode B — [`build_from_tree`](../GLOSSARY.md#mode-b--build_from_tree)`(&tree, source, language)`** accepts a `tree_sitter::Tree` the caller already parsed. It needs **no** `lang-*` feature (the caller owns the grammar), skips the `max_file_size` check, and runs the identical AST → CFG → optional call-resolution → DFG pipeline. Because Mode A funnels through Mode B, the two produce structurally identical graphs — a regression test asserts equal `node_count`, `edge_count`, and `language` for the same source and configuration.
+**Mode B — [`build_from_tree`](../GLOSSARY.md#mode-b--build_from_tree)`(&tree, source, language)`** accepts a `tree_sitter::Tree` the caller already parsed. It needs **no** `lang-*` feature (the caller owns the grammar), skips the `max_file_size` check, and runs the identical AST → CFG → optional call-resolution → DFG pipeline. Because Mode A funnels through Mode B, the two produce structurally identical graphs — a regression test compares canonical typed edge triples (including `FieldWrite` and member-to-field `Reference`), node count, and language for the same source and configuration.
 
 ```rust
 // Mode B: the caller has already parsed `source` with a grammar it links itself.
@@ -88,6 +88,14 @@ MeTTa keyword atoms remain because they are named `identifier` nodes.
 | `Markdown` | `map_markdown` | | `Rholang` \| `MeTTa` | `map_rholang` / `map_metta` (feature-gated) |
 
 Each routine matches the grammar's node-kind strings onto shared `CpgNodeKind` variants — `function_item` → `Function`, `if_expression` → `If`, `call_expression` → `Call`, `integer_literal` → `Literal`, and so on — and always has an `Unknown { kind }` fallback so an unrecognized construct is preserved rather than lost. Two invariants the mappers uphold make the downstream overlays work: a named function/procedure maps to `Function` (so the CFG builder seeds an entry and treats its trailing body child as the body), and a *bound* name maps to `Variable`/`Parameter` (a DFG definition) while a *referenced* name maps to `Identifier` (a DFG use). The per-language routines are catalogued in [`../components/builder/node-mapper.md`](../components/builder/node-mapper.md).
+
+A third invariant supports object-oriented data flow: an explicit struct/class
+member maps to a named `Field`. Real Mode-A fixtures verify this for Rust,
+JavaScript, TypeScript, Go, Java, C, and C++; JavaScript's `property` slot,
+TypeScript's `name` slot, and declarator-wrapped Java/C-family identifiers are
+normalized to the same shape. Dynamic Python/Ruby attributes remain accesses
+without invented declarations. The resulting language-neutral member topology
+is documented in [DFG extraction](../components/builder/dfg.md#complex-l-values-and-declaration-resolution).
 
 For Rust specifically, the grammar's `range_expression` becomes semantic
 `BinaryOp("..")` / `BinaryOp("..=")`, and an identifier under a

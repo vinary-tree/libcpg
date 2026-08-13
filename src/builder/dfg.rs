@@ -44,6 +44,73 @@ pub struct DfgExtractor {
     config: DfgExtractorConfig,
 }
 
+/// Immutable exact-name index used by member-to-field resolution.
+///
+/// The full extractor builds it once and shares it across functions, avoiding
+/// a graph-wide type scan per access. Candidate lists preserve ambiguity so
+/// resolution can fail closed instead of choosing by storage order.
+type NamedCandidates = FxHashMap<Arc<str>, SmallVec<[NodeId; 2]>>;
+
+#[derive(Debug, Default)]
+struct FieldResolutionIndex {
+    types: FxHashMap<Option<NodeId>, NamedCandidates>,
+    fields: FxHashMap<NodeId, NamedCandidates>,
+}
+
+impl FieldResolutionIndex {
+    fn new(cpg: &CodePropertyGraph) -> Self {
+        let mut index = Self::default();
+        for id in cpg.node_ids() {
+            match cpg.node(id).map(|node| &node.kind) {
+                Some(
+                    CpgNodeKind::Class { name, .. }
+                    | CpgNodeKind::Struct { name }
+                    | CpgNodeKind::Enum { name },
+                ) if !name.is_empty() => {
+                    index
+                        .types
+                        .entry(declaration_scope(cpg, id))
+                        .or_default()
+                        .entry(name.clone())
+                        .or_default()
+                        .push(id);
+                }
+                Some(CpgNodeKind::Field { name, .. }) if !name.is_empty() => {
+                    if let Some(owner) = enclosing_field_owner(cpg, id) {
+                        index
+                            .fields
+                            .entry(owner)
+                            .or_default()
+                            .entry(name.clone())
+                            .or_default()
+                            .push(id);
+                    }
+                }
+                _ => {}
+            }
+        }
+        for candidates in index.types.values_mut().flat_map(FxHashMap::values_mut) {
+            candidates.sort_unstable();
+            candidates.dedup();
+        }
+        for candidates in index.fields.values_mut().flat_map(FxHashMap::values_mut) {
+            candidates.sort_unstable();
+            candidates.dedup();
+        }
+        index
+    }
+
+    fn unique_type(&self, scope: Option<NodeId>, name: &str) -> Option<NodeId> {
+        let candidates = self.types.get(&scope)?.get(name)?;
+        (candidates.len() == 1).then_some(candidates[0])
+    }
+
+    fn unique_field(&self, owner: NodeId, name: &str) -> Option<NodeId> {
+        let candidates = self.fields.get(&owner)?.get(name)?;
+        (candidates.len() == 1).then_some(candidates[0])
+    }
+}
+
 impl DfgExtractor {
     /// Creates a new DFG extractor with default configuration.
     pub fn new() -> Self {
@@ -61,14 +128,31 @@ impl DfgExtractor {
     pub fn extract(&self, cpg: &mut CodePropertyGraph) {
         // Find all function nodes
         let functions: Vec<NodeId> = cpg.functions().map(|n| n.id).collect();
+        let field_index = self
+            .config
+            .include_field_access
+            .then(|| FieldResolutionIndex::new(cpg));
 
         for func_id in functions {
-            self.extract_function_dfg(cpg, func_id);
+            self.extract_function_dfg_indexed(cpg, func_id, field_index.as_ref());
         }
     }
 
     /// Extracts DFG edges for a single function.
     pub fn extract_function_dfg(&self, cpg: &mut CodePropertyGraph, function: NodeId) {
+        let field_index = self
+            .config
+            .include_field_access
+            .then(|| FieldResolutionIndex::new(cpg));
+        self.extract_function_dfg_indexed(cpg, function, field_index.as_ref());
+    }
+
+    fn extract_function_dfg_indexed(
+        &self,
+        cpg: &mut CodePropertyGraph,
+        function: NodeId,
+        field_index: Option<&FieldResolutionIndex>,
+    ) {
         // Phase 1: Collect field/index/parameter sites for the auxiliary edge
         // builders below. Def/use *edges* are no longer driven from this
         // collector's name→site tables — see `build_def_use_edges`.
@@ -93,7 +177,11 @@ impl DfgExtractor {
         }
 
         if self.config.include_field_access {
-            self.build_field_access_edges(cpg, &collector);
+            self.build_field_access_edges(
+                cpg,
+                &collector,
+                field_index.expect("field index exists when field access is enabled"),
+            );
         }
     }
 
@@ -412,8 +500,22 @@ impl DfgExtractor {
         }
     }
 
-    /// Builds field access edges.
-    fn build_field_access_edges(&self, cpg: &mut CodePropertyGraph, collector: &DefUseCollector) {
+    /// Builds field/index read and write edges and resolves receiver-local
+    /// member accesses to their declaring fields.
+    ///
+    /// Reads retain the historical direction (`receiver -> access`). For an
+    /// assignment whose first AST child is a member or index l-value, the
+    /// complementary write edge is `assignment -> access`. A `self.x` or
+    /// `this.x` access inside a method is also linked to the uniquely matching
+    /// `Field("x")` in its enclosing class/implemented type. Resolution is
+    /// deliberately name- and lexical-scope-bounded: missing or ambiguous type
+    /// and field evidence produces no `Reference` edge.
+    fn build_field_access_edges(
+        &self,
+        cpg: &mut CodePropertyGraph,
+        collector: &DefUseCollector,
+        field_index: &FieldResolutionIndex,
+    ) {
         // Process member access nodes
         for &node_id in &collector.field_accesses {
             let children = cpg.ast_children(node_id);
@@ -422,6 +524,10 @@ impl DfgExtractor {
             if let Some(&obj) = children.first() {
                 // Create field read edge from object to member access
                 cpg.connect_unique(obj, node_id, CpgEdgeKind::DataFlow(DfgEdgeKind::FieldRead));
+            }
+
+            if let Some(field) = resolve_receiver_field(cpg, field_index, node_id) {
+                cpg.connect_unique(node_id, field, CpgEdgeKind::Reference);
             }
         }
 
@@ -446,7 +552,121 @@ impl DfgExtractor {
                 );
             }
         }
+
+        // An assignment's first AST child is its l-value. Complex l-values are
+        // access sites rather than declaration sites, so retain the assignment
+        // as the write origin and point at the same access node used by reads.
+        for &assignment in &collector.assignments {
+            let Some(target) = cpg.ast_children(assignment).first().copied() else {
+                continue;
+            };
+            let write_kind = match cpg.node(target).map(|node| &node.kind) {
+                Some(CpgNodeKind::MemberAccess { .. }) => DfgEdgeKind::FieldWrite,
+                Some(CpgNodeKind::IndexAccess) => DfgEdgeKind::IndexWrite,
+                _ => continue,
+            };
+            cpg.connect_unique(assignment, target, CpgEdgeKind::DataFlow(write_kind));
+        }
     }
+}
+
+/// Resolves `self.member` / `this.member` to one declaration in the enclosing
+/// nominal type.
+///
+/// Parser frontends represent the receiver either as an `Identifier` (Python)
+/// or as a named keyword retained as `Unknown { kind: "self" | "this" }`
+/// (Rust, Java, JavaScript, and C++). Both shapes carry the same semantic
+/// evidence and are accepted without consulting [`Language`].
+fn resolve_receiver_field(
+    cpg: &CodePropertyGraph,
+    index: &FieldResolutionIndex,
+    access: NodeId,
+) -> Option<NodeId> {
+    let member = match cpg.node(access).map(|node| &node.kind) {
+        Some(CpgNodeKind::MemberAccess { member }) if !member.is_empty() => member.as_ref(),
+        _ => return None,
+    };
+
+    let receiver = cpg.ast_children(access).first().copied()?;
+    let receiver_is_local = match cpg.node(receiver).map(|node| &node.kind) {
+        Some(CpgNodeKind::Identifier { name, .. }) => matches!(name.as_ref(), "self" | "this"),
+        Some(CpgNodeKind::Unknown { kind }) => matches!(kind.as_ref(), "self" | "this"),
+        _ => false,
+    };
+    if !receiver_is_local {
+        return None;
+    }
+
+    // The access must first be inside a function; only an owner above that
+    // function makes it a method rather than a coincidentally nested access.
+    let ancestors = cpg.ast_ancestors(access);
+    let method_index = ancestors.iter().position(|&id| {
+        matches!(
+            cpg.node(id).map(|node| &node.kind),
+            Some(CpgNodeKind::Function { .. })
+        )
+    })?;
+    let mut owner = None;
+    for &ancestor in &ancestors[method_index + 1..] {
+        match cpg.node(ancestor).map(|node| &node.kind) {
+            Some(CpgNodeKind::Class { .. } | CpgNodeKind::Impl { .. }) => {
+                owner = Some(ancestor);
+                break;
+            }
+            // Reaching a second function means the nearest function is nested
+            // inside a method, not itself owned by the nominal type.
+            Some(CpgNodeKind::Function { .. }) => return None,
+            _ => {}
+        }
+    }
+    let owner = owner?;
+
+    let owner = match cpg.node(owner).map(|node| &node.kind) {
+        Some(CpgNodeKind::Class { .. }) => owner,
+        Some(CpgNodeKind::Impl {
+            for_type: Some(type_name),
+            ..
+        }) if !type_name.is_empty() => {
+            index.unique_type(declaration_scope(cpg, owner), type_name)?
+        }
+        _ => return None,
+    };
+
+    index.unique_field(owner, member)
+}
+
+/// Returns the nearest enclosing namespace/type/root declaration. Comparing
+/// node ids (not display names) keeps same-named types in sibling modules from
+/// being conflated.
+fn declaration_scope(cpg: &CodePropertyGraph, node: NodeId) -> Option<NodeId> {
+    cpg.ast_ancestors(node).into_iter().find(|&ancestor| {
+        matches!(
+            cpg.node(ancestor).map(|node| &node.kind),
+            Some(
+                CpgNodeKind::Root
+                    | CpgNodeKind::Module { .. }
+                    | CpgNodeKind::Class { .. }
+                    | CpgNodeKind::Struct { .. }
+                    | CpgNodeKind::Enum { .. }
+                    | CpgNodeKind::Trait { .. }
+            )
+        )
+    })
+}
+
+/// Finds the nearest nominal owner of a field, but never crosses a function or
+/// implementation boundary. Grammar wrapper nodes are transparent.
+fn enclosing_field_owner(cpg: &CodePropertyGraph, field: NodeId) -> Option<NodeId> {
+    for ancestor in cpg.ast_ancestors(field) {
+        match cpg.node(ancestor).map(|node| &node.kind) {
+            Some(
+                CpgNodeKind::Class { .. } | CpgNodeKind::Struct { .. } | CpgNodeKind::Enum { .. },
+            ) => return Some(ancestor),
+            Some(CpgNodeKind::Function { .. } | CpgNodeKind::Impl { .. }) => return None,
+            _ => {}
+        }
+    }
+    None
 }
 
 /// Returns call arguments in source order without including callee syntax.
@@ -1334,6 +1554,625 @@ mod tests {
         }
     }
 
+    fn has_typed_edge(
+        cpg: &CodePropertyGraph,
+        source: NodeId,
+        target: NodeId,
+        kind: &CpgEdgeKind,
+    ) -> bool {
+        cpg.edges_between(source, target)
+            .into_iter()
+            .any(|edge| &edge.kind == kind)
+    }
+
+    /// Complex assignment l-values receive write edges, while `self.x` is
+    /// resolved only to the same-named field of the implementation's lexical
+    /// type. The pass is additive and idempotent.
+    #[test]
+    fn field_and_index_writes_resolve_scoped_field_idempotently() {
+        let mut cpg = CodePropertyGraph::new(Language::Rust);
+        let root = cpg.add_node(CpgNode::new(
+            NodeId::new(0),
+            CpgNodeKind::Root,
+            SourceRange::default(),
+        ));
+        let module = dfg_child(&mut cpg, root, CpgNodeKind::Module { name: "m".into() });
+        let ty = dfg_child(&mut cpg, module, CpgNodeKind::Struct { name: "S".into() });
+        let field_list = dfg_child(
+            &mut cpg,
+            ty,
+            CpgNodeKind::Unknown {
+                kind: "field_declaration_list".into(),
+            },
+        );
+        let field = dfg_child(
+            &mut cpg,
+            field_list,
+            CpgNodeKind::Field {
+                name: "x".into(),
+                field_type: None,
+                visibility: Visibility::Private,
+            },
+        );
+        let implementation = dfg_child(
+            &mut cpg,
+            module,
+            CpgNodeKind::Impl {
+                for_type: Some("S".into()),
+                trait_name: None,
+            },
+        );
+        let method = dfg_child(
+            &mut cpg,
+            implementation,
+            CpgNodeKind::Function {
+                signature: MethodSignature {
+                    name: "set".into(),
+                    params: Default::default(),
+                    return_type: None,
+                    is_static: false,
+                    is_async: false,
+                    visibility: Visibility::Public,
+                },
+            },
+        );
+        let body = dfg_child(
+            &mut cpg,
+            method,
+            CpgNodeKind::Block {
+                scope: ScopeId::GLOBAL,
+            },
+        );
+
+        let field_assignment = dfg_child(
+            &mut cpg,
+            body,
+            CpgNodeKind::Assignment {
+                operator: "=".into(),
+            },
+        );
+        let member = dfg_child(
+            &mut cpg,
+            field_assignment,
+            CpgNodeKind::MemberAccess { member: "x".into() },
+        );
+        let receiver = dfg_child(&mut cpg, member, dfg_ident("self"));
+        dfg_child(
+            &mut cpg,
+            field_assignment,
+            CpgNodeKind::Literal {
+                kind: crate::LiteralKind::Integer(1),
+            },
+        );
+
+        let index_assignment = dfg_child(
+            &mut cpg,
+            body,
+            CpgNodeKind::Assignment {
+                operator: "=".into(),
+            },
+        );
+        let index_access = dfg_child(&mut cpg, index_assignment, CpgNodeKind::IndexAccess);
+        let array = dfg_child(&mut cpg, index_access, dfg_ident("items"));
+        let subscript = dfg_child(
+            &mut cpg,
+            index_access,
+            CpgNodeKind::Literal {
+                kind: crate::LiteralKind::Integer(0),
+            },
+        );
+        dfg_child(
+            &mut cpg,
+            index_assignment,
+            CpgNodeKind::Literal {
+                kind: crate::LiteralKind::Integer(2),
+            },
+        );
+
+        let mut disabled = cpg.clone();
+        DfgExtractor::with_config(DfgExtractorConfig {
+            include_field_access: false,
+            ..DfgExtractorConfig::default()
+        })
+        .extract_function_dfg(&mut disabled, method);
+        assert!(disabled.edges().all(|edge| !matches!(
+            edge.kind,
+            CpgEdgeKind::Reference
+                | CpgEdgeKind::DataFlow(
+                    DfgEdgeKind::FieldRead
+                        | DfgEdgeKind::FieldWrite
+                        | DfgEdgeKind::IndexRead
+                        | DfgEdgeKind::IndexWrite
+                        | DfgEdgeKind::DataDependency
+                )
+        )));
+
+        let original_nodes = cpg.node_count();
+        let original_edges = cpg.edge_count();
+        DfgExtractor::new().extract_function_dfg(&mut cpg, method);
+
+        assert_eq!(
+            cpg.node_count(),
+            original_nodes,
+            "DFG extraction is append-only"
+        );
+        assert_eq!(
+            cpg.edge_count(),
+            original_edges + 6,
+            "five DFG edges and one Reference are added"
+        );
+        assert_eq!(
+            cpg.stats().dfg_edges,
+            5,
+            "Reference is not counted as a DFG edge"
+        );
+        assert!(has_typed_edge(
+            &cpg,
+            receiver,
+            member,
+            &CpgEdgeKind::DataFlow(DfgEdgeKind::FieldRead)
+        ));
+        assert!(has_typed_edge(
+            &cpg,
+            field_assignment,
+            member,
+            &CpgEdgeKind::DataFlow(DfgEdgeKind::FieldWrite)
+        ));
+        assert!(has_typed_edge(&cpg, member, field, &CpgEdgeKind::Reference));
+        assert!(has_typed_edge(
+            &cpg,
+            array,
+            index_access,
+            &CpgEdgeKind::DataFlow(DfgEdgeKind::IndexRead)
+        ));
+        assert!(has_typed_edge(
+            &cpg,
+            subscript,
+            index_access,
+            &CpgEdgeKind::DataFlow(DfgEdgeKind::DataDependency)
+        ));
+        assert!(has_typed_edge(
+            &cpg,
+            index_assignment,
+            index_access,
+            &CpgEdgeKind::DataFlow(DfgEdgeKind::IndexWrite)
+        ));
+
+        let after_first = cpg.edge_count();
+        DfgExtractor::new().extract_function_dfg(&mut cpg, method);
+        assert_eq!(
+            cpg.edge_count(),
+            after_first,
+            "the complete pass is idempotent"
+        );
+    }
+
+    /// A class owns its fields directly (through transparent grammar wrappers),
+    /// but unrelated receivers and duplicate declarations are not guessed.
+    #[test]
+    fn class_field_resolution_is_receiver_local_and_ambiguity_safe() {
+        let mut cpg = CodePropertyGraph::new(Language::Java);
+        let class = cpg.add_node(CpgNode::new(
+            NodeId::new(0),
+            CpgNodeKind::Class {
+                name: "C".into(),
+                is_abstract: false,
+            },
+            SourceRange::default(),
+        ));
+        let wrapper = dfg_child(
+            &mut cpg,
+            class,
+            CpgNodeKind::Unknown {
+                kind: "class_body".into(),
+            },
+        );
+        let field = dfg_child(
+            &mut cpg,
+            wrapper,
+            CpgNodeKind::Field {
+                name: "x".into(),
+                field_type: None,
+                visibility: Visibility::Private,
+            },
+        );
+        let method = dfg_child(
+            &mut cpg,
+            wrapper,
+            CpgNodeKind::Function {
+                signature: MethodSignature {
+                    name: "m".into(),
+                    params: Default::default(),
+                    return_type: None,
+                    is_static: false,
+                    is_async: false,
+                    visibility: Visibility::Public,
+                },
+            },
+        );
+        let body = dfg_child(
+            &mut cpg,
+            method,
+            CpgNodeKind::Block {
+                scope: ScopeId::GLOBAL,
+            },
+        );
+        let resolved = dfg_child(
+            &mut cpg,
+            body,
+            CpgNodeKind::MemberAccess { member: "x".into() },
+        );
+        dfg_child(
+            &mut cpg,
+            resolved,
+            CpgNodeKind::Unknown {
+                kind: "this".into(),
+            },
+        );
+        let unrelated = dfg_child(
+            &mut cpg,
+            body,
+            CpgNodeKind::MemberAccess { member: "x".into() },
+        );
+        dfg_child(&mut cpg, unrelated, dfg_ident("other"));
+
+        DfgExtractor::new().extract_function_dfg(&mut cpg, method);
+        assert!(has_typed_edge(
+            &cpg,
+            resolved,
+            field,
+            &CpgEdgeKind::Reference
+        ));
+        assert!(!cpg
+            .outgoing_edges(unrelated)
+            .any(|edge| matches!(edge.kind, CpgEdgeKind::Reference)));
+
+        // A duplicate declaration makes the name ambiguous, so a fresh access
+        // added after the first pass must remain unresolved.
+        dfg_child(
+            &mut cpg,
+            wrapper,
+            CpgNodeKind::Field {
+                name: "x".into(),
+                field_type: None,
+                visibility: Visibility::Private,
+            },
+        );
+        let ambiguous = dfg_child(
+            &mut cpg,
+            body,
+            CpgNodeKind::MemberAccess { member: "x".into() },
+        );
+        dfg_child(&mut cpg, ambiguous, dfg_ident("this"));
+        DfgExtractor::new().extract_function_dfg(&mut cpg, method);
+        assert!(!cpg
+            .outgoing_edges(ambiguous)
+            .any(|edge| matches!(edge.kind, CpgEdgeKind::Reference)));
+    }
+
+    /// Implementation owners resolve by exact type name in the implementation's
+    /// lexical declaration scope. A same-named type in a sibling module is not
+    /// a candidate, while two declarations in the same scope make resolution
+    /// ambiguous. A function nested inside a method is not promoted to a method.
+    #[test]
+    fn impl_field_resolution_is_scope_bounded_and_method_local() {
+        let mut cpg = CodePropertyGraph::new(Language::Rust);
+        let root = cpg.add_node(CpgNode::new(
+            NodeId::new(0),
+            CpgNodeKind::Root,
+            SourceRange::default(),
+        ));
+        let left = dfg_child(
+            &mut cpg,
+            root,
+            CpgNodeKind::Module {
+                name: "left".into(),
+            },
+        );
+        let right = dfg_child(
+            &mut cpg,
+            root,
+            CpgNodeKind::Module {
+                name: "right".into(),
+            },
+        );
+        let left_type = dfg_child(&mut cpg, left, CpgNodeKind::Struct { name: "S".into() });
+        let left_field = dfg_child(
+            &mut cpg,
+            left_type,
+            CpgNodeKind::Field {
+                name: "x".into(),
+                field_type: None,
+                visibility: Visibility::Private,
+            },
+        );
+        let right_type = dfg_child(&mut cpg, right, CpgNodeKind::Struct { name: "S".into() });
+        let right_field = dfg_child(
+            &mut cpg,
+            right_type,
+            CpgNodeKind::Field {
+                name: "x".into(),
+                field_type: None,
+                visibility: Visibility::Private,
+            },
+        );
+        let implementation = dfg_child(
+            &mut cpg,
+            left,
+            CpgNodeKind::Impl {
+                for_type: Some("S".into()),
+                trait_name: None,
+            },
+        );
+        let method = dfg_child(
+            &mut cpg,
+            implementation,
+            CpgNodeKind::Function {
+                signature: MethodSignature {
+                    name: "method".into(),
+                    params: Default::default(),
+                    return_type: None,
+                    is_static: false,
+                    is_async: false,
+                    visibility: Visibility::Private,
+                },
+            },
+        );
+        let access = dfg_child(
+            &mut cpg,
+            method,
+            CpgNodeKind::MemberAccess { member: "x".into() },
+        );
+        dfg_child(&mut cpg, access, dfg_ident("self"));
+
+        let nested_function = dfg_child(
+            &mut cpg,
+            method,
+            CpgNodeKind::Function {
+                signature: MethodSignature {
+                    name: "nested".into(),
+                    params: Default::default(),
+                    return_type: None,
+                    is_static: false,
+                    is_async: false,
+                    visibility: Visibility::Private,
+                },
+            },
+        );
+        let nested_access = dfg_child(
+            &mut cpg,
+            nested_function,
+            CpgNodeKind::MemberAccess { member: "x".into() },
+        );
+        dfg_child(&mut cpg, nested_access, dfg_ident("self"));
+
+        DfgExtractor::new().extract_function_dfg(&mut cpg, method);
+        assert!(has_typed_edge(
+            &cpg,
+            access,
+            left_field,
+            &CpgEdgeKind::Reference
+        ));
+        assert!(!has_typed_edge(
+            &cpg,
+            access,
+            right_field,
+            &CpgEdgeKind::Reference
+        ));
+        assert!(!cpg
+            .outgoing_edges(nested_access)
+            .any(|edge| matches!(edge.kind, CpgEdgeKind::Reference)));
+
+        let duplicate_type = dfg_child(&mut cpg, left, CpgNodeKind::Struct { name: "S".into() });
+        dfg_child(
+            &mut cpg,
+            duplicate_type,
+            CpgNodeKind::Field {
+                name: "x".into(),
+                field_type: None,
+                visibility: Visibility::Private,
+            },
+        );
+        let ambiguous_access = dfg_child(
+            &mut cpg,
+            method,
+            CpgNodeKind::MemberAccess { member: "x".into() },
+        );
+        dfg_child(&mut cpg, ambiguous_access, dfg_ident("self"));
+
+        DfgExtractor::new().extract_function_dfg(&mut cpg, method);
+        assert!(!cpg
+            .outgoing_edges(ambiguous_access)
+            .any(|edge| matches!(edge.kind, CpgEdgeKind::Reference)));
+    }
+
+    /// Every missing-evidence shape is a total, fail-closed lookup. This matrix
+    /// distinguishes an absent receiver/function/owner/type/field from a valid
+    /// resolution and exercises malformed access nodes without manufacturing a
+    /// declaration edge.
+    #[test]
+    fn field_resolution_rejection_matrix_is_total() {
+        let mut cpg = CodePropertyGraph::new(Language::Rust);
+        let root = cpg.add_node(CpgNode::new(
+            NodeId::new(0),
+            CpgNodeKind::Root,
+            SourceRange::default(),
+        ));
+
+        // Empty declaration names and fields outside a nominal owner are not
+        // indexed. A field below a function is likewise not type-owned.
+        dfg_child(&mut cpg, root, CpgNodeKind::Enum { name: "".into() });
+        cpg.add_node(CpgNode::new(
+            NodeId::new(0),
+            CpgNodeKind::Field {
+                name: "orphan".into(),
+                field_type: None,
+                visibility: Visibility::Private,
+            },
+            SourceRange::default(),
+        ));
+        cpg.add_node(CpgNode::new(
+            NodeId::new(0),
+            CpgNodeKind::Field {
+                name: "".into(),
+                field_type: None,
+                visibility: Visibility::Private,
+            },
+            SourceRange::default(),
+        ));
+
+        let free_function = dfg_child(
+            &mut cpg,
+            root,
+            CpgNodeKind::Function {
+                signature: MethodSignature {
+                    name: "free".into(),
+                    params: Default::default(),
+                    return_type: None,
+                    is_static: false,
+                    is_async: false,
+                    visibility: Visibility::Private,
+                },
+            },
+        );
+        dfg_child(
+            &mut cpg,
+            free_function,
+            CpgNodeKind::Field {
+                name: "local".into(),
+                field_type: None,
+                visibility: Visibility::Private,
+            },
+        );
+
+        let bare_member = dfg_child(
+            &mut cpg,
+            free_function,
+            CpgNodeKind::MemberAccess { member: "x".into() },
+        );
+        let empty_member = dfg_child(
+            &mut cpg,
+            free_function,
+            CpgNodeKind::MemberAccess { member: "".into() },
+        );
+        dfg_child(&mut cpg, empty_member, dfg_ident("self"));
+        let literal_receiver = dfg_child(
+            &mut cpg,
+            free_function,
+            CpgNodeKind::MemberAccess { member: "x".into() },
+        );
+        dfg_child(
+            &mut cpg,
+            literal_receiver,
+            CpgNodeKind::Literal {
+                kind: crate::LiteralKind::Integer(0),
+            },
+        );
+        let ownerless = dfg_child(
+            &mut cpg,
+            free_function,
+            CpgNodeKind::MemberAccess { member: "x".into() },
+        );
+        dfg_child(&mut cpg, ownerless, dfg_ident("self"));
+
+        let implementation = dfg_child(
+            &mut cpg,
+            root,
+            CpgNodeKind::Impl {
+                for_type: None,
+                trait_name: None,
+            },
+        );
+        let method = dfg_child(
+            &mut cpg,
+            implementation,
+            CpgNodeKind::Function {
+                signature: MethodSignature {
+                    name: "method".into(),
+                    params: Default::default(),
+                    return_type: None,
+                    is_static: false,
+                    is_async: false,
+                    visibility: Visibility::Private,
+                },
+            },
+        );
+        let unknown_type = dfg_child(
+            &mut cpg,
+            method,
+            CpgNodeKind::MemberAccess { member: "x".into() },
+        );
+        dfg_child(&mut cpg, unknown_type, dfg_ident("self"));
+
+        let malformed_index = dfg_child(&mut cpg, method, CpgNodeKind::IndexAccess);
+        let childless_assignment = dfg_child(
+            &mut cpg,
+            method,
+            CpgNodeKind::Assignment {
+                operator: "=".into(),
+            },
+        );
+
+        let index = FieldResolutionIndex::new(&cpg);
+        for access in [
+            bare_member,
+            empty_member,
+            literal_receiver,
+            ownerless,
+            unknown_type,
+        ] {
+            assert_eq!(resolve_receiver_field(&cpg, &index, access), None);
+        }
+        assert_eq!(resolve_receiver_field(&cpg, &index, root), None);
+        assert_eq!(index.unique_type(Some(root), "missing"), None);
+        assert_eq!(index.unique_field(root, "missing"), None);
+
+        DfgExtractor::new().extract(&mut cpg);
+        assert!(!cpg
+            .outgoing_edges(malformed_index)
+            .any(|edge| edge.kind.is_dfg()));
+        assert!(!cpg
+            .outgoing_edges(childless_assignment)
+            .any(|edge| matches!(
+                edge.kind,
+                CpgEdgeKind::DataFlow(DfgEdgeKind::FieldWrite | DfgEdgeKind::IndexWrite)
+            )));
+        assert!(cpg
+            .outgoing_edges(bare_member)
+            .all(|edge| !matches!(edge.kind, CpgEdgeKind::Reference)));
+    }
+
+    /// Real Rust syntax exercises the complete parser -> mapper -> DFG path:
+    /// `self.x = 1` has the write edge and resolves to `struct S::x`.
+    #[test]
+    #[cfg(feature = "lang-rust")]
+    fn parsed_self_field_assignment_emits_write_and_reference() {
+        let mut cpg =
+            build_rust("struct S { x: i32 } impl S { fn set(&mut self) { self.x = 1; } }");
+        let field = nodes_where(
+            &cpg,
+            |kind| matches!(kind, CpgNodeKind::Field { name, .. } if name.as_ref() == "x"),
+        )[0];
+        let member = nodes_where(
+            &cpg,
+            |kind| matches!(kind, CpgNodeKind::MemberAccess { member } if member.as_ref() == "x"),
+        )[0];
+        let assignment =
+            nodes_where(&cpg, |kind| matches!(kind, CpgNodeKind::Assignment { .. }))[0];
+
+        assert!(has_typed_edge(
+            &cpg,
+            assignment,
+            member,
+            &CpgEdgeKind::DataFlow(DfgEdgeKind::FieldWrite)
+        ));
+        assert!(has_typed_edge(&cpg, member, field, &CpgEdgeKind::Reference));
+
+        let edges = cpg.edge_count();
+        DfgExtractor::new().extract(&mut cpg);
+        assert_eq!(cpg.edge_count(), edges);
+    }
+
     /// `DfgExtractorConfig` field defaults and `DfgExtractor::with_config`.
     #[test]
     fn dfg_extractor_config_fields_and_with_config() {
@@ -1820,12 +2659,251 @@ mod proptests {
     use super::*;
     use crate::testutil::*;
     use crate::{
-        CfgExtractor, CpgNode, Language, LiteralKind, MethodSignature, SourceRange, Visibility,
+        CfgExtractor, CpgNode, Language, LiteralKind, MethodSignature, ScopeId, SourceRange,
+        Visibility,
     };
     use proptest::prelude::*;
 
+    fn fixed_field_graph(
+        type_name: &str,
+        field_name: &str,
+        receiver: &str,
+        receiver_as_keyword: bool,
+        reverse_insertion: bool,
+    ) -> CodePropertyGraph {
+        let mut cpg = CodePropertyGraph::new(Language::Rust);
+        cpg.add_node_with_id(CpgNode::new(
+            NodeId::new(0),
+            CpgNodeKind::Root,
+            SourceRange::default(),
+        ));
+        let method = MethodSignature {
+            name: "set".into(),
+            params: Default::default(),
+            return_type: None,
+            is_static: false,
+            is_async: false,
+            visibility: Visibility::Public,
+        };
+        let receiver_kind = if receiver_as_keyword {
+            CpgNodeKind::Unknown {
+                kind: receiver.into(),
+            }
+        } else {
+            CpgNodeKind::Identifier {
+                name: receiver.into(),
+                definition: None,
+            }
+        };
+        let mut nodes = vec![
+            CpgNode::new(
+                NodeId::new(1),
+                CpgNodeKind::Struct {
+                    name: type_name.into(),
+                },
+                SourceRange::default(),
+            )
+            .with_parent(NodeId::new(0)),
+            CpgNode::new(
+                NodeId::new(2),
+                CpgNodeKind::Unknown {
+                    kind: "field_declaration_list".into(),
+                },
+                SourceRange::default(),
+            )
+            .with_parent(NodeId::new(1)),
+            CpgNode::new(
+                NodeId::new(3),
+                CpgNodeKind::Field {
+                    name: field_name.into(),
+                    field_type: None,
+                    visibility: Visibility::Private,
+                },
+                SourceRange::default(),
+            )
+            .with_parent(NodeId::new(2)),
+            CpgNode::new(
+                NodeId::new(4),
+                CpgNodeKind::Impl {
+                    for_type: Some(type_name.into()),
+                    trait_name: None,
+                },
+                SourceRange::default(),
+            )
+            .with_parent(NodeId::new(0)),
+            CpgNode::new(
+                NodeId::new(5),
+                CpgNodeKind::Function { signature: method },
+                SourceRange::default(),
+            )
+            .with_parent(NodeId::new(4)),
+            CpgNode::new(
+                NodeId::new(6),
+                CpgNodeKind::Block {
+                    scope: ScopeId::GLOBAL,
+                },
+                SourceRange::default(),
+            )
+            .with_parent(NodeId::new(5)),
+            CpgNode::new(
+                NodeId::new(7),
+                CpgNodeKind::Assignment {
+                    operator: "=".into(),
+                },
+                SourceRange::default(),
+            )
+            .with_parent(NodeId::new(6)),
+            CpgNode::new(
+                NodeId::new(8),
+                CpgNodeKind::MemberAccess {
+                    member: field_name.into(),
+                },
+                SourceRange::default(),
+            )
+            .with_parent(NodeId::new(7)),
+            CpgNode::new(NodeId::new(9), receiver_kind, SourceRange::default())
+                .with_parent(NodeId::new(8)),
+            CpgNode::new(
+                NodeId::new(10),
+                CpgNodeKind::Literal {
+                    kind: LiteralKind::Integer(1),
+                },
+                SourceRange::default(),
+            )
+            .with_parent(NodeId::new(7)),
+            CpgNode::new(
+                NodeId::new(11),
+                CpgNodeKind::Assignment {
+                    operator: "=".into(),
+                },
+                SourceRange::default(),
+            )
+            .with_parent(NodeId::new(6)),
+            CpgNode::new(
+                NodeId::new(12),
+                CpgNodeKind::IndexAccess,
+                SourceRange::default(),
+            )
+            .with_parent(NodeId::new(11)),
+            CpgNode::new(
+                NodeId::new(13),
+                CpgNodeKind::Identifier {
+                    name: "items".into(),
+                    definition: None,
+                },
+                SourceRange::default(),
+            )
+            .with_parent(NodeId::new(12)),
+            CpgNode::new(
+                NodeId::new(14),
+                CpgNodeKind::Literal {
+                    kind: LiteralKind::Integer(0),
+                },
+                SourceRange::default(),
+            )
+            .with_parent(NodeId::new(12)),
+            CpgNode::new(
+                NodeId::new(15),
+                CpgNodeKind::Literal {
+                    kind: LiteralKind::Integer(2),
+                },
+                SourceRange::default(),
+            )
+            .with_parent(NodeId::new(11)),
+        ];
+        if reverse_insertion {
+            nodes.reverse();
+        }
+        for node in nodes {
+            cpg.add_node_with_id(node);
+        }
+        for (parent, child) in [
+            (0, 1),
+            (1, 2),
+            (2, 3),
+            (0, 4),
+            (4, 5),
+            (5, 6),
+            (6, 7),
+            (7, 8),
+            (8, 9),
+            (7, 10),
+            (6, 11),
+            (11, 12),
+            (12, 13),
+            (12, 14),
+            (11, 15),
+        ] {
+            cpg.connect(
+                NodeId::new(parent),
+                NodeId::new(child),
+                CpgEdgeKind::AstChild,
+            );
+        }
+        cpg
+    }
+
+    fn canonical_field_edges(cpg: &CodePropertyGraph) -> Vec<(u32, u32, u8)> {
+        let mut edges: Vec<_> = cpg
+            .edges()
+            .filter_map(|edge| {
+                let tag = match edge.kind {
+                    CpgEdgeKind::Reference => 0,
+                    CpgEdgeKind::DataFlow(DfgEdgeKind::FieldRead) => 1,
+                    CpgEdgeKind::DataFlow(DfgEdgeKind::FieldWrite) => 2,
+                    CpgEdgeKind::DataFlow(DfgEdgeKind::IndexRead) => 3,
+                    CpgEdgeKind::DataFlow(DfgEdgeKind::IndexWrite) => 4,
+                    CpgEdgeKind::DataFlow(DfgEdgeKind::DataDependency) => 5,
+                    _ => return None,
+                };
+                Some((edge.source.0, edge.target.0, tag))
+            })
+            .collect();
+        edges.sort_unstable();
+        edges
+    }
+
     proptest! {
-        #![proptest_config(ProptestConfig::with_cases(128))]
+        #![proptest_config(ProptestConfig::with_cases(256))]
+
+        /// Field/index extraction depends only on semantic shape, not petgraph
+        /// node insertion order. Both receiver representations accepted from
+        /// Mode-A frontends produce the same six canonical edges.
+        #[test]
+        fn prop_field_edges_are_deterministic(
+            type_name in arb_name(),
+            field_name in arb_name(),
+            receiver in prop_oneof![Just("self"), Just("this")],
+            receiver_as_keyword in any::<bool>(),
+        ) {
+            let mut forward = fixed_field_graph(
+                &type_name,
+                &field_name,
+                receiver,
+                receiver_as_keyword,
+                false,
+            );
+            let mut reversed = fixed_field_graph(
+                &type_name,
+                &field_name,
+                receiver,
+                receiver_as_keyword,
+                true,
+            );
+            DfgExtractor::new().extract_function_dfg(&mut forward, NodeId::new(5));
+            DfgExtractor::new().extract_function_dfg(&mut reversed, NodeId::new(5));
+
+            let expected = vec![
+                (7, 8, 2),
+                (8, 3, 0),
+                (9, 8, 1),
+                (11, 12, 4),
+                (13, 12, 3),
+                (14, 12, 5),
+            ];
+            prop_assert_eq!(canonical_field_edges(&forward), expected.clone());
+            prop_assert_eq!(canonical_field_edges(&reversed), expected);
+        }
 
         /// On a well-formed CPG (with calls/returns/branches), a second
         /// `DfgExtractor::extract` leaves the DFG edge count unchanged — the

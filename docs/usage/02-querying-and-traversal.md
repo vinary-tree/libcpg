@@ -131,6 +131,49 @@ fn data_flow(cpg: &CodePropertyGraph, use_site: NodeId, definition: NodeId) {
 
 libcpg's [reaching definitions](../GLOSSARY.md#reaching-definition) are computed by a single AST-ordered sweep, **not** [SSA](../GLOSSARY.md#static-single-assignment-ssa) and not a CFG fixed point; the rationale and the loop-double-sweep detail are in [DFG construction](../components/builder/dfg.md) and [ADR-0003](../design/0003-ast-ordered-reaching-defs.md).
 
+### Finding resolved field writes
+
+A member write has two complementary edges: `Assignment -> MemberAccess` as
+`FieldWrite`, and — when `self`/`this` resolution is uniquely supported —
+`MemberAccess -> Field` as `Reference`. The following feature-free query returns
+their three node IDs:
+
+```rust
+use libcpg::{CodePropertyGraph, CpgEdgeKind, CpgNodeKind, DfgEdgeKind, NodeId};
+
+fn resolved_field_writes(cpg: &CodePropertyGraph) -> Vec<(NodeId, NodeId, NodeId)> {
+    let mut writes = Vec::new();
+    for access in cpg.nodes().filter(|node| {
+        matches!(node.kind, CpgNodeKind::MemberAccess { .. })
+    }) {
+        let assignment = cpg.incoming_edges(access.id).find_map(|edge| {
+            matches!(
+                edge.kind,
+                CpgEdgeKind::DataFlow(DfgEdgeKind::FieldWrite)
+            )
+            .then_some(edge.source)
+        });
+        let field = cpg.outgoing_edges(access.id).find_map(|edge| {
+            (matches!(edge.kind, CpgEdgeKind::Reference)
+                && matches!(
+                    cpg.node(edge.target).map(|node| &node.kind),
+                    Some(CpgNodeKind::Field { .. })
+                ))
+            .then_some(edge.target)
+        });
+        if let (Some(assignment), Some(field)) = (assignment, field) {
+            writes.push((assignment, access.id, field));
+        }
+    }
+    writes.sort_unstable();
+    writes
+}
+```
+
+Keep unresolved accesses rather than treating them as evidence of no field:
+arbitrary receivers, external types, aliases, and ambiguous fields deliberately
+receive no `Reference`. See the [builder semantics](../components/builder/dfg.md#complex-l-values-and-declaration-resolution).
+
 ### Proving constants and dead branches
 
 SCCP consumes the CFG and those `DefUse` edges together. It remains feature-free

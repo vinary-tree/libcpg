@@ -378,6 +378,16 @@ identifiers. `FactUniverse<T>` makes bit-domain states and serialized solutions
 independent of source graph insertion order. See the
 [data-flow framework guide](components/graph/dataflow-framework.md#built-in-domains-and-fact-universes).
 
+### Field access / resolved field reference
+
+A **field access** is a `MemberAccess { member }` expression. Under
+`include_field_access`, its receiver points to the access with `FieldRead`; an
+assignment whose first AST child is that access points to it with `FieldWrite`.
+A **resolved field reference** is the separate `Reference` edge from a
+`self`/`this` member access to the unique same-name `Field` declaration of the
+enclosing class/implemented type. Missing or ambiguous type evidence leaves the
+access unresolved. See [DFG extraction](components/builder/dfg.md#complex-l-values-and-declaration-resolution).
+
 ### Feature flag (cargo)
 
 A compile-time switch declared in `Cargo.toml` that gates optional code and dependencies. `libcpg`'s default set is **empty** (`default = []`): language grammars, pattern/algorithm detection, serde, and the GNN are each opt-in. Key flags: `lang-*` (16 grammars), `design-patterns`, `algorithm-detection`, `serde`, `gnn`, `ml-linfa`/`ml-rules`, the Mode-B toggles `rholang`/`metta`, and the umbrella `full`. See [`engineering/01-build-and-features.md`](engineering/01-build-and-features.md).

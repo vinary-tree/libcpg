@@ -682,10 +682,17 @@ correctness**: an analysis may return a meaningless answer, but it must
 | `build_symbol_table` / `resolve_calls` | visited sets cut parent and callee-subtree cycles; deterministic scope-depth, candidate-retention, and call-count caps bound configured work |
 | `CfgExtractor::process_node` (and every `process_*` handler) | a **path set** on `CfgContext` — a node already on the current recursion path becomes its own exit instead of being re-entered |
 | DFG reaching definitions (`visit_reaching`) | a **path set** — same rule |
+| DFG member-to-field resolution | one immutable declaration index; every owner/scope walk uses cycle-bounded `ast_ancestors`; exact lexical/type/field names and uniqueness are required, so malformed, missing, or ambiguous evidence emits no `Reference` |
 
 A *path* set rather than a global visited set is used in the two extractors so
 that a node legitimately reachable from two disjoint branches is still processed
 on each path; only a genuine cycle is cut. Tree input is therefore unaffected.
+
+Field resolution has a different threat: a hostile graph can repeat names or
+forge parent pointers to induce a false declaration link. The resolver therefore
+compares lexical scope by stable owner `NodeId`, never by display name alone,
+requires exactly one type and field candidate, stops parent walks at dangling or
+cyclic pointers through `ast_ancestors`, and never removes an existing edge.
 
 These guarantees are pinned by `tests/robustness.rs`, which injects ten distinct
 corruptions into a plausible function graph and drives **every** public analysis

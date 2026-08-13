@@ -71,8 +71,9 @@ alternatives is folklore, and a decision without its costs is marketing.
 | [0025 — Pure path reflexion model](0025-pure-path-reflexion-model.md) | Decouple ordered path-layer conformance from pgmcp configuration and make every convergence, divergence, realization, and absence deterministic. | Accepted |
 | [0026 — Longest-path architectural layering](0026-longest-path-architectural-layering.md) | Reverse validated condensation levels into bottom-first architecture and retain honest cyclic, skip-layer, and upward witnesses. | Accepted |
 | [0027 — Validated advisory architectural smells](0027-validated-advisory-architectural-smells.md) | Validate projection, SCC, module, and Martin evidence as one snapshot before emitting canonical advisory smell findings. | Accepted |
+| [0028 — Evidence-bounded member-to-field resolution](0028-evidence-bounded-member-field-resolution.md) | Emit complex-l-value writes and resolve only uniquely supported `self`/`this` accesses to same-scope field declarations. | Accepted |
 
-These twenty-seven are not independent. ADR-0001 fixes the substrate that all analyses
+These twenty-eight are not independent. ADR-0001 fixes the substrate that all analyses
 write onto; ADR-0002 and ADR-0005 together explain how a language reaches that
 substrate and what you must switch on to get there; ADR-0003 and ADR-0004 are
 two analyses *over* the substrate (one always-on, one feature-gated) that each
@@ -131,6 +132,10 @@ ADR-0027 composes the projection/SCC substrate with ADR-0024's explicit Martin
 module boundary. It rejects mismatched evidence bundles before classifying
 cycles, two-sided hubs, less-stable dependency shares, and module-size outliers
 as deterministic advisory findings.
+ADR-0028 returns to the builder seam established by ADR-0003: it adds the
+missing complex-l-value writes, indexes declarative fields once, and admits a
+member-to-declaration edge only when receiver, owner, lexical scope, type, and
+field-name evidence are unique.
 
 ![Module architecture of libcpg, showing the graph core and the analysis modules layered over it](../diagrams/module-architecture.svg)
 
@@ -142,7 +147,7 @@ as deterministic advisory findings.
   (`0001`…). Numbers are never reused; a reversed decision is marked
   *Superseded* and a new record supersedes it, so history stays legible.
 - **Status lifecycle.** `Proposed → Accepted → (Superseded by NNNN | Deprecated)`.
-  All twenty-seven current records are **Accepted** and reflect the shipped `v0.1.1`
+  All twenty-eight current records are **Accepted** and reflect the shipped `v0.1.1`
   code.
 - **Grounding.** Every claim here is traceable to source: the
   [`Cargo.toml`](../engineering/01-build-and-features.md) feature block, the

@@ -148,10 +148,10 @@ Data-flow edges are wrapped as `CpgEdgeKind::DataFlow(DfgEdgeKind)`. There are
 | `DataDependency` | a general data dependency |
 | `Parameter` | argument passed into a parameter |
 | `ReturnValue` | value returned from a function |
-| `FieldRead` | read of an object field |
-| `FieldWrite` | write to an object field |
-| `IndexRead` | read of an array/index element |
-| `IndexWrite` | write to an array/index element |
+| `FieldRead` | receiver → member access (base-object read) |
+| `FieldWrite` | assignment → first-child member-access l-value |
+| `IndexRead` | array receiver → index access |
+| `IndexWrite` | assignment → first-child index-access l-value |
 | `Alias` | two names for the same storage |
 | `Dereference` | pointer dereference |
 | `AddressOf` | address-of operation |
@@ -162,6 +162,15 @@ not [SSA](../../GLOSSARY.md#static-single-assignment-ssa), so there are no
 $`\phi`$-nodes. `DfgEdgeKind` classifiers are `is_read()` (`DefUse`, `FieldRead`,
 `IndexRead`, `Dereference`) and `is_write()` (`UseDef`, `FieldWrite`,
 `IndexWrite`).
+
+The field/index auxiliary topology is shown below. A declaration link uses the
+separate `CpgEdgeKind::Reference` family because it identifies a declaration
+rather than transporting a value.
+
+![Field/index access data flow plus member-to-field reference](../../diagrams/member-field-flow.svg)
+
+*Figure — read/write directions and the conservative declaration edge. Source:
+[`diagrams/member-field-flow.puml`](../../diagrams/member-field-flow.puml).*
 
 ![Def-use and reaching-definition edges over a small program](../../diagrams/def-use-example.svg)
 
