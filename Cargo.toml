@@ -257,3 +257,7 @@ harness = false
 [[bench]]
 name = "ged"
 harness = false
+
+[[bench]]
+name = "clones"
+harness = false

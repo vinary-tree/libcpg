@@ -682,6 +682,18 @@ It is a bounded topological candidate class, not proof of exact isomorphism,
 source equality, or behavioral equivalence. See
 [`components/graph/wl-analysis.md`](components/graph/wl-analysis.md).
 
+### Function clone type
+
+A relation between function-rooted program regions. **Type-1** preserves
+retained syntax after ignoring comments and locations; **Type-2** abstracts
+identifier and literal payloads; **Type-3** admits statement changes measured
+by multiset similarity; **Type-4** compares program-dependence structure.
+libcpg classifies pairs by the strongest established relation and groups
+same-type pair edges into clone classes. This is distinct from a projection
+[structural clone class](#structural-clone-class), which groups individual
+vertices by one WL label. See
+[`theory/23-function-clone-detection.md`](theory/23-function-clone-detection.md).
+
 ### Static Single Assignment (SSA)
 
 An IR form in which every variable is assigned exactly once, with $`\phi`$-functions merging values at control-flow joins (Cytron et al. [[3]](#references)). `libcpg` deliberately does **not** use SSA for its DFG (it uses [AST-ordered reaching definitions](#ast-ordered-reaching-definitions)); SSA is defined here to make that contrast precise. See [`design/0003-ast-ordered-reaching-defs.md`](design/0003-ast-ordered-reaching-defs.md).

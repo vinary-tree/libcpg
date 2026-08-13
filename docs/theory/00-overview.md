@@ -185,7 +185,7 @@ same graph. Errors are the crate's own [`libcpg::Error`](../api/graph-reference.
 
 ## 6. Map of the theory pillar
 
-This overview sits above twenty-one formal chapters. Read them in order for a ground-up
+This overview sits above twenty-three formal chapters. Read them in order for a ground-up
 development, or jump to the layer you need:
 
 1. **[01 — Code Property Graphs](01-code-property-graphs.md).** The formal model:
@@ -222,7 +222,10 @@ development, or jump to the layer you need:
 20. **[20 — Longest-path architectural layering](20-longest-path-architectural-layering.md).**
 21. **[21 — Advisory architectural smells](21-advisory-architectural-smells.md).**
 22. **[22 — Object-oriented and function metrics](22-object-oriented-and-function-metrics.md).**
-    The final twelve chapters define deterministic projection structure,
+23. **[23 — Function clone detection](23-function-clone-detection.md).**
+    Ordered AST fingerprints, multiset similarity, and bounded PDG WL/VF2
+    verification define the four function-clone relations.
+    The final thirteen chapters define deterministic projection structure,
     architecture metrics, inspectable evidence, and their interpretation
     limits.
 

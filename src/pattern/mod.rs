@@ -3,10 +3,15 @@
 //! This module provides algorithms for detecting patterns in Code Property Graphs
 //! using subgraph isomorphism (VF2/VF3 algorithms) and similarity metrics.
 
+mod clones;
 mod ged;
 mod similarity;
 mod vf2;
 
+pub use clones::{
+    detect_clones, CloneClass, CloneOptions, CloneType, MAX_CLONE_PAIRS, MAX_CLONE_PDG_NODES,
+    MAX_CLONE_VF2_INVOCATIONS,
+};
 pub use ged::{ged_upper_bound, GedBound, GedOptions, MAX_GED_NODES};
 pub use similarity::{GraphSimilarity, SimilarityMetric};
 pub use vf2::{Vf2Matcher, Vf2State};

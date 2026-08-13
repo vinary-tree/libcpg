@@ -41,6 +41,8 @@
 //! - **Graph Edit Distance**: Compute deterministic bipartite typed edit-script
 //!   upper bounds with an explicit 512-node compatibility boundary
 //! - **Structural Clones**: Refine bounded Weisfeiler-Lehman projection labels
+//! - **Function Clones**: Classify Type-1/2 AST, Type-3 multiset, and bounded
+//!   Type-4 PDG WL/VF2 evidence
 //! - **Pattern Detection**: Detect design patterns using subgraph isomorphism (VF2/VF3)
 //! - **Algorithm Analysis**: Extract algorithm signatures and estimate complexity
 //! - **GNN Support**: Graph neural network message passing for semantic embeddings

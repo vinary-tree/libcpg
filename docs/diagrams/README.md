@@ -1,6 +1,6 @@
 # Diagram catalog
 
-Every figure in the `libcpg` documentation is a **committed source** (`.puml` for PlantUML, `.dot` for Graphviz) rendered to a **committed `.svg`** that the Markdown pages embed. Sources are version-controlled so figures are reproducible and reviewable; SVGs are committed so they render on GitHub (which does not render PlantUML/Graphviz inline). This directory holds all 79 figures plus the shared theme.
+Every figure in the `libcpg` documentation is a **committed source** (`.puml` for PlantUML, `.dot` for Graphviz) rendered to a **committed `.svg`** that the Markdown pages embed. Sources are version-controlled so figures are reproducible and reviewable; SVGs are committed so they render on GitHub (which does not render PlantUML/Graphviz inline). This directory holds all 80 figures plus the shared theme.
 
 ## Conventions
 
@@ -99,6 +99,7 @@ Grouped by subject. Each row: the source (its `.svg` sibling is embedded by the 
 | `vf2-diamond.dot` | graph | Diamond target, exactly two embeddings | components/patterns/vf2-matching, scientific/03 |
 | `similarity-metrics.puml` | mindmap | Jaccard / Cosine / WL / GraphEdit | theory/06, components/patterns/vf2-matching |
 | `ged-pipeline.puml` | activity | Budgeted star costs → Hungarian assignment → concrete typed edit scripts → symmetric normalized bound | theory/06, components/patterns/ged-analysis |
+| `clone-detection-pipeline.puml` | activity/decision flow | Ordered Type-1/2 AST fingerprints → bounded Type-3 multiset comparison → PDG WL prefilter and relaxed VF2 Type-4 verification → canonical classes | theory/23, design/0030, components/patterns/clone-detection |
 | `wl-kernel.dot` | graph | Weisfeiler-Lehman label refinement | theory/06, components/patterns/vf2-matching |
 | `pattern-detection-pipeline.puml` | activity | GoF detect: template → relaxed VF2 → confidence | theory/07, design/0004, components/patterns/overview, usage/03 |
 | `gof-taxonomy.puml` | mindmap | 23 GoF patterns by category | theory/07, api/pattern-reference, components/patterns/gang-of-four |

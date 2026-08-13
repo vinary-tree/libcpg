@@ -24,6 +24,7 @@ Source: [`diagrams/resource-bounds.puml`](../diagrams/resource-bounds.puml).*
 | `ResolveConfig::max_calls` | `100_000` | sorted call-node enumeration | higher `NodeId` calls remain untouched after the cap |
 | `Vf2Matcher::max_matches` | `0` (unlimited) | `pattern::Vf2Matcher` | search short-circuits once the match count is reached |
 | `Vf2Matcher` strict toggles | `strict_kinds`/`strict_edges` off | `pattern::Vf2Matcher` | tighter feasibility test prunes branches earlier |
+| Clone pair / PDG / VF2 budgets | `100_000` pairs, `300` PDG nodes, `10_000` VF2 calls | `pattern::detect_clones` | returns `AnalysisError::BudgetExceeded` before omitting a required comparison; hard maxima are `100_000`, `300`, and `100_000` |
 | DFG structural guards | always on | `DfgExtractor` | loop bodies receive exactly two passes; an AST path set cuts malformed cycles |
 | `backward_slice` / `forward_slice` `max_nodes` | *(caller-supplied argument)* | crate-root slice fns | BFS returns as soon as the slice reaches `max_nodes` |
 | AST traversal guards | *(always on)* | `ast_descendants` / `ast_ancestors` / `ast_depth`, SCC scope discovery, `CfgExtractor`, DFG reaching-defs | a cyclic `AstChild` graph terminates instead of looping or overflowing the stack |
@@ -147,6 +148,22 @@ Note that the [Gang-of-Four detector](../GLOSSARY.md#gang-of-four-gof) uses a
 *relaxed* matcher by design (category-level kind/edge matching); when you run it on
 untrusted input, bound the surrounding work instead — cap the number of patterns
 searched and the size of the CPG (via `max_file_size`).
+
+### Function clone search
+
+[`detect_clones`](../components/patterns/clone-detection.md) contains VF2 behind
+three all-or-error work gates. `max_pairs` counts size-qualified candidate
+pairs before strongest-relation classification, `max_pdg_nodes` limits either semantic candidate graph to at most
+300 vertices, and `max_vf2_invocations` limits verifier calls. The first needed
+unit beyond a configured cap returns `BudgetExceeded`; no partial classes are
+returned. Thresholds must be finite values in $`[0,1]`$, and requests above the
+hard ceilings are `InvalidInput`.
+
+The Type-1/2 fingerprint walk is iterative, skips nested functions, and cuts
+malformed AST cycles. The Type-4 matcher uses `with_max_matches(1)`, so a
+successful existential check stops immediately. For untrusted CPGs, lower all
+three budgets together; lowering only `max_pairs` does not constrain pairs that
+reach Type-1/2 by direct fingerprint equality.
 
 ## Data flow: structural sweep bounds
 

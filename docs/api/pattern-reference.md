@@ -5,7 +5,7 @@ This page is the authoritative reference for the four **analysis** surfaces of
 
 | Module | Cargo feature | Purpose | Primary entry points |
 |--------|---------------|---------|----------------------|
-| `pattern` | **always on** | [Subgraph isomorphism](../GLOSSARY.md#isomorphism--subgraph-isomorphism) (VF2) and [graph similarity](../GLOSSARY.md#similarity-metric) | `Vf2Matcher`, `GraphSimilarity` |
+| `pattern` | **always on** | function clone detection, [subgraph isomorphism](../GLOSSARY.md#isomorphism--subgraph-isomorphism) (VF2), and [graph similarity](../GLOSSARY.md#similarity-metric) | `detect_clones`, `Vf2Matcher`, `GraphSimilarity` |
 | `patterns` | `design-patterns` | [Gang-of-Four](../GLOSSARY.md#gang-of-four-gof) detection, DPML, rule/ML classification, OO metrics | `GofPatternDetector`, `PatternClassifier` |
 | `algorithms` | `algorithm-detection` | [Algorithm-family](../GLOSSARY.md#algorithm-family) and [complexity](../GLOSSARY.md#complexity-class--big-o) detection | `DefaultAlgorithmDetector` |
 | `gnn` | `gnn` | Message-passing [embeddings](../GLOSSARY.md#embedding) | `CpgGnn` |
@@ -25,6 +25,8 @@ references.
 use libcpg::{PatternMatch, SubgraphMatcher};
 // …the rest of pattern:: needs the full path:
 use libcpg::pattern::{
+    detect_clones, CloneClass, CloneOptions, CloneType,
+    MAX_CLONE_PAIRS, MAX_CLONE_PDG_NODES, MAX_CLONE_VF2_INVOCATIONS,
     Vf2Matcher, Vf2State, GraphSimilarity, SimilarityMetric,
     ged_upper_bound, GedBound, GedOptions, MAX_GED_NODES,
     PatternTemplate, NodeConstraint, EdgeConstraint,
@@ -54,6 +56,45 @@ use libcpg::gnn::{CpgGnn, NodeEmbedding, SubgraphEmbedding};
 ---
 
 ## `pattern::` — subgraph matching & similarity (always on)
+
+### Function clone detection
+
+```rust
+pub fn detect_clones(
+    cpg: &CodePropertyGraph,
+    options: &CloneOptions,
+) -> Result<Vec<CloneClass>, AnalysisError>;
+
+pub enum CloneType { Type1, Type2, Type3, Type4 }
+
+pub struct CloneClass {
+    pub clone_type: CloneType,
+    pub members: Vec<NodeId>,
+    pub similarity: f64,
+}
+```
+
+`members` contains sorted function roots. Pair relations are strongest-first
+Type-1, Type-2, Type-4, then Type-3; public classes remain sorted by the enum's
+stable order. `similarity` is `1.0` for Type-1/2/4 and multiset Jaccard for
+Type-3. Same-type pair relations become connected clone classes.
+
+`CloneOptions` has six public fields:
+
+| Field | Default | Valid range / hard ceiling |
+|---|---:|---|
+| `type3_threshold` | `0.8` | finite $`[0,1]`$ |
+| `type4_wl_threshold` | `0.8` | finite $`[0,1]`$ |
+| `wl_iterations` | `3` | `0..=MAX_WL_ITERATIONS` |
+| `max_pairs` | `100_000` | `0..=MAX_CLONE_PAIRS` |
+| `max_pdg_nodes` | `300` | `0..=MAX_CLONE_PDG_NODES` |
+| `max_vf2_invocations` | `10_000` | `0..=MAX_CLONE_VF2_INVOCATIONS` |
+
+Invalid configuration returns `AnalysisError::InvalidInput`. Exhausting a
+live pair, PDG-node, or VF2-invocation budget returns
+`AnalysisError::BudgetExceeded` and no partial result. All public types gain
+serde derives with the `serde` feature. See the complete
+[component guide](../components/patterns/clone-detection.md).
 
 ### `SubgraphMatcher` trait
 

@@ -1,0 +1,68 @@
+@startuml
+!include _libcpg-theme.iuml
+title Bounded Type-1 through Type-4 function clone detection
+
+skinparam backgroundColor #FCFCFC
+skinparam activity {
+  BackgroundColor #DBE4FF
+  BorderColor #4C6EF5
+  DiamondBackgroundColor #FFF3BF
+  DiamondBorderColor #F08C00
+}
+skinparam note {
+  BackgroundColor #F1F3F5
+  BorderColor #495057
+}
+
+start
+:Enumerate function roots by stable NodeId;<<#F1F3F5>>
+:Build ordered AST Merkle fingerprints\nand kind-plus-name bags;<<#DBE4FF>>
+
+if (Type-1 fingerprints equal?) then (yes)
+  :Emit Type-1 pair, similarity 1;<<#D3F9D8>>
+else (no)
+  if (Type-2 fingerprints equal?) then (yes)
+    :Emit Type-2 pair, similarity 1;<<#D3F9D8>>
+  else (no)
+    if (Size ratio can reach threshold?) then (yes)
+      :Consume candidate-pair budget;
+      :Compute multiset Jaccard\n<latex>J(A,B)=\frac{\sum_x\min(m_A,m_B)}{\sum_x\max(m_A,m_B)}</latex>;<<#FFF3BF>>
+      if (Equal bags?) then (yes)
+        :Build per-function PDG projections;<<#E5DBFF>>
+        :Enforce 300-node ceiling;
+        :WL-label cosine prefilter;<<#E5DBFF>>
+        if (Cosine reaches threshold?) then (yes)
+          :Consume VF2 invocation budget;
+          :Verify relaxed full-size PDG embedding\nwith max_matches = 1;<<#FFE3E3>>
+          if (Embedding exists?) then (yes)
+            :Emit Type-4 pair, similarity 1;<<#D3F9D8>>
+          endif
+        endif
+      else (no)
+        if (Jaccard reaches threshold?) then (yes)
+          :Emit Type-3 pair, similarity J;<<#D3F9D8>>
+        endif
+      endif
+    endif
+  endif
+endif
+
+:Group same-type pair edges into\ncanonical connected clone classes;<<#C3FAE8>>
+:Return complete sorted classes;<<#D3F9D8>>
+note right
+  Any exhausted live budget returns
+  AnalysisError::BudgetExceeded.
+  No partial class vector escapes.
+end note
+stop
+
+legend bottom
+|= Colour |= Evidence or decision |
+|<#DBE4FF>| ordered AST syntax |
+|<#FFF3BF>| bag similarity and budget gates |
+|<#E5DBFF>| program dependence and WL |
+|<#FFE3E3>| relaxed VF2 verification |
+|<#D3F9D8>| accepted relation / complete result |
+|<#C3FAE8>| canonical class grouping |
+endlegend
+@enduml

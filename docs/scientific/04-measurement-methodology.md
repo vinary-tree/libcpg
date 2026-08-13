@@ -1,6 +1,6 @@
 # Measurement methodology
 
-`libcpg` ships fifteen runnable Criterion targets. Their baseline groups are
+`libcpg` ships sixteen runnable Criterion targets. Their baseline groups are
 feature-free; the `induction_analysis` target also registers an
 `algorithm-detection`-gated complexity-evidence group. Each active group
 asserts a deterministic correctness oracle **before** entering the timed loop.
@@ -19,7 +19,7 @@ the source transformation under study does not [[1]](#references).
 
 ## 1. Current evidence
 
-All fifteen targets use `harness = false`, which hands execution to Criterion
+All sixteen targets use `harness = false`, which hands execution to Criterion
 rather than Rust's test harness:
 
 ```toml
@@ -85,6 +85,10 @@ harness = false
 [[bench]]
 name = "ged"
 harness = false
+
+[[bench]]
+name = "clones"
+harness = false
 ```
 
 | Target | Public operation | Families and sizes | Pre-timing oracle |
@@ -105,6 +109,7 @@ harness = false
 | `cycles` | `simple_cycles` | acyclic paths at 1,024/8,192 vertices, disjoint triangles at 1,023/8,190 vertices, and complete digraphs at 8/10 vertices | exact counts, edge closure, canonical starts, repeatability, caps, and first omitted witness |
 | `motifs` | `motif_census` | paths and out-stars at 24/50 vertices; complete bidirected graphs at 16/30 vertices | exact class/graphlet binomial counts, conservation, and repeatability |
 | `ged` | `ged_upper_bound` | identical paths, relabeled isolates, and retyped paths at 16/48 vertices | exact edit costs $`0`$, $`n`$, and $`n-1`$, uncapped result |
+| `clones` | `detect_clones` | dense Type-1 equality, Type-3 insertion, and Type-4 reordering corpora at 16/64 functions | exact class taxonomy, complete membership, and similarity score |
 
 The evidence is deliberately local: a result for one named family, size,
 machine, toolchain, and environment is not a universal speed claim. DFG/PDG
@@ -154,6 +159,7 @@ tees Criterion output to one timestamped log:
 ./scripts/bench.sh induction_analysis --save-baseline before
 ./scripts/bench.sh centrality --save-baseline before
 ./scripts/bench.sh community --save-baseline before
+./scripts/bench.sh clones --save-baseline before
 cargo bench --no-default-features --features algorithm-detection \
   --bench induction_analysis -- --test
 ```
@@ -288,6 +294,7 @@ $`d`$ is embedding dimension.
 | bounded simple cycles | output-sensitive exponential worst case after linear SCC preprocessing | active acyclic/triangle/dense target with explicit output cap |
 | directed motif census | $`O(V^3+V^4)`$ within 512/50-node family caps | active path/out-star/bidirected-clique target |
 | bipartite GED upper bound | $`O(N^3+E_1+E_2)`$ for $`N=V_1+V_2`$ | active identical/relabel/retype target within 512 nodes per input |
+| function clone detection | $`O(P+q(V+E)+I\cdot\operatorname{VF2})`$ for $`P`$ size-qualified pairs, $`q`$ WL rounds, and $`I`$ bounded verifier calls | active equality/insertion/reordering target with 16/64 functions |
 | DFG/PDG construction | analysis-specific; must separate extraction from slicing | benchmark gap |
 | GNN propagation | $`O(\text{layers}\cdot(V+E)\cdot d)`$ | benchmark gap |
 

@@ -1,14 +1,15 @@
 # Pattern Detection
 
-libcpg finds recurring structures in a CPG in three complementary ways. Before any code, fix one distinction that the API makes and the documentation never blurs:
+libcpg finds recurring structures in a CPG in five complementary ways. Before any code, fix one distinction that the API makes and the documentation never blurs:
 
-- **`pattern`** (singular, module `libcpg::pattern`) is **always compiled**. It provides the general [VF2](../GLOSSARY.md#vf2) [subgraph-isomorphism](../GLOSSARY.md#isomorphism--subgraph-isomorphism) matcher, [graph-similarity](../GLOSSARY.md#similarity-metric) metrics, and configurable bipartite [GED](../GLOSSARY.md#graph-edit-distance). No feature flag required.
+- **`pattern`** (singular, module `libcpg::pattern`) is **always compiled**. It provides function clone detection, the general [VF2](../GLOSSARY.md#vf2) [subgraph-isomorphism](../GLOSSARY.md#isomorphism--subgraph-isomorphism) matcher, [graph-similarity](../GLOSSARY.md#similarity-metric) metrics, and configurable bipartite [GED](../GLOSSARY.md#graph-edit-distance). No feature flag required.
 - **`patterns`** (plural, module `libcpg::patterns`) is **gated behind the `design-patterns` feature**. It provides the [Gang-of-Four](../GLOSSARY.md#gang-of-four-gof) detector, the DPML template language, and the feature-vector classifier.
 
-They are different modules for different jobs. The three approaches, from most general to most specialised:
+They are different modules for different jobs. The five approaches, from most general to most specialised:
 
 | Approach | Module | Feature | Best for |
 |----------|--------|---------|----------|
+| Type-1 through Type-4 function clones | `pattern::detect_clones` | none (always on) | Duplicate and dependence-equivalent function families |
 | VF2 subgraph isomorphism | `pattern::Vf2Matcher` | none (always on) | Any structural motif you can express as a small graph |
 | Graph-edit upper bound | `pattern::ged_upper_bound` | none (always on) | Typed whole-graph change cost with explicit budget evidence |
 | GoF template detection | `patterns::GofPatternDetector` | `design-patterns` | The 23 classic [design patterns](../GLOSSARY.md#design-pattern) |
@@ -19,6 +20,37 @@ They are different modules for different jobs. The three approaches, from most g
 *Figure — the pattern-detection pipeline shared by the VF2 matcher and the GoF detector. Source: [`diagrams/pattern-detection-pipeline.puml`](../diagrams/pattern-detection-pipeline.puml).*
 
 ---
+
+## Function clone detection (feature-free)
+
+Use `detect_clones` when the units are functions and the desired vocabulary is
+Type-1 through Type-4. Build PDG edges before relying on Type-4 findings; the
+syntax-only types work from the AST alone.
+
+```rust
+use libcpg::pattern::{detect_clones, CloneOptions, CloneType};
+use libcpg::{AnalysisError, CodePropertyGraph};
+
+fn report_clones(cpg: &CodePropertyGraph) -> Result<(), AnalysisError> {
+    let options = CloneOptions {
+        type3_threshold: 0.85,
+        max_pairs: 50_000,
+        max_vf2_invocations: 1_000,
+        ..CloneOptions::default()
+    };
+    for class in detect_clones(cpg, &options)? {
+        let semantic = class.clone_type == CloneType::Type4;
+        println!("{:?}: {:?}; semantic={semantic}", class.clone_type, class.members);
+    }
+    Ok(())
+}
+```
+
+Budget exhaustion is an error, not a partial result. Match
+`AnalysisError::BudgetExceeded` to log `unit`, `needed`, and `cap`, then either
+raise a trusted-input budget or split the analysis scope. The complete
+semantics and hard ceilings are in the
+[component guide](../components/patterns/clone-detection.md).
 
 ## VF2 subgraph isomorphism (feature-free)
 

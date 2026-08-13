@@ -10,7 +10,7 @@ because their names differ by one letter and their guarantees differ by a lot:
 
 | Module | What it holds | Feature gate | Availability |
 | :----- | :------------ | :----------- | :----------- |
-| `libcpg::pattern` (singular) | [VF2](../../GLOSSARY.md#vf2), templates, graph similarity, and bounded bipartite [GED](../../GLOSSARY.md#graph-edit-distance) | none — **always compiled** | every build |
+| `libcpg::pattern` (singular) | function clone detection, [VF2](../../GLOSSARY.md#vf2), templates, graph similarity, and bounded bipartite [GED](../../GLOSSARY.md#graph-edit-distance) | none — **always compiled** | every build |
 | `libcpg::patterns` (plural) | the 23 [Gang-of-Four](../../GLOSSARY.md#gang-of-four-gof) detectors, [DPML](../../GLOSSARY.md#dpml-design-pattern-markup-language) templates, [`PatternMetrics`](../../GLOSSARY.md#feature-vector-classification), and the heuristic classifier | `design-patterns` | opt-in |
 
 Throughout this documentation, **`pattern`** means the always-on matching engine and
@@ -82,12 +82,20 @@ for m in &matches {
 Note `node(id)` returns `Option<&CpgNode>` (not `Result`), and `node.kind` / `node.range`
 are public *fields*, not methods.
 
-## Four detection approaches
+## Five detection approaches
 
-`libcpg` offers four complementary ways to find patterns. The first three live in the
-always-on `pattern` module; the fourth lives in the feature-gated `patterns` module.
+`libcpg` offers five complementary ways to find patterns. The first four live in the
+always-on `pattern` module; the fifth lives in the feature-gated `patterns` module.
 
-### 1. Subgraph isomorphism — `pattern::Vf2Matcher`
+### 1. Function clone taxonomy — `pattern::detect_clones`
+
+The feature-free clone detector compares function-rooted syntax and program
+dependence. Ordered Merkle fingerprints establish Type-1/2, kind-and-name
+multisets establish Type-3, and bounded PDG WL/VF2 verification establishes
+Type-4. Use it for clone families rather than arbitrary caller-defined motifs.
+See [function clone detection](clone-detection.md).
+
+### 2. Subgraph isomorphism — `pattern::Vf2Matcher`
 
 The most precise approach. You supply a small pattern CPG and a target CPG; VF2 finds
 every embedding of the pattern in the target, pruning with node- and edge-feasibility
@@ -109,7 +117,7 @@ let matches = matcher.find_matches(&pattern_cpg, &target_cpg);
 Use it when you need exact structures, security-relevant shapes, or full control over
 strictness. See [VF2 subgraph matching](vf2-matching.md) for the algorithm and the API.
 
-### 2. Template-based detection — `PatternTemplate` and DPML
+### 3. Template-based detection — `PatternTemplate` and DPML
 
 Instead of hand-building a pattern CPG, declare it as a `pattern::PatternTemplate` (node
 and edge constraints) or as a [DPML](dpml.md) document (roles and relationships in YAML
@@ -134,7 +142,7 @@ let matches = Vf2Matcher::new().find_matches(&pattern_cpg, &target_cpg);
 
 Use it when the pattern is declarative, reusable, or authored by non-Rust users (DPML).
 
-### 3. Graph similarity — `pattern::GraphSimilarity`
+### 4. Graph similarity — `pattern::GraphSimilarity`
 
 Rather than locating a sub-shape, similarity scores how alike two *whole* graphs are —
 useful for clone detection and clustering. Four metrics are available; the default is
@@ -153,7 +161,7 @@ sub-structure. Similarity is covered alongside VF2 in [VF2 subgraph matching](vf
 configurable edit costs and the flagged resource boundary are in
 [bipartite GED](ged-analysis.md).
 
-### 4. Heuristic classification — `patterns::classification::PatternClassifier`
+### 5. Heuristic classification — `patterns::classification::PatternClassifier`
 
 A cheaper, name- and shape-aware alternative to VF2 for a handful of patterns. It walks
 each class, builds a 12-element [feature vector](../../GLOSSARY.md#feature-vector-classification),

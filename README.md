@@ -5,8 +5,9 @@ A CPG (Yamaguchi et al. 2014) merges complementary views of a program — the
 **Abstract Syntax Tree** (AST), the **Control Flow Graph** (CFG), and the
 **Data Flow Graph** (DFG) — into one unified `petgraph`-backed graph, and adds
 the **Program Dependence Graph** (PDG) on top for program slicing. On this
-substrate it offers subgraph-isomorphism pattern matching, Gang-of-Four design
-pattern detection, algorithm/complexity analysis, and graph-neural-network
+substrate it offers Type-1 through Type-4 function clone detection,
+subgraph-isomorphism pattern matching, Gang-of-Four design pattern detection,
+algorithm/complexity analysis, and graph-neural-network
 embeddings.
 
 ## Architecture at a glance
@@ -53,6 +54,9 @@ PDG). A query can therefore mix syntax, control flow, and data flow freely.
   declared-absence evidence.
 - **WL structural clones** — deterministic directed-degree labels and ordered
   Weisfeiler–Lehman clone-candidate classes over validated graph projections.
+- **Function clone detection** — strongest Type-1/2 ordered AST fingerprints,
+  Type-3 kind/name multiset similarity, and bounded Type-4 PDG WL/VF2
+  verification with all-or-error pair, graph-size, and invocation budgets.
 - **Projection centrality** — deterministic PageRank variants, vertex/edge
   betweenness, eigenvector, Katz, closeness, harmonic, HITS, and Burt
   structural-hole scores with explicit iteration and traversal budgets.
@@ -97,7 +101,8 @@ PDG). A query can therefore mix syntax, control flow, and data flow freely.
   frontier (Ferrante–Ottenstein–Warren 1987; Cytron et al. 1991) plus
   data-dependence edges, with bounded backward/forward Weiser slices
   (`PdgBuilder`, `backward_slice`, `forward_slice`).
-- **Subgraph isomorphism** — VF2 pattern matching (`pattern::Vf2Matcher`) and
+- **Function clones and subgraph isomorphism** — feature-free
+  `pattern::detect_clones`, VF2 pattern matching (`pattern::Vf2Matcher`), and
   graph similarity (Jaccard, cosine, stable Weisfeiler-Lehman, and bounded
   bipartite graph-edit upper bounds with explicit cap evidence).
 - **Design-pattern detection** (23 Gang-of-Four patterns) and **algorithm /
