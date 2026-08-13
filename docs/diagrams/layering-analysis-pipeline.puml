@@ -1,0 +1,62 @@
+@startuml
+!include _libcpg-theme.iuml
+title Longest-path architectural layering
+
+skinparam component {
+  BackgroundColor #F1F3F5
+  BorderColor #495057
+}
+skinparam note {
+  BackgroundColor #FFF9DB
+  BorderColor #F08C00
+}
+
+component "SccDecomposition\ncomponents + condensation DAG" as SCC #C3FAE8
+component "CondensationMetrics\nsource-oriented levels" as METRICS #DBE4FF
+component "Structural validation\ndomain + DAG + dense levels" as VALIDATE #E9ECEF
+component "Reverse orientation\n<latex>a(v)=(H-1)-\\ell(v)</latex>" as REVERSE #FFF3BF
+component "Bottom-first layers\nlayer_of lookup" as LAYERS #D3F9D8
+component "Cyclic SCC witnesses" as CYCLE #FCC2D7
+component "Cross-edge descent\n<latex>d(u,v)=a(u)-a(v)</latex>" as CLASSIFY #FFE8CC
+component "Skip-layer witnesses\n<latex>d(u,v)>1</latex>" as SKIP #FFE3E3
+component "Upward witnesses\n<latex>d(u,v)\\leq 0</latex>" as UP #E5DBFF
+component "LayeringReport\nordered + out of graph" as REPORT #D0EBFF
+
+SCC --> VALIDATE : component membership\ncanonical cross edges
+METRICS --> VALIDATE : complete + uncapped\nheight, width, levels
+VALIDATE --> REVERSE : bounded valid domain
+REVERSE --> LAYERS : append component ids\nin ascending id order
+SCC --> CYCLE : component.cyclic
+LAYERS --> CLASSIFY : source/target layer
+SCC --> CLASSIFY : condensation edges
+CLASSIFY --> SKIP : descent greater than one
+CLASSIFY --> UP : lateral or ascending
+LAYERS --> REPORT
+CYCLE --> REPORT
+SKIP --> REPORT
+UP --> REPORT
+
+note bottom of CYCLE
+  One exact component witness
+  No fabricated internal edge
+end note
+
+note bottom of REPORT
+  Unflagged cross edges descend exactly one layer
+  Feature-free, deterministic, read-only
+end note
+
+legend bottom
+|= Color |= Concept |
+|<#C3FAE8>| SCC partition and dependency topology |
+|<#DBE4FF>| upstream longest-path evidence |
+|<#E9ECEF>| hostile-input boundary |
+|<#FFF3BF>| orientation transform |
+|<#D3F9D8>| inferred architectural layers |
+|<#FCC2D7>| contracted cyclic evidence |
+|<#FFE8CC>| directed-edge classification |
+|<#FFE3E3>| downward boundary bypass |
+|<#E5DBFF>| non-downward dependency |
+|<#D0EBFF>| immutable public report |
+endlegend
+@enduml

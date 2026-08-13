@@ -43,6 +43,13 @@ direct Coffman-Graham returns BudgetExceeded.;
 ***[#F1F3F5]:public decomposition validation
 rejects inconsistent membership, invalid edges,
 self-loops, cycles, and zero layering width.;
+**[#FFE3E3] Architectural layering
+***[#F1F3F5]:inherits the 1,000,000-component ceiling
+reuses condensation structural validation before
+allocating bottom-first layers.;
+***[#F1F3F5]:hostile public-metric validation
+rejects incomplete/capped reports, mismatched domains,
+non-dense levels, and inconsistent height or width.;
 **[#FFE3E3] DSM visibility
 ***[#F1F3F5]:MAX_DSM_NODES = 50,000
 rejects before repeated breadth-first search,

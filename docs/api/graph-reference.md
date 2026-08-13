@@ -311,6 +311,22 @@ See the [condensation component guide](../components/graph/condensation-analysis
 for orientation, Kahn and Coffman–Graham pseudocode, malformed-input policy,
 complexity, examples, and exhaustive path/schedule oracles.
 
+### Architectural layering inference
+
+| Item | Signature / purpose |
+|---|---|
+| `infer_layering` | `fn(&SccDecomposition, &CondensationMetrics) -> LayeringReport` — reverse source levels into bottom-first layers and classify cycle, skip, and non-downward evidence. |
+| `LayeringReport` | `layers`, `layer_of`, sorted `violations`, plus `complete`/`capped` state. |
+| `LayeringViolation` | Component endpoints, bottom-first endpoint layers, absolute distance, and a `LayeringViolationKind`. |
+| `LayeringViolationKind` | `CyclicComponent`, `SkipLayer`, or `Upward`. |
+
+The input decomposition is structurally revalidated. Consumed level fields must
+have the component domain, dense bounded levels, and consistent height/width.
+Every non-violating condensation edge descends exactly one layer. A cyclic
+witness names its exact contracted component rather than fabricating an
+internal edge that `SccDecomposition` no longer stores. See the [layering
+component guide](../components/graph/layering-analysis.md).
+
 ### Design Structure Matrix visibility and core–periphery
 
 These feature-free functions consume a valid `GraphProjection` without

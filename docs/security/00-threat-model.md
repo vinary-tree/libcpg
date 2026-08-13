@@ -109,6 +109,9 @@ security guarantees:
 - [Reflexion-model](../GLOSSARY.md#reflexion-model) categories are exact for
   the supplied prefix policy and dependency paths. They do not validate
   filesystem identity or authorize a layering change.
+- [Architectural-layering](../GLOSSARY.md#architectural-layer--layering-violation)
+  categories are exact for supplied SCC and level values. They do not prove
+  architectural intent or authorize moving, deleting, or inverting code.
 
 Use these to *prioritise* human attention, not to *gate* a security decision on
 their own. Exact structural analyses are exact with respect to their input
@@ -149,8 +152,9 @@ and its build pipeline.
 | Cubic graph-edit assignment | caller-selectable node budget with a 512 hard ceiling, finite-cost validation, and an explicit `capped` compatibility result | [hardening §GED](01-input-and-resource-hardening.md#graph-edit-distance-cubic-assignment-cap) |
 | Forged module assignment or instability values | projection validation, inert invalid bucket indices, canonical assignments, and all-or-none SDP metric validation | [hardening §Martin metrics](01-input-and-resource-hardening.md#martin-metrics-assignment-and-comparison-validation) |
 | Path-prefix confusion or oversized reflexion policy | pure lexical semantics; caller normalization and ingress caps for layers, prefixes, path bytes, allowed pairs, and observations | [hardening §reflexion](01-input-and-resource-hardening.md#reflexion-model-path-policy-and-input-bounds) |
+| Forged or oversized layering inputs | inherited condensation ceiling, full SCC validation, bounded dense levels, and consistent height/width checks | [hardening §layering](01-input-and-resource-hardening.md#architectural-layering-inherited-cap-and-level-validation) |
 | Untrusted serialized graph | Deserialize only trusted bytes | [`usage/05-serialization.md`](../usage/05-serialization.md) |
-| Over-trusting heuristics, rankings, partitions, edit bounds, architecture metrics, cut/robustness evidence, bounded cycle prefixes, or motif frequencies | Treat pattern/algorithm/GNN, GED, Martin, reflexion, centrality, community, cohesion, spectral, truncated-cycle, and motif output as advisory | this page |
+| Over-trusting heuristics, rankings, partitions, edit bounds, architecture metrics, cut/robustness evidence, bounded cycle prefixes, or motif frequencies | Treat pattern/algorithm/GNN, GED, Martin, reflexion, layering, centrality, community, cohesion, spectral, truncated-cycle, and motif output as advisory | this page |
 
 ## References
 

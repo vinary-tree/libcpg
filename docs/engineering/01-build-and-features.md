@@ -73,7 +73,8 @@ feature is on (`#[cfg(feature = "…")]` on the `pub mod` in `lib.rs`); the `gra
 `analysis`, `builder`, and [`pattern`](../GLOSSARY.md#vf2) modules are always compiled. The
 feature-free `analysis` module supplies deterministic dominator/post-dominator
 trees, exact CFG and call-graph SCC decomposition, and deterministic
-condensation-DAG critical-path and width-bounded layering analytics, projection
+condensation-DAG critical-path and width-bounded layering analytics,
+architectural-layering inference and violation classification, projection
 centrality, Martin package metrics and stable-dependency witnesses over explicit
 module assignments, pure path reflexion-model conformance,
 bounded multi-level community detection, and deterministic bounded

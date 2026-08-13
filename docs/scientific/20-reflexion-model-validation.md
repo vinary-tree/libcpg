@@ -63,8 +63,8 @@ The implementation task explicitly defers a Criterion target. This evidence
 therefore establishes semantics and exercised control flow, not a throughput
 claim. In the clean maximal matrix, `src/analysis/reflexion.rs` measures
 **100.00%** line, **100.00%** region, **100.00%** function, and **100.00%**
-branch coverage. The repository totals are **98.18%** line, **98.09%** region,
-**98.40%** function, and **86.73%** branch coverage. Coverage remains supporting
+branch coverage. The repository totals are **98.20%** line, **98.10%** region,
+**98.41%** function, and **86.91%** branch coverage. Coverage remains supporting
 evidence rather than a correctness proof.
 
 ## Interpretation boundary

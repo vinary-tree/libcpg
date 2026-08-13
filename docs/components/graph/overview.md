@@ -4,7 +4,7 @@ The `graph` module holds the data structures at the heart of `libcpg`: the
 [Code Property Graph](../../GLOSSARY.md#code-property-graph-cpg) (CPG) and the
 node, edge, and identifier types it is built from. Everything else in the crate
 — the builders, graph projections, centrality, community, cohesion, dominator,
-SCC, condensation, DSM, Martin-metrics, and reflexion analyses, the pattern matchers, the slicer, the GNN — reads
+SCC, condensation, architectural-layering, DSM, Martin-metrics, and reflexion analyses, the pattern matchers, the slicer, the GNN — reads
 from or writes to this one structure. This page explains what a CPG is, why `libcpg` merges
 several program views into a single graph, how that graph is stored, and how you
 create and inspect one.
@@ -147,6 +147,11 @@ without changing the graph or guessing an architectural boundary.
 path-layer model with caller-supplied dependency paths. Its pure, feature-free
 summary separates convergences, divergences, uncovered edges, realized allowed
 pairs, and declared absences without parsing or filesystem access.
+
+[Architectural layering inference](layering-analysis.md) composes an SCC
+decomposition with its condensation longest-path metrics. It reverses source
+depth into bottom-first layers and reports contracted cycles, downward skips,
+and non-downward edges as immutable component-aligned evidence.
 
 ### Creating a CPG
 
@@ -336,6 +341,8 @@ So the safe pattern is: build (single-threaded, `&mut`), then analyse
 - [Condensation-DAG analytics](condensation-analysis.md) — canonical
   source-oriented depth/width, SCC-member-weighted critical paths, and
   sink-oriented width-bounded Coffman–Graham layers.
+- [Architectural layering](layering-analysis.md) — bottom-first longest-path
+  layers plus cyclic-component, skip-layer, and upward witnesses.
 - [DSM visibility and core–periphery](dsm-analysis.md) — transitive visibility
   fan-in/fan-out, propagation cost, median roles, and the largest
   multi-vertex cyclic group over any directed projection.

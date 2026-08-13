@@ -15,6 +15,7 @@ pub mod dataflow;
 mod dominators;
 mod dsm;
 mod induction;
+mod layering;
 mod loops;
 mod martin;
 mod motifs;
@@ -82,6 +83,8 @@ pub use induction::{
     loop_induction, InductionAnalysis, InductionVariable, IvDirection, LoopBoundEvidence,
     LoopInvariants, TripEvidence,
 };
+
+pub use layering::{infer_layering, LayeringReport, LayeringViolation, LayeringViolationKind};
 
 pub use loops::{loop_forest, LoopExitEdge, LoopForest, NaturalLoop};
 

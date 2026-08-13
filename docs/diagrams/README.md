@@ -39,9 +39,9 @@ Grouped by subject. Each row: the source (its `.svg` sibling is embedded by the 
 |---|---|---|---|
 | `cpg-overlay.dot` | graph | AST⊕CFG⊕DFG overlays on one shared node set (hero figure) | README, docs/README, theory/00–01, architecture/graph-data-model, api/graph-reference, components/graph/overview, design/0001 |
 | `cpg-vs-traditional.dot` | graph | Three separate views vs one unified CPG | theory/00, architecture/overview |
-| `module-architecture.puml` | component | Crate modules, always-on projections/block-CFG/data-flow/liveness/induction/reachability/dominator/loop/SCC/DSM/Martin/WL/centrality/community/cohesion/spectral/cycle/motif analysis, and feature gates | architecture/overview, design/00 |
+| `module-architecture.puml` | component | Crate modules, always-on projections/block-CFG/data-flow/liveness/induction/reachability/dominator/loop/SCC/condensation/layering/DSM/Martin/WL/centrality/community/cohesion/spectral/cycle/motif analysis, and feature gates | architecture/overview, design/00 |
 | `construction-pipeline.puml` | activity | parse → AST → CFG → optional definite-call resolution → DFG | architecture/data-flow, components/builder/overview, api/builder-reference, usage/01 |
-| `analysis-pipeline.puml` | activity | CPG → blocks/data-flow/liveness/induction/reachability/dominance/loops/SCC/DSM/Martin/WL/centrality/community/cohesion/spectral/cycles/motifs, PDG/slice, VF2/GoF, algorithm, GNN | architecture/data-flow |
+| `analysis-pipeline.puml` | activity | CPG → blocks/data-flow/liveness/induction/reachability/dominance/loops/SCC/condensation/layering/DSM/Martin/WL/centrality/community/cohesion/spectral/cycles/motifs, PDG/slice, VF2/GoF, algorithm, GNN | architecture/data-flow |
 | `feature-flag-map.puml` | mindmap | Cargo feature taxonomy (`default = []`) | design/0005, engineering/01, usage/00 |
 
 ### Graph data model
@@ -58,6 +58,7 @@ Grouped by subject. Each row: the source (its `.svg` sibling is embedded by the 
 | `motif-census-pipeline.puml` | activity/algorithm flow | validated directed projection → bounded bit rows → complete 64-tricode classification and selected graphlets → complete fixed-array census | components/graph/motif-analysis, theory/17, design/0022 |
 | `martin-metrics-pipeline.puml` | activity/algorithm flow | explicit module assignment + validated dependency projection + CPG type declarations → coupling/abstractness → instability/distance + witnessed SDP violations | components/graph/martin-metrics, theory/18, design/0024, scientific/19 |
 | `reflexion-model-pipeline.puml` | component/decision flow | ordered path-layer policy + observed dependency multiset → convergence/divergence/unlayered evidence + realized pairs and absences | components/graph/reflexion-model, theory/19, design/0025, scientific/20 |
+| `layering-analysis-pipeline.puml` | component/decision flow | SCC condensation + longest-path metrics → validated bottom-first layers + cyclic/skip/upward witnesses | components/graph/layering-analysis, theory/20, design/0026, scientific/21 |
 | `dominator-analysis.puml` | component | Shared CHK engine for forward dominance, reversed-CFG post-dominance, and PDG control edges | components/graph/dominator-analysis |
 | `loop-analysis.puml` | activity/component flow | Shared CFG scope and dominance evidence → natural/irreducible regions → strict nesting; builder continuation → `LoopExit` | components/graph/loop-analysis |
 | `reachability-analysis.puml` | component/decision flow | Function scope and iterative DFS → reachable/unreachable partition → structural dead branches; builder terminators → disconnected islands | components/graph/reachability-analysis |
@@ -139,4 +140,4 @@ Grouped by subject. Each row: the source (its `.svg` sibling is embedded by the 
 | `build-equivalence.puml` | activity | `build` ≡ `build_from_tree` node/edge equality | scientific/01, engineering/02 |
 | `measurement-methodology.puml` | activity | Rigorous benchmarking method (a documented gap) | scientific/04, engineering/03 |
 | `threat-model-dataflow.puml` | activity | Untrusted input flow & trust boundaries | security/00 |
-| `resource-bounds.puml` | mindmap | Construction/analysis caps and validation, including DSM, Martin metrics, centrality, Louvain, k-truss, minimum-cut, and attack ceilings | security/01 |
+| `resource-bounds.puml` | mindmap | Construction/analysis caps and validation, including condensation/layering, DSM, Martin metrics, centrality, Louvain, k-truss, minimum-cut, and attack ceilings | security/01 |

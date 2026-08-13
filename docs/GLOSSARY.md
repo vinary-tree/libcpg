@@ -779,6 +779,16 @@ not observed. `libcpg` maps opaque paths to layers by first textual prefix
 match and reports ordered evidence; “reflexion” is unrelated to runtime
 reflection. See [`theory/19-reflexion-model-conformance.md`](theory/19-reflexion-model-conformance.md).
 
+### Architectural layer / Layering violation
+
+An **architectural layer** is a bottom-first integer assigned to one SCC
+component by reversing its source-oriented condensation longest-path level.
+Larger values are higher layers. A healthy cross-component dependency descends
+exactly one layer; a **skip-layer** edge descends more than one, and an
+**upward** violation is lateral or ascending. A **cyclic-component** violation
+identifies an SCC whose internal cyclic edges were contracted. See
+[`components/graph/layering-analysis.md`](components/graph/layering-analysis.md).
+
 ---
 
 ## References

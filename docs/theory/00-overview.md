@@ -112,7 +112,10 @@ with selected bounded four-node graphlets
 architectural module assignments
 ([Theory 18](18-martin-package-metrics.md)), and pure
 [reflexion-model conformance](../GLOSSARY.md#reflexion-model) over a declared
-path-to-layer policy ([Theory 19](19-reflexion-model-conformance.md)). Each
+path-to-layer policy ([Theory 19](19-reflexion-model-conformance.md)), and
+[architectural layering](../GLOSSARY.md#architectural-layer--layering-violation)
+from condensation longest-path levels
+([Theory 20](20-longest-path-architectural-layering.md)). Each
 graph analysis consumes the same
 `CodePropertyGraph`; none needs its own bespoke intermediate representation.
 

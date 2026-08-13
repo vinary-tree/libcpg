@@ -273,6 +273,7 @@ $`d`$ is embedding dimension.
 | DSM visibility / classification | $`O(V(V+E))`$ visibility plus SCC and median classification | active path/ring target |
 | Martin package metrics / SDP | $`O(E\log V+T\log K)`$ metrics plus $`O(E\log K)`$ SDP aggregation | benchmark deliberately deferred; exact oracle/property/integration validation is active |
 | Reflexion-model conformance | $`O(RHP+R\log R+A\log A)`$ for observations, layers/prefixes, and allowed pairs | benchmark deliberately deferred; exact oracle/property/integration validation is active |
+| Architectural layering | $`O(M+C+E\log E)`$ for SCC membership, components, and condensation edges | benchmark deliberately deferred; exact oracle/property/integration validation is active |
 | projection WL labels / clones | $`O(q(V\log V+E+\sum_v d(v)\log d(v)))`$ for $`q\le16`$, plus clone sorting | active four-round ring/star target |
 | multi-level Louvain | $`O(h[p(V+E\log V)+E\log E])`$ for $`p\le50`$ and $`h\le10`$ | active ring-of-cliques target |
 | connected-community refinement | $`O(V+E)`$ after validation | active disconnected-path target |

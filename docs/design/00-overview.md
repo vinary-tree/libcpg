@@ -69,8 +69,9 @@ alternatives is folklore, and a decision without its costs is marketing.
 | [0023 — Deterministic bounded bipartite GED](0023-deterministic-bipartite-ged.md) | Select a stable node correspondence with Hungarian assignment, price a concrete typed edit script, and expose the hard-cap fallback. | Accepted |
 | [0024 — Explicit Martin module assignments](0024-explicit-martin-module-assignments.md) | Keep dependency topology and module boundaries explicit, count distinct external vertices, derive abstractness from CPG types, and retain stable-dependency witnesses. | Accepted |
 | [0025 — Pure path reflexion model](0025-pure-path-reflexion-model.md) | Decouple ordered path-layer conformance from pgmcp configuration and make every convergence, divergence, realization, and absence deterministic. | Accepted |
+| [0026 — Longest-path architectural layering](0026-longest-path-architectural-layering.md) | Reverse validated condensation levels into bottom-first architecture and retain honest cyclic, skip-layer, and upward witnesses. | Accepted |
 
-These twenty-five are not independent. ADR-0001 fixes the substrate that all analyses
+These twenty-six are not independent. ADR-0001 fixes the substrate that all analyses
 write onto; ADR-0002 and ADR-0005 together explain how a language reaches that
 substrate and what you must switch on to get there; ADR-0003 and ADR-0004 are
 two analyses *over* the substrate (one always-on, one feature-gated) that each
@@ -122,6 +123,9 @@ and Stable Dependencies Principle findings remain reproducible and auditable.
 ADR-0025 deliberately needs no projection: dependency producers pass path
 edges into a pure first-prefix layer policy, keeping configuration conversion
 at the application boundary and ordered conformance evidence in the library.
+ADR-0026 returns to the SCC condensation substrate and consumes ADR-0014's
+longest-path levels. It fixes architectural orientation, one-step descent, and
+the evidence boundary created when SCC contraction removes internal edges.
 
 ![Module architecture of libcpg, showing the graph core and the analysis modules layered over it](../diagrams/module-architecture.svg)
 
@@ -133,7 +137,7 @@ at the application boundary and ordered conformance evidence in the library.
   (`0001`…). Numbers are never reused; a reversed decision is marked
   *Superseded* and a new record supersedes it, so history stays legible.
 - **Status lifecycle.** `Proposed → Accepted → (Superseded by NNNN | Deprecated)`.
-  All twenty-five current records are **Accepted** and reflect the shipped `v0.1.1`
+  All twenty-six current records are **Accepted** and reflect the shipped `v0.1.1`
   code.
 - **Grounding.** Every claim here is traceable to source: the
   [`Cargo.toml`](../engineering/01-build-and-features.md) feature block, the

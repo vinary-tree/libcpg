@@ -631,6 +631,46 @@ assignments, exact formulae, and interpretation boundaries.
 
 ---
 
+## Inferring structural architectural layers
+
+Use layering inference when a directed graph represents dependencies and you
+want bottom-first layers derived from topology rather than a declared path
+policy:
+
+```rust
+use libcpg::{
+    condensation_metrics, infer_layering, module_graph_projection,
+    projection_sccs, CodePropertyGraph, CondensationOptions,
+};
+
+fn inspect_inferred_layers(cpg: &CodePropertyGraph) {
+    let modules = module_graph_projection(cpg);
+    let sccs = projection_sccs(&modules);
+    let metrics = condensation_metrics(&sccs, &CondensationOptions::default());
+    let report = infer_layering(&sccs, &metrics);
+
+    if !report.complete {
+        println!("layering unavailable; capped={}", report.capped);
+        return;
+    }
+    for (layer, components) in report.layers.iter().enumerate().rev() {
+        println!("layer {layer}: {components:?}");
+    }
+    for violation in report.violations {
+        println!("{:#?}", violation);
+    }
+}
+```
+
+Every unflagged condensation edge descends exactly one layer. Cycle witnesses
+identify a contracted SCC, skip witnesses bypass intervening layers, and upward
+witnesses indicate a lateral/ascending edge in stale or foreign level data.
+The module graph retains `Root`/`Module` vertices and `Imports` edges. See
+[architectural layering inference](../components/graph/layering-analysis.md)
+for validation, direction, and evidence boundaries.
+
+---
+
 ## Comparing intended and observed layers
 
 Use the reflexion model when your dependency producer already emits path
@@ -688,6 +728,7 @@ for complete edge categories, duplicate semantics, and security boundaries.
 - Enumerate concrete recursion/dependency witnesses: [Bounded Simple Cycles](../components/graph/cycle-analysis.md).
 - Profile local directed topology: [Directed Motif Census](../components/graph/motif-analysis.md).
 - Measure architectural coupling and stable dependencies: [Martin Package Metrics](../components/graph/martin-metrics.md).
+- Infer bottom-first layers and structural violations: [Architectural Layering](../components/graph/layering-analysis.md).
 - Compare declared and observed dependency layers: [Reflexion-model Conformance](../components/graph/reflexion-model.md).
 - The complete method tables (construction, AST, CFG, DFG, call, query, metrics, subgraph) are in the [graph reference](../api/graph-reference.md); traversal internals are in [Graph Traversal](../components/graph/traversal.md).
 

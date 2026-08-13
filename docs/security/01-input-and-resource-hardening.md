@@ -33,6 +33,7 @@ Source: [`diagrams/resource-bounds.puml`](../diagrams/resource-bounds.puml).*
 | `SolverConfig::narrow_passes` | `0` | `solve` | performs exactly the configured number of post-widening deterministic sweeps |
 | SCCP event cap | `4 * (scope nodes + DefUse edges)` | `sccp` | returns `AnalysisError::IterationLimitExceeded` if malformed dependencies exceed the finite-lattice schedule bound |
 | `CondensationOptions::max_components` | `1_000_000` hard maximum | `condensation_metrics`; `coffman_graham` always uses the hard maximum | the total metrics API returns an incomplete capped report; the direct CG API returns `AnalysisError::BudgetExceeded` |
+| Layering structural/metric validation | inherits condensation hard maximum | `infer_layering` | incomplete/capped or malformed SCC values, noncanonical edges, impossible/nondense level domains, and inconsistent height/width return an empty incomplete report |
 | `MAX_DSM_NODES` | `50_000` hard maximum | `analyze_dsm`; independently rechecked by `classify_core_periphery` | returns an incomplete capped result with the stable node universe and no partial visibility/class vectors |
 | Martin structural validation | always on | `martin_metrics`; `sdp_violations` | malformed projections return no result; invalid assignment entries are inert; duplicate/non-finite/out-of-range instability values suppress all SDP verdicts |
 | Reflexion input admission | caller-selected | `reflexion` | pure finite iteration, but callers must normalize path identity and cap layers, prefixes, path bytes, allowed pairs, and observations at ingress |
@@ -232,6 +233,28 @@ recursive traversal. Work uses explicit heaps and vectors. The cap limits the
 number of components, while total SCC membership and edge storage still scale
 with the supplied decomposition, so callers must retain source/graph size
 limits for hostile inputs.
+
+## Architectural layering: inherited cap and level validation
+
+[`infer_layering`](../components/graph/layering-analysis.md) invokes the
+condensation engine's complete SCC/DAG validation before indexing either public
+input. It therefore inherits `MAX_CONDENSATION_COMPONENTS = 1_000_000` and the
+membership, endpoint, and acyclicity checks above. It additionally requires
+canonical distinct condensation-edge order, marks a multi-node component with
+`cyclic == false` invalid, and rejects incomplete or capped metric values.
+
+The consumed level vector must have exactly one entry per component, remain
+below the component count, occupy every level from zero through its maximum,
+and agree with `height` and `width`. These checks happen before allocating the
+returned layer vectors, so `u32::MAX` cannot trigger an attacker-sized
+allocation. Shape-consistent stale levels are deliberately classified: their
+lateral or ascending edges become `Upward` witnesses. The result is advisory,
+read-only, iterative, and out of graph.
+
+The inherited hard cap is not a latency target. The validator and report still
+scale with total SCC membership and condensation edges; interactive or hostile-
+repository services should configure a substantially smaller condensation cap
+before computing the metrics supplied to layering.
 
 ## DSM visibility: quadratic-work cap and CSR validation
 
