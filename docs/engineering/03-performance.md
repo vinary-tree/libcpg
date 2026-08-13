@@ -64,6 +64,9 @@ metrics, $`T`$ is CPG nodes and $`K`$ is unique module names.
 For graph edit distance, $`N=V_1+V_2`$ is the square assignment dimension.
 For reflexion conformance, $`R`$ is observed path edges, $`H`$ layers, $`P`$
 prefixes per layer, and $`A`$ allowed pairs.
+For code metrics, $`T`$ is nominal types, $`M`$ methods in one type, $`F`$
+fields, and $`A_f`$ retained method-field accesses; $`N_f,E_f`$ describe one
+function scope.
 
 | Operation | Expected cost | Notes |
 | --- | --- | --- |
@@ -80,6 +83,8 @@ prefixes per layer, and $`A`$ allowed pairs.
 | Architectural smells | $`O((V+E)\log(V+K)+R\log R\cdot L)`$ time and $`O(V+E+S)`$ temporary/output space | Validates assignments/Martin metrics, recomputes SCCs, and scans edges once for SCC evidence, degree, and instability shares. $`K`$ is module count, $`R`$ is finding count, $`L`$ is the largest finding-node vector compared during sorting, and $`S`$ is total emitted node evidence. No independent cap: bound the input projection at ingress. |
 | DSM visibility and core–periphery | $`O(V(V+E))`$ time and $`O(V+E)`$ working space after $`O(V+E\log d_{max})`$ validation | One iterative BFS per vertex computes non-reflexive fan-out/fan-in; shared iterative SCC analysis supplies the cyclic core. Inputs above 50,000 vertices return a total capped result before traversal. |
 | Martin package metrics / SDP | $`O(E\log V+T\log K)`$ metrics and $`O(E\log K)`$ SDP time; $`O(V+K)`$ auxiliary space | Ordered sets count distinct external vertices; CPG type declarations supply abstractness; malformed projections and invalid comparison metrics return no verdict. |
+| CK / LCOM class metrics | current worst case $`O(T(N+E+M^2+MF))`$ time and $`O(N+E+MF)`$ temporary/output space | Each class report retains real method-access-field evidence, scans resolved calls/type edges, compares method pairs, and condenses inheritance cycles; stable ordered sets remove insertion-order effects. |
+| Halstead / cyclomatic / cognitive / MI | $`O(N_f+E_f)`$ time and $`O(N_f)`$ temporary space | One iterative semantic function-scope walk plus ordered operator/operand vocabularies and merged comment intervals; no source reparse or convergence loop. |
 | Reflexion-model conformance | $`O(RHP+R\log R+A\log A)`$ time and $`O(R+A)`$ output/auxiliary space | First textual prefix mapping, ordered allowed/realized pairs, and path-sorted divergences; no parser, graph search, or I/O. |
 | Variable liveness | conventional $`O(H(B + E_b)W)`$ solve plus $`O(NW)`$ report replay | $`B`$ blocks, $`E_b`$ block edges, $`N`$ reachable CFG nodes, lattice height $`H \le F`$ for $`F`$ variables, and $`W = \lceil F/64 \rceil`$ machine words per state. |
 | Available / very-busy expressions | each has conventional $`O(H(B + E_b)W)`$ solve plus $`O(NW)`$ report replay; advisory candidate filtering adds dominance and bounded kill-reachability checks | $`F`$ structural expressions, $`H \le F`$, and $`W = \lceil F/64 \rceil`$; kill indexing is linear in operand memberships and definitions. |
@@ -265,8 +270,8 @@ cargo bench --no-default-features --features algorithm-detection \
   --bench induction_analysis -- --test
 ```
 
-Martin metrics, reflexion conformance, architectural layering, and
-architectural-smell detection are intentionally benchmark-deferred
+Martin metrics, CK/LCOM and function metrics, reflexion conformance,
+architectural layering, and architectural-smell detection are intentionally benchmark-deferred
 by their implementation tasks: exact example/property/integration suites
 establish correctness, but no timing claim is made. DFG/PDG construction, whole-corpus analysis, and
 GNN propagation remain the broader runnable-benchmark gaps. Every other

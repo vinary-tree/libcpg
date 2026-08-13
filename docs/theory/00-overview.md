@@ -118,7 +118,10 @@ from condensation longest-path levels
 ([Theory 20](20-longest-path-architectural-layering.md)), and
 [architectural smells](../GLOSSARY.md#architectural-smell) from SCC, degree,
 Martin-instability, and assigned component-size evidence
-([Theory 21](21-advisory-architectural-smells.md)). Each
+([Theory 21](21-advisory-architectural-smells.md)), and
+[object-oriented and function metrics](../GLOSSARY.md#code-metrics)
+from resolved field/call and normalized node-kind evidence
+([Theory 22](22-object-oriented-and-function-metrics.md)). Each
 graph analysis consumes the same
 `CodePropertyGraph`; none needs its own bespoke intermediate representation.
 
@@ -218,7 +221,8 @@ development, or jump to the layer you need:
 19. **[19 — Reflexion-model conformance](19-reflexion-model-conformance.md).**
 20. **[20 — Longest-path architectural layering](20-longest-path-architectural-layering.md).**
 21. **[21 — Advisory architectural smells](21-advisory-architectural-smells.md).**
-    The final eleven chapters define deterministic projection structure,
+22. **[22 — Object-oriented and function metrics](22-object-oriented-and-function-metrics.md).**
+    The final twelve chapters define deterministic projection structure,
     architecture metrics, inspectable evidence, and their interpretation
     limits.
 

@@ -378,6 +378,36 @@ or invalid metric values suppress SDP verdicts. See the [Martin component
 guide](../components/graph/martin-metrics.md) for formulae, assignment policy,
 pseudocode, examples, complexity, and interpretation limits.
 
+### CK, LCOM, and function metrics
+
+The feature-free metrics API consumes nominal ownership, resolved calls, typed
+field flow, and common CPG node kinds without reparsing source:
+
+| Function | Signature | Result |
+|---|---|---|
+| `method_field_graph` | `fn(&CodePropertyGraph, NodeId) -> MethodFieldGraph` | Sorted method/field partitions, concrete access witnesses with read/write flags, and resolved internal method calls. |
+| `ck_metrics` | `fn(&CodePropertyGraph, &CkOptions) -> Vec<ClassMetrics>` | Class-ID-sorted WMC, DIT, NOC, CBO, RFC, and LCOM1–5 rows. |
+| `function_metrics` | `fn(&CodePropertyGraph, NodeId) -> Result<FunctionMetrics, AnalysisError>` | Semantic Halstead, cyclomatic, cognitive, source-span/comment, and maintainability values for one function. |
+
+`CkOptions` exposes `include_structs`, `include_enums`, and
+`include_implements`. Defaults include structs, exclude enums, and treat only
+`Inherits` as inheritance. `MethodFieldAccess` preserves `method`, `access`,
+`field`, `reads`, and `writes`; it exists only when `Reference` and typed field
+DFG evidence agree. `MethodCall` preserves resolved internal endpoints.
+
+`ClassMetrics` exposes `class`, `wmc`, `dit`, `noc`, `cbo`, `rfc`, and
+`LcomSuite`. `FunctionMetrics` exposes `function`, `cyclomatic_complexity`,
+`cognitive_complexity`, `halstead`, `logical_lines`, `comment_lines`, and
+`maintainability_index`. `HalsteadMetrics` retains all four primitive counts so
+derived values can be independently audited.
+
+Invalid function selectors use the shared analysis errors; invalid nominal
+selectors return an empty evidence graph. Inheritance cycles are condensed,
+all public vectors use stable ID order, and floating results have defined
+zero-denominator cases. See the [code-metrics component guide](../components/graph/code-metrics.md)
+for exact formulae, semantic classification, pseudocode, and interpretation
+limits.
+
 ### Advisory architectural smells
 
 The feature-free smell API composes a directed projection with its exact SCC

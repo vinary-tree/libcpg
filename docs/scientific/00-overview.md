@@ -50,15 +50,15 @@ Two properties of the suite make this rigorous rather than merely suggestive:
 
 ## 3. The evidence base
 
-The maximal matrix contains **786 library tests**, **21 general public-API
+The maximal matrix contains **798 library tests**, **21 general public-API
 integration tests**, **5 malformed-input robustness tests**, **3 SCCP
 public/parser integration tests**, and **3 interval public/parser integration
 tests**, plus **3 loop-induction** and **3 complexity-evidence public/parser
 integration tests**, plus **2 condensation** and **2 DSM public/parser
 integration tests**, plus **1 WL**, **2 centrality**, **2 community**, **2
-cohesion**, **2 spectral**, **2 cycle**, **2 motif**, **2 GED**, **2 Martin**, and
+cohesion**, **2 spectral**, **2 cycle**, **2 motif**, **2 GED**, **2 Martin**, **2 code-metric**, and
 **2 reflexion**, **2 layering**, **2 architectural-smell**, and **2 field-access
-public/parser integration tests**. These 853 executable cases combine
+public/parser integration tests**. These 867 executable cases combine
 fixed examples, differential oracles, and 61 exact source-level
 `proptest!` blocks. The feature-free matrix remains
 independently runnable and exercises the exact graph/data-flow substrate
@@ -97,6 +97,7 @@ Because `default = []`, many tests are **feature-gated**. The end-to-end reachin
 | [21 — Layering validation](21-layering-validation.md) | Bottom-first longest-path reversal, exact cycle/skip/upward witnesses, one-step descent, determinism, hostile public values, serialization | exact layered/stale-level oracles, 256-case DAG property, `layering_integration` | feature-free / `serde` |
 | [22 — Architectural-smell validation](22-architectural-smells-validation.md) | Exact cycle/hub/instability/size findings, clean topology, evidence-bundle rejection, deterministic ordering, serialization | four isolated smell oracles, 256-case property, hostile-value tables, `smells_integration` | feature-free / `serde` |
 | [23 — Member-field flow validation](23-member-field-flow-validation.md) | Field/index writes, conservative member-to-field references, gate/idempotency/append-only behavior, storage determinism, Mode-A/Mode-B parity | exact six-edge oracle, ambiguity counterexamples, 256-case property, seven frontend declaration fixtures, public/parser integration | feature-free / `lang-all` |
+| [24 — Code-metrics validation](24-code-metrics-validation.md) | Real method-field evidence, exact CK/LCOM1–5, Halstead/cyclomatic/cognitive/MI arithmetic, storage determinism, scoped implementations, hostile selectors/cycles, parser integration | exact hand-class/formula oracles, generated insertion-order property, public and Rust-parser integration | feature-free / `serde` / `lang-rust` |
 
 ## 5. What is proven, and what is advisory
 

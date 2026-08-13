@@ -22,7 +22,7 @@ think to write down.
 
 | Kind | Count | Where |
 | --- | ---: | --- |
-| Maximal-matrix library tests | 786 | inline `#[cfg(test)] mod …` next to the code; includes examples and properties |
+| Maximal-matrix library tests | 798 | inline `#[cfg(test)] mod …` next to the code; includes examples and properties |
 | Public-API integration tests | 21 | `tests/integration.rs` |
 | Malformed-input robustness tests | 5 | `tests/robustness.rs` |
 | SCCP public/parser integration tests | 3 | `tests/sccp_integration.rs` |
@@ -44,7 +44,8 @@ think to write down.
 | Reflexion public/serialization integration tests | 2 | `tests/reflexion_integration.rs` |
 | Architectural-smell public/serialization integration tests | 2 | `tests/smells_integration.rs` |
 | Field-access public/parser integration tests | 2 | `tests/field_access_integration.rs` |
-| **Executable test cases** | **853** | excludes three ignored rustdoc examples |
+| Code-metrics public/parser integration tests | 2 | `tests/metrics_integration.rs` |
+| **Executable test cases** | **867** | excludes three ignored rustdoc examples |
 | `proptest!` blocks (subset of the library/robustness rows) | 61 | exact source-level macro count in `src/` and `tests/` |
 
 The maximal-matrix library count is up from **99** inline tests and **zero**
@@ -63,14 +64,15 @@ on the features enabled:
 
 | Command | Lib tests | Notes |
 | --- | ---: | --- |
-| `cargo test` | 462 | `default = []`: the feature-free surface only |
-| `cargo test --features "full rholang metta"` | 786 | the maximal matrix, including the Mode-B mappers and evidence-aware complexity |
+| `cargo test` | 473 | `default = []`: the feature-free surface only |
+| `cargo test --features "full rholang metta"` | 798 | the maximal matrix, including the Mode-B mappers and evidence-aware complexity |
 
-The feature-free 462 exercise the graph model, exact dominator/post-dominator,
+The feature-free 473 exercise the graph model, exact dominator/post-dominator,
 natural-loop, monotone data-flow, variable-liveness/dead-store,
 available/very-busy-expression, SCCP, interval value-range, CFG/call-graph
 SCC analyses, condensation-DAG analytics, DSM visibility/core–periphery, Martin
-package metrics and stable-dependency witnesses, architectural-smell detection, WL
+package metrics and stable-dependency witnesses, CK/LCOM1–5 and function code
+metrics, architectural-smell detection, WL
 structural-clone, centrality, community, cohesion/robustness,
 spectral-connectivity classification, bounded simple cycles, directed motifs,
 bipartite GED, the CFG/DFG/PDG extractors, VF2, and similarity by building CPGs
@@ -166,6 +168,7 @@ The invariants fall into complementary families.
 | **Complexity evidence** | fully counted reducible depth maps to the exact polynomial degree; opposite storage orders produce identical class/confidence/justification; every generated CFG-free function returns the exact legacy estimate; fixed examples decide unknown-trip and irreducible confidence precedence, provenance, recursion composition, public parsing, and graph non-mutation |
 | **DSM visibility / architecture roles** | repeated-BFS VFO/VFI vectors and propagation cost equal an independent Floyd–Warshall closure; the largest multi-vertex SCC equals an independent mutual-reachability partition; reversed enumeration and duplicate edges preserve reports; examples cover chain/cycle/hub/isolates, equal-core ties, caps, malformed CSR/reverse data, cross-projection provenance, serde, public construction, parser integration, and graph non-mutation |
 | **Martin package metrics / SDP** | an exact three-module oracle pins every $`C_a`$, $`C_e`$, $`I`$, $`A`$, and $`D`$ value plus the strict stable-dependency witness; 256 sparse generated graphs preserve assignments, metrics, and violations under pair/edge reversal and keep all scalars in $`[0,1]`$; examples cover nested/anonymous/root/source buckets, duplicate and invalid public values, weights/intra edges, serde, public/parser composition, robustness, and graph non-mutation |
+| **CK, LCOM, and function metrics** | an exact hand-class oracle pins WMC/DIT/NOC/CBO/RFC and LCOM1–5 over real resolved method–field evidence; generated incidence graphs preserve complete reports under reversed insertion and keep LCOM laws; generated MI inputs remain finite/bounded; semantic-taxonomy examples cover every supported Halstead operator/operand and all literal classes; examples cover nested-control cognitive scoring, recursion, comments, scoped implementations, inheritance cycles, selectors, serde, public/parser composition, and graph non-mutation |
 | **Reflexion-model conformance** | an exact layered oracle pins same-layer/allowed convergence, path-sorted divergences, uncovered edges, realized pairs, and absences; 256 generated dependency multisets preserve complete summaries under reversal and satisfy exhaustive classification; examples cover prefix precedence, empty/duplicate public values, serde, the feature-free crate-root boundary, and caller-input non-mutation |
 | **Architectural layering** | an exact four-component oracle pins bottom-first reversal, cyclic-component and skip-layer witnesses, and one-step descent for every unflagged edge; a stale-level oracle covers lateral/upward edges; 256 generated DAGs require deterministic reports and the descent invariant; examples cover empty, out-of-domain, capped, impossible-level, duplicate-edge, invalid-cycle-flag, serde, public composition, and graph non-mutation behavior |
 | **Architectural smells** | four isolated fixtures pin exact cycle, two-sided-hub, less-stable-share, and module-size-outlier evidence while a clean chain/self-loop emits none; 256 generated projections require insertion-order determinism, in-graph sorted nodes, finite evidence, and canonical result order; hostile tables cover every option/metric boundary, stale SCC, malformed CSR, partial assignment, duplicate/missing metrics, serde, public composition, and non-mutation |
@@ -305,10 +308,10 @@ cargo +nightly cov-branch           # branch coverage needs nightly
 
 | Metric | Coverage | Lowest file |
 | --- | ---: | --- |
-| Lines | **98.27 %** | 91.67 % (`language.rs`) |
-| Regions | **98.17 %** | — |
-| Functions | **98.37 %** | — |
-| Branches | **87.16 %** | see below |
+| Lines | **98.26 %** | 91.67 % (`language.rs`) |
+| Regions | **98.16 %** | — |
+| Functions | **98.41 %** | — |
+| Branches | **86.87 %** | see below |
 
 Every source file is above 90 % line coverage; twenty-two are at 100 %.
 The `analysis/dominators.rs` module measures **97.50 %** line and
@@ -340,6 +343,12 @@ The new `analysis/dataflow/intervals.rs` module measures **99.46 %** line,
 the same thresholds. Its independent concrete interpreters, algebraic laws,
 loop-convergence checks, SCCP cross-check, and parser experiment are catalogued
 in [`scientific/06-interval-analysis-validation.md`](../scientific/06-interval-analysis-validation.md).
+The new `analysis/metrics.rs` module measures **98.11 %** line,
+**98.00 %** region, **100 %** function, and **80.00 %** branch coverage,
+clearing the epic's 90 % / 80 % thresholds. Its exact class/formula oracles,
+semantic taxonomy, insertion-order properties, parser integration, and
+evidence-boundary counterexamples are catalogued in
+[`scientific/24-code-metrics-validation.md`](../scientific/24-code-metrics-validation.md).
 The new `analysis/induction.rs` module measures **97.67 %** line,
 **97.44 %** region, **97.26 %** function, and **84.44 %** branch coverage,
 clearing the same thresholds. Its DFG invariant contracts, unique/dominating

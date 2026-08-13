@@ -45,6 +45,9 @@ PDG). A query can therefore mix syntax, control flow, and data flow freely.
 - **Martin package metrics** — deterministic afferent/efferent coupling,
   instability, abstractness, main-sequence distance, and witnessed Stable
   Dependencies Principle violations over explicit module assignments.
+- **Code metrics** — deterministic CK and LCOM1–5 reports over resolved
+  method–field/call evidence, plus language-independent Halstead, cyclomatic,
+  cognitive-complexity, and maintainability-index function summaries.
 - **Reflexion-model conformance** — pure ordered path-to-layer mapping with
   deterministic convergence, divergence, unlayered, realized-pair, and
   declared-absence evidence.
@@ -163,8 +166,8 @@ Comprehensive documentation lives under [`docs/`](docs/README.md):
 - **[Theory](docs/theory/00-overview.md)** — the CPG model, control/data flow, program dependence & slicing, subgraph isomorphism, similarity, pattern detection, complexity, and GNNs, with proofs, math, and citations.
 - **[Architecture](docs/architecture/overview.md)** — module map, the graph data model, construction & analysis pipelines, and language frontends.
 - **[Design decisions](docs/design/00-overview.md)** — ADR-style records for load-bearing graph, construction, analysis, and feature choices.
-- **[API reference](docs/api/graph-reference.md)** — graph/projection/block-CFG/SCC/condensation/layering/architectural-smell/DSM/Martin/reflexion/centrality/community/cohesion/reachability, builder, and pattern/algorithm/GNN reference.
-- **[Components](docs/README.md#components)** — graph projections, basic blocks, dominators, SCC/condensation/layering/architectural-smell/DSM/Martin/reflexion/centrality/community/cohesion analytics, reachability, builders, patterns, algorithms, and GNN internals.
+- **[API reference](docs/api/graph-reference.md)** — graph/projection/block-CFG/SCC/condensation/layering/architectural-smell/DSM/Martin/code-metric/reflexion/centrality/community/cohesion/reachability, builder, and pattern/algorithm/GNN reference.
+- **[Components](docs/README.md#components)** — graph projections, basic blocks, dominators, SCC/condensation/layering/architectural-smell/DSM/Martin/code-metric/reflexion/centrality/community/cohesion analytics, reachability, builders, patterns, algorithms, and GNN internals.
 - **[Usage guides](docs/usage/00-getting-started.md)** — task-oriented how-tos.
 - **[Engineering](docs/engineering/00-overview.md)** · **[Scientific validation](docs/scientific/00-overview.md)** · **[Security](docs/security/00-threat-model.md)**.
 - **[Glossary](docs/GLOSSARY.md)** and the **[diagram catalog](docs/diagrams/README.md)**.

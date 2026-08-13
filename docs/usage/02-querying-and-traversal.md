@@ -803,6 +803,55 @@ for complete edge categories, duplicate semantics, and security boundaries.
 
 ---
 
+## Auditing class cohesion and function complexity
+
+Use the feature-free metrics API after DFG extraction and optional call
+resolution. The evidence graph makes a high LCOM value auditable instead of
+leaving only a scalar:
+
+```rust
+use libcpg::{
+    ck_metrics, function_metrics, method_field_graph, AnalysisError,
+    CkOptions, CodePropertyGraph,
+};
+
+fn audit_metrics(cpg: &CodePropertyGraph) -> Result<(), AnalysisError> {
+    for row in ck_metrics(cpg, &CkOptions::default()) {
+        println!(
+            "class {:?}: WMC={} CBO={} RFC={} LCOM4={}",
+            row.class, row.wmc, row.cbo, row.rfc, row.lcom.lcom4,
+        );
+        for access in method_field_graph(cpg, row.class).accesses {
+            println!(
+                "  {:?} -> {:?} via {:?} (read={}, write={})",
+                access.method, access.field, access.access,
+                access.reads, access.writes,
+            );
+        }
+    }
+
+    for function in cpg.functions() {
+        let row = function_metrics(cpg, function.id)?;
+        println!(
+            "function {:?}: cyclomatic={} cognitive={} MI={:.2}",
+            row.function,
+            row.cyclomatic_complexity,
+            row.cognitive_complexity,
+            row.maintainability_index,
+        );
+    }
+    Ok(())
+}
+```
+
+`CkOptions::default()` emits classes and structs. Enable `include_enums` only
+when enum bodies are class-like in your measurement policy. Unresolved fields
+and calls do not contribute guessed links, so retain the builder and resolution
+configuration with any stored metric snapshot. See [CK, LCOM, and function
+metrics](../components/graph/code-metrics.md) for formulae and evidence limits.
+
+---
+
 ## Next steps
 
 - Detect design patterns over the graph you just queried: [Pattern Detection](03-pattern-detection.md).
@@ -814,6 +863,7 @@ for complete edge categories, duplicate semantics, and security boundaries.
 - Enumerate concrete recursion/dependency witnesses: [Bounded Simple Cycles](../components/graph/cycle-analysis.md).
 - Profile local directed topology: [Directed Motif Census](../components/graph/motif-analysis.md).
 - Measure architectural coupling and stable dependencies: [Martin Package Metrics](../components/graph/martin-metrics.md).
+- Audit class cohesion and function complexity: [CK, LCOM, and Function Metrics](../components/graph/code-metrics.md).
 - Review cycles, hubs, instability direction, and size outliers: [Architectural Smells](../components/graph/architecture-smells.md).
 - Infer bottom-first layers and structural violations: [Architectural Layering](../components/graph/layering-analysis.md).
 - Compare declared and observed dependency layers: [Reflexion-model Conformance](../components/graph/reflexion-model.md).

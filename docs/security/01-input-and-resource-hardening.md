@@ -10,7 +10,7 @@ timeout).
 ![Resource bounds that keep libcpg finite on large or untrusted input](../diagrams/resource-bounds.svg)
 
 *Figure — finite-work safeguards for construction, call resolution, VF2
-matching, monotone solving, condensation/DSM/Martin/smell/centrality analytics, the structural DFG
+matching, monotone solving, condensation/DSM/Martin/code-metric/smell/centrality analytics, the structural DFG
 sweep, and slicing.
 Source: [`diagrams/resource-bounds.puml`](../diagrams/resource-bounds.puml).*
 
@@ -36,6 +36,7 @@ Source: [`diagrams/resource-bounds.puml`](../diagrams/resource-bounds.puml).*
 | Layering structural/metric validation | inherits condensation hard maximum | `infer_layering` | incomplete/capped or malformed SCC values, noncanonical edges, impossible/nondense level domains, and inconsistent height/width return an empty incomplete report |
 | `MAX_DSM_NODES` | `50_000` hard maximum | `analyze_dsm`; independently rechecked by `classify_core_periphery` | returns an incomplete capped result with the stable node universe and no partial visibility/class vectors |
 | Martin structural validation | always on | `martin_metrics`; `sdp_violations` | malformed projections return no result; invalid assignment entries are inert; duplicate/non-finite/out-of-range instability values suppress all SDP verdicts |
+| Code-metric structural guards | always on; caller caps CPG size | `method_field_graph`; `ck_metrics`; `function_metrics` | finite visited traversals, exact field/call evidence, inheritance SCC condensation, saturating counts, and defined zero denominators prevent cycles and non-finite results; invalid function selectors return typed errors |
 | Architectural-smell bundle validation | always on; caller caps projection size | `architecture_smells` | malformed CSR, stale SCC, invalid options/metrics, partial assignment, or missing/duplicate metrics return no findings before detection |
 | Reflexion input admission | caller-selected | `reflexion` | pure finite iteration, but callers must normalize path identity and cap layers, prefixes, path bytes, allowed pairs, and observations at ingress |
 | `MAX_WL_ITERATIONS` | `16` hard maximum | `wl_labels`; inherited by `structural_clone_classes` | clamps the request before refinement; malformed projections return empty vectors before indexed traversal |
@@ -303,6 +304,31 @@ CPG/projection size and module-name bytes at its ingress. Treat the assignment
 policy and dependency-edge semantics as untrusted metadata when they cross a
 serialization or service boundary; validation guarantees total execution, not
 architectural truth.
+
+## Code metrics: finite evidence and ingress cap
+
+[`method_field_graph`, `ck_metrics`, and `function_metrics`](../components/graph/code-metrics.md)
+perform no parser call, source evaluation, I/O, recursion, or unbounded fixed
+point. Function/member discovery uses visited iterative stacks; inheritance
+cycles are collapsed by the shared iterative SCC engine before DIT longest-path
+evaluation; ordered sets bound each declaration/access/call to finite storage.
+Integer aggregation saturates at `u32::MAX`, Halstead zero denominators are
+defined as zero, logarithm inputs are floored at one, and maintainability index
+is clamped to a finite $`[0,100]`$ result.
+
+The fixed-signature API has no independent node/edge cap because it analyzes an
+already admitted finite CPG. Full CK evaluation can repeat evidence scans per
+nominal type and LCOM pair comparison is quadratic in a class's method count.
+Hostile or interactive services must therefore cap CPG nodes, edges, methods per
+type, string payload bytes, and total nominal types at ingestion. The Mode-A
+`max_file_size` guard is the broadest control; Mode-B and deserialized graphs
+require caller policy.
+
+Structural safety is not semantic trust. A forged deserialized graph can attach
+a plausible `Reference`, `FieldRead`, call target, or source range and thereby
+produce a deterministic but misleading metric. Persist builder, DFG, resolver,
+frontend, and `CkOptions` policy beside reports. Never use a threshold as an
+automatic authorization to move/delete code or as a security gate.
 
 ## Architectural smells: validated bundle and ingress cap
 
@@ -683,6 +709,7 @@ correctness**: an analysis may return a meaningless answer, but it must
 | `CfgExtractor::process_node` (and every `process_*` handler) | a **path set** on `CfgContext` — a node already on the current recursion path becomes its own exit instead of being re-entered |
 | DFG reaching definitions (`visit_reaching`) | a **path set** — same rule |
 | DFG member-to-field resolution | one immutable declaration index; every owner/scope walk uses cycle-bounded `ast_ancestors`; exact lexical/type/field names and uniqueness are required, so malformed, missing, or ambiguous evidence emits no `Reference` |
+| `method_field_graph` / `ck_metrics` / `function_metrics` | iterative visited function/member walks, declaration uniqueness, typed field/call evidence, inheritance SCC condensation, ordered sets, saturating counts, and finite arithmetic edge cases; nested functions remain separate scopes |
 
 A *path* set rather than a global visited set is used in the two extractors so
 that a node legitimately reachable from two disjoint branches is still processed
@@ -735,6 +762,9 @@ over each one — see
 15. **Cap projection size before community detection** for hostile workloads;
     the 50-pass and 10-level ceilings bound repetition but not one sweep's edge
     volume. Treat every partition as advisory.
+16. **Cap CPG/type size before code metrics**, persist frontend/DFG/resolver and
+    `CkOptions` policy with the report, and inspect method-field witnesses before
+    interpreting a cohesion or coupling threshold.
 
 ## Related pages
 

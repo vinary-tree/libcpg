@@ -143,6 +143,12 @@ afferent/efferent coupling, instability, CPG-backed type abstractness,
 main-sequence distance, and concrete Stable Dependencies Principle witnesses
 without changing the graph or guessing an architectural boundary.
 
+[Code metrics](code-metrics.md) combine resolved calls, type relations, and
+real method–field references into deterministic CK and LCOM1–5 reports. A
+separate function-scope pass classifies semantic CPG nodes for Halstead,
+cyclomatic, cognitive-complexity, and maintainability-index values without
+reparsing source text.
+
 [Reflexion-model conformance](reflexion-model.md) compares an ordered declared
 path-layer model with caller-supplied dependency paths. Its pure, feature-free
 summary separates convergences, divergences, uncovered edges, realized allowed
@@ -356,6 +362,9 @@ So the safe pattern is: build (single-threaded, `&mut`), then analyse
 - [Martin package metrics](martin-metrics.md) — explicit module assignment,
   afferent/efferent coupling, instability/abstractness/distance, and witnessed
   stable-dependency violations.
+- [Code metrics](code-metrics.md) — CK and LCOM1–5 over resolved graph evidence,
+  plus language-independent Halstead, cyclomatic, cognitive, and maintainability
+  summaries for functions.
 - [Reflexion-model conformance](reflexion-model.md) — ordered path layers,
   deterministic edge verdicts, realized pairs, and declared absences.
 - [WL labels and structural clones](wl-analysis.md) — bounded deterministic

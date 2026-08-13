@@ -1,6 +1,6 @@
 # Diagram catalog
 
-Every figure in the `libcpg` documentation is a **committed source** (`.puml` for PlantUML, `.dot` for Graphviz) rendered to a **committed `.svg`** that the Markdown pages embed. Sources are version-controlled so figures are reproducible and reviewable; SVGs are committed so they render on GitHub (which does not render PlantUML/Graphviz inline). This directory holds all 78 figures plus the shared theme.
+Every figure in the `libcpg` documentation is a **committed source** (`.puml` for PlantUML, `.dot` for Graphviz) rendered to a **committed `.svg`** that the Markdown pages embed. Sources are version-controlled so figures are reproducible and reviewable; SVGs are committed so they render on GitHub (which does not render PlantUML/Graphviz inline). This directory holds all 79 figures plus the shared theme.
 
 ## Conventions
 
@@ -60,6 +60,7 @@ Grouped by subject. Each row: the source (its `.svg` sibling is embedded by the 
 | `reflexion-model-pipeline.puml` | component/decision flow | ordered path-layer policy + observed dependency multiset → convergence/divergence/unlayered evidence + realized pairs and absences | components/graph/reflexion-model, theory/19, design/0025, scientific/20 |
 | `layering-analysis-pipeline.puml` | component/decision flow | SCC condensation + longest-path metrics → validated bottom-first layers + cyclic/skip/upward witnesses | components/graph/layering-analysis, theory/20, design/0026, scientific/21 |
 | `architecture-smells-pipeline.puml` | component/decision flow | projection + exact SCC + explicit module assignment + Martin metrics → validation → four advisory smell families + canonical evidence | components/graph/architecture-smells, theory/21, design/0027, scientific/22 |
+| `code-metrics-pipeline.puml` | activity/evidence flow | type/function selection + AST/CFG/DFG/call evidence → method–field graph, CK/LCOM1–5, Halstead, complexity, and maintainability reports | components/graph/code-metrics, theory/22, design/0029, scientific/24 |
 | `dominator-analysis.puml` | component | Shared CHK engine for forward dominance, reversed-CFG post-dominance, and PDG control edges | components/graph/dominator-analysis |
 | `loop-analysis.puml` | activity/component flow | Shared CFG scope and dominance evidence → natural/irreducible regions → strict nesting; builder continuation → `LoopExit` | components/graph/loop-analysis |
 | `reachability-analysis.puml` | component/decision flow | Function scope and iterative DFS → reachable/unreachable partition → structural dead branches; builder terminators → disconnected islands | components/graph/reachability-analysis |

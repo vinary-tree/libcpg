@@ -1,0 +1,59 @@
+@startuml
+!include _libcpg-theme.iuml
+title Evidence-bounded class and function metrics
+
+left to right direction
+
+component "CodePropertyGraph" as CPG #DBE4FF
+component "Nominal ownership\nClass / Struct / Enum" as OWNER #E9ECEF
+component "Resolved field evidence\nFieldRead / FieldWrite + Reference" as FIELD #FFE8CC
+component "Resolved call graph\ncaller -> callee" as CALL #C3FAE8
+component "Method-field graph" as MFG #FFF3BF
+component "CK + LCOM1-5" as CK #E5DBFF
+component "Function CPG scope\n(no nested functions)" as SCOPE #D3F9D8
+component "Halstead + cyclomatic\n+ cognitive + MI" as FUNCTION #FFD8A8
+
+CPG --> OWNER : declaration scope\nand unique sibling Impl
+CPG --> FIELD : typed DFG/reference edges
+CPG --> CALL : Call target / call edge
+OWNER --> MFG : methods and fields
+FIELD --> MFG : method -- access -- field
+CALL --> MFG : internal method calls
+MFG --> CK : <latex>LCOM_1,\ldots,LCOM_5</latex>
+CALL --> CK : RFC and CBO
+OWNER --> CK : WMC, DIT, NOC
+
+CPG --> SCOPE : semantic node kinds\nand source ranges
+SCOPE --> FUNCTION : operator / operand classes\ncontrol nesting / comment spans
+
+note bottom of MFG
+  An access is admitted only when the same node has:
+  * a Reference to an owned Field; and
+  * a typed FieldRead or FieldWrite relation.
+  Unresolved member spelling contributes no cohesion edge.
+end note
+
+note bottom of CK
+  Stable NodeId ordering
+  Feature-free and read-only
+  Finite graph-bounded traversal
+end note
+
+note bottom of FUNCTION
+  No source reparse
+  MI is clamped to <latex>[0,100]</latex>
+  Counts remain inspectable
+end note
+
+legend bottom
+|= Color |= Concept |
+|<#DBE4FF>| shared CPG evidence |
+|<#E9ECEF>| nominal ownership policy |
+|<#FFE8CC>| resolved field access |
+|<#C3FAE8>| resolved invocation |
+|<#FFF3BF>| method-field topology |
+|<#E5DBFF>| class-level report |
+|<#D3F9D8>| bounded function scope |
+|<#FFD8A8>| function-level report |
+endlegend
+@enduml

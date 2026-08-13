@@ -145,6 +145,23 @@ and [`components/graph/cohesion-analysis.md`](components/graph/cohesion-analysis
 
 A single directed graph that merges several program views onto **one shared node set**: the [AST](#abstract-syntax-tree-ast), the [CFG](#control-flow-graph-cfg), the [DFG](#data-flow-graph-dfg), and — on demand — the [PDG](#program-dependence-graph-pdg). Introduced by Yamaguchi et al. [[1]](#references) to express vulnerability queries that need syntax, control, and data flow simultaneously. In `libcpg` the CPG is the type `CodePropertyGraph`, backed by a [petgraph](#petgraph) `DiGraph<CpgNode, CpgEdge>`. See [`theory/01-code-property-graphs.md`](theory/01-code-property-graphs.md).
 
+### Code metrics
+
+Static numerical summaries of type and function structure. The
+Chidamber–Kemerer suite comprises **weighted methods per class (WMC)**,
+**depth of inheritance tree (DIT)**, **number of children (NOC)**,
+**coupling between object classes (CBO)**, **response for a class (RFC)**, and
+**lack of cohesion of methods (LCOM)** [[15]](#references). `libcpg` reports
+LCOM1–LCOM5 over an evidence-bounded method–field graph. At function scope,
+**Halstead metrics** count distinct and total operators and operands,
+**cyclomatic complexity** counts independent control-flow paths,
+**cognitive complexity** weights nested control flow, and the
+**maintainability index (MI)** combines Halstead volume, cyclomatic complexity,
+logical lines, and comments [[40]](#references). These are descriptive signals,
+not quality verdicts. See
+[`theory/22-object-oriented-and-function-metrics.md`](theory/22-object-oriented-and-function-metrics.md)
+and [`components/graph/code-metrics.md`](components/graph/code-metrics.md).
+
 ### Coffman–Graham layering (CG)
 
 A deterministic assignment of a [DAG](#directed-acyclic-graph-dag) to ordered,
@@ -856,3 +873,4 @@ Findings remain advisory and carry stable nodes plus numerical evidence. See
 37. Murphy, G. C., Notkin, D., Sullivan, K. J. (2001). *Software Reflexion Models: Bridging the Gap between Design and Implementation.* IEEE Transactions on Software Engineering 27(4), 364–380. DOI: [10.1109/32.917525](https://doi.org/10.1109/32.917525).
 38. Fontana, F. A., Pigazzini, I., Roveda, R., Tamburri, D. A., Zanoni, M., Di Nitto, E. (2017). *Arcan: A Tool for Architectural Smells Detection.* 2017 IEEE International Conference on Software Architecture Workshops, 282–285. DOI: [10.1109/ICSAW.2017.16](https://doi.org/10.1109/ICSAW.2017.16).
 39. Fontana, F. A., Pigazzini, I., Roveda, R., Zanoni, M. (2016). *Automatic Detection of Instability Architectural Smells.* 2016 IEEE International Conference on Software Maintenance and Evolution, 433–437. DOI: [10.1109/ICSME.2016.33](https://doi.org/10.1109/ICSME.2016.33).
+40. Code-metric foundations: (**40a**) Chidamber, S. R., Kemerer, C. F. (1991). *Towards a Metrics Suite for Object Oriented Design.* DOI: [10.1145/117954.117970](https://doi.org/10.1145/117954.117970). (**40b**) Li, W., Henry, S. (1993). *Object-oriented metrics that predict maintainability.* DOI: [10.1016/0164-1212(93)90077-B](https://doi.org/10.1016/0164-1212(93)90077-B). (**40c**) Hitz, M., Montazeri, B. (1995). *Measuring Coupling and Cohesion in Object-Oriented Systems.* No DOI assigned. (**40d**) Henderson-Sellers, B. (1996). *Object-Oriented Metrics: Measures of Complexity.* ISBN 978-0-13-239872-5 (no DOI). (**40e**) Halstead, M. H. (1977). *Elements of Software Science.* ISBN 0-444-00205-7 (no DOI). (**40f**) Campbell, G. A. (2018). *Cognitive Complexity: An Overview and Evaluation.* DOI: [10.1145/3194164.3194186](https://doi.org/10.1145/3194164.3194186). (**40g**) Oman, P., Hagemeister, J. (1992). *Metrics for assessing a software system's maintainability.* DOI: [10.1109/ICSM.1992.242525](https://doi.org/10.1109/ICSM.1992.242525). (**40h**) Coleman, D., Ash, D., Lowther, B., Oman, P. (1994). *Using metrics to evaluate software system maintainability.* DOI: [10.1109/2.303623](https://doi.org/10.1109/2.303623).

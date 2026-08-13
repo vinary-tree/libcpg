@@ -116,6 +116,10 @@ security guarantees:
   evidence are exact for one validated projection/SCC/assignment/Martin
   snapshot. A cycle, hub, instability direction, or size outlier does not prove
   a defect or authorize automated refactoring.
+- [Code metrics](../GLOSSARY.md#code-metrics) are exact for the represented
+  node/edge evidence and documented formulae. WMC, CBO, RFC, LCOM, Halstead,
+  cognitive complexity, and maintainability index do not prove a defect,
+  business responsibility, comprehension cost, or future maintenance effort.
 
 Use these to *prioritise* human attention, not to *gate* a security decision on
 their own. Exact structural analyses are exact with respect to their input
@@ -158,8 +162,9 @@ and its build pipeline.
 | Path-prefix confusion or oversized reflexion policy | pure lexical semantics; caller normalization and ingress caps for layers, prefixes, path bytes, allowed pairs, and observations | [hardening §reflexion](01-input-and-resource-hardening.md#reflexion-model-path-policy-and-input-bounds) |
 | Forged or oversized layering inputs | inherited condensation ceiling, full SCC validation, bounded dense levels, and consistent height/width checks | [hardening §layering](01-input-and-resource-hardening.md#architectural-layering-inherited-cap-and-level-validation) |
 | Forged or oversized smell evidence bundle | complete projection/options/metric/assignment validation, exact SCC recomputation, fail-closed empty result; caller-side projection cap | [hardening §architectural smells](01-input-and-resource-hardening.md#architectural-smells-validated-bundle-and-ingress-cap) |
+| Oversized or misleading code-metric evidence | finite iterative graph traversals, inheritance-SCC condensation, stable ordered sets, defined arithmetic edge cases; caller-side CPG cap and retained resolver policy | [hardening §code metrics](01-input-and-resource-hardening.md#code-metrics-finite-evidence-and-ingress-cap) |
 | Untrusted serialized graph | Deserialize only trusted bytes | [`usage/05-serialization.md`](../usage/05-serialization.md) |
-| Over-trusting heuristics, rankings, partitions, edit bounds, architecture metrics, cut/robustness evidence, bounded cycle prefixes, or motif frequencies | Treat pattern/algorithm/GNN, GED, Martin, reflexion, layering, smells, centrality, community, cohesion, spectral, truncated-cycle, and motif output as advisory | this page |
+| Over-trusting heuristics, rankings, partitions, edit bounds, architecture/code metrics, cut/robustness evidence, bounded cycle prefixes, or motif frequencies | Treat pattern/algorithm/GNN, GED, Martin, CK/LCOM/function metrics, reflexion, layering, smells, centrality, community, cohesion, spectral, truncated-cycle, and motif output as advisory | this page |
 
 ## References
 
