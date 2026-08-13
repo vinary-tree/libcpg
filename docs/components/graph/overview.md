@@ -153,6 +153,11 @@ decomposition with its condensation longest-path metrics. It reverses source
 depth into bottom-first layers and reports contracted cycles, downward skips,
 and non-downward edges as immutable component-aligned evidence.
 
+[Architectural-smell analysis](architecture-smells.md) composes that SCC
+topology with explicit module assignments and Martin metrics. It validates the
+bundle before reporting multi-node cycles, two-sided hubs, dependencies toward
+less-stable modules, and module-size outliers as immutable advisory evidence.
+
 ### Creating a CPG
 
 With **no cargo features enabled** (`default = []`), `libcpg` links no grammars,
@@ -343,6 +348,8 @@ So the safe pattern is: build (single-threaded, `&mut`), then analyse
   sink-oriented width-bounded Coffman–Graham layers.
 - [Architectural layering](layering-analysis.md) — bottom-first longest-path
   layers plus cyclic-component, skip-layer, and upward witnesses.
+- [Architectural smells](architecture-smells.md) — validated multi-node cycle,
+  two-sided hub, instability-direction, and module-size-outlier evidence.
 - [DSM visibility and core–periphery](dsm-analysis.md) — transitive visibility
   fan-in/fan-out, propagation cost, median roles, and the largest
   multi-vertex cyclic group over any directed projection.

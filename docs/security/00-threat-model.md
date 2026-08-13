@@ -112,6 +112,10 @@ security guarantees:
 - [Architectural-layering](../GLOSSARY.md#architectural-layer--layering-violation)
   categories are exact for supplied SCC and level values. They do not prove
   architectural intent or authorize moving, deleting, or inverting code.
+- [Architectural-smell](../GLOSSARY.md#architectural-smell) categories and
+  evidence are exact for one validated projection/SCC/assignment/Martin
+  snapshot. A cycle, hub, instability direction, or size outlier does not prove
+  a defect or authorize automated refactoring.
 
 Use these to *prioritise* human attention, not to *gate* a security decision on
 their own. Exact structural analyses are exact with respect to their input
@@ -153,8 +157,9 @@ and its build pipeline.
 | Forged module assignment or instability values | projection validation, inert invalid bucket indices, canonical assignments, and all-or-none SDP metric validation | [hardening §Martin metrics](01-input-and-resource-hardening.md#martin-metrics-assignment-and-comparison-validation) |
 | Path-prefix confusion or oversized reflexion policy | pure lexical semantics; caller normalization and ingress caps for layers, prefixes, path bytes, allowed pairs, and observations | [hardening §reflexion](01-input-and-resource-hardening.md#reflexion-model-path-policy-and-input-bounds) |
 | Forged or oversized layering inputs | inherited condensation ceiling, full SCC validation, bounded dense levels, and consistent height/width checks | [hardening §layering](01-input-and-resource-hardening.md#architectural-layering-inherited-cap-and-level-validation) |
+| Forged or oversized smell evidence bundle | complete projection/options/metric/assignment validation, exact SCC recomputation, fail-closed empty result; caller-side projection cap | [hardening §architectural smells](01-input-and-resource-hardening.md#architectural-smells-validated-bundle-and-ingress-cap) |
 | Untrusted serialized graph | Deserialize only trusted bytes | [`usage/05-serialization.md`](../usage/05-serialization.md) |
-| Over-trusting heuristics, rankings, partitions, edit bounds, architecture metrics, cut/robustness evidence, bounded cycle prefixes, or motif frequencies | Treat pattern/algorithm/GNN, GED, Martin, reflexion, layering, centrality, community, cohesion, spectral, truncated-cycle, and motif output as advisory | this page |
+| Over-trusting heuristics, rankings, partitions, edit bounds, architecture metrics, cut/robustness evidence, bounded cycle prefixes, or motif frequencies | Treat pattern/algorithm/GNN, GED, Martin, reflexion, layering, smells, centrality, community, cohesion, spectral, truncated-cycle, and motif output as advisory | this page |
 
 ## References
 

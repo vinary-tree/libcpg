@@ -19,6 +19,7 @@ fork
   + infer_layering / cycle-skip-upward witnesses
   + analyze_dsm / core-periphery / cyclic core
   + Martin Ca / Ce / I / A / D / SDP witnesses
+  + architecture_smells / cycle-hub-instability-size evidence
   + wl_labels / structural clone classes
   + PageRank / Brandes / spectral / distance / HITS / Burt
   + multi-level Louvain / connected refinement
@@ -45,7 +46,7 @@ end fork
 stop
 legend right
   |= colour |= analysis (module) |
-  |<#C3FAE8>| structural — blocks / data flow / liveness / expressions / SCCP / intervals / induction / reachability / dominance / loops / SCCs / condensation / layering / DSM / Martin metrics / WL / centrality / communities / cohesion / spectral connectivity / simple cycles / directed motifs |
+  |<#C3FAE8>| structural — blocks / data flow / liveness / expressions / SCCP / intervals / induction / reachability / dominance / loops / SCCs / condensation / layering / DSM / Martin metrics / architectural smells / WL / centrality / communities / cohesion / spectral connectivity / simple cycles / directed motifs |
   |<#E5DBFF>| PDG — program slicing |
   |<#FFE3E3>| pattern — VF2 / GED / similarity / GoF |
   |<#FFF3BF>| algorithm + complexity |

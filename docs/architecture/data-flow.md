@@ -3,7 +3,7 @@
 This page traces how information moves through libcpg in two phases:
 
 1. the **construction pipeline** — source text becomes a [Code Property Graph](../GLOSSARY.md#code-property-graph-cpg) (Yamaguchi et al. [[1]](#references)) with AST, [CFG](../GLOSSARY.md#control-flow-graph-cfg), and [DFG](../GLOSSARY.md#data-flow-graph-dfg) overlays; and
-2. the **analysis pipeline** — a constructed CPG is queried by exact [dominator/post-dominator](../components/graph/dominator-analysis.md), [natural-loop](../components/graph/loop-analysis.md), [loop-induction](../components/graph/induction-analysis.md), [liveness](../components/graph/liveness-analysis.md), [available/very-busy expression](../components/graph/expression-analysis.md), [SCCP](../components/graph/sccp-analysis.md), [interval value-range](../components/graph/interval-analysis.md), [SCC](../GLOSSARY.md#strongly-connected-component-scc), [condensation/layering](../components/graph/layering-analysis.md), [DSM visibility](../components/graph/dsm-analysis.md), [Martin package-metric](../components/graph/martin-metrics.md), [reflexion-model](../components/graph/reflexion-model.md), [WL structural-clone](../components/graph/wl-analysis.md), [centrality](../components/graph/centrality-analysis.md), [community](../components/graph/community-detection.md), [cohesion/robustness](../components/graph/cohesion-analysis.md), [spectral connectivity](../components/graph/spectral-analysis.md), [bounded simple-cycle](../components/graph/cycle-analysis.md), and [directed-motif](../components/graph/motif-analysis.md) analyses, the [PDG](../GLOSSARY.md#program-dependence-graph-pdg)/slicer, [VF2](../GLOSSARY.md#vf2), bounded bipartite [GED](../components/patterns/ged-analysis.md), and [GoF](../GLOSSARY.md#gang-of-four-gof) detectors, the algorithm/complexity heuristics, and the [GNN](../GLOSSARY.md#graph-neural-network-gnn).
+2. the **analysis pipeline** — a constructed CPG is queried by exact [dominator/post-dominator](../components/graph/dominator-analysis.md), [natural-loop](../components/graph/loop-analysis.md), [loop-induction](../components/graph/induction-analysis.md), [liveness](../components/graph/liveness-analysis.md), [available/very-busy expression](../components/graph/expression-analysis.md), [SCCP](../components/graph/sccp-analysis.md), [interval value-range](../components/graph/interval-analysis.md), [SCC](../GLOSSARY.md#strongly-connected-component-scc), [condensation/layering](../components/graph/layering-analysis.md), [DSM visibility](../components/graph/dsm-analysis.md), [Martin package-metric](../components/graph/martin-metrics.md), [architectural-smell](../components/graph/architecture-smells.md), [reflexion-model](../components/graph/reflexion-model.md), [WL structural-clone](../components/graph/wl-analysis.md), [centrality](../components/graph/centrality-analysis.md), [community](../components/graph/community-detection.md), [cohesion/robustness](../components/graph/cohesion-analysis.md), [spectral connectivity](../components/graph/spectral-analysis.md), [bounded simple-cycle](../components/graph/cycle-analysis.md), and [directed-motif](../components/graph/motif-analysis.md) analyses, the [PDG](../GLOSSARY.md#program-dependence-graph-pdg)/slicer, [VF2](../GLOSSARY.md#vf2), bounded bipartite [GED](../components/patterns/ged-analysis.md), and [GoF](../GLOSSARY.md#gang-of-four-gof) detectors, the algorithm/complexity heuristics, and the [GNN](../GLOSSARY.md#graph-neural-network-gnn).
 
 "Data flow" here means both the program's own data-flow overlay *and* the flow of data through libcpg's stages. This is a rewrite of an earlier draft that invented `BranchTrue`/`UseUse`/`Phi` edge kinds, an SSA-based DFG, a parse/embedding cache, and a bincode format — none of which exist. The real edge model is [`CpgEdgeKind::ControlFlow(CfgEdgeKind)`](../GLOSSARY.md#control-flow-graph-cfg) / [`DataFlow(DfgEdgeKind)`](../GLOSSARY.md#data-flow-graph-dfg), the DFG is [AST-ordered reaching definitions](../GLOSSARY.md#ast-ordered-reaching-definitions), and persistence is plain derive-based serde.
 
@@ -167,7 +167,7 @@ Public helpers expose the same information as [def-use chains](../GLOSSARY.md#de
 
 A constructed CPG is the substrate for several independent analyses. Each consumes the overlays built above; none of them run during construction.
 
-![Activity diagram fanning a CPG out to block, data-flow, liveness, induction, dominance, loop/SCC/DSM/Martin/WL/centrality/community/cohesion/spectral/cycle/motif, PDG/slice, VF2/GoF, algorithm, and GNN analyses](../diagrams/analysis-pipeline.svg)
+![Activity diagram fanning a CPG out to block, data-flow, liveness, induction, dominance, loop/SCC/DSM/Martin/smell/WL/centrality/community/cohesion/spectral/cycle/motif, PDG/slice, VF2/GoF, algorithm, and GNN analyses](../diagrams/analysis-pipeline.svg)
 
 *Figure — a constructed CPG fans out to exact structural and data-flow analysis, the on-demand PDG/slicer, the VF2 and GoF pattern detectors, the algorithm/complexity heuristics, and the GNN. Source: [`diagrams/analysis-pipeline.puml`](../diagrams/analysis-pipeline.puml).*
 
@@ -261,6 +261,15 @@ lexical module order. `sdp_violations` then retains one concrete stable-node
 edge for every module dependency that points from a more stable source to a
 less stable target. See [Martin package metrics and SDP
 analysis](../components/graph/martin-metrics.md).
+
+`architecture_smells(&projection, &sccs, &martin, &assignment, &options)`
+validates those artifacts as one snapshot before running four independent
+detectors. Multi-node SCCs, two-sided degree hubs, source modules with a high
+share of dependencies toward greater Martin instability, and assigned
+node-count outliers become stable-node findings with named numerical evidence.
+The analysis is feature-free, read-only, and advisory; invalid or mismatched
+evidence fails closed. See [architectural-smell
+analysis](../components/graph/architecture-smells.md).
 
 The pure [`reflexion`](../components/graph/reflexion-model.md) path is adjacent
 to, rather than dependent on, CPG projection analysis. A caller supplies both

@@ -76,6 +76,7 @@ prefixes per layer, and $`A`$ allowed pairs.
 | Condensation metrics | $`O(M + E\log E + (C+E)\log C)`$ time, $`O(C+E)`$ auxiliary space | $`C`$ components, $`E`$ condensation edges, and $`M`$ SCC members. Validation checks the public membership map, adjacency is normalized, and a min-id Kahn heap drives levels and weighted critical paths. |
 | Coffman–Graham layering | worst case $`O(M + E\log E + C^2\log C)`$ time, $`O(C+E)`$ auxiliary space | Predecessor-label vectors make heap comparison linear in $`C`$ in the worst case; ordered available layers enforce the requested width. The component cap is $`10^6`$. |
 | Architectural layering | $`O(M+C+E\log E)`$ validation/inference time and $`O(M+C+E)`$ temporary/output space | Reuses condensation validation, reverses one bounded level per component, and scans canonical edges once; inherits the $`10^6`$ component ceiling. |
+| Architectural smells | $`O((V+E)\log(V+K)+R\log R\cdot L)`$ time and $`O(V+E+S)`$ temporary/output space | Validates assignments/Martin metrics, recomputes SCCs, and scans edges once for SCC evidence, degree, and instability shares. $`K`$ is module count, $`R`$ is finding count, $`L`$ is the largest finding-node vector compared during sorting, and $`S`$ is total emitted node evidence. No independent cap: bound the input projection at ingress. |
 | DSM visibility and core–periphery | $`O(V(V+E))`$ time and $`O(V+E)`$ working space after $`O(V+E\log d_{max})`$ validation | One iterative BFS per vertex computes non-reflexive fan-out/fan-in; shared iterative SCC analysis supplies the cyclic core. Inputs above 50,000 vertices return a total capped result before traversal. |
 | Martin package metrics / SDP | $`O(E\log V+T\log K)`$ metrics and $`O(E\log K)`$ SDP time; $`O(V+K)`$ auxiliary space | Ordered sets count distinct external vertices; CPG type declarations supply abstractness; malformed projections and invalid comparison metrics return no verdict. |
 | Reflexion-model conformance | $`O(RHP+R\log R+A\log A)`$ time and $`O(R+A)`$ output/auxiliary space | First textual prefix mapping, ordered allowed/realized pairs, and path-sorted divergences; no parser, graph search, or I/O. |
@@ -263,7 +264,8 @@ cargo bench --no-default-features --features algorithm-detection \
   --bench induction_analysis -- --test
 ```
 
-Martin metrics, reflexion conformance, and architectural layering are intentionally benchmark-deferred
+Martin metrics, reflexion conformance, architectural layering, and
+architectural-smell detection are intentionally benchmark-deferred
 by their implementation tasks: exact example/property/integration suites
 establish correctness, but no timing claim is made. DFG/PDG construction, whole-corpus analysis, and
 GNN propagation remain the broader runnable-benchmark gaps. Every other

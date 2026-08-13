@@ -22,7 +22,7 @@ think to write down.
 
 | Kind | Count | Where |
 | --- | ---: | --- |
-| Maximal-matrix library tests | 761 | inline `#[cfg(test)] mod …` next to the code; includes examples and properties |
+| Maximal-matrix library tests | 769 | inline `#[cfg(test)] mod …` next to the code; includes examples and properties |
 | Public-API integration tests | 21 | `tests/integration.rs` |
 | Malformed-input robustness tests | 5 | `tests/robustness.rs` |
 | SCCP public/parser integration tests | 3 | `tests/sccp_integration.rs` |
@@ -42,8 +42,9 @@ think to write down.
 | GED public/parser integration tests | 2 | `tests/ged_integration.rs` |
 | Martin public/parser integration tests | 2 | `tests/martin_integration.rs` |
 | Reflexion public/serialization integration tests | 2 | `tests/reflexion_integration.rs` |
-| **Executable test cases** | **824** | excludes three ignored rustdoc examples |
-| `proptest!` blocks (subset of the library/robustness rows) | 59 | exact source-level macro count in `src/` and `tests/` |
+| Architectural-smell public/serialization integration tests | 2 | `tests/smells_integration.rs` |
+| **Executable test cases** | **834** | excludes three ignored rustdoc examples |
+| `proptest!` blocks (subset of the library/robustness rows) | 60 | exact source-level macro count in `src/` and `tests/` |
 
 The maximal-matrix library count is up from **99** inline tests and **zero**
 property tests before this work.
@@ -61,14 +62,14 @@ on the features enabled:
 
 | Command | Lib tests | Notes |
 | --- | ---: | --- |
-| `cargo test` | 445 | `default = []`: the feature-free surface only |
-| `cargo test --features "full rholang metta"` | 761 | the maximal matrix, including the Mode-B mappers and evidence-aware complexity |
+| `cargo test` | 452 | `default = []`: the feature-free surface only |
+| `cargo test --features "full rholang metta"` | 769 | the maximal matrix, including the Mode-B mappers and evidence-aware complexity |
 
-The feature-free 445 exercise the graph model, exact dominator/post-dominator,
+The feature-free 452 exercise the graph model, exact dominator/post-dominator,
 natural-loop, monotone data-flow, variable-liveness/dead-store,
 available/very-busy-expression, SCCP, interval value-range, CFG/call-graph
 SCC analyses, condensation-DAG analytics, DSM visibility/core–periphery, Martin
-package metrics and stable-dependency witnesses, WL
+package metrics and stable-dependency witnesses, architectural-smell detection, WL
 structural-clone, centrality, community, cohesion/robustness,
 spectral-connectivity classification, bounded simple cycles, directed motifs,
 bipartite GED, the CFG/DFG/PDG extractors, VF2, and similarity by building CPGs
@@ -166,6 +167,7 @@ The invariants fall into complementary families.
 | **Martin package metrics / SDP** | an exact three-module oracle pins every $`C_a`$, $`C_e`$, $`I`$, $`A`$, and $`D`$ value plus the strict stable-dependency witness; 256 sparse generated graphs preserve assignments, metrics, and violations under pair/edge reversal and keep all scalars in $`[0,1]`$; examples cover nested/anonymous/root/source buckets, duplicate and invalid public values, weights/intra edges, serde, public/parser composition, robustness, and graph non-mutation |
 | **Reflexion-model conformance** | an exact layered oracle pins same-layer/allowed convergence, path-sorted divergences, uncovered edges, realized pairs, and absences; 256 generated dependency multisets preserve complete summaries under reversal and satisfy exhaustive classification; examples cover prefix precedence, empty/duplicate public values, serde, the feature-free crate-root boundary, and caller-input non-mutation |
 | **Architectural layering** | an exact four-component oracle pins bottom-first reversal, cyclic-component and skip-layer witnesses, and one-step descent for every unflagged edge; a stale-level oracle covers lateral/upward edges; 256 generated DAGs require deterministic reports and the descent invariant; examples cover empty, out-of-domain, capped, impossible-level, duplicate-edge, invalid-cycle-flag, serde, public composition, and graph non-mutation behavior |
+| **Architectural smells** | four isolated fixtures pin exact cycle, two-sided-hub, less-stable-share, and module-size-outlier evidence while a clean chain/self-loop emits none; 256 generated projections require insertion-order determinism, in-graph sorted nodes, finite evidence, and canonical result order; hostile tables cover every option/metric boundary, stale SCC, malformed CSR, partial assignment, duplicate/missing metrics, serde, public composition, and non-mutation |
 | **WL labels / structural clones** | 256 isomorphic stable-id relabelings preserve final label multisets and logical clone partitions under reversed and duplicate edge input; exact examples pin triangle/star behavior, mixer vectors, direction/weight semantics, the 16-round cap, malformed handling, class thresholds/order, public composition, and graph non-mutation |
 | **Projection centrality** | 128 generated topologies check exact repeat and input-permutation equality plus stable-id reversal equivalence for PageRank, personalized/reverse PageRank, eigenvector, Katz, distance, HITS, Burt, vertex Brandes, and edge Brandes; fixed ring/path/star/triangle/disconnected examples pin closed forms; petgraph PageRank and dominator differentials, naive simple-path Brandes, source-partition composition, malformed/budget/invalid-option behavior, public feature-free composition, and graph non-mutation cover independent boundaries |
 | **Community detection** | generated weighted projections check exact repeat and reversed-input equality, canonical labels, independent generalized modularity, and the singleton score baseline; fixed planted cliques, complete/self-loop graphs, a ring-of-cliques multi-level witness, aggregation conservation, caps, numeric/CSR rejection, and byte-identical serde cover the Louvain boundary; generated arbitrary partitions prove every refined group connected and canonical; public/parser integration and the corruption harness prove alignment and non-mutation |
@@ -418,6 +420,13 @@ violation oracles, 256 generated DAGs, hostile public structs, serde, and
 feature-free public integration; see
 [`scientific/21-layering-validation.md`](../scientific/21-layering-validation.md).
 Its clean maximal-matrix coverage is recorded in that validation page.
+The architectural-smell module is evaluated against four isolated exact
+detectors, a clean negative fixture, 256 generated order permutations, complete
+option/metric boundary tables, stale/malformed evidence, serde, and feature-free
+public integration; see
+[`scientific/22-architectural-smells-validation.md`](../scientific/22-architectural-smells-validation.md).
+It records 100% line, region, and function coverage; the final nightly branch
+figure is recorded in that validation page.
 All figures come from clean maximal-matrix coverage runs; no focused-test
 figure is substituted for the repository gate.
 
@@ -452,7 +461,7 @@ dependencies and are not part of the `full` feature set.
 | --- | --- |
 | `examples/` directory | present but **empty** — no runnable `cargo run --example …` programs. |
 | Doctests | none run — every code fence in a doc comment is marked `ignore` / `rust,ignore`, so `cargo test --doc` executes nothing. Feature-gating individual doctests in a `default = []` crate is awkward; the snippets are instead validated by the documentation snippet-check harness. |
-| Benchmarks | Fifteen active Criterion targets cover SCC paths/rings/clusters, condensation paths/independent chains with and without CG layering, graph-arena paths, bounded VF2 paths, liveness chains/diamond ladders/nested loops, counted-loop induction regions, DSM paths/rings, WL rings/stars, centrality paths/rings/clusters, Louvain rings of cliques, disconnected-community refinement, cohesion lattices/clique chains/weighted seams/star attacks, spectral stars/complete-bipartite/disconnected-star families, bounded cycles over acyclic paths/disjoint triangles/dense digraphs, motif censuses over paths/bidirected cliques/out-stars, GED over identical/relabelled/retyped graphs, and—under `algorithm-detection`—complexity evidence on the counted-loop fixtures. Each active group asserts a deterministic oracle before timing; Martin metrics, reflexion conformance, and architectural layering are explicitly benchmark-deferred. See [performance](03-performance.md). |
+| Benchmarks | Fifteen active Criterion targets cover SCC paths/rings/clusters, condensation paths/independent chains with and without CG layering, graph-arena paths, bounded VF2 paths, liveness chains/diamond ladders/nested loops, counted-loop induction regions, DSM paths/rings, WL rings/stars, centrality paths/rings/clusters, Louvain rings of cliques, disconnected-community refinement, cohesion lattices/clique chains/weighted seams/star attacks, spectral stars/complete-bipartite/disconnected-star families, bounded cycles over acyclic paths/disjoint triangles/dense digraphs, motif censuses over paths/bidirected cliques/out-stars, GED over identical/relabelled/retyped graphs, and—under `algorithm-detection`—complexity evidence on the counted-loop fixtures. Each active group asserts a deterministic oracle before timing; Martin metrics, reflexion conformance, architectural layering, and architectural-smell detection are explicitly benchmark-deferred. See [performance](03-performance.md). |
 | `ml-linfa`, `gpu` | not exercised: optional heavy dependencies outside the `full` feature set. |
 
 ## Related pages

@@ -70,8 +70,9 @@ alternatives is folklore, and a decision without its costs is marketing.
 | [0024 — Explicit Martin module assignments](0024-explicit-martin-module-assignments.md) | Keep dependency topology and module boundaries explicit, count distinct external vertices, derive abstractness from CPG types, and retain stable-dependency witnesses. | Accepted |
 | [0025 — Pure path reflexion model](0025-pure-path-reflexion-model.md) | Decouple ordered path-layer conformance from pgmcp configuration and make every convergence, divergence, realization, and absence deterministic. | Accepted |
 | [0026 — Longest-path architectural layering](0026-longest-path-architectural-layering.md) | Reverse validated condensation levels into bottom-first architecture and retain honest cyclic, skip-layer, and upward witnesses. | Accepted |
+| [0027 — Validated advisory architectural smells](0027-validated-advisory-architectural-smells.md) | Validate projection, SCC, module, and Martin evidence as one snapshot before emitting canonical advisory smell findings. | Accepted |
 
-These twenty-six are not independent. ADR-0001 fixes the substrate that all analyses
+These twenty-seven are not independent. ADR-0001 fixes the substrate that all analyses
 write onto; ADR-0002 and ADR-0005 together explain how a language reaches that
 substrate and what you must switch on to get there; ADR-0003 and ADR-0004 are
 two analyses *over* the substrate (one always-on, one feature-gated) that each
@@ -126,6 +127,10 @@ at the application boundary and ordered conformance evidence in the library.
 ADR-0026 returns to the SCC condensation substrate and consumes ADR-0014's
 longest-path levels. It fixes architectural orientation, one-step descent, and
 the evidence boundary created when SCC contraction removes internal edges.
+ADR-0027 composes the projection/SCC substrate with ADR-0024's explicit Martin
+module boundary. It rejects mismatched evidence bundles before classifying
+cycles, two-sided hubs, less-stable dependency shares, and module-size outliers
+as deterministic advisory findings.
 
 ![Module architecture of libcpg, showing the graph core and the analysis modules layered over it](../diagrams/module-architecture.svg)
 
@@ -137,7 +142,7 @@ the evidence boundary created when SCC contraction removes internal edges.
   (`0001`…). Numbers are never reused; a reversed decision is marked
   *Superseded* and a new record supersedes it, so history stays legible.
 - **Status lifecycle.** `Proposed → Accepted → (Superseded by NNNN | Deprecated)`.
-  All twenty-six current records are **Accepted** and reflect the shipped `v0.1.1`
+  All twenty-seven current records are **Accepted** and reflect the shipped `v0.1.1`
   code.
 - **Grounding.** Every claim here is traceable to source: the
   [`Cargo.toml`](../engineering/01-build-and-features.md) feature block, the

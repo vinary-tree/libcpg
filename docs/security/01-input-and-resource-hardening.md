@@ -10,7 +10,7 @@ timeout).
 ![Resource bounds that keep libcpg finite on large or untrusted input](../diagrams/resource-bounds.svg)
 
 *Figure — finite-work safeguards for construction, call resolution, VF2
-matching, monotone solving, condensation/DSM/Martin/centrality analytics, the structural DFG
+matching, monotone solving, condensation/DSM/Martin/smell/centrality analytics, the structural DFG
 sweep, and slicing.
 Source: [`diagrams/resource-bounds.puml`](../diagrams/resource-bounds.puml).*
 
@@ -36,6 +36,7 @@ Source: [`diagrams/resource-bounds.puml`](../diagrams/resource-bounds.puml).*
 | Layering structural/metric validation | inherits condensation hard maximum | `infer_layering` | incomplete/capped or malformed SCC values, noncanonical edges, impossible/nondense level domains, and inconsistent height/width return an empty incomplete report |
 | `MAX_DSM_NODES` | `50_000` hard maximum | `analyze_dsm`; independently rechecked by `classify_core_periphery` | returns an incomplete capped result with the stable node universe and no partial visibility/class vectors |
 | Martin structural validation | always on | `martin_metrics`; `sdp_violations` | malformed projections return no result; invalid assignment entries are inert; duplicate/non-finite/out-of-range instability values suppress all SDP verdicts |
+| Architectural-smell bundle validation | always on; caller caps projection size | `architecture_smells` | malformed CSR, stale SCC, invalid options/metrics, partial assignment, or missing/duplicate metrics return no findings before detection |
 | Reflexion input admission | caller-selected | `reflexion` | pure finite iteration, but callers must normalize path identity and cap layers, prefixes, path bytes, allowed pairs, and observations at ingress |
 | `MAX_WL_ITERATIONS` | `16` hard maximum | `wl_labels`; inherited by `structural_clone_classes` | clamps the request before refinement; malformed projections return empty vectors before indexed traversal |
 | `MAX_CENTRALITY_ITERATIONS` | `10_000` hard maximum | PageRank, eigenvector, Katz, and HITS | clamps every requested round count; invalid numerical options return a non-converged result without iteration |
@@ -302,6 +303,25 @@ CPG/projection size and module-name bytes at its ingress. Treat the assignment
 policy and dependency-edge semantics as untrusted metadata when they cross a
 serialization or service boundary; validation guarantees total execution, not
 architectural truth.
+
+## Architectural smells: validated bundle and ingress cap
+
+[`architecture_smells`](../components/graph/architecture-smells.md) treats its
+projection, SCC decomposition, module assignment, Martin metrics, and options as
+one untrusted snapshot. It validates complete CSR invariants, recomputes SCCs
+with the iterative shared engine and requires exact equality, resolves every
+projected node to an in-range assignment bucket, and requires one finite bounded
+Martin record per used module. Every option must be finite and in its documented
+domain. Any failure returns no findings before detector traversal.
+
+The function has no independent hard node/edge cap because it is a
+caller-selected feature-free analysis over an already admitted projection. Its
+graph work is near-linear apart from ordered-map lookups and canonical output
+sorting, but a hostile service must still cap vertices, edges, module/name
+bytes, and serialized evidence at ingress. The SCC recomputation is a
+consistency defense, not a latency limit. Preserve projection meaning,
+assignment policy, Martin inputs, and options with the output; deterministic
+evidence does not establish architectural intent.
 
 ## Reflexion model: path policy and input bounds
 
@@ -699,10 +719,13 @@ over each one — see
 12. **Bound Martin projection/assignment size at ingress** and retain its
     boundary policy with every result; structural validation is not a latency
     cap or proof that the selected modules represent the intended architecture.
-13. **Tighten centrality budgets and iteration requests** for interactive or
+13. **Bound architectural-smell input at ingress** and treat an empty result as
+    “no advisory verdict”; the compact API also uses that result for invalid or
+    mismatched evidence.
+14. **Tighten centrality budgets and iteration requests** for interactive or
     hostile graphs, and require `converged` before presenting an iterative
     ranking as complete.
-14. **Cap projection size before community detection** for hostile workloads;
+15. **Cap projection size before community detection** for hostile workloads;
     the 50-pass and 10-level ceilings bound repetition but not one sweep's edge
     volume. Treat every partition as advisory.
 

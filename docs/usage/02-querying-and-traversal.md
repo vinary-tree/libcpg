@@ -631,6 +631,49 @@ assignments, exact formulae, and interpretation boundaries.
 
 ---
 
+## Reviewing advisory architectural smells
+
+Use the same dependency direction and module policy to combine SCC and Martin
+evidence into four review-oriented smell families:
+
+```rust
+use libcpg::{
+    architecture_smells, martin_metrics, module_graph_projection,
+    projection_sccs, CodePropertyGraph, ModuleAssignment, SmellOptions,
+};
+
+fn inspect_architectural_smells(cpg: &CodePropertyGraph) {
+    let dependencies = module_graph_projection(cpg);
+    let assignment = ModuleAssignment::by_module_nodes(cpg);
+    let sccs = projection_sccs(&dependencies);
+    let martin = martin_metrics(cpg, &assignment, &dependencies);
+    let findings = architecture_smells(
+        &dependencies,
+        &sccs,
+        &martin,
+        &assignment,
+        &SmellOptions::default(),
+    );
+
+    for finding in findings {
+        println!(
+            "{:?}: severity={:.3}, nodes={:?}, evidence={:?}",
+            finding.kind, finding.severity, finding.nodes, finding.evidence,
+        );
+    }
+}
+```
+
+The inputs must describe one snapshot. Invalid CSR, stale SCCs, partial module
+assignment, missing/duplicate Martin metrics, or invalid numerical options
+produce no advisory verdict. A valid empty result means no threshold was
+crossed, so validate externally if an application must distinguish those two
+states. Persist projection/assignment policy and options with findings, and
+never use a smell alone to authorize refactoring. See [architectural-smell
+analysis](../components/graph/architecture-smells.md).
+
+---
+
 ## Inferring structural architectural layers
 
 Use layering inference when a directed graph represents dependencies and you
@@ -728,6 +771,7 @@ for complete edge categories, duplicate semantics, and security boundaries.
 - Enumerate concrete recursion/dependency witnesses: [Bounded Simple Cycles](../components/graph/cycle-analysis.md).
 - Profile local directed topology: [Directed Motif Census](../components/graph/motif-analysis.md).
 - Measure architectural coupling and stable dependencies: [Martin Package Metrics](../components/graph/martin-metrics.md).
+- Review cycles, hubs, instability direction, and size outliers: [Architectural Smells](../components/graph/architecture-smells.md).
 - Infer bottom-first layers and structural violations: [Architectural Layering](../components/graph/layering-analysis.md).
 - Compare declared and observed dependency layers: [Reflexion-model Conformance](../components/graph/reflexion-model.md).
 - The complete method tables (construction, AST, CFG, DFG, call, query, metrics, subgraph) are in the [graph reference](../api/graph-reference.md); traversal internals are in [Graph Traversal](../components/graph/traversal.md).

@@ -1,0 +1,51 @@
+@startuml
+title Advisory architectural-smell analysis
+skinparam backgroundColor #F8F9FA
+skinparam shadowing false
+skinparam defaultFontName DejaVu Sans
+skinparam ArrowColor #495057
+skinparam ArrowThickness 1.2
+skinparam rectangle {
+  RoundCorner 10
+  BorderColor #343A40
+}
+
+rectangle "Directed dependency projection\ncanonical CSR + stable NodeId" as VIEW #D0EBFF
+rectangle "Exact SCC decomposition" as SCC #C3FAE8
+rectangle "Module assignment" as ASSIGN #FFF3BF
+rectangle "Martin metrics\n<latex>I=C_e/(C_a+C_e)</latex>" as MARTIN #E5DBFF
+
+rectangle "Evidence-bundle validation\nCSR shape • SCC equality • complete assignment\nfinite bounded metrics • valid thresholds" as VALIDATE #FFE8CC
+
+rectangle "Cyclic dependency\n<latex>|S|\\ge 2</latex>" as CYCLE #FFC9C9
+rectangle "Two-sided hub\n<latex>d^- > \\mu_-+k_-\\sigma_-</latex>\n<latex>d^+ > \\mu_++k_+\\sigma_+</latex>" as HUB #FFD8A8
+rectangle "Unstable dependency\n<latex>p_a > \\tau</latex>" as UNSTABLE #E5DBFF
+rectangle "God component\n<latex>s_m > \\mu_s+k_s\\sigma_s</latex>" as GOD #FFF3BF
+
+rectangle "Canonical advisory findings\nkind • sorted nodes • finite severity\nordered numerical evidence" as REPORT #B2F2BB
+
+VIEW --> VALIDATE
+SCC --> VALIDATE
+ASSIGN --> VALIDATE
+MARTIN --> VALIDATE
+VALIDATE --> CYCLE
+VALIDATE --> HUB
+VALIDATE --> UNSTABLE
+VALIDATE --> GOD
+CYCLE --> REPORT
+HUB --> REPORT
+UNSTABLE --> REPORT
+GOD --> REPORT
+
+legend bottom
+|= colour |= role |
+|<#D0EBFF> | canonical graph input |
+|<#C3FAE8> | exact structural evidence |
+|<#FFF3BF> | caller policy / size evidence |
+|<#E5DBFF> | Martin stability evidence |
+|<#FFE8CC> | fail-closed validation boundary |
+|<#FFC9C9> | cycle finding |
+|<#FFD8A8> | hub finding |
+|<#B2F2BB> | sorted advisory output |
+endlegend
+@enduml

@@ -76,7 +76,7 @@ trees, exact CFG and call-graph SCC decomposition, and deterministic
 condensation-DAG critical-path and width-bounded layering analytics,
 architectural-layering inference and violation classification, projection
 centrality, Martin package metrics and stable-dependency witnesses over explicit
-module assignments, pure path reflexion-model conformance,
+module assignments, validated advisory architectural-smell detection, pure path reflexion-model conformance,
 bounded multi-level community detection, and deterministic bounded
 cohesion/robustness analysis, plus bounded algebraic connectivity and Fiedler
 partitioning, SCC-pruned bounded simple-cycle enumeration, and complete bounded

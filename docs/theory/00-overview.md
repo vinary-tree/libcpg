@@ -115,7 +115,10 @@ architectural module assignments
 path-to-layer policy ([Theory 19](19-reflexion-model-conformance.md)), and
 [architectural layering](../GLOSSARY.md#architectural-layer--layering-violation)
 from condensation longest-path levels
-([Theory 20](20-longest-path-architectural-layering.md)). Each
+([Theory 20](20-longest-path-architectural-layering.md)), and
+[architectural smells](../GLOSSARY.md#architectural-smell) from SCC, degree,
+Martin-instability, and assigned component-size evidence
+([Theory 21](21-advisory-architectural-smells.md)). Each
 graph analysis consumes the same
 `CodePropertyGraph`; none needs its own bespoke intermediate representation.
 
@@ -179,7 +182,7 @@ same graph. Errors are the crate's own [`libcpg::Error`](../api/graph-reference.
 
 ## 6. Map of the theory pillar
 
-This overview sits above ten formal chapters. Read them in order for a ground-up
+This overview sits above twenty-one formal chapters. Read them in order for a ground-up
 development, or jump to the layer you need:
 
 1. **[01 — Code Property Graphs](01-code-property-graphs.md).** The formal model:
@@ -204,6 +207,20 @@ development, or jump to the layer you need:
 10. **[10 — Design Structure Matrices, visibility, and architectural cores](10-design-structure-matrix-analysis.md).**
     Transitive visibility, propagation cost, median quadrants, and the largest
     multi-vertex SCC as distinct architecture evidence.
+11. **[11 — Weisfeiler–Lehman structural clones](11-weisfeiler-lehman-structural-clones.md).**
+12. **[12 — Centrality and structural importance](12-centrality-and-structural-importance.md).**
+13. **[13 — Community structure and modularity](13-community-structure-and-modularity.md).**
+14. **[14 — Graph cohesion and robustness](14-graph-cohesion-and-robustness.md).**
+15. **[15 — Spectral connectivity and bisection](15-spectral-connectivity-and-bisection.md).**
+16. **[16 — Bounded simple-cycle enumeration](16-bounded-simple-cycle-enumeration.md).**
+17. **[17 — Directed motif census](17-directed-motif-census.md).**
+18. **[18 — Martin package metrics](18-martin-package-metrics.md).**
+19. **[19 — Reflexion-model conformance](19-reflexion-model-conformance.md).**
+20. **[20 — Longest-path architectural layering](20-longest-path-architectural-layering.md).**
+21. **[21 — Advisory architectural smells](21-advisory-architectural-smells.md).**
+    The final eleven chapters define deterministic projection structure,
+    architecture metrics, inspectable evidence, and their interpretation
+    limits.
 
 For how these ideas are realised in code, cross the bridge to the architecture
 pillar ([`architecture/overview.md`](../architecture/overview.md),

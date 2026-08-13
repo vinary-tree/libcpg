@@ -24,6 +24,7 @@ mod reachability;
 mod reflexion;
 mod resolve;
 mod scc;
+mod smells;
 mod spectral;
 pub(crate) mod wl;
 
@@ -110,6 +111,8 @@ pub use scc::{
     call_graph_sccs, control_flow_sccs, projection_sccs, SccAnalysisError, SccComponent,
     SccCondensationEdge, SccDecomposition, SccProjection,
 };
+
+pub use smells::{architecture_smells, ArchSmell, ArchSmellKind, SmellOptions};
 
 pub use spectral::{
     algebraic_connectivity, try_algebraic_connectivity, Spectral, SpectralOptions,

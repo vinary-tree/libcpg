@@ -50,15 +50,16 @@ Two properties of the suite make this rigorous rather than merely suggestive:
 
 ## 3. The evidence base
 
-The maximal matrix contains **761 library tests**, **21 general public-API
+The maximal matrix contains **769 library tests**, **21 general public-API
 integration tests**, **5 malformed-input robustness tests**, **3 SCCP
 public/parser integration tests**, and **3 interval public/parser integration
 tests**, plus **3 loop-induction** and **3 complexity-evidence public/parser
 integration tests**, plus **2 condensation** and **2 DSM public/parser
 integration tests**, plus **1 WL**, **2 centrality**, **2 community**, **2
 cohesion**, **2 spectral**, **2 cycle**, **2 motif**, **2 GED**, **2 Martin**, and
-**2 reflexion** and **2 layering public/serialization integration tests**. These
-824 executable cases combine fixed examples, differential oracles, and 59 exact source-level
+**2 reflexion**, **2 layering**, and **2 architectural-smell
+public/serialization integration tests**. These 834 executable cases combine
+fixed examples, differential oracles, and 60 exact source-level
 `proptest!` blocks. The feature-free matrix remains
 independently runnable and exercises the exact graph/data-flow substrate
 without compiling any grammar. Fifteen active Criterion targets supplement
@@ -94,6 +95,7 @@ Because `default = []`, many tests are **feature-gated**. The end-to-end reachin
 | [19 — Martin-metrics validation](19-martin-metrics-validation.md) | Distinct external coupling, CPG-backed abstractness, exact instability/distance, strict stable-dependency witnesses, assignment/projection order invariance, malformed values, parser integration | exact three-module oracle, 256-case property, `martin_integration`, robustness harness | feature-free / `serde` / `lang-rust` parser case |
 | [20 — Reflexion-model validation](20-reflexion-model-validation.md) | First-prefix mapping, exhaustive verdicts, exact realized pairs/absences, multiset reversal, duplicates, uncovered paths, serialization | exact layered oracle, 256-case property, `reflexion_integration` | feature-free / `serde` |
 | [21 — Layering validation](21-layering-validation.md) | Bottom-first longest-path reversal, exact cycle/skip/upward witnesses, one-step descent, determinism, hostile public values, serialization | exact layered/stale-level oracles, 256-case DAG property, `layering_integration` | feature-free / `serde` |
+| [22 — Architectural-smell validation](22-architectural-smells-validation.md) | Exact cycle/hub/instability/size findings, clean topology, evidence-bundle rejection, deterministic ordering, serialization | four isolated smell oracles, 256-case property, hostile-value tables, `smells_integration` | feature-free / `serde` |
 
 ## 5. What is proven, and what is advisory
 
@@ -155,11 +157,14 @@ Scientific honesty requires separating the two:
   Architectural-layer indices and violation categories are exact for the
   supplied SCC/level values; dependency extraction, intended boundaries, and
   remediation remain advisory.
+  Architectural-smell classification and numerical evidence are exact for the
+  validated projection/SCC/assignment/Martin snapshot and options; whether a
+  finding is harmful or warrants refactoring remains advisory.
 - **Empirically bounded.** Performance results apply only to a target's named
   fixture, size, and controlled environment. DFG/PDG
   construction, whole-corpus analysis, and GNN propagation remain measurement gaps; no result
   from the fifteen active targets (or twenty-seven enabled operation groups) may be
-  generalized to them. Martin metrics, reflexion conformance, and architectural layering are also
+  generalized to them. Martin metrics, reflexion conformance, architectural layering, and architectural-smell detection are also
   benchmark-deferred, so their validation supports correctness but makes no
   timing claim.
 

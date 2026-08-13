@@ -36,6 +36,9 @@ PDG). A query can therefore mix syntax, control flow, and data flow freely.
 - **Architectural layering** — bottom-first reversal of condensation longest-
   path levels with deterministic cyclic-component, downward-skip, and upward
   dependency witnesses.
+- **Architectural smells** — advisory multi-node cycles, two-sided dependency
+  hubs, Martin-instability violations, and module-size outliers with stable
+  node and numerical evidence.
 - **Design Structure Matrix analytics** — bounded transitive visibility
   fan-out/fan-in, propagation cost, deterministic median core–periphery roles,
   and largest cyclic-group evidence over any graph projection.
@@ -160,8 +163,8 @@ Comprehensive documentation lives under [`docs/`](docs/README.md):
 - **[Theory](docs/theory/00-overview.md)** — the CPG model, control/data flow, program dependence & slicing, subgraph isomorphism, similarity, pattern detection, complexity, and GNNs, with proofs, math, and citations.
 - **[Architecture](docs/architecture/overview.md)** — module map, the graph data model, construction & analysis pipelines, and language frontends.
 - **[Design decisions](docs/design/00-overview.md)** — ADR-style records for load-bearing graph, construction, analysis, and feature choices.
-- **[API reference](docs/api/graph-reference.md)** — graph/projection/block-CFG/SCC/condensation/layering/DSM/Martin/reflexion/centrality/community/cohesion/reachability, builder, and pattern/algorithm/GNN reference.
-- **[Components](docs/README.md#components)** — graph projections, basic blocks, dominators, SCC/condensation/layering/DSM/Martin/reflexion/centrality/community/cohesion analytics, reachability, builders, patterns, algorithms, and GNN internals.
+- **[API reference](docs/api/graph-reference.md)** — graph/projection/block-CFG/SCC/condensation/layering/architectural-smell/DSM/Martin/reflexion/centrality/community/cohesion/reachability, builder, and pattern/algorithm/GNN reference.
+- **[Components](docs/README.md#components)** — graph projections, basic blocks, dominators, SCC/condensation/layering/architectural-smell/DSM/Martin/reflexion/centrality/community/cohesion analytics, reachability, builders, patterns, algorithms, and GNN internals.
 - **[Usage guides](docs/usage/00-getting-started.md)** — task-oriented how-tos.
 - **[Engineering](docs/engineering/00-overview.md)** · **[Scientific validation](docs/scientific/00-overview.md)** · **[Security](docs/security/00-threat-model.md)**.
 - **[Glossary](docs/GLOSSARY.md)** and the **[diagram catalog](docs/diagrams/README.md)**.
@@ -186,3 +189,5 @@ Licensed under either of [Apache License, Version 2.0](LICENSE-APACHE) or
 - MacCormack, A., Rusnak, J., Baldwin, C. Y. (2006). *Exploring the Structure of Complex Software Designs: An Empirical Study of Open Source and Proprietary Code.* Management Science. DOI: [10.1287/mnsc.1060.0552](https://doi.org/10.1287/mnsc.1060.0552)
 - Baldwin, C. Y., MacCormack, A., Rusnak, J. (2014). *Hidden Structure: Using Network Methods to Map System Architecture.* Research Policy. DOI: [10.1016/j.respol.2014.05.004](https://doi.org/10.1016/j.respol.2014.05.004)
 - Martin, R. C. (1994). *OO Design Quality Metrics: An Analysis of Dependencies.* Object Mentor technical report. [Archived report PDF](https://condor.depaul.edu/dmumaugh/OOT/Design-Principles/oodmetrc.pdf). No DOI assigned.
+- Fontana, F. A., Pigazzini, I., Roveda, R., Tamburri, D. A., Zanoni, M., Di Nitto, E. (2017). *Arcan: A Tool for Architectural Smells Detection.* DOI: [10.1109/ICSAW.2017.16](https://doi.org/10.1109/ICSAW.2017.16)
+- Fontana, F. A., Pigazzini, I., Roveda, R., Zanoni, M. (2016). *Automatic Detection of Instability Architectural Smells.* DOI: [10.1109/ICSME.2016.33](https://doi.org/10.1109/ICSME.2016.33)

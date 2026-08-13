@@ -67,6 +67,13 @@ duplicate modules, non-finite instability, or values outside
 ***[#F1F3F5]:input-sized work
 no independent cap — hosts bound projection, CPG,
 module count, and name bytes at ingress.;
+**[#FFE3E3] Architectural smells
+***[#F1F3F5]:validated evidence bundle
+rejects malformed CSR, stale SCC, partial assignment,
+invalid options, and missing/duplicate/invalid metrics.;
+***[#F1F3F5]:input-sized work
+iterative SCC recomputation and one-pass graph evidence;
+hosts cap projection, module, and name size at ingress.;
 **[#FFE3E3] WL refinement
 ***[#F1F3F5]:MAX_WL_ITERATIONS = 16
 clamps every requested round count before work,

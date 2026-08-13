@@ -789,6 +789,20 @@ exactly one layer; a **skip-layer** edge descends more than one, and an
 identifies an SCC whose internal cyclic edges were contracted. See
 [`components/graph/layering-analysis.md`](components/graph/layering-analysis.md).
 
+### Architectural smell
+
+An **architectural smell** is a dependency pattern that warrants human review
+because it can accompany architectural erosion; it is evidence, not proof of a
+defect. `architecture_smells` reports four Arcan-family categories [[38]](#references):
+a **cyclic dependency** is a strongly connected component with at least two
+nodes; a **hub-like dependency** is simultaneously a high fan-in and high
+fan-out population outlier; an **unstable dependency** is a source module whose
+configured share of outgoing dependencies points toward modules with greater
+[Martin instability](#martin-package-metrics) [[39]](#references); and a
+**god component** is a high-side outlier in assigned projection-node count.
+Findings remain advisory and carry stable nodes plus numerical evidence. See
+[`theory/21-advisory-architectural-smells.md`](theory/21-advisory-architectural-smells.md).
+
 ---
 
 ## References
@@ -830,3 +844,5 @@ identifies an SCC whose internal cyclic edges were contracted. See
 35. Graph-edit assignment foundations: (**35a**) Riesen, K., Bunke, H. (2009). *Approximate Graph Edit Distance Computation by Means of Bipartite Graph Matching.* DOI: [10.1016/j.imavis.2008.04.004](https://doi.org/10.1016/j.imavis.2008.04.004). (**35b**) Kuhn, H. W. (1955). *The Hungarian Method for the Assignment Problem.* DOI: [10.1002/nav.3800020109](https://doi.org/10.1002/nav.3800020109).
 36. Martin package-metric foundations: (**36a**) Martin, R. C. (1994). *OO Design Quality Metrics: An Analysis of Dependencies.* Object Mentor technical report. [Archived report PDF](https://condor.depaul.edu/dmumaugh/OOT/Design-Principles/oodmetrc.pdf). No DOI assigned. (**36b**) Martin, R. C. (2003). *Agile Software Development: Principles, Patterns, and Practices.* Prentice Hall/Pearson. ISBN 978-0-13-597444-5. [Publisher record](https://www.informit.com/store/agile-software-development-principles-patterns-and-9780135974445).
 37. Murphy, G. C., Notkin, D., Sullivan, K. J. (2001). *Software Reflexion Models: Bridging the Gap between Design and Implementation.* IEEE Transactions on Software Engineering 27(4), 364–380. DOI: [10.1109/32.917525](https://doi.org/10.1109/32.917525).
+38. Fontana, F. A., Pigazzini, I., Roveda, R., Tamburri, D. A., Zanoni, M., Di Nitto, E. (2017). *Arcan: A Tool for Architectural Smells Detection.* 2017 IEEE International Conference on Software Architecture Workshops, 282–285. DOI: [10.1109/ICSAW.2017.16](https://doi.org/10.1109/ICSAW.2017.16).
+39. Fontana, F. A., Pigazzini, I., Roveda, R., Zanoni, M. (2016). *Automatic Detection of Instability Architectural Smells.* 2016 IEEE International Conference on Software Maintenance and Evolution, 433–437. DOI: [10.1109/ICSME.2016.33](https://doi.org/10.1109/ICSME.2016.33).

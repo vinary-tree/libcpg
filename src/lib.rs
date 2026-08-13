@@ -12,6 +12,8 @@
 //!   and bounded Coffman-Graham layers
 //! - **Architectural Layering**: Reverse condensation longest-path levels and
 //!   classify cyclic, skip-layer, and upward dependency violations
+//! - **Architectural Smells**: Report cycles, two-sided dependency hubs,
+//!   unstable dependencies, and module-size outliers with numerical evidence
 //! - **Martin Package Metrics**: Measure afferent/efferent coupling,
 //!   instability, abstractness, main-sequence distance, and stable-dependency
 //!   violations over explicit module assignments
@@ -94,12 +96,12 @@ pub use graph::{
 };
 
 pub use analysis::{
-    accumulate_for_sources, algebraic_connectivity, analyze_dsm, attack_simulation,
-    available_expressions, betweenness_centrality, block_cfg, build_symbol_table, burt_constraint,
-    call_graph_projection, call_graph_sccs, cfg_projection, classify_core_periphery,
-    closeness_centrality, coffman_graham, condensation_metrics, control_flow_sccs,
-    cut_vertices_and_bridges, dead_stores, degree_assortativity, dfg_projection, dominator_tree,
-    edge_betweenness, eigenvector_centrality, expression_facts, global_min_cut,
+    accumulate_for_sources, algebraic_connectivity, analyze_dsm, architecture_smells,
+    attack_simulation, available_expressions, betweenness_centrality, block_cfg,
+    build_symbol_table, burt_constraint, call_graph_projection, call_graph_sccs, cfg_projection,
+    classify_core_periphery, closeness_centrality, coffman_graham, condensation_metrics,
+    control_flow_sccs, cut_vertices_and_bridges, dead_stores, degree_assortativity, dfg_projection,
+    dominator_tree, edge_betweenness, eigenvector_centrality, expression_facts, global_min_cut,
     harmonic_centrality, hits, infer_layering, k_core_decomposition, k_truss_decomposition,
     katz_centrality, liveness, loop_forest, loop_induction, louvain, martin_metrics,
     module_graph_projection, motif_census, pagerank, pdg_projection, personalized_pagerank,
@@ -107,14 +109,14 @@ pub use analysis::{
     resolve_calls, reverse_pagerank, sccp, sdp_violations, simple_cycles, solve,
     structural_clone_classes, try_algebraic_connectivity, try_refine_connected,
     two_edge_connected_components, unreachable_code, value_ranges, variable_facts,
-    very_busy_expressions, wl_labels, AnalysisError, AttackResult, AttackStep,
-    AvailableExpressions, BasicBlock, BetweennessOptions, BitSetDomain, BlockCfg, BlockEdge,
-    BlockId, Bound, CallGraphResolution, CallResolution, CentralityBudget, CentralityKind,
-    CentralityScores, CgLayering, CommunityAssignment, CommunityKind, CondensationMetrics,
-    CondensationOptions, Confidence, Confluence, ConstLattice, ConstValue, CorePeriphery,
-    CorePeripheryResult, CutStructure, CycleOptions, CycleSet, DataflowAnalysis, DataflowSolution,
-    DeadBranch, DeadStore, DeadStoreReport, Direction, DominatorTree, DsmAnalysis,
-    EdgeCentralityScores, ExprFacts, ExprKey, ExprOperand, FactUniverse, GlobalMinCut,
+    very_busy_expressions, wl_labels, AnalysisError, ArchSmell, ArchSmellKind, AttackResult,
+    AttackStep, AvailableExpressions, BasicBlock, BetweennessOptions, BitSetDomain, BlockCfg,
+    BlockEdge, BlockId, Bound, CallGraphResolution, CallResolution, CentralityBudget,
+    CentralityKind, CentralityScores, CgLayering, CommunityAssignment, CommunityKind,
+    CondensationMetrics, CondensationOptions, Confidence, Confluence, ConstLattice, ConstValue,
+    CorePeriphery, CorePeripheryResult, CutStructure, CycleOptions, CycleSet, DataflowAnalysis,
+    DataflowSolution, DeadBranch, DeadStore, DeadStoreReport, Direction, DominatorTree,
+    DsmAnalysis, EdgeCentralityScores, ExprFacts, ExprKey, ExprOperand, FactUniverse, GlobalMinCut,
     GraphProjection, HitsScores, InductionAnalysis, InductionVariable, Interval, IntervalEnv,
     IntervalReport, IterationOptions, IvDirection, KCoreDecomposition, KTrussDecomposition,
     KatzOptions, Lattice, LayerSpec, LayeringReport, LayeringViolation, LayeringViolationKind,
@@ -123,13 +125,14 @@ pub use analysis::{
     PageRankOptions, PostDominatorTree, ProjectionError, ProjectionKind, ReachabilityReport,
     ReflexionDivergence, ReflexionRules, ReflexionSummary, ReflexionVerdict, ResolveConfig,
     SccAnalysisError, SccComponent, SccCondensationEdge, SccDecomposition, SccProjection,
-    SccpResult, SdpViolation, SolverConfig, Spectral, SpectralOptions, SymbolCandidates,
-    SymbolTable, TripEvidence, TrussEdge, TwoEdgeConnectedComponents, UndirectedProjection,
-    VarFacts, VariableDefinition, VeryBusyExpressions, DEFAULT_CENTRALITY_WORK_LIMIT,
-    MAX_ATTACK_STEPS, MAX_CENTRALITY_ITERATIONS, MAX_CONDENSATION_COMPONENTS, MAX_CYCLE_LENGTH,
-    MAX_DSM_NODES, MAX_GRAPHLET_NODES, MAX_K_TRUSS_EDGES, MAX_LOUVAIN_LEVELS, MAX_LOUVAIN_PASSES,
-    MAX_MIN_CUT_NODES, MAX_SIMPLE_CYCLES, MAX_SPECTRAL_ITERATIONS, MAX_SPECTRAL_STARTS,
-    MAX_TRIAD_NODES, MAX_WL_ITERATIONS, TRIAD_NAMES,
+    SccpResult, SdpViolation, SmellOptions, SolverConfig, Spectral, SpectralOptions,
+    SymbolCandidates, SymbolTable, TripEvidence, TrussEdge, TwoEdgeConnectedComponents,
+    UndirectedProjection, VarFacts, VariableDefinition, VeryBusyExpressions,
+    DEFAULT_CENTRALITY_WORK_LIMIT, MAX_ATTACK_STEPS, MAX_CENTRALITY_ITERATIONS,
+    MAX_CONDENSATION_COMPONENTS, MAX_CYCLE_LENGTH, MAX_DSM_NODES, MAX_GRAPHLET_NODES,
+    MAX_K_TRUSS_EDGES, MAX_LOUVAIN_LEVELS, MAX_LOUVAIN_PASSES, MAX_MIN_CUT_NODES,
+    MAX_SIMPLE_CYCLES, MAX_SPECTRAL_ITERATIONS, MAX_SPECTRAL_STARTS, MAX_TRIAD_NODES,
+    MAX_WL_ITERATIONS, TRIAD_NAMES,
 };
 
 pub use builder::{

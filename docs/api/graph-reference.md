@@ -378,6 +378,31 @@ or invalid metric values suppress SDP verdicts. See the [Martin component
 guide](../components/graph/martin-metrics.md) for formulae, assignment policy,
 pseudocode, examples, complexity, and interpretation limits.
 
+### Advisory architectural smells
+
+The feature-free smell API composes a directed projection with its exact SCC
+decomposition, an explicit module assignment, and Martin metrics:
+
+| Item | Signature / purpose |
+|---|---|
+| `architecture_smells` | `fn(&GraphProjection, &SccDecomposition, &[MartinMetrics], &ModuleAssignment, &SmellOptions) -> Vec<ArchSmell>` — validate one evidence snapshot and return canonical advisory findings. |
+| `ArchSmellKind` | `CyclicDependency { component }`, `HubLikeDependency`, `UnstableDependency`, or `GodComponent`. |
+| `ArchSmell` | One kind, a sorted non-empty `Vec<NodeId>`, finite `severity`, and detector-specific `BTreeMap<&'static str, f64>` evidence. |
+| `SmellOptions` | Non-negative fan-in/fan-out sigma multipliers, a less-stable share in `0.0..=1.0`, and a non-negative component-size sigma multiplier. |
+
+Cycles require at least two SCC members. Hubs must exceed both configured
+population degree thresholds. Unstable findings group one source module's
+cross-module edges whose target has greater Martin instability. God components
+are high-side outliers in assigned projection-node count because this API has
+no lines-of-code table. Comparisons are strict; weights and self-loops do not
+affect fan/module-edge rules.
+
+Malformed CSR, stale SCCs, missing assignment/metrics, duplicate metric names,
+or invalid numerics fail closed with an empty result. Findings sort by kind,
+descending severity, smallest node, then the whole node vector. See the
+[architectural-smell component guide](../components/graph/architecture-smells.md)
+for evidence keys, a complete example, formulae, and advisory boundaries.
+
 ### Reflexion-model conformance
 
 This feature-free path API compares a declared layered architecture with an
