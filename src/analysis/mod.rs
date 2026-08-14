@@ -60,8 +60,8 @@ pub use community::{
 };
 
 pub use concurrency::{
-    channel_report, extract_events, ChannelEvent, ChannelFinding, ChannelFindingKind, ChannelId,
-    MsgKind,
+    channel_report, communication_deadlocks, extract_events, ChannelEvent, ChannelFinding,
+    ChannelFindingKind, ChannelId, DeadlockFinding, DeadlockFindingKind, DeadlockWitness, MsgKind,
 };
 
 pub use condensation::{

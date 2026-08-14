@@ -19,7 +19,12 @@ serde = { version = "1", features = ["derive"] } # only needed for the portable 
 serde_json = "1"
 ```
 
-The `serde` feature expands to `["dep:serde", "petgraph/serde-1"]` — it pulls in serde itself and turns on serde support in `petgraph`, so the underlying `DiGraph` (and therefore the whole `CodePropertyGraph`) becomes serialisable. The graph types that gain `Serialize`/`Deserialize` include `CodePropertyGraph`, `CpgNode`, `CpgEdge`, all the kind enums (`CpgNodeKind`, `CpgEdgeKind`, `CfgEdgeKind`, `DfgEdgeKind`), `NodeId`/`EdgeId`, `SourceRange`, `Language`, and `CpgStats`.
+The `serde` feature expands to `["dep:serde", "petgraph/serde-1"]` — it pulls in serde itself and turns on serde support in `petgraph`, so the underlying `DiGraph` (and therefore the whole `CodePropertyGraph`) becomes serialisable. The graph types that gain `Serialize`/`Deserialize` include `CodePropertyGraph`, `CpgNode`, `CpgEdge`, all the kind enums (`CpgNodeKind`, `CpgEdgeKind`, `CfgEdgeKind`, `DfgEdgeKind`, `MsgKind`, `LockKind`, and `LockMode`), `NodeId`/`EdgeId`, `SourceRange`, `Language`, and `CpgStats`.
+
+`CpgNode.message_kind` and `CpgNode.lock_kind` are optional typed concurrency
+metadata. Both fields deserialize with a `None` default, so snapshots produced
+before either field existed remain readable. When present, the enum value is
+preserved exactly across a serde round trip.
 
 ---
 

@@ -353,6 +353,29 @@ See the [component guide](../components/graph/channel-topology.md), [usage
 guide](../usage/12-channel-topology.md), and [security
 boundary](../security/04-channel-topology.md).
 
+### Communication and lock-order deadlock candidates
+
+`LockKind::{AcquireRead, AcquireWrite, Release}` is optional typed metadata on a
+`Call`; `LockMode::{Read, Write}` appears in witnesses. A frontend or semantic
+adapter attaches the operation after resolving the synchronization API. The
+analyzer never infers it from a call's source spelling.
+
+| Function | Signature | Result |
+|---|---|---|
+| `communication_deadlocks` | `fn(&CodePropertyGraph) -> Vec<DeadlockFinding>` | Communication wait-for SCCs followed by conflicting lock-order SCCs, all deterministically ordered. |
+
+`DeadlockFinding` contains a `DeadlockFindingKind`, sorted `processes`, sorted
+channel/lock `resources`, `DeadlockWitness` values, and explanatory `detail`.
+Communication witnesses preserve waiter/producer/channel and receive/send
+sites/ranges. Lock witnesses preserve holder/acquirer/resource/mode evidence,
+both acquisition sites/ranges, and an optional interprocedural call site.
+
+The function constructs `GraphProjection::External` values and reuses
+`projection_sccs`; it is feature-free, read-only, and advisory. See the
+[component guide](../components/graph/deadlock-analysis.md), [usage
+guide](../usage/13-deadlock-candidates.md), [theory](../theory/30-cyclic-wait-and-lock-order.md),
+and [security boundary](../security/05-deadlock-analysis.md).
+
 ### Deterministic graph projections
 
 `GraphProjection` is the feature-free, payload-free compressed-sparse-row view

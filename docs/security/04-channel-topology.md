@@ -59,7 +59,8 @@ from matching. These are expected consequences of the topology abstraction.
   result.
 - Inspect unresolved `ChannelEvent` values before treating a clean report as
   meaningful.
-- Combine `BlockedRecv` with CFG reachability and later cyclic-wait evidence.
+- Combine `BlockedRecv` with CFG reachability and
+  [`communication_deadlocks`](05-deadlock-analysis.md) cyclic-wait evidence.
 - Confirm whether non-determinism is a protocol feature before escalating F4.
 - Protect reports like source code: event locations and channel structure can
   reveal application architecture.
@@ -68,10 +69,10 @@ from matching. These are expected consequences of the topology abstraction.
 
 ## 6. Non-goals
 
-This analysis does not enumerate Petri-net markings, prove fairness, simulate
+This topology analysis does not enumerate Petri-net markings, prove fairness, simulate
 message queues, evaluate Rholang patterns/guards, infer protocol/session types,
-or prove deadlock freedom. Those require additional semantics and explicit
-resource/completeness contracts.
+or prove deadlock freedom. The separate F3 analysis reports structural cyclic
+candidates but still does not prove runtime deadlock.
 
 ## References
 

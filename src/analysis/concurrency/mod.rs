@@ -5,8 +5,12 @@
 //! AST relations, and typed def-use/reference evidence.
 
 mod channels;
+mod deadlock;
 mod events;
 
-pub use crate::MsgKind;
+pub use crate::{LockKind, LockMode, MsgKind};
 pub use channels::{channel_report, ChannelFinding, ChannelFindingKind};
+pub use deadlock::{
+    communication_deadlocks, DeadlockFinding, DeadlockFindingKind, DeadlockWitness,
+};
 pub use events::{extract_events, ChannelEvent, ChannelId};

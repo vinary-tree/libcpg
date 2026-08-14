@@ -142,6 +142,8 @@ let slice = backward_slice(&cpg, func, 256);         // bounded backward slice
 
 [Channel topology and linear consumption](theory/29-channel-topology-and-linearity.md)
 
+[Cyclic wait and lock-order deadlock candidates](theory/30-cyclic-wait-and-lock-order.md)
+
 ### Architecture — the "what / where"
 [Overview](architecture/overview.md) · [Graph data model](architecture/graph-data-model.md) · [Construction & analysis data flow](architecture/data-flow.md) · [Language frontends](architecture/language-frontends.md)
 
@@ -157,6 +159,8 @@ let slice = backward_slice(&cpg, func, 256);         // bounded backward slice
 [0035 Overlay SDG summary edges and two-pass slicing](design/0035-system-dependence-summary-slicing.md)
 
 [0036 Typed channel topology](design/0036-typed-channel-topology.md)
+
+[0037 Typed deadlock witnesses](design/0037-typed-deadlock-witnesses.md)
 
 ### API reference
 [Graph / analysis reference](api/graph-reference.md) · [Builder reference](api/builder-reference.md) · [Pattern / algorithm / GNN reference](api/pattern-reference.md)
@@ -175,6 +179,8 @@ let slice = backward_slice(&cpg, func, 256);         // bounded backward slice
 [System dependence and interprocedural slicing](components/graph/system-dependence-slicing.md)
 
 [Channel-event extraction and topology](components/graph/channel-topology.md)
+
+[Communication and lock-order deadlock candidates](components/graph/deadlock-analysis.md)
 
 #### Builder
 [Overview](components/builder/overview.md) · [CFG extraction](components/builder/cfg.md) · [DFG extraction](components/builder/dfg.md) · [PDG & slicing](components/builder/pdg-and-slicing.md) · [Node mapper](components/builder/node-mapper.md)
@@ -201,6 +207,8 @@ let slice = backward_slice(&cpg, func, 256);         // bounded backward slice
 
 [Channel topology and linearity reports](usage/12-channel-topology.md)
 
+[Communication and lock-order deadlock candidates](usage/13-deadlock-candidates.md)
+
 ### Engineering
 [Overview](engineering/00-overview.md) · [Build & features](engineering/01-build-and-features.md) · [Testing](engineering/02-testing.md) · [Performance](engineering/03-performance.md) · [Contributing](engineering/04-contributing.md)
 
@@ -217,8 +225,10 @@ let slice = backward_slice(&cpg, func, 256);         // bounded backward slice
 
 [Channel-topology validation](scientific/31-channel-topology-validation.md)
 
+[Deadlock-candidate validation](scientific/32-deadlock-validation.md)
+
 ### Security
-[Threat model](security/00-threat-model.md) · [Input & resource hardening](security/01-input-and-resource-hardening.md) · [Taint-analysis security boundary](security/02-taint-analysis.md) · [Interprocedural-slicing security boundary](security/03-system-dependence-slicing.md) · [Channel-topology security boundary](security/04-channel-topology.md)
+[Threat model](security/00-threat-model.md) · [Input & resource hardening](security/01-input-and-resource-hardening.md) · [Taint-analysis security boundary](security/02-taint-analysis.md) · [Interprocedural-slicing security boundary](security/03-system-dependence-slicing.md) · [Channel-topology security boundary](security/04-channel-topology.md) · [Deadlock-analysis security boundary](security/05-deadlock-analysis.md)
 
 ### Reference
 [Glossary](GLOSSARY.md) · [Diagram catalog](diagrams/README.md)

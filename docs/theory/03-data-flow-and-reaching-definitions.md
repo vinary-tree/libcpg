@@ -197,6 +197,11 @@ The environment $`\rho`$ is updated as the walk descends, with these rules
 (the `bind` operation is a [strong or weak update](../GLOSSARY.md#strong-update--weak-update)
 per context):
 
+Before those rules visit a function body, $`\rho`$ is seeded from definitions in
+lexically preceding siblings along the function's ancestor path. This models
+captured/global bindings while preserving function isolation: the seed treats a
+`Function` as opaque and never imports its locals into a sibling function.
+
 1. **Definitions** — a `Variable` (`let`), `Parameter`, or simple `Assignment`
    *binds* its name. The initialiser/right-hand side is visited **before** the bind,
    so a self-referential use sees the *pre-existing* definition (`let x = x + 1`

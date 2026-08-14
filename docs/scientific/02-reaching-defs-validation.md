@@ -211,6 +211,24 @@ assert_eq!(before, cpg.stats().dfg_edges, "extract must be idempotent");
 
 **Result.** The DFG edge count is identical before and after a second sweep — the extractor's snapshot-and-skip guard holds on a graph that already carries shadowing and nested-use edges. Hypothesis corroborated.
 
+### Lexical capture without sibling leakage
+
+**Hypothesis.** A function can use a lexically preceding definition in an outer
+scope, but cannot use a local definition owned by a preceding sibling function.
+
+**Experiment.** Two feature-free structural regressions construct these exact
+ASTs. `nested_function_captures_lexically_preceding_outer_definition` places a
+`Variable(channel)` before a nested contract and requires its use to have that
+one reaching definition. `preceding_sibling_function_locals_do_not_leak_into_lexical_seed`
+places `private_local` inside one function and requires a same-named use in the
+next function to remain unresolved. The real Rholang deadlock integration test
+also parses two contracts inside one outer `new c1, c2` and requires both
+channels to resolve.
+
+**Result.** Outer capture succeeds, sibling-local leakage is absent, and the
+real Rholang wait-for cycle has two resolved channel identities. Hypothesis
+corroborated.
+
 ## 7. Coverage, and an honest boundary
 
 The sweep's flow-sensitive machinery is illustrated end to end below.
@@ -219,9 +237,9 @@ The sweep's flow-sensitive machinery is illustrated end to end below.
 
 *Figure — the single source-order sweep threading `ReachingEnv` through bindings, reassignments, nested expressions, and shadowing scopes. Source: [`diagrams/reaching-defs-sweep.puml`](../diagrams/reaching-defs-sweep.puml).*
 
-What the corpus establishes: nested-expression resolution and chaining (§2), strong update / latest-definition in straight-line code (§3), name-scoped non-flow (§4), scope-correct shadowing (§5), and idempotency (§6).
+What the corpus establishes: nested-expression resolution and chaining (§2), strong update / latest-definition in straight-line code (§3), name-scoped non-flow (§4), scope-correct shadowing (§5), idempotency (§6), and captured outer definitions without sibling-function leakage.
 
-What it does **not** directly assert: the **loop-carried** double-sweep is a documented mechanism of the extractor (a loop body is swept twice so a definition at the bottom of the loop reaches a use at the top), but this corpus does not contain a dedicated loop-back regression; the flow-sensitivity evidence here is the straight-line strong update of §3 plus the scope handling of §5. The [weak update](../GLOSSARY.md#strong-update--weak-update) inside conditional regions is likewise a mechanism described in [`components/builder/dfg.md`](../components/builder/dfg.md) and [`theory/03-data-flow-and-reaching-definitions.md`](../theory/03-data-flow-and-reaching-definitions.md) rather than a line in this five-scenario corpus. Stating these boundaries is part of the ledger: the validated claims are exactly the six above, no more.
+What it does **not** directly assert: the **loop-carried** double-sweep is a documented mechanism of the extractor (a loop body is swept twice so a definition at the bottom of the loop reaches a use at the top), but this corpus does not contain a dedicated loop-back regression; the flow-sensitivity evidence here is the straight-line strong update of §3 plus the scope handling of §5. The [weak update](../GLOSSARY.md#strong-update--weak-update) inside conditional regions is likewise a mechanism described in [`components/builder/dfg.md`](../components/builder/dfg.md) and [`theory/03-data-flow-and-reaching-definitions.md`](../theory/03-data-flow-and-reaching-definitions.md) rather than a dedicated line in this corpus. Stating these boundaries is part of the ledger: the validated claims are exactly those named above, no more.
 
 ## References
 

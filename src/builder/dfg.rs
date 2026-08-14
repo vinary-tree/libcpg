@@ -376,6 +376,7 @@ impl DfgExtractor {
         // precede it in the function's AST child order.
         let mut env: ReachingEnv = FxHashMap::default();
         let mut pairs: Vec<(NodeId, NodeId)> = Vec::new();
+        seed_lexical_environment(cpg, function, &mut env);
         let mut on_path: FxHashSet<NodeId> = FxHashSet::default();
         on_path.insert(function);
         for child in cpg.ast_children(function) {
@@ -796,6 +797,54 @@ fn bind_definition(env: &mut ReachingEnv, name: Arc<str>, def: NodeId, condition
     }
 }
 
+/// Seeds a function's reaching environment from lexically preceding outer AST
+/// siblings. This represents captured/global definitions (for example a
+/// Rholang `new` channel surrounding multiple contracts) without folding a
+/// sibling function's local definitions into the target function.
+fn seed_lexical_environment(cpg: &CodePropertyGraph, function: NodeId, env: &mut ReachingEnv) {
+    let mut path = vec![function];
+    let mut cursor = function;
+    let mut seen = FxHashSet::default();
+    seen.insert(function);
+    while let Some(parent) = lexical_parent(cpg, cursor) {
+        if !seen.insert(parent) {
+            break;
+        }
+        path.push(parent);
+        cursor = parent;
+    }
+    path.reverse();
+    let mut ignored_pairs = Vec::new();
+
+    for pair in path.windows(2) {
+        let parent = pair[0];
+        let child_on_path = pair[1];
+        let mut siblings = cpg.ast_children(parent);
+        siblings.sort_unstable_by_key(|&node| {
+            cpg.node(node)
+                .map(|node| (node.range.start, node.range.end, node.id))
+                .unwrap_or((u32::MAX, u32::MAX, node))
+        });
+        for sibling in siblings {
+            if sibling == child_on_path {
+                break;
+            }
+            let mut on_path = FxHashSet::default();
+            visit_reaching(cpg, sibling, env, false, &mut ignored_pairs, &mut on_path);
+            ignored_pairs.clear();
+        }
+    }
+}
+
+fn lexical_parent(cpg: &CodePropertyGraph, node: NodeId) -> Option<NodeId> {
+    if let Some(parent) = cpg.node(node).and_then(|node| node.parent) {
+        return Some(parent);
+    }
+    cpg.incoming_edges(node)
+        .filter_map(|edge| (edge.kind == CpgEdgeKind::AstChild).then_some(edge.source))
+        .min()
+}
+
 /// Core AST-ordered reaching-definitions walk. See
 /// [`DfgExtractor::build_def_use_edges`] for the algorithm and its rationale.
 fn visit_reaching(
@@ -824,6 +873,11 @@ fn visit_reaching(
     }
 
     match &kind {
+        // Nested and lexically preceding functions own independent local
+        // environments. Their bodies cannot define names in the function
+        // currently being analyzed.
+        CpgNodeKind::Function { .. } => {}
+
         // `let` / local declaration: evaluate the initializer (whose uses see the
         // pre-binding environment), then bind the declared name.
         CpgNodeKind::Variable { name, .. } => {
@@ -1552,6 +1606,96 @@ mod tests {
             name: name.into(),
             definition: None,
         }
+    }
+
+    fn function_kind(name: &str) -> CpgNodeKind {
+        CpgNodeKind::Function {
+            signature: MethodSignature {
+                name: name.into(),
+                params: Default::default(),
+                return_type: None,
+                is_static: false,
+                is_async: false,
+                visibility: Visibility::Public,
+            },
+        }
+    }
+
+    #[test]
+    fn nested_function_captures_lexically_preceding_outer_definition() {
+        let mut cpg = CodePropertyGraph::new(Language::Rholang);
+        let outer = cpg.add_node(CpgNode::new(
+            NodeId::new(0),
+            CpgNodeKind::Block {
+                scope: ScopeId::GLOBAL,
+            },
+            SourceRange::default(),
+        ));
+        let channel = dfg_child(
+            &mut cpg,
+            outer,
+            CpgNodeKind::Variable {
+                name: "channel".into(),
+                var_type: None,
+                scope: ScopeId::GLOBAL,
+                is_mutable: false,
+            },
+        );
+        let function = dfg_child(&mut cpg, outer, function_kind("contract"));
+        let body = dfg_child(
+            &mut cpg,
+            function,
+            CpgNodeKind::Block {
+                scope: ScopeId::GLOBAL,
+            },
+        );
+        let use_site = dfg_child(&mut cpg, body, dfg_ident("channel"));
+
+        DfgExtractor::new().extract(&mut cpg);
+        assert_eq!(cpg.reaching_definitions(use_site), vec![channel]);
+    }
+
+    #[test]
+    fn preceding_sibling_function_locals_do_not_leak_into_lexical_seed() {
+        let mut cpg = CodePropertyGraph::new(Language::Rust);
+        let outer = cpg.add_node(CpgNode::new(
+            NodeId::new(0),
+            CpgNodeKind::Block {
+                scope: ScopeId::GLOBAL,
+            },
+            SourceRange::default(),
+        ));
+        let first = dfg_child(&mut cpg, outer, function_kind("first"));
+        let first_body = dfg_child(
+            &mut cpg,
+            first,
+            CpgNodeKind::Block {
+                scope: ScopeId::GLOBAL,
+            },
+        );
+        dfg_child(
+            &mut cpg,
+            first_body,
+            CpgNodeKind::Variable {
+                name: "private_local".into(),
+                var_type: None,
+                scope: ScopeId::GLOBAL,
+                is_mutable: false,
+            },
+        );
+
+        let second = dfg_child(&mut cpg, outer, function_kind("second"));
+        let second_body = dfg_child(
+            &mut cpg,
+            second,
+            CpgNodeKind::Block {
+                scope: ScopeId::GLOBAL,
+            },
+        );
+        let use_site = dfg_child(&mut cpg, second_body, dfg_ident("private_local"));
+
+        DfgExtractor::new().extract(&mut cpg);
+        assert!(cpg.reaching_definitions(use_site).is_empty());
     }
 
     fn has_typed_edge(

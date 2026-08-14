@@ -70,7 +70,8 @@ For each function the extractor runs five steps:
    name→site tables.
 2. **AST-ordered def-use sweep.** `build_def_use_edges` performs the reaching-definitions
    walk and emits `DefUse` edges — including to identifier uses nested deep inside
-   expressions.
+   expressions. Before the function body, it seeds lexically preceding outer
+   definitions and treats every sibling/nested `Function` as an environment boundary.
 3. **Parameter edges** (if `include_parameters`).
 4. **Return-value edges** (if `include_return_values`).
 5. **Field/index edges** (if `include_field_access`).
@@ -100,6 +101,12 @@ Formally this is a map into the powerset [lattice](../../GLOSSARY.md#lattice-dat
 definitions — the same object classic data-flow analysis iterates over (Kildall
 [[1]](#references); Aho et al. [[2]](#references)) — but here it is updated by a single
 ordered traversal rather than a worklist to a fixed point.
+
+For a nested function, the initial environment is not always empty. The
+extractor follows the function's ancestor path and visits only preceding
+siblings at each level. This captures outer/global bindings such as Rholang
+`new` channels. `Function` nodes are never descended during the seed, preventing
+locals from a preceding sibling function from leaking across scope boundaries.
 
 ---
 

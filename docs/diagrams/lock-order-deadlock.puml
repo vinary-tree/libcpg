@@ -1,0 +1,56 @@
+@startuml
+!include _libcpg-theme.iuml
+title Typed direct and interprocedural lock-order analysis
+
+skinparam backgroundColor #FCFCFC
+skinparam component {
+  BorderColor #343A40
+  FontColor #212529
+}
+skinparam note {
+  BackgroundColor #F8F9FA
+  BorderColor #495057
+}
+
+component "Call nodes + LockKind\nAcquireRead · AcquireWrite · Release" as TYPED #DBE4FF
+component "Resolved lock Variable\nDefinition / DefUse / Reference" as ID #FFF3BF
+component "Per-process ordered skeleton\nlock events + resolved calls" as SKELETON #C3FAE8
+component "Finite acquisition summaries\nown plus callee resources" as SUMMARY #E5DBFF
+component "Held-lock stack\nrelease removes latest matching lock" as HELD #D3F9D8
+component "Lock-order projection\nA -> B: B acquired while A held" as GRAPH #FFE8CC
+component "Shared projection_sccs\nresource components" as SCC #FCC2D7
+component "All internal edges Read->Read" as READ #F1F3F5
+component "LockOrderCycle\nprocesses · resources · sites/ranges · call" as REPORT #FFE3E3
+
+TYPED --> SKELETON
+ID --> SKELETON
+SKELETON --> SUMMARY : resolved call targets
+SKELETON --> HELD : direct order
+SUMMARY --> HELD : call while lock held
+HELD --> GRAPH
+GRAPH --> SCC
+SCC --> READ : inspect modes
+READ --> REPORT : at least one conflicting mode
+READ --> READ : all shared reads\nsuppress
+
+note bottom of SUMMARY
+  Monotone finite union terminates over the process/resource universe.
+end note
+
+note bottom of REPORT
+  Witnesses distinguish holder/acquirer processes and retain via_call when interprocedural.
+end note
+
+legend bottom
+|= Colour |= Meaning |
+|<#DBE4FF>| normalized lock semantics |
+|<#FFF3BF>| stable resource identity |
+|<#C3FAE8>| ordered process evidence |
+|<#E5DBFF>| interprocedural may-acquire closure |
+|<#D3F9D8>| held-state transfer |
+|<#FFE8CC>| resource order graph |
+|<#FCC2D7>| reused SCC engine |
+|<#F1F3F5>| shared-read suppression |
+|<#FFE3E3>| advisory conflicting cycle |
+endlegend
+@enduml

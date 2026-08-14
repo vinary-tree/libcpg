@@ -80,8 +80,9 @@ alternatives is folklore, and a decision without its costs is marketing.
 | [0034 — Data-driven advisory taint](0034-data-driven-advisory-taint.md) | Specialize the shared summary solver with caller-owned source/sink policy, typed value flow, canonical witnesses, maybe-null evidence, and explicit partial-result semantics. | Accepted |
 | [0035 — Overlay SDG summary edges and two-pass slicing](0035-system-dependence-summary-slicing.md) | Materialize labeled caller-local parameter-to-return dependences and apply deterministic HRB phase masks with explicit node/depth caps. | Accepted |
 | [0036 — Typed channel topology](0036-typed-channel-topology.md) | Preserve language-neutral message semantics at the frontend boundary and classify def-use-resolved channel matching/linearity as ordered out-of-graph evidence. | Accepted |
+| [0037 — Typed deadlock witnesses](0037-typed-deadlock-witnesses.md) | Build communication wait-for and interprocedural lock-order projections from typed identity evidence, reuse shared SCCs, and retain statement-precise advisory witnesses. | Accepted |
 
-These thirty-six are not independent. ADR-0001 fixes the substrate that all analyses
+These thirty-seven are not independent. ADR-0001 fixes the substrate that all analyses
 write onto; ADR-0002 and ADR-0005 together explain how a language reaches that
 substrate and what you must switch on to get there; ADR-0003 and ADR-0004 are
 two analyses *over* the substrate (one always-on, one feature-gated) that each
@@ -170,7 +171,9 @@ ADR-0035 composes those summaries with PDG/DFG overlays using labeled caller-
 local edges and two-pass context discipline. ADR-0036 instead extends the
 frontend-to-analysis seam: it preserves orthogonal typed concurrency metadata,
 resolves stable channel identity from existing definition evidence, and keeps
-matching/linearity findings immutable and advisory.
+matching/linearity findings immutable and advisory. ADR-0037 deepens that
+evidence into process wait-for and lock-resource order projections, reuses the
+shared SCC engine, and preserves exact sites/ranges for every cyclic witness.
 
 ![Module architecture of libcpg, showing the graph core and the analysis modules layered over it](../diagrams/module-architecture.svg)
 

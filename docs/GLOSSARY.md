@@ -595,6 +595,25 @@ and reports structural orphan, blocked, and linear-contention evidence. See
 [Theory 29](theory/29-channel-topology-and-linearity.md) and Meredith–Radestock
 [[43]](#references).
 
+### Deadlock candidate / Wait-for graph / Lock-order graph
+
+A **deadlock candidate** is a cyclic structural dependency, not a proof of a
+reachable deadlocked schedule. In a process **wait-for graph**, `P -> Q` means
+`P` is initially blocked on a resolved linear receive whose known producers are
+all initially blocked, and `Q` is one producer. In a resource **lock-order
+graph**, `A -> B` means typed evidence shows `B` can be acquired while `A` is
+held. libcpg projects these relations into deterministic CSR graphs and reports
+cyclic [strongly connected components](#strongly-connected-component-scc) with
+statement sites and source ranges. See [Theory
+30](theory/30-cyclic-wait-and-lock-order.md) and Kobayashi [[44]](#references).
+
+### Lock kind / Lock mode
+
+`LockKind` is language-neutral metadata attached orthogonally to a `Call`:
+`AcquireRead`, `AcquireWrite`, or `Release`. `LockMode` is `Read` or `Write` and
+is retained in lock-order witnesses. A semantic adapter assigns the kind after
+API resolution; the deadlock analyzer does not guess from a function name.
+
 ### Message passing (GNN)
 
 One round of GNN computation: every node updates its vector from its neighbours' vectors. `libcpg` uses mean aggregation with a ReLU nonlinearity over AST, CFG, and DFG neighbourhoods:
@@ -965,3 +984,4 @@ Findings remain advisory and carry stable nodes plus numerical evidence. See
 41. Interprocedural distributive-data-flow foundations: (**41a**) Reps, T., Horwitz, S., Sagiv, M. (1995). *Precise Interprocedural Dataflow Analysis via Graph Reachability.* DOI: [10.1145/199448.199462](https://doi.org/10.1145/199448.199462). (**41b**) Sagiv, M., Reps, T., Horwitz, S. (1996). *Precise Interprocedural Dataflow Analysis with Applications to Constant Propagation.* DOI: [10.1016/0304-3975(96)00072-2](https://doi.org/10.1016/0304-3975(96)00072-2).
 42. Horwitz, S., Reps, T., Binkley, D. (1990). *Interprocedural Slicing Using Dependence Graphs.* ACM Transactions on Programming Languages and Systems 12(1), 26–60. DOI: [10.1145/77606.77608](https://doi.org/10.1145/77606.77608).
 43. Meredith, L. G., Radestock, M. (2005). *A Reflective Higher-order Calculus.* Electronic Notes in Theoretical Computer Science 141(5), 49–67. DOI: [10.1016/j.entcs.2005.05.016](https://doi.org/10.1016/j.entcs.2005.05.016).
+44. Kobayashi, N. (2006). *A New Type System for Deadlock-Free Processes.* CONCUR 2006, LNCS 4137, 233–247. DOI: [10.1007/11817949_16](https://doi.org/10.1007/11817949_16).

@@ -408,6 +408,9 @@ So the safe pattern is: build (single-threaded, `&mut`), then analyse
 - [Channel-event extraction and topology](channel-topology.md) — frontend-
   normalized message kinds, definition-resolved channel identities, and
   ordered advisory matching/linear-consumption findings.
+- [Communication and lock-order deadlocks](deadlock-analysis.md) — initially
+  blocked process waits, typed direct/interprocedural lock order, shared SCCs,
+  and statement-precise advisory witnesses.
 - [`api/graph-reference.md`](../../api/graph-reference.md) — the precise,
   method-by-method API reference for `CodePropertyGraph`.
 - [`theory/01-code-property-graphs.md`](../../theory/01-code-property-graphs.md)

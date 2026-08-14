@@ -5,8 +5,9 @@
 **Accepted.** Realised in `src/builder/dfg.rs` (`DfgExtractor::build_def_use_edges`,
 the `visit_reaching` walk, `ReachingEnv`, and `bind_definition`). Two earlier
 CFG-based approaches are retained in the same file, compiled out under
-`#[cfg(any())]`, as an executable record of what was superseded. Pinned by four
-inline `#[cfg(feature = "lang-rust")]` tests (the *P7c* prerequisite).
+`#[cfg(any())]`, as an executable record of what was superseded. Example tests
+pin parsed Rust flow, lexical capture, and function-boundary isolation; a public
+Rholang integration test pins capture through an enclosing `new` binder.
 
 ## Context
 
@@ -80,9 +81,18 @@ children in order, updating `env` in place and pushing `(def, use)` pairs.
 Expressed as literate pseudocode:
 
 ```text
+seed(function, env):
+  path <- root-to-function ancestor path
+  for each ancestor/child step on path:
+      for each source-ordered sibling before child:
+          visit(sibling, env, false, ignored_pairs)
+
 visit(node, env, conditional, pairs):
   1. kind ← kind(node); if the node is gone, return.
   2. dispatch on kind:
+
+     Function:
+        return                                          # separate lexical environment
 
      Variable{name}  (a `let` / local declaration):
         for each child EXCEPT the binder identifier:
@@ -136,6 +146,11 @@ Four design points make this correct where the CFG approach failed:
 - **Loop bodies swept twice.** A bounded two-pass fixpoint lets a use near the
   top of a loop body observe a definition made lower in the same body
   (loop-carried dependence) without an unbounded iteration count.
+- **Lexical capture without function leakage.** Before visiting a function, the
+  extractor follows its ancestor path and visits only source-ordered siblings
+  that precede each path child. This seeds outer definitions such as Rholang
+  `new` bindings. Encountering any other `Function` is a hard boundary, so a
+  preceding sibling function cannot leak its local definitions into the seed.
 
 ### Emission and idempotency
 
@@ -193,6 +208,12 @@ let cpg = TreeSitterCpgBuilder::new().build(
 - **Correct shadowing.** `parsed_shadowing_and_idempotent` pins that the `n` in
   `let n = n + 1` binds to the *parameter* while `consume(n)` binds to the
   shadowing `let n`.
+- **Lexically enclosing definitions are visible, sibling locals are not.**
+  `nested_function_captures_lexically_preceding_outer_definition` pins capture
+  from an outer binder, while
+  `preceding_sibling_function_locals_do_not_leak_into_lexical_seed` pins the
+  `Function` boundary. The public deadlock integration test exercises the same
+  rule through two parsed Rholang contracts beneath `new c1, c2`.
 - **Simple, language-agnostic, and cheap.** The sweep dispatches on
   [`CpgNodeKind`](../GLOSSARY.md#node-kind--edge-kind), never on grammar
   specifics, so it works for every frontend including the Mode-B F1R3FLY

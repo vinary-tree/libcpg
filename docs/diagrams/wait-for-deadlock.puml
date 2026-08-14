@@ -1,0 +1,52 @@
+@startuml
+!include _libcpg-theme.iuml
+title Communication wait-for deadlock candidate
+
+skinparam backgroundColor #FCFCFC
+skinparam component {
+  BorderColor #343A40
+  FontColor #212529
+}
+skinparam note {
+  BackgroundColor #F8F9FA
+  BorderColor #495057
+}
+
+component "Ordered ChannelEvent sequences\nper top-level process" as EVENTS #DBE4FF
+component "First relevant operation\nSend · SendSync · linear Recv" as FIRST #FFF3BF
+component "Resolved initial waits\nprocess waits on channel" as WAITS #FFE8CC
+component "Producer sets\nprocesses sending per channel" as SENDERS #C3FAE8
+component "Conservative edge gate\nknown producer set is non-empty and\nevery producer is initially blocked" as GATE #E5DBFF
+component "Wait-for projection\nP -> Q with site/range evidence" as GRAPH #D3F9D8
+component "Shared projection_sccs\ncyclic components incl. self-loop" as SCC #FCC2D7
+component "CommunicationCycle\nprocesses · channels · witnesses" as REPORT #FFE3E3
+component "No edge\nunresolved or ready producer" as SUPPRESS #F1F3F5
+
+EVENTS --> FIRST
+FIRST --> WAITS : first is Recv(c)
+FIRST --> SUPPRESS : first is send / unresolved
+EVENTS --> SENDERS
+WAITS --> GATE
+SENDERS --> GATE
+GATE --> GRAPH : predicate true
+GATE --> SUPPRESS : predicate false
+GRAPH --> SCC
+SCC --> REPORT : cyclic SCC
+
+note bottom of REPORT
+  Structural and advisory: the SCC is not a runtime reachability proof.
+end note
+
+legend bottom
+|= Colour |= Meaning |
+|<#DBE4FF>| ordered typed evidence |
+|<#FFF3BF>| initial-operation classification |
+|<#FFE8CC>| blocked process evidence |
+|<#C3FAE8>| producer evidence |
+|<#E5DBFF>| false-positive reduction gate |
+|<#D3F9D8>| canonical wait-for projection |
+|<#FCC2D7>| reused SCC engine |
+|<#FFE3E3>| advisory cyclic finding |
+|<#F1F3F5>| explicit suppression/uncertainty |
+endlegend
+@enduml

@@ -108,7 +108,8 @@ The def-versus-use distinction (`classify_rholang_var`) is what makes the Rholan
 `message_kind` preserves the process-calculus distinction orthogonally:
 `Send`, `SendSync`, `Recv`, `RecvPersistent`, `Peek`, `Select`, and `Spawn`.
 Use [`extract_events` and `channel_report`](12-channel-topology.md) to consume
-that metadata through the feature-free public API.
+that metadata, then [`communication_deadlocks`](13-deadlock-candidates.md) for
+initially blocked wait cycles through the feature-free public API.
 
 ![Rholang constructs mapped onto CPG node and edge kinds.](../diagrams/rholang-mapping.svg)
 
@@ -138,10 +139,15 @@ fn main() -> Result<(), libcpg::Error> {
         .edges_by_kind(|k| matches!(k, CpgEdgeKind::DataFlow(DfgEdgeKind::DefUse)))
         .next()
         .is_some();
-    assert!(has_defuse);
+assert!(has_defuse);
     Ok(())
 }
 ```
+
+The same DFG seed reaches lexically preceding definitions outside a contract.
+For example, two contracts inside one outer `new c1, c2` resolve both channel
+definitions. Sibling contract bodies remain separate: one contract's local
+bindings never seed another contract.
 
 ---
 

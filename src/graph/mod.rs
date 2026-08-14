@@ -15,6 +15,6 @@ pub use cpg::{CodePropertyGraph, CpgStats};
 pub use edge::{CfgEdgeKind, CpgEdge, CpgEdgeKind, DfgEdgeKind, EdgeId};
 pub use language::{Language, Paradigm};
 pub use node::{
-    CpgNode, CpgNodeKind, LiteralKind, MethodSignature, MsgKind, NodeId, PropertyKey,
-    PropertyValue, ScopeId, SourceRange, TypeInfo, Visibility,
+    CpgNode, CpgNodeKind, LiteralKind, LockKind, LockMode, MethodSignature, MsgKind, NodeId,
+    PropertyKey, PropertyValue, ScopeId, SourceRange, TypeInfo, Visibility,
 };

@@ -63,7 +63,7 @@ pub fn extract_events(cpg: &CodePropertyGraph) -> BTreeMap<NodeId, Vec<ChannelEv
                 let kind = node.message_kind?;
                 let channel = kind
                     .uses_channel()
-                    .then(|| resolve_event_channel(cpg, site))
+                    .then(|| resolve_event_variable(cpg, site))
                     .flatten();
                 Some(ChannelEvent {
                     kind,
@@ -104,7 +104,7 @@ fn has_function_ancestor(cpg: &CodePropertyGraph, node: NodeId) -> bool {
 
 /// Resolves only identifiers within this event's own syntax subtree. A nested
 /// channel event starts a new statement boundary and is deliberately skipped.
-fn resolve_event_channel(cpg: &CodePropertyGraph, site: NodeId) -> Option<ChannelId> {
+pub(crate) fn resolve_event_variable(cpg: &CodePropertyGraph, site: NodeId) -> Option<NodeId> {
     let mut visited = FxHashSet::default();
     let mut stack = cpg.ast_children(site);
     stack.reverse();
@@ -117,7 +117,7 @@ fn resolve_event_channel(cpg: &CodePropertyGraph, site: NodeId) -> Option<Channe
         let Some(node) = cpg.node(candidate) else {
             continue;
         };
-        if node.message_kind.is_some() {
+        if node.message_kind.is_some() || node.lock_kind.is_some() {
             continue;
         }
         if matches!(node.kind, CpgNodeKind::Identifier { .. }) {

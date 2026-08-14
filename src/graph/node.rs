@@ -86,6 +86,43 @@ impl MsgKind {
     }
 }
 
+/// Lock operation attached to a call-like CPG node.
+///
+/// Frontends and semantic adapters assign this metadata after resolving a
+/// synchronization API. The feature-free concurrency core therefore consumes
+/// typed lock evidence without guessing from call spelling or parsing source.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+pub enum LockKind {
+    /// Acquire a shared/read lock.
+    AcquireRead,
+    /// Acquire an exclusive/write lock.
+    AcquireWrite,
+    /// Release the identified lock.
+    Release,
+}
+
+impl LockKind {
+    /// Returns the acquisition mode, or `None` for a release.
+    pub const fn acquisition_mode(self) -> Option<LockMode> {
+        match self {
+            Self::AcquireRead => Some(LockMode::Read),
+            Self::AcquireWrite => Some(LockMode::Write),
+            Self::Release => None,
+        }
+    }
+}
+
+/// Sharing mode of a lock acquisition.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+pub enum LockMode {
+    /// Shared acquisition; other readers may proceed.
+    Read,
+    /// Exclusive acquisition; readers and writers conflict.
+    Write,
+}
+
 /// Source code location range.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
@@ -620,6 +657,16 @@ pub struct CpgNode {
         serde(default, skip_serializing_if = "Option::is_none")
     )]
     pub message_kind: Option<MsgKind>,
+    /// Normalized lock semantics, when this node is a synchronization call.
+    ///
+    /// This field is intentionally independent of [`CpgNodeKind::Call`]. A
+    /// semantic adapter can preserve the ordinary call role while recording
+    /// whether it acquires or releases a resolved lock resource.
+    #[cfg_attr(
+        feature = "serde",
+        serde(default, skip_serializing_if = "Option::is_none")
+    )]
+    pub lock_kind: Option<LockKind>,
     /// Additional properties.
     pub properties: FxHashMap<PropertyKey, PropertyValue>,
     /// AST children (indices into the node array).
@@ -637,6 +684,7 @@ impl CpgNode {
             range,
             text: None,
             message_kind: None,
+            lock_kind: None,
             properties: FxHashMap::default(),
             children: SmallVec::new(),
             parent: None,
@@ -652,6 +700,12 @@ impl CpgNode {
     /// Attaches normalized message-passing semantics to this node.
     pub fn with_message_kind(mut self, kind: MsgKind) -> Self {
         self.message_kind = Some(kind);
+        self
+    }
+
+    /// Attaches normalized lock semantics to this node.
+    pub fn with_lock_kind(mut self, kind: LockKind) -> Self {
+        self.lock_kind = Some(kind);
         self
     }
 
@@ -819,6 +873,29 @@ mod tests {
     fn node_builder_attaches_message_kind() {
         let n = node(CpgNodeKind::Root).with_message_kind(MsgKind::Spawn);
         assert_eq!(n.message_kind, Some(MsgKind::Spawn));
+    }
+
+    #[test]
+    fn lock_kinds_expose_acquisition_modes() {
+        assert_eq!(
+            LockKind::AcquireRead.acquisition_mode(),
+            Some(LockMode::Read)
+        );
+        assert_eq!(
+            LockKind::AcquireWrite.acquisition_mode(),
+            Some(LockMode::Write)
+        );
+        assert_eq!(LockKind::Release.acquisition_mode(), None);
+    }
+
+    #[test]
+    fn node_builder_attaches_lock_kind() {
+        let n = node(CpgNodeKind::Call {
+            target: None,
+            is_method: true,
+        })
+        .with_lock_kind(LockKind::AcquireWrite);
+        assert_eq!(n.lock_kind, Some(LockKind::AcquireWrite));
     }
 
     #[test]
@@ -1277,6 +1354,7 @@ mod serde_tests {
             && a.range == b.range
             && a.text == b.text
             && a.message_kind == b.message_kind
+            && a.lock_kind == b.lock_kind
             && a.children == b.children
             && a.parent == b.parent
             && a.properties == b.properties
@@ -1356,6 +1434,7 @@ mod serde_tests {
         )
         .with_text("x")
         .with_message_kind(MsgKind::Peek)
+        .with_lock_kind(LockKind::AcquireRead)
         .with_child(NodeId::new(6))
         .with_child(NodeId::new(7))
         .with_parent(NodeId::new(4));
@@ -1383,14 +1462,36 @@ mod serde_tests {
     }
 
     #[test]
+    fn serde_lock_kind_and_mode_round_trip() {
+        for kind in [
+            LockKind::AcquireRead,
+            LockKind::AcquireWrite,
+            LockKind::Release,
+        ] {
+            let json = serde_json::to_string(&kind).expect("serialize lock kind");
+            let round_trip: LockKind = serde_json::from_str(&json).expect("deserialize lock kind");
+            assert_eq!(round_trip, kind);
+        }
+        for mode in [LockMode::Read, LockMode::Write] {
+            let json = serde_json::to_string(&mode).expect("serialize lock mode");
+            let round_trip: LockMode = serde_json::from_str(&json).expect("deserialize lock mode");
+            assert_eq!(round_trip, mode);
+        }
+    }
+
+    #[test]
     fn serde_legacy_node_defaults_missing_message_kind() {
         let node = CpgNode::new(NodeId::new(9), CpgNodeKind::Root, SourceRange::default());
         let mut json = serde_json::to_value(node).expect("serialize node");
         json.as_object_mut()
             .expect("node object")
             .remove("message_kind");
+        json.as_object_mut()
+            .expect("node object")
+            .remove("lock_kind");
         let round_trip: CpgNode = serde_json::from_value(json).expect("legacy node");
         assert_eq!(round_trip.message_kind, None);
+        assert_eq!(round_trip.lock_kind, None);
     }
 
     /// The full `arb_node_kind` strategy — no float exclusion. `serde_json` is

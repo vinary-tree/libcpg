@@ -196,7 +196,7 @@ same graph. Errors are the crate's own [`libcpg::Error`](../api/graph-reference.
 
 ## 6. Map of the theory pillar
 
-This overview sits above twenty-nine formal chapters. Read them in order for a ground-up
+This overview sits above thirty formal chapters. Read them in order for a ground-up
 development, or jump to the layer you need:
 
 1. **[01 — Code Property Graphs](01-code-property-graphs.md).** The formal model:
@@ -256,6 +256,10 @@ development, or jump to the layer you need:
     Frontend-normalized message events, definition-resolved channel identities,
     and structural producer/consumer predicates define deterministic advisory
     orphan, blocked, and contention evidence without source reparsing.
+30. **[30 — Cyclic wait and lock order](30-cyclic-wait-and-lock-order.md).**
+    Initially blocked process relations, typed held-lock order, finite
+    interprocedural acquisition summaries, and shared SCC decomposition define
+    statement-precise advisory deadlock candidates.
     The later chapters define deterministic projection structure,
     architecture metrics, inspectable evidence, and their interpretation
     limits.

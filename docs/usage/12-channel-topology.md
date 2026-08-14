@@ -125,7 +125,8 @@ rules.
 - Rebuild old serialized CPGs if they predate `message_kind`; the serde default
   is intentionally `None`.
 - Combine the report with CFG reachability, pattern/guard reasoning, and later
-  deadlock analysis before making a runtime claim.
+  [`communication_deadlocks`](13-deadlock-candidates.md) evidence before making
+  a runtime claim.
 - Do not interpret an empty report as proof of determinism or liveness.
 
 ## 7. Focused verification

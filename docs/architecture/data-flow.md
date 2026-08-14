@@ -470,6 +470,27 @@ See the [component guide](../components/graph/channel-topology.md), [Theory
 29](../theory/29-channel-topology-and-linearity.md), and [Usage
 12](../usage/12-channel-topology.md).
 
+### Deadlock projections and lexical capture (feature-free)
+
+`communication_deadlocks` consumes the ordered channel sequences above and
+typed `LockKind` calls. It builds a process wait-for projection for initial
+linear receives and a lock-resource order projection for direct and resolved-
+callee acquisitions. Both use `GraphProjection::External` and the shared
+`projection_sccs` engine; neither relation is written back into the CPG.
+
+The DFG seeds each function with lexically preceding outer definitions before
+walking its own body. This lets Rholang contracts enclosed by one `new` share
+channel definitions. The seed stops at `Function` nodes, so locals from a
+preceding sibling function cannot leak.
+
+![Communication wait-for projection](../diagrams/wait-for-deadlock.svg)
+
+![Typed lock-order projection](../diagrams/lock-order-deadlock.svg)
+
+See the [component guide](../components/graph/deadlock-analysis.md), [Theory
+30](../theory/30-cyclic-wait-and-lock-order.md), and [Usage
+13](../usage/13-deadlock-candidates.md).
+
 ### Pattern detection
 
 Two layers, at two feature levels:

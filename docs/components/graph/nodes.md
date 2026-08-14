@@ -29,6 +29,8 @@ pub struct CpgNode {
     pub text: Option<Arc<str>>,
     /// Language-neutral message semantics for a channel event, if any.
     pub message_kind: Option<MsgKind>,
+    /// Typed lock semantics for a synchronization call, if any.
+    pub lock_kind: Option<LockKind>,
     /// Extra key/value metadata.
     pub properties: FxHashMap<PropertyKey, PropertyValue>,
     /// AST children, in source order.
@@ -39,21 +41,28 @@ pub struct CpgNode {
 ```
 
 Construct nodes with `CpgNode::new(id, kind, range)` and refine them with the
-chainable builders `with_text`, `with_message_kind`, `with_property`,
+chainable builders `with_text`, `with_message_kind`, `with_lock_kind`, `with_property`,
 `with_child`, and `with_parent`:
 
 ```rust
-use libcpg::{CpgNode, CpgNodeKind, MsgKind, NodeId, SourceRange};
+use libcpg::{CpgNode, CpgNodeKind, LockKind, NodeId, SourceRange};
 
-let node = CpgNode::new(NodeId::new(0), CpgNodeKind::Return, SourceRange::default())
-    .with_text("return x")
-    .with_message_kind(MsgKind::Send);
+let node = CpgNode::new(
+    NodeId::new(0),
+    CpgNodeKind::Call { target: None, is_method: true },
+    SourceRange::default(),
+)
+.with_text("guard.acquire()")
+.with_lock_kind(LockKind::AcquireWrite);
 ```
 
 `message_kind` is orthogonal to `kind`: it preserves channel semantics while a
 send remains `CpgNodeKind::Call`, a select remains `Match`, and a parallel
 composition remains `Block`. Frontends populate it; feature-free concurrency
 analysis consumes it. See the [channel-topology component](channel-topology.md).
+`lock_kind` likewise preserves `Call` structure while a semantic adapter records
+shared/exclusive acquisition or release. See the
+[deadlock-analysis component](deadlock-analysis.md).
 
 When you add a node to a graph with `add_node`, the graph assigns the real
 [`NodeId`](#nodeid) and overwrites the placeholder you passed — so `NodeId::new(0)`

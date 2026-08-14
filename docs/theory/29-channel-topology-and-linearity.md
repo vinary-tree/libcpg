@@ -165,6 +165,10 @@ sorted process ids, sorted event sites, and a descriptive explanation so a
 consumer can inspect the evidence. An empty report is not a proof of deadlock
 freedom, determinism, or liveness.
 
+[Theory 30](30-cyclic-wait-and-lock-order.md) deliberately adds the narrower
+initially-blocked wait-for relation and shared-SCC classification while
+preserving this advisory evidence boundary.
+
 ## References
 
 1. Meredith, L. G., Radestock, M. (2005). *A Reflective Higher-order Calculus.*

@@ -75,6 +75,9 @@ PDG). A query can therefore mix syntax, control flow, and data flow freely.
 - **Channel topology and linearity** — feature-free typed send/receive event
   extraction, def-use-resolved channel identity, orphan/blocked topology, and
   advisory linear-consumption contention.
+- **Communication and lock-order deadlocks** — feature-free initially blocked
+  wait-for SCCs, typed read/write lock-order SCCs, transitive acquisition
+  summaries, and statement-precise advisory witnesses.
 - **Projection centrality** — deterministic PageRank variants, vertex/edge
   betweenness, eigenvector, Katz, closeness, harmonic, HITS, and Burt
   structural-hole scores with explicit iteration and traversal budgets.
