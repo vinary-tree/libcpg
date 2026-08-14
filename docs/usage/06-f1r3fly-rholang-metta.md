@@ -78,7 +78,7 @@ fn main() -> Result<(), libcpg::Error> {
     let cpg = TreeSitterCpgBuilder::new().build_from_tree(&tree, source, Language::Rholang)?;
 
     // The `contract` mapped to a Function (seeding a CFG entry) and the
-    // `stdout!(…)` send mapped to a Call.
+    // `stdout!(…)` send mapped to a Call with message_kind = Send.
     assert_eq!(cpg.functions().count(), 1);
     assert!(!cpg.cfg_entries().is_empty());
     Ok(())
@@ -94,9 +94,9 @@ The mapper (`map_rholang`) normalises ρ-calculus onto the CPG's imperative voca
 | `contract`, `constructor_decl`, `method_decl`, `default_decl` | `Function` | Seeds a CFG entry; its trailing `block` is the body |
 | `agent_block` | `Class` | An object-like grouping of a constructor + methods |
 | `new … in`, `let … in`, `for(…){…}`, `{…}`, `\|` (par), `bundle` | `Block` | Each introduces a process region / scope |
-| `x!(v)` send (`send`, `send_sync`) | `Call` | The load-bearing send site |
+| `x!(v)` send (`send`, `send_sync`) | `Call` | The load-bearing send site; typed metadata distinguishes async/sync |
 | `x!m(v)` / method send (`send_method`, `method`) | `Call` (method) | Method-style dispatch |
-| receive binds (`linear_bind`, `repeated_bind`, `peek_bind`) | `Call` | Consumes on the source channel |
+| receive binds (`linear_bind`, `repeated_bind`, `peek_bind`) | `Call` | Source anchor; typed metadata distinguishes linear/persistent/peek |
 | `ifElse` | `If`; `match`, `choice` (select) | `Match` | Scrutinee dispatch / non-deterministic choice |
 | a **bound** name (`new`-restricted, receive-bound, contract formal, `let` binder) | `Variable` / `Parameter` | A DFG **definition** |
 | a **referenced** name | `Identifier` | A DFG **use** |
@@ -104,6 +104,11 @@ The mapper (`map_rholang`) normalises ρ-calculus onto the CPG's imperative voca
 | `*x` (eval), `@P` (quote) | `UnaryOp` | Dereference / reify |
 
 The def-versus-use distinction (`classify_rholang_var`) is what makes the Rholang DFG **sound**: a name in a binder position becomes a definition, a name mentioned elsewhere becomes a use, and reaching-definitions links them.
+
+`message_kind` preserves the process-calculus distinction orthogonally:
+`Send`, `SendSync`, `Recv`, `RecvPersistent`, `Peek`, `Select`, and `Spawn`.
+Use [`extract_events` and `channel_report`](12-channel-topology.md) to consume
+that metadata through the feature-free public API.
 
 ![Rholang constructs mapped onto CPG node and edge kinds.](../diagrams/rholang-mapping.svg)
 

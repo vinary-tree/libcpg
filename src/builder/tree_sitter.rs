@@ -243,7 +243,8 @@ impl TreeSitterCpgBuilder {
         );
 
         // Create the CPG node
-        let cpg_node = CpgNode::new(NodeId::new(0), cpg_kind.clone(), range);
+        let mut cpg_node = CpgNode::new(NodeId::new(0), cpg_kind.clone(), range);
+        cpg_node.message_kind = mapper.message_kind(ts_kind);
         let node_id = cpg.add_node(cpg_node);
 
         // Create the AST edge from parent to this node AND record the parent

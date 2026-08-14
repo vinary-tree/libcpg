@@ -79,8 +79,9 @@ alternatives is folklore, and a decision without its costs is marketing.
 | [0033 — Compositional effect summaries](0033-compositional-effect-summaries.md) | Specialize the shared summary solver with typed storage places, transitive purity, return dependencies, and a lawful flat constant lattice. | Accepted |
 | [0034 — Data-driven advisory taint](0034-data-driven-advisory-taint.md) | Specialize the shared summary solver with caller-owned source/sink policy, typed value flow, canonical witnesses, maybe-null evidence, and explicit partial-result semantics. | Accepted |
 | [0035 — Overlay SDG summary edges and two-pass slicing](0035-system-dependence-summary-slicing.md) | Materialize labeled caller-local parameter-to-return dependences and apply deterministic HRB phase masks with explicit node/depth caps. | Accepted |
+| [0036 — Typed channel topology](0036-typed-channel-topology.md) | Preserve language-neutral message semantics at the frontend boundary and classify def-use-resolved channel matching/linearity as ordered out-of-graph evidence. | Accepted |
 
-These thirty-four are not independent. ADR-0001 fixes the substrate that all analyses
+These thirty-six are not independent. ADR-0001 fixes the substrate that all analyses
 write onto; ADR-0002 and ADR-0005 together explain how a language reaches that
 substrate and what you must switch on to get there; ADR-0003 and ADR-0004 are
 two analyses *over* the substrate (one always-on, one feature-gated) that each
@@ -165,6 +166,11 @@ ADR-0034 builds on the same framework but keeps security policy outside the
 graph. It classifies typed call paths with a caller-owned catalog, composes
 source-to-return and parameter-to-sink jump functions, retains canonical
 positive witnesses, and treats maybe-null dereferences as advisory evidence.
+ADR-0035 composes those summaries with PDG/DFG overlays using labeled caller-
+local edges and two-pass context discipline. ADR-0036 instead extends the
+frontend-to-analysis seam: it preserves orthogonal typed concurrency metadata,
+resolves stable channel identity from existing definition evidence, and keeps
+matching/linearity findings immutable and advisory.
 
 ![Module architecture of libcpg, showing the graph core and the analysis modules layered over it](../diagrams/module-architecture.svg)
 
@@ -176,7 +182,7 @@ positive witnesses, and treats maybe-null dereferences as advisory evidence.
   (`0001`…). Numbers are never reused; a reversed decision is marked
   *Superseded* and a new record supersedes it, so history stays legible.
 - **Status lifecycle.** `Proposed → Accepted → (Superseded by NNNN | Deprecated)`.
-  All thirty-four current records are **Accepted** and reflect the shipped `v0.1.1`
+  All thirty-six current records are **Accepted** and reflect the shipped `v0.1.1`
   code.
 - **Grounding.** Every claim here is traceable to source: the
   [`Cargo.toml`](../engineering/01-build-and-features.md) feature block, the

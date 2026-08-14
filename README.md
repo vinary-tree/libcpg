@@ -72,6 +72,9 @@ PDG). A query can therefore mix syntax, control flow, and data flow freely.
 - **System dependence and interprocedural slicing** — feature-free labeled
   summary edges plus deterministic node/depth-capped two-pass backward and
   forward slices that preserve represented call context.
+- **Channel topology and linearity** — feature-free typed send/receive event
+  extraction, def-use-resolved channel identity, orphan/blocked topology, and
+  advisory linear-consumption contention.
 - **Projection centrality** — deterministic PageRank variants, vertex/edge
   betweenness, eigenvector, Katz, closeness, harmonic, HITS, and Burt
   structural-hole scores with explicit iteration and traversal budgets.

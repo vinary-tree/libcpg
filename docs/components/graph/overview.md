@@ -405,6 +405,9 @@ So the safe pattern is: build (single-threaded, `&mut`), then analyse
 - [System dependence and interprocedural slicing](system-dependence-slicing.md)
   — effect-derived labeled summary edges and deterministic context-sensitive
   two-pass slices with explicit node and call-depth caps.
+- [Channel-event extraction and topology](channel-topology.md) — frontend-
+  normalized message kinds, definition-resolved channel identities, and
+  ordered advisory matching/linear-consumption findings.
 - [`api/graph-reference.md`](../../api/graph-reference.md) — the precise,
   method-by-method API reference for `CodePropertyGraph`.
 - [`theory/01-code-property-graphs.md`](../../theory/01-code-property-graphs.md)

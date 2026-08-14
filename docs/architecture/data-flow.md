@@ -39,7 +39,8 @@ fn demo() -> libcpg::Result<()> {
 `build_from_tree` recursively walks the tree-sitter tree (`convert_node`). For each retained node it:
 
 1. asks the `NodeMapper` whether to keep the node (`should_include_node`, which drops punctuation, comments unless configured, and language-specific wrappers/tokens);
-2. maps the grammar's node-kind string to a `CpgNodeKind` (`map_kind`);
+2. maps the grammar's node-kind string to a `CpgNodeKind` (`map_kind`) and,
+   where applicable, a language-neutral `MsgKind` (`message_kind`);
 3. records a `SourceRange` from the tree-sitter byte offsets;
 4. adds the node and, if it has a parent, wires an `AstChild` edge **and** sets the child's `parent` pointer; and
 5. marks `Function` nodes as CFG entry points.
@@ -448,6 +449,26 @@ node-capped prefix deterministic.
 See the [component guide](../components/graph/system-dependence-slicing.md),
 [Theory 28](../theory/28-system-dependence-and-slicing.md), and [Usage
 11](../usage/11-interprocedural-slicing.md).
+
+### Channel topology and linearity (feature-free)
+
+During AST construction, a language frontend can attach `MsgKind` metadata
+without replacing a node's structural `CpgNodeKind`. The Rholang mapper uses
+this seam for asynchronous/synchronous sends, linear/persistent/peek receives,
+select, and parallel spawn. This is the only grammar-specific stage.
+
+`extract_events` then visits top-level function scopes, orders event sites by
+`NodeId`, and resolves a channel only when an event-local identifier reaches a
+`Variable` through `Identifier::definition`, `DefUse`/`ReachingDef`, or
+`Reference`. `channel_report` groups resolved events by that stable identity
+and returns ordered orphan-send, blocked-linear-receive, and non-deterministic-
+consumption evidence. Both functions are read-only and advisory.
+
+![Frontend normalization and typed channel identity extraction](../diagrams/channel-event-extraction.svg)
+
+See the [component guide](../components/graph/channel-topology.md), [Theory
+29](../theory/29-channel-topology-and-linearity.md), and [Usage
+12](../usage/12-channel-topology.md).
 
 ### Pattern detection
 

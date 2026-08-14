@@ -1,6 +1,6 @@
 # Diagram catalog
 
-Every figure in the `libcpg` documentation is a **committed source** (`.puml` for PlantUML, `.dot` for Graphviz) rendered to a **committed `.svg`** that the Markdown pages embed. Sources are version-controlled so figures are reproducible and reviewable; SVGs are committed so they render on GitHub (which does not render PlantUML/Graphviz inline). This directory holds all 87 figures plus the shared theme.
+Every figure in the `libcpg` documentation is a **committed source** (`.puml` for PlantUML, `.dot` for Graphviz) rendered to a **committed `.svg`** that the Markdown pages embed. Sources are version-controlled so figures are reproducible and reviewable; SVGs are committed so they render on GitHub (which does not render PlantUML/Graphviz inline). This directory holds all 89 figures plus the shared theme.
 
 ## Conventions
 
@@ -84,6 +84,8 @@ Grouped by subject. Each row: the source (its `.svg` sibling is embedded by the 
 | `taint-witness-sequence.puml` | sequence | source classification, interprocedural propagation, sink matching, and canonical witness emission | components/graph/taint-analysis, usage/10 |
 | `sdg-summary-overlay.puml` | component/overlay flow | call, DFG, PDG, and effect evidence → labeled caller-local summary dependences → bounded slice | components/graph/system-dependence-slicing, theory/28, security/03 |
 | `sdg-two-pass-slicing.puml` | two-lane phase flow | backward and forward ascent/descent masks, depth state, and context-preserving ordered results | theory/28, design/0035, usage/11, scientific/30 |
+| `channel-event-extraction.puml` | component/evidence flow | caller-owned parse → frontend `MsgKind` normalization → statement-local def-use/reference channel identity → ordered events | components/graph/channel-topology, theory/29, security/04 |
+| `channel-topology-classification.puml` | component/decision flow | per-channel producer/linear/persistent/peek tallies → orphan, blocked, and consumption-contention evidence | components/graph/channel-topology, theory/29, design/0036 |
 
 ### Control flow, data flow, dependence
 | Source | Type | Depicts | Embedded by |

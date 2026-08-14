@@ -196,7 +196,7 @@ same graph. Errors are the crate's own [`libcpg::Error`](../api/graph-reference.
 
 ## 6. Map of the theory pillar
 
-This overview sits above twenty-four formal chapters. Read them in order for a ground-up
+This overview sits above twenty-nine formal chapters. Read them in order for a ground-up
 development, or jump to the layer you need:
 
 1. **[01 — Code Property Graphs](01-code-property-graphs.md).** The formal model:
@@ -252,6 +252,10 @@ development, or jump to the layer you need:
 28. **[28 — System dependence and context-sensitive slicing](28-system-dependence-and-slicing.md).**
     Effect-derived summary edges and direction-aware two-pass traversal define
     deterministic bounded slices without unrealizable sibling-call paths.
+29. **[29 — Channel topology and linear consumption](29-channel-topology-and-linearity.md).**
+    Frontend-normalized message events, definition-resolved channel identities,
+    and structural producer/consumer predicates define deterministic advisory
+    orphan, blocked, and contention evidence without source reparsing.
     The later chapters define deterministic projection structure,
     architecture metrics, inspectable evidence, and their interpretation
     limits.

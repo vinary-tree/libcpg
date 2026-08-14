@@ -28,6 +28,8 @@ fork
   + bounded canonical simple-cycle witnesses
   + complete triad census / selected graphlets
   + IFDS / effect / taint / maybe-null summaries
+  + SDG two-pass slicing
+  + typed channel topology / linearity
   → exact structural relations + fixed points;<<#C3FAE8>>
 fork again
   :PdgBuilder.build
@@ -47,7 +49,7 @@ end fork
 stop
 legend right
   |= colour |= analysis (module) |
-  |<#C3FAE8>| structural — blocks / data flow / IFDS / effects / taint / nullflow / graph analytics |
+  |<#C3FAE8>| structural — blocks / data flow / IFDS / effects / taint / SDG / channels / graph analytics |
   |<#E5DBFF>| PDG — program slicing |
   |<#FFE3E3>| pattern — VF2 / GED / similarity / GoF |
   |<#FFF3BF>| algorithm + complexity |

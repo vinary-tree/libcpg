@@ -53,6 +53,8 @@
 //!   sinks, sanitizers, external calls, and dereferences with bounded witnesses
 //! - **System Dependence Slicing**: Materialize effect-derived labeled summary
 //!   edges and compute deterministic context-sensitive two-pass slices
+//! - **Channel Topology**: Extract typed message events through def-use channel
+//!   identity and report orphan, blocked, and contended linear consumption
 //! - **Pattern Detection**: Detect design patterns using subgraph isomorphism (VF2/VF3)
 //! - **Algorithm Analysis**: Extract algorithm signatures and estimate complexity
 //! - **GNN Support**: Graph neural network message passing for semantic embeddings
@@ -105,8 +107,8 @@ pub(crate) mod testutil;
 // Re-export commonly used types
 pub use graph::{
     CfgEdgeKind, CodePropertyGraph, CpgEdge, CpgEdgeKind, CpgNode, CpgNodeKind, CpgStats,
-    DfgEdgeKind, EdgeId, Language, LiteralKind, MethodSignature, NodeId, Paradigm, PropertyKey,
-    PropertyValue, ScopeId, SourceRange, TypeInfo, Visibility,
+    DfgEdgeKind, EdgeId, Language, LiteralKind, MethodSignature, MsgKind, NodeId, Paradigm,
+    PropertyKey, PropertyValue, ScopeId, SourceRange, TypeInfo, Visibility,
 };
 
 pub use analysis::{
@@ -114,23 +116,24 @@ pub use analysis::{
     analyze_null_flows, analyze_null_flows_report, analyze_taint, analyze_taint_report,
     architecture_smells, attack_simulation, available_expressions, betweenness_centrality,
     block_cfg, build_import_graph, build_summary_edges, build_symbol_table, burt_constraint,
-    call_graph_projection, call_graph_sccs, cfg_projection, ck_metrics, classify_core_periphery,
-    closeness_centrality, coffman_graham, condensation_metrics, control_flow_sccs,
-    cut_vertices_and_bridges, dead_stores, degree_assortativity, dfg_projection, dominator_tree,
-    edge_betweenness, effect_summaries, eigenvector_centrality, expression_facts, function_metrics,
-    global_min_cut, harmonic_centrality, hits, infer_layering, interprocedural_backward_slice,
-    interprocedural_forward_slice, k_core_decomposition, k_truss_decomposition, katz_centrality,
-    liveness, loop_forest, loop_induction, louvain, martin_metrics, merge_programs,
-    method_field_graph, module_graph_projection, motif_census, pagerank, pdg_projection,
-    personalized_pagerank, post_dominator_tree, projection_of, projection_sccs, refine_connected,
-    reflexion, resolve_calls, reverse_pagerank, sccp, sdp_violations, simple_cycles, solve,
-    solve_summaries, solve_summaries_with_resolver, structural_clone_classes,
-    try_algebraic_connectivity, try_refine_connected, two_edge_connected_components,
-    unreachable_code, value_ranges, variable_facts, very_busy_expressions, wl_labels,
-    AmbientFlowKey, AnalysisError, ArchSmell, ArchSmellKind, AttackResult, AttackStep,
-    AvailableExpressions, BasicBlock, BetweennessOptions, BitSetDomain, BlockCfg, BlockEdge,
-    BlockId, Bound, CallGraphResolution, CallResolution, CalleeRef, CatalogClassification,
-    CatalogMatch, CatalogRule, CentralityBudget, CentralityKind, CentralityScores, CgLayering,
+    call_graph_projection, call_graph_sccs, cfg_projection, channel_report, ck_metrics,
+    classify_core_periphery, closeness_centrality, coffman_graham, condensation_metrics,
+    control_flow_sccs, cut_vertices_and_bridges, dead_stores, degree_assortativity, dfg_projection,
+    dominator_tree, edge_betweenness, effect_summaries, eigenvector_centrality, expression_facts,
+    extract_events, function_metrics, global_min_cut, harmonic_centrality, hits, infer_layering,
+    interprocedural_backward_slice, interprocedural_forward_slice, k_core_decomposition,
+    k_truss_decomposition, katz_centrality, liveness, loop_forest, loop_induction, louvain,
+    martin_metrics, merge_programs, method_field_graph, module_graph_projection, motif_census,
+    pagerank, pdg_projection, personalized_pagerank, post_dominator_tree, projection_of,
+    projection_sccs, refine_connected, reflexion, resolve_calls, reverse_pagerank, sccp,
+    sdp_violations, simple_cycles, solve, solve_summaries, solve_summaries_with_resolver,
+    structural_clone_classes, try_algebraic_connectivity, try_refine_connected,
+    two_edge_connected_components, unreachable_code, value_ranges, variable_facts,
+    very_busy_expressions, wl_labels, AmbientFlowKey, AnalysisError, ArchSmell, ArchSmellKind,
+    AttackResult, AttackStep, AvailableExpressions, BasicBlock, BetweennessOptions, BitSetDomain,
+    BlockCfg, BlockEdge, BlockId, Bound, CallGraphResolution, CallResolution, CalleeRef,
+    CatalogClassification, CatalogMatch, CatalogRule, CentralityBudget, CentralityKind,
+    CentralityScores, CgLayering, ChannelEvent, ChannelFinding, ChannelFindingKind, ChannelId,
     CkOptions, ClassMetrics, CommunityAssignment, CommunityKind, CondensationMetrics,
     CondensationOptions, Confidence, Confluence, ConstLattice, ConstValue, CorePeriphery,
     CorePeripheryResult, CutStructure, CycleOptions, CycleSet, DataflowAnalysis, DataflowSolution,

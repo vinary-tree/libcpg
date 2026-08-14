@@ -335,6 +335,24 @@ unknown criteria and zero node caps return an empty set. See the
 guide](../usage/11-interprocedural-slicing.md), and [security
 boundary](../security/03-system-dependence-slicing.md).
 
+### Channel events and topology
+
+Language frontends attach optional `MsgKind` metadata to existing CPG nodes;
+the feature-free concurrency surface resolves stable `Variable` identities
+through `Identifier::definition`, `DefUse`/`ReachingDef`, and `Reference`:
+
+| Function | Signature | Result |
+|---|---|---|
+| `extract_events` | `fn(&CodePropertyGraph) -> BTreeMap<NodeId, Vec<ChannelEvent>>` | Top-level processes and statement sites in `NodeId` order; unresolved channel evidence remains `None`. |
+| `channel_report` | `fn(&CodePropertyGraph) -> Vec<ChannelFinding>` | Ordered `OrphanSend`, `BlockedRecv`, and `NondeterministicConsumption` evidence. |
+
+`ChannelId` is the defining `Variable` `NodeId`. `ChannelEvent` carries kind,
+optional channel, site, and `SourceRange`; `ChannelFinding` carries channel,
+sorted process/site ids, and detail. Both functions are read-only and advisory.
+See the [component guide](../components/graph/channel-topology.md), [usage
+guide](../usage/12-channel-topology.md), and [security
+boundary](../security/04-channel-topology.md).
+
 ### Deterministic graph projections
 
 `GraphProjection` is the feature-free, payload-free compressed-sparse-row view

@@ -42,6 +42,50 @@ impl From<NodeId> for u32 {
     }
 }
 
+/// Language-neutral message-passing operation attached to a CPG node.
+///
+/// Frontends translate grammar-specific syntax into this closed vocabulary at
+/// construction time. Analyses can therefore reason about concurrency without
+/// inspecting source text or depending on a language grammar.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+pub enum MsgKind {
+    /// An asynchronous send.
+    Send,
+    /// A synchronous send whose continuation waits for acknowledgement.
+    SendSync,
+    /// A linear, consuming receive.
+    Recv,
+    /// A persistent receive that remains available after matching.
+    RecvPersistent,
+    /// A non-consuming receive that observes without removing a message.
+    Peek,
+    /// A non-deterministic selection among receive branches.
+    Select,
+    /// Concurrent process creation or parallel composition.
+    Spawn,
+}
+
+impl MsgKind {
+    /// Returns true for asynchronous and synchronous producers.
+    pub const fn is_send(self) -> bool {
+        matches!(self, Self::Send | Self::SendSync)
+    }
+
+    /// Returns true only for a linear, consuming receive.
+    pub const fn is_linear_receive(self) -> bool {
+        matches!(self, Self::Recv)
+    }
+
+    /// Returns true for operations that identify a channel.
+    pub const fn uses_channel(self) -> bool {
+        matches!(
+            self,
+            Self::Send | Self::SendSync | Self::Recv | Self::RecvPersistent | Self::Peek
+        )
+    }
+}
+
 /// Source code location range.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
@@ -566,6 +610,16 @@ pub struct CpgNode {
     /// Original source text (optional, for terminals).
     #[cfg_attr(feature = "serde", serde(with = "option_arc_str"))]
     pub text: Option<Arc<str>>,
+    /// Normalized message-passing semantics, when this node is a channel event.
+    ///
+    /// This metadata is populated by language frontends. It is intentionally
+    /// independent of [`CpgNodeKind`] so a send can remain a call-like
+    /// expression and a selection can remain a control-flow construct.
+    #[cfg_attr(
+        feature = "serde",
+        serde(default, skip_serializing_if = "Option::is_none")
+    )]
+    pub message_kind: Option<MsgKind>,
     /// Additional properties.
     pub properties: FxHashMap<PropertyKey, PropertyValue>,
     /// AST children (indices into the node array).
@@ -582,6 +636,7 @@ impl CpgNode {
             kind,
             range,
             text: None,
+            message_kind: None,
             properties: FxHashMap::default(),
             children: SmallVec::new(),
             parent: None,
@@ -591,6 +646,12 @@ impl CpgNode {
     /// Sets the source text.
     pub fn with_text(mut self, text: impl Into<Arc<str>>) -> Self {
         self.text = Some(text.into());
+        self
+    }
+
+    /// Attaches normalized message-passing semantics to this node.
+    pub fn with_message_kind(mut self, kind: MsgKind) -> Self {
+        self.message_kind = Some(kind);
         self
     }
 
@@ -733,6 +794,31 @@ mod tests {
         assert_eq!(NodeId::from(9u32).as_u32(), 9);
         assert_eq!(u32::from(NodeId::new(11)), 11);
         assert_eq!(NodeId::new(3), NodeId(3));
+    }
+
+    #[test]
+    fn message_kinds_expose_consumption_roles() {
+        for kind in [MsgKind::Send, MsgKind::SendSync] {
+            assert!(kind.is_send());
+            assert!(kind.uses_channel());
+            assert!(!kind.is_linear_receive());
+        }
+        assert!(MsgKind::Recv.is_linear_receive());
+        for kind in [MsgKind::Recv, MsgKind::RecvPersistent, MsgKind::Peek] {
+            assert!(kind.uses_channel());
+            assert!(!kind.is_send());
+        }
+        for kind in [MsgKind::Select, MsgKind::Spawn] {
+            assert!(!kind.uses_channel());
+            assert!(!kind.is_send());
+            assert!(!kind.is_linear_receive());
+        }
+    }
+
+    #[test]
+    fn node_builder_attaches_message_kind() {
+        let n = node(CpgNodeKind::Root).with_message_kind(MsgKind::Spawn);
+        assert_eq!(n.message_kind, Some(MsgKind::Spawn));
     }
 
     #[test]
@@ -1190,6 +1276,7 @@ mod serde_tests {
             && a.kind == b.kind
             && a.range == b.range
             && a.text == b.text
+            && a.message_kind == b.message_kind
             && a.children == b.children
             && a.parent == b.parent
             && a.properties == b.properties
@@ -1268,12 +1355,42 @@ mod serde_tests {
             SourceRange::from_bytes(2, 4),
         )
         .with_text("x")
+        .with_message_kind(MsgKind::Peek)
         .with_child(NodeId::new(6))
         .with_child(NodeId::new(7))
         .with_parent(NodeId::new(4));
         let s = serde_json::to_string(&node).expect("serialize node");
         let back: CpgNode = serde_json::from_str(&s).expect("deser node");
         assert!(node_eq(&node, &back));
+    }
+
+    #[test]
+    fn serde_message_kind_round_trip() {
+        for kind in [
+            MsgKind::Send,
+            MsgKind::SendSync,
+            MsgKind::Recv,
+            MsgKind::RecvPersistent,
+            MsgKind::Peek,
+            MsgKind::Select,
+            MsgKind::Spawn,
+        ] {
+            let json = serde_json::to_string(&kind).expect("serialize message kind");
+            let round_trip: MsgKind =
+                serde_json::from_str(&json).expect("deserialize message kind");
+            assert_eq!(round_trip, kind);
+        }
+    }
+
+    #[test]
+    fn serde_legacy_node_defaults_missing_message_kind() {
+        let node = CpgNode::new(NodeId::new(9), CpgNodeKind::Root, SourceRange::default());
+        let mut json = serde_json::to_value(node).expect("serialize node");
+        json.as_object_mut()
+            .expect("node object")
+            .remove("message_kind");
+        let round_trip: CpgNode = serde_json::from_value(json).expect("legacy node");
+        assert_eq!(round_trip.message_kind, None);
     }
 
     /// The full `arb_node_kind` strategy — no float exclusion. `serde_json` is

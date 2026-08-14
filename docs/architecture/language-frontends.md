@@ -117,13 +117,19 @@ Rholang is the concurrent [process-calculus](../GLOSSARY.md#rholang) language of
 | `agent_block` | `Class` | Object-like grouping of a constructor + methods |
 | `new`, `let`, `for`-`input`, `{…}`, `par`, `bundle` | `Block` | Process regions / restriction scopes |
 | `ifElse` | `If`; `match`, `choice` → `Match`; `case`, `branch` → `MatchArm` | Control flow |
-| `send`, `send_sync` (`x!(v)`) | `Call` | The load-bearing send site |
-| `linear_bind`, `repeated_bind`, `peek_bind` (`x <- src`) | `Call` | A receive consumes on `src` |
+| `send`, `send_sync` (`x!(v)`) | `Call` | The load-bearing send site; `message_kind` distinguishes `Send`/`SendSync` |
+| `linear_bind`, `repeated_bind`, `peek_bind` | `Call` | One source anchor; `message_kind` distinguishes consuming, persistent, and peek receives |
 | `name_decl` with a `` `rho:…` `` URI | `Import` (URI, backticks stripped) | The polyglot system-process anchor |
 | `var` (context-dependent) | `Variable` / `Parameter` / `Identifier` | Definition vs use, by syntactic position |
 | `eval` (`*x`), `quote` (`@P`) | `UnaryOp` | Dereference / reify |
 
 The `var` classification (`classify_rholang_var`) is what makes the Rholang DFG sound: a name bound by a `new`, a `let` binder, or a contract/agent formal or receive pattern is a *definition* (`Variable`/`Parameter`); a name used as a send channel, argument, or `*x` target is a *use* (`Identifier`). This yields real def-use edges — e.g. in `contract @"main"() = { new c in { c!(1) } }` the new-bound channel `c` (a `Variable`) links to its use as the send channel via a `DefUse` edge.
+
+This is also the concurrency-analysis boundary. `NodeMapper::message_kind`
+normalizes `send`, `send_sync`, `linear_bind`, `repeated_bind`, `peek_bind`,
+`choice`, and `par` while the raw tree is available. The feature-free
+[`analysis::concurrency`](../components/graph/channel-topology.md) module later
+uses that typed metadata and the DFG; it never reparses Rholang source.
 
 ```rust
 // requires: features = ["rholang"]   (an empty cfg toggle; the caller links the grammar)

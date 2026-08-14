@@ -6,7 +6,9 @@
 use smallvec::SmallVec;
 use std::sync::Arc;
 
-use crate::{CpgNodeKind, Language, LiteralKind, MethodSignature, ScopeId, TypeInfo, Visibility};
+use crate::{
+    CpgNodeKind, Language, LiteralKind, MethodSignature, MsgKind, ScopeId, TypeInfo, Visibility,
+};
 
 /// Maps tree-sitter node types to CpgNodeKind.
 ///
@@ -60,6 +62,28 @@ impl NodeMapper {
             #[cfg(feature = "metta")]
             Language::MeTTa => self.map_metta(ts_kind, node, source),
             _ => self.map_generic(ts_kind, node, source),
+        }
+    }
+
+    /// Returns normalized message-passing semantics for a syntax node.
+    ///
+    /// Grammar-specific names are interpreted only at this frontend boundary;
+    /// downstream concurrency analyses consume [`MsgKind`] metadata and never
+    /// parse source text. Languages without an explicit mapping return `None`.
+    pub(crate) fn message_kind(&self, _ts_kind: &str) -> Option<MsgKind> {
+        match self.language {
+            #[cfg(feature = "rholang")]
+            Language::Rholang => match _ts_kind {
+                "send" | "send_method" => Some(MsgKind::Send),
+                "send_sync" => Some(MsgKind::SendSync),
+                "linear_bind" => Some(MsgKind::Recv),
+                "repeated_bind" => Some(MsgKind::RecvPersistent),
+                "peek_bind" => Some(MsgKind::Peek),
+                "choice" => Some(MsgKind::Select),
+                "par" => Some(MsgKind::Spawn),
+                _ => None,
+            },
+            _ => None,
         }
     }
 

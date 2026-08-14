@@ -79,7 +79,9 @@ function abstraction becomes `Function` (so it seeds a CFG entry and its **last*
 is treated as the body — see [`cfg.md`](cfg.md#the-last-child-is-body-rule)); a *bound* name
 becomes `Variable`/`Parameter` (a DFG definition) while a *referenced* name becomes
 `Identifier` (a DFG use), so def-use edges form; and a call/send becomes `Call` (so the
-argument→parameter machinery fires). Unrecognised kinds degrade to `Unknown { kind }` rather
+argument→parameter machinery fires). A mapper may also attach an orthogonal
+`MsgKind` through `message_kind`, preserving send/receive/select/spawn semantics
+without changing those structural anchors. Unrecognised kinds degrade to `Unknown { kind }` rather
 than failing — construction never aborts on an unfamiliar node.
 
 ### Rust range and `for`-binding normalization
@@ -248,7 +250,7 @@ so each is normalised onto the nearest imperative anchor that keeps the CFG/DFG 
 | `case`, `branch` | `MatchArm` | a match/choice arm |
 | `send`, `send_sync` | `Call` | `x!(v)` / `x!?(v)` send at the send site |
 | `send_method`, `method`, `send_method_source` | `Call { is_method: true }` | method-style send / method call |
-| `linear_bind`, `repeated_bind`, `peek_bind`, `receive_send_source`, `send_receive_source` | `Call` | `<-` / `<=` / `<<-` receive consumes on a source channel |
+| `linear_bind`, `repeated_bind`, `peek_bind`, `receive_send_source`, `send_receive_source` | `Call` | receive/source operation anchored at its source channel |
 | `simple_source` | `Identifier` | bare channel name in `for`-source position (a use) |
 | `name_decl` **with** a `` `rho:…` `` URI child | `Import { path }` | system-process import (the polyglot anchor) |
 | `name_decl` without a URI, `let_var_decl`, `decl` | `Block` | scope wrapper around the bound `Variable` |
@@ -268,6 +270,22 @@ so each is normalised onto the nearest imperative anchor that keeps the CFG/DFG 
 | `bundle_read`/`bundle_write`/`bundle_equiv`/`bundle_read_write` | `Attribute` | capability markers |
 | `line_comment`, `block_comment` | `Comment` | |
 | `ERROR` | `Error` | parse error |
+
+The orthogonal message metadata preserves distinctions that the structural
+anchor intentionally shares:
+
+| Rholang rule | `message_kind` |
+|---|---|
+| `send`, `send_method` | `Send` |
+| `send_sync` | `SendSync` |
+| `linear_bind` | `Recv` |
+| `repeated_bind` | `RecvPersistent` |
+| `peek_bind` | `Peek` |
+| `choice` | `Select` |
+| `par` | `Spawn` |
+
+See the [channel-topology component](../graph/channel-topology.md) for the
+feature-free consumer and its typed identity rules.
 
 ### `classify_rholang_var` — the DFG-soundness core
 

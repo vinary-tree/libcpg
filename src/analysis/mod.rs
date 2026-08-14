@@ -9,6 +9,7 @@ mod centrality;
 pub(crate) mod cfg_scope;
 mod cohesion;
 mod community;
+pub mod concurrency;
 mod condensation;
 mod cycles;
 pub mod dataflow;
@@ -56,6 +57,11 @@ pub use cohesion::{
 pub use community::{
     louvain, refine_connected, try_refine_connected, CommunityAssignment, CommunityKind,
     LouvainOptions, MAX_LOUVAIN_LEVELS, MAX_LOUVAIN_PASSES,
+};
+
+pub use concurrency::{
+    channel_report, extract_events, ChannelEvent, ChannelFinding, ChannelFindingKind, ChannelId,
+    MsgKind,
 };
 
 pub use condensation::{

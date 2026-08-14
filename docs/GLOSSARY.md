@@ -584,7 +584,18 @@ using union at confluence. A **must** fact is true only when it holds on every
 path, usually using intersection. `Confluence` records this intent; the domain's
 `Lattice::join` supplies the actual operation.
 
-### Message passing
+### Channel event / Channel identity
+
+A **channel event** is a frontend-normalized `Send`, `SendSync`, linear `Recv`,
+persistent `RecvPersistent`, non-consuming `Peek`, `Select`, or `Spawn` site.
+Its optional **channel identity** is the `NodeId` of the `Variable` definition
+supported by `Identifier::definition`, `DefUse`/`ReachingDef`, or `Reference`
+evidence—not a source spelling. libcpg groups these events per top-level process
+and reports structural orphan, blocked, and linear-contention evidence. See
+[Theory 29](theory/29-channel-topology-and-linearity.md) and Meredith–Radestock
+[[43]](#references).
+
+### Message passing (GNN)
 
 One round of GNN computation: every node updates its vector from its neighbours' vectors. `libcpg` uses mean aggregation with a ReLU nonlinearity over AST, CFG, and DFG neighbourhoods:
 
@@ -953,3 +964,4 @@ Findings remain advisory and carry stable nodes plus numerical evidence. See
 40. Code-metric foundations: (**40a**) Chidamber, S. R., Kemerer, C. F. (1991). *Towards a Metrics Suite for Object Oriented Design.* DOI: [10.1145/117954.117970](https://doi.org/10.1145/117954.117970). (**40b**) Li, W., Henry, S. (1993). *Object-oriented metrics that predict maintainability.* DOI: [10.1016/0164-1212(93)90077-B](https://doi.org/10.1016/0164-1212(93)90077-B). (**40c**) Hitz, M., Montazeri, B. (1995). *Measuring Coupling and Cohesion in Object-Oriented Systems.* No DOI assigned. (**40d**) Henderson-Sellers, B. (1996). *Object-Oriented Metrics: Measures of Complexity.* ISBN 978-0-13-239872-5 (no DOI). (**40e**) Halstead, M. H. (1977). *Elements of Software Science.* ISBN 0-444-00205-7 (no DOI). (**40f**) Campbell, G. A. (2018). *Cognitive Complexity: An Overview and Evaluation.* DOI: [10.1145/3194164.3194186](https://doi.org/10.1145/3194164.3194186). (**40g**) Oman, P., Hagemeister, J. (1992). *Metrics for assessing a software system's maintainability.* DOI: [10.1109/ICSM.1992.242525](https://doi.org/10.1109/ICSM.1992.242525). (**40h**) Coleman, D., Ash, D., Lowther, B., Oman, P. (1994). *Using metrics to evaluate software system maintainability.* DOI: [10.1109/2.303623](https://doi.org/10.1109/2.303623).
 41. Interprocedural distributive-data-flow foundations: (**41a**) Reps, T., Horwitz, S., Sagiv, M. (1995). *Precise Interprocedural Dataflow Analysis via Graph Reachability.* DOI: [10.1145/199448.199462](https://doi.org/10.1145/199448.199462). (**41b**) Sagiv, M., Reps, T., Horwitz, S. (1996). *Precise Interprocedural Dataflow Analysis with Applications to Constant Propagation.* DOI: [10.1016/0304-3975(96)00072-2](https://doi.org/10.1016/0304-3975(96)00072-2).
 42. Horwitz, S., Reps, T., Binkley, D. (1990). *Interprocedural Slicing Using Dependence Graphs.* ACM Transactions on Programming Languages and Systems 12(1), 26–60. DOI: [10.1145/77606.77608](https://doi.org/10.1145/77606.77608).
+43. Meredith, L. G., Radestock, M. (2005). *A Reflective Higher-order Calculus.* Electronic Notes in Theoretical Computer Science 141(5), 49–67. DOI: [10.1016/j.entcs.2005.05.016](https://doi.org/10.1016/j.entcs.2005.05.016).

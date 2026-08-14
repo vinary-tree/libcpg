@@ -1,0 +1,56 @@
+@startuml
+!include _libcpg-theme.iuml
+title Per-channel topology and linear-consumption classification
+
+skinparam backgroundColor #FCFCFC
+skinparam component {
+  BorderColor #343A40
+  FontColor #212529
+}
+skinparam note {
+  BackgroundColor #F8F9FA
+  BorderColor #495057
+}
+
+component "Resolved ChannelId c\nnew-bound Variable NodeId" as CHANNEL #C3FAE8
+component "Producer sites S_c\nSend · SendSync" as SEND #DBE4FF
+component "Linear receiver sites R_c\nRecv (<-) · consuming" as LINEAR #FFF3BF
+component "Persistent sites P_c\nRecvPersistent (<=) · stays armed" as PERSIST #D3F9D8
+component "Peek sites K_c\nPeek (<<-) · non-consuming" as PEEK #E5DBFF
+component "OrphanSend\n|S_c| > 0 and no receiver" as ORPHAN #FFE8CC
+component "BlockedRecv\n|R_c| > 0 and |S_c| = 0" as BLOCKED #FFE3E3
+component "NondeterministicConsumption\n|R_c| > 0 and\n(|S_c| >= 2 or |R_c| >= 2)" as CONTEND #FCC2D7
+component "Ordered ChannelFinding\nchannel · processes · sites · detail" as REPORT #F1F3F5
+
+SEND --> CHANNEL : group by c
+LINEAR --> CHANNEL : group by c
+PERSIST --> CHANNEL : group by c
+PEEK --> CHANNEL : group by c
+CHANNEL --> ORPHAN : producer / observer predicate
+CHANNEL --> BLOCKED : linear starvation predicate
+CHANNEL --> CONTEND : consumption predicate
+ORPHAN --> REPORT
+BLOCKED --> REPORT
+CONTEND --> REPORT
+
+note bottom of PEEK
+  A peek prevents an orphan classification but never enters a consumption count.
+end note
+
+note bottom of REPORT
+  Structural and advisory only: no reachability, fairness, or marking enumeration.
+end note
+
+legend bottom
+|= Colour |= Meaning |
+|<#C3FAE8>| stable channel identity |
+|<#DBE4FF>| producer evidence |
+|<#FFF3BF>| consuming receive evidence |
+|<#D3F9D8>| persistent receive evidence |
+|<#E5DBFF>| non-consuming observation |
+|<#FFE8CC>| dropped-output candidate |
+|<#FFE3E3>| starvation candidate |
+|<#FCC2D7>| schedule-sensitive consumption |
+|<#F1F3F5>| immutable advisory report |
+endlegend
+@enduml
