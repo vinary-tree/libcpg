@@ -15,6 +15,10 @@ Both are deterministic projections over existing CPG `NodeId` values. Both use
 the shared strongly connected component (SCC) implementation instead of a
 private cycle detector.
 
+Parallel composition is a separate question: [Theory 31](31-may-happen-in-parallel.md)
+derives a symmetric statement relation from typed operand subtrees without
+using SCCs.
+
 ![Initially blocked processes become a wait-for SCC](../diagrams/wait-for-deadlock.svg)
 
 ## 1. Evidence vocabulary

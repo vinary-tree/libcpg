@@ -376,6 +376,29 @@ The function constructs `GraphProjection::External` values and reuses
 guide](../usage/13-deadlock-candidates.md), [theory](../theory/30-cyclic-wait-and-lock-order.md),
 and [security boundary](../security/05-deadlock-analysis.md).
 
+### May-happen-in-parallel relation
+
+`may_happen_in_parallel(&CodePropertyGraph) -> MhpRelation` recognizes typed
+parallel regions (`Block` plus `MsgKind::Spawn`) and relates execution sites in
+different direct operand subtrees. Direct process roots and wrapper blocks are
+both valid operands; nested `Function` bodies are excluded.
+
+| Item | Contract |
+|---|---|
+| `MhpPair` | One canonical unordered pair with `first < second`. |
+| `MhpRelation::pairs` | Lexicographically sorted, deduplicated canonical pairs. |
+| `MhpRelation::contains(left, right)` | Symmetric membership; self-pairs are false. |
+| `MhpRelation::partners(node)` | Stable iterator over all sites related to `node`. |
+| `MhpRelation::capped` | True when the public pair ceiling omitted later valid pairs. |
+| `MAX_MHP_PAIRS` | One-million-pair materialization ceiling. |
+
+Execution sites are statement nodes plus `Variable`, `Assignment`, `Call`,
+`Await`, and `Yield`. The relation is feature-free, read-only, and out of graph.
+A capped result contains no false pairs but is incomplete. See the [component
+guide](../components/graph/mhp-analysis.md), [usage
+guide](../usage/14-may-happen-in-parallel.md), [theory](../theory/31-may-happen-in-parallel.md),
+and [security boundary](../security/06-mhp-analysis.md).
+
 ### Deterministic graph projections
 
 `GraphProjection` is the feature-free, payload-free compressed-sparse-row view

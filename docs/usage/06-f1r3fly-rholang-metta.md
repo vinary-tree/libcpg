@@ -109,7 +109,11 @@ The def-versus-use distinction (`classify_rholang_var`) is what makes the Rholan
 `Send`, `SendSync`, `Recv`, `RecvPersistent`, `Peek`, `Select`, and `Spawn`.
 Use [`extract_events` and `channel_report`](12-channel-topology.md) to consume
 that metadata, then [`communication_deadlocks`](13-deadlock-candidates.md) for
-initially blocked wait cycles through the feature-free public API.
+initially blocked wait cycles and
+[`may_happen_in_parallel`](14-may-happen-in-parallel.md) for structural
+parallelism through the feature-free public API. A typed `par` block's direct
+operands can be process nodes such as sends or wrapper blocks; both layouts have
+the same MHP semantics.
 
 ![Rholang constructs mapped onto CPG node and edge kinds.](../diagrams/rholang-mapping.svg)
 

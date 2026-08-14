@@ -31,6 +31,10 @@ node's established structural meaning. For example, a Rholang `send` remains a
 `Call`, `choice` remains `Match`, and `par` remains `Block`, while each also
 carries the appropriate `MsgKind`.
 
+For `par`, the block's direct children are its semantic operands. Depending on
+the real grammar tree, those roots may be process nodes or wrapper blocks. The
+[MHP component](mhp-analysis.md) intentionally accepts both shapes.
+
 The Rholang mapping is:
 
 ```text
@@ -89,6 +93,7 @@ Finding `processes` and `sites` are independently sorted and deduplicated.
 - [Usage 12](../../usage/12-channel-topology.md)
 - [Scientific validation 31](../../scientific/31-channel-topology-validation.md)
 - [Security boundary](../../security/04-channel-topology.md)
+- [May-happen-in-parallel analysis](mhp-analysis.md)
 
 ## References
 

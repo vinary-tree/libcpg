@@ -62,6 +62,9 @@ The analysis does not prove deadlock freedom, enumerate schedules, model fairnes
 interpret lock implementation internals, infer condition-variable predicates,
 or assign CWE severity. It supplies reproducible review candidates.
 
+For the orthogonal question of which sites may execute concurrently, see the
+[MHP security boundary](06-mhp-analysis.md).
+
 ## References
 
 1. Kobayashi, N. (2006). *A New Type System for Deadlock-Free Processes.* DOI:

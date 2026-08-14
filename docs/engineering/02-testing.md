@@ -22,7 +22,7 @@ think to write down.
 
 | Kind | Count | Where |
 | --- | ---: | --- |
-| Maximal-matrix library tests | 897 | inline `#[cfg(test)] mod …` next to the code; includes examples and properties |
+| Maximal-matrix library tests | 973 | inline `#[cfg(test)] mod …` next to the code; includes examples and properties |
 | Public-API integration tests | 21 | `tests/integration.rs` |
 | Malformed-input robustness tests | 5 | `tests/robustness.rs` |
 | SCCP public/parser integration tests | 3 | `tests/sccp_integration.rs` |
@@ -51,8 +51,11 @@ think to write down.
 | Architectural-smell public/serialization integration tests | 2 | `tests/smells_integration.rs` |
 | Field-access public/parser integration tests | 2 | `tests/field_access_integration.rs` |
 | Code-metrics public/parser integration tests | 2 | `tests/metrics_integration.rs` |
-| **Executable test cases** | **994** | measured by the all-features test inventory; excludes three ignored rustdoc examples |
-| `proptest!` blocks (subset of the library/robustness rows) | 69 | exact source-level macro count in `src/` and `tests/` |
+| Channel-topology public/parser integration tests | 3 | `tests/concurrency_integration.rs` |
+| Deadlock-candidate public/parser integration tests | 3 | `tests/deadlock_integration.rs` |
+| MHP public/parser integration tests | 2 | `tests/mhp_integration.rs` |
+| **Executable test cases** | **1,063** | measured by the all-features test inventory; excludes three ignored rustdoc examples |
+| `proptest!` blocks (subset of the library/robustness rows) | 70 | exact source-level macro count in `src/` and `tests/` |
 
 The maximal-matrix library count is up from **99** inline tests and **zero**
 property tests before this work.
@@ -70,10 +73,10 @@ on the features enabled:
 
 | Command | Lib tests | Notes |
 | --- | ---: | --- |
-| `cargo test` | 568 | `default = []`: the feature-free surface only |
-| `cargo test --features "full rholang metta"` | 897 | the maximal matrix, including the Mode-B mappers and evidence-aware complexity |
+| `cargo test` | 634 | `default = []`: the feature-free surface only |
+| `cargo test --features "full rholang metta"` | 973 | the maximal matrix, including the Mode-B mappers and evidence-aware complexity |
 
-The feature-free 568 exercise the graph model, deterministic multi-file merge
+The feature-free 634 exercise the graph model, deterministic multi-file merge
 and import linkage, exact dominator/post-dominator,
 natural-loop, monotone data-flow, IFDS/IDE procedure summaries,
 interprocedural effect/constant, taint, and maybe-null summaries, variable-liveness/dead-store,
@@ -83,7 +86,8 @@ package metrics and stable-dependency witnesses, CK/LCOM1–5 and function code
 metrics, architectural-smell detection, WL
 structural-clone and Type-1 through Type-4 function-clone detection, centrality, community, cohesion/robustness,
 spectral-connectivity classification, bounded simple cycles, directed motifs,
-bipartite GED, the CFG/DFG/PDG extractors, VF2, and similarity by building CPGs
+bipartite GED, typed channel/deadlock evidence, may-happen-in-parallel relations,
+the CFG/DFG/PDG extractors, VF2, and similarity by building CPGs
 **by hand** — no grammar required. This is what
 the [`arb_well_formed_cpg`](#the-generators) generator exists for.
 

@@ -81,8 +81,9 @@ alternatives is folklore, and a decision without its costs is marketing.
 | [0035 — Overlay SDG summary edges and two-pass slicing](0035-system-dependence-summary-slicing.md) | Materialize labeled caller-local parameter-to-return dependences and apply deterministic HRB phase masks with explicit node/depth caps. | Accepted |
 | [0036 — Typed channel topology](0036-typed-channel-topology.md) | Preserve language-neutral message semantics at the frontend boundary and classify def-use-resolved channel matching/linearity as ordered out-of-graph evidence. | Accepted |
 | [0037 — Typed deadlock witnesses](0037-typed-deadlock-witnesses.md) | Build communication wait-for and interprocedural lock-order projections from typed identity evidence, reuse shared SCCs, and retain statement-precise advisory witnesses. | Accepted |
+| [0038 — Typed AST MHP](0038-typed-ast-mhp.md) | Derive bounded canonical may-happen-in-parallel pairs from direct operand subtrees of typed parallel blocks, independent of parser wrapper shape. | Accepted |
 
-These thirty-seven are not independent. ADR-0001 fixes the substrate that all analyses
+These thirty-eight are not independent. ADR-0001 fixes the substrate that all analyses
 write onto; ADR-0002 and ADR-0005 together explain how a language reaches that
 substrate and what you must switch on to get there; ADR-0003 and ADR-0004 are
 two analyses *over* the substrate (one always-on, one feature-gated) that each
@@ -174,6 +175,10 @@ resolves stable channel identity from existing definition evidence, and keeps
 matching/linearity findings immutable and advisory. ADR-0037 deepens that
 evidence into process wait-for and lock-resource order projections, reuses the
 shared SCC engine, and preserves exact sites/ranges for every cyclic witness.
+ADR-0038 consumes ADR-0036's typed `Spawn` boundary directly: it treats every
+direct AST child as one parallel operand, emits canonical cross-operand
+execution-site pairs, excludes nested definitions, and exposes quadratic
+truncation instead of hiding it.
 
 ![Module architecture of libcpg, showing the graph core and the analysis modules layered over it](../diagrams/module-architecture.svg)
 
@@ -185,7 +190,7 @@ shared SCC engine, and preserves exact sites/ranges for every cyclic witness.
   (`0001`…). Numbers are never reused; a reversed decision is marked
   *Superseded* and a new record supersedes it, so history stays legible.
 - **Status lifecycle.** `Proposed → Accepted → (Superseded by NNNN | Deprecated)`.
-  All thirty-six current records are **Accepted** and reflect the shipped `v0.1.1`
+  All thirty-eight current records are **Accepted** and reflect the shipped `v0.1.1`
   code.
 - **Grounding.** Every claim here is traceable to source: the
   [`Cargo.toml`](../engineering/01-build-and-features.md) feature block, the

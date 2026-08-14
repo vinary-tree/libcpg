@@ -411,6 +411,9 @@ So the safe pattern is: build (single-threaded, `&mut`), then analyse
 - [Communication and lock-order deadlocks](deadlock-analysis.md) — initially
   blocked process waits, typed direct/interprocedural lock order, shared SCCs,
   and statement-precise advisory witnesses.
+- [May-happen-in-parallel analysis](mhp-analysis.md) — typed parallel operand
+  subtrees, canonical symmetric execution-site pairs, nested-region
+  composition, and explicit quadratic-output truncation.
 - [`api/graph-reference.md`](../../api/graph-reference.md) — the precise,
   method-by-method API reference for `CodePropertyGraph`.
 - [`theory/01-code-property-graphs.md`](../../theory/01-code-property-graphs.md)

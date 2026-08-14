@@ -196,7 +196,7 @@ same graph. Errors are the crate's own [`libcpg::Error`](../api/graph-reference.
 
 ## 6. Map of the theory pillar
 
-This overview sits above thirty formal chapters. Read them in order for a ground-up
+This overview sits above thirty-one formal chapters. Read them in order for a ground-up
 development, or jump to the layer you need:
 
 1. **[01 — Code Property Graphs](01-code-property-graphs.md).** The formal model:
@@ -260,9 +260,13 @@ development, or jump to the layer you need:
     Initially blocked process relations, typed held-lock order, finite
     interprocedural acquisition summaries, and shared SCC decomposition define
     statement-precise advisory deadlock candidates.
-    The later chapters define deterministic projection structure,
-    architecture metrics, inspectable evidence, and their interpretation
-    limits.
+31. **[31 — May-happen-in-parallel relations](31-may-happen-in-parallel.md).**
+    Typed parallel operand subtrees, explicit execution-site boundaries,
+    canonical symmetric pairs, and a visible output cap define immutable
+    structural concurrency evidence.
+
+The later chapters define deterministic projection structure, architecture
+metrics, inspectable evidence, and their interpretation limits.
 
 For how these ideas are realised in code, cross the bridge to the architecture
 pillar ([`architecture/overview.md`](../architecture/overview.md),

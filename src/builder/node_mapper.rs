@@ -1362,8 +1362,9 @@ impl NodeMapper {
             // `new … in {…}` (ν-restriction), `let … in {…}`, `for(…){…}`
             // (receive), explicit `{…}`, `|` parallel composition, `bundle`,
             // and send-continuations all introduce a process region → `Block`.
-            // `par` keeps both operands as concurrent sibling sub-blocks: the
-            // CFG is sound (both run) though it does not model interleaving.
+            // `par` keeps both operands as concurrent AST siblings (direct
+            // process roots or wrapper blocks, depending on grammar shape):
+            // the CFG is sound (both run) though it does not model interleaving.
             "new" | "let" | "input" | "block" | "par" | "bundle" | "sync_send_cont"
             | "non_empty_cont" | "empty_cont" => CpgNodeKind::Block {
                 scope: ScopeId::GLOBAL,

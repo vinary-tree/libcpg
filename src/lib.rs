@@ -57,6 +57,8 @@
 //!   identity and report orphan, blocked, and contended linear consumption
 //! - **Deadlock Candidates**: Reuse deterministic SCC projections for initially
 //!   blocked communication waits and typed interprocedural lock order
+//! - **May-Happen-in-Parallel**: Derive canonical symmetric execution-site
+//!   pairs from typed parallel operand subtrees under an explicit output cap
 //! - **Pattern Detection**: Detect design patterns using subgraph isomorphism (VF2/VF3)
 //! - **Algorithm Analysis**: Extract algorithm signatures and estimate complexity
 //! - **GNN Support**: Graph neural network message passing for semantic embeddings
@@ -125,11 +127,11 @@ pub use analysis::{
     eigenvector_centrality, expression_facts, extract_events, function_metrics, global_min_cut,
     harmonic_centrality, hits, infer_layering, interprocedural_backward_slice,
     interprocedural_forward_slice, k_core_decomposition, k_truss_decomposition, katz_centrality,
-    liveness, loop_forest, loop_induction, louvain, martin_metrics, merge_programs,
-    method_field_graph, module_graph_projection, motif_census, pagerank, pdg_projection,
-    personalized_pagerank, post_dominator_tree, projection_of, projection_sccs, refine_connected,
-    reflexion, resolve_calls, reverse_pagerank, sccp, sdp_violations, simple_cycles, solve,
-    solve_summaries, solve_summaries_with_resolver, structural_clone_classes,
+    liveness, loop_forest, loop_induction, louvain, martin_metrics, may_happen_in_parallel,
+    merge_programs, method_field_graph, module_graph_projection, motif_census, pagerank,
+    pdg_projection, personalized_pagerank, post_dominator_tree, projection_of, projection_sccs,
+    refine_connected, reflexion, resolve_calls, reverse_pagerank, sccp, sdp_violations,
+    simple_cycles, solve, solve_summaries, solve_summaries_with_resolver, structural_clone_classes,
     try_algebraic_connectivity, try_refine_connected, two_edge_connected_components,
     unreachable_code, value_ranges, variable_facts, very_busy_expressions, wl_labels,
     AmbientFlowKey, AnalysisError, ArchSmell, ArchSmellKind, AttackResult, AttackStep,
@@ -149,19 +151,19 @@ pub use analysis::{
     IvDirection, KCoreDecomposition, KTrussDecomposition, KatzOptions, Lattice, LayerSpec,
     LayeringReport, LayeringViolation, LayeringViolationKind, LcomSuite, LivenessResult,
     LoopBoundEvidence, LoopExitEdge, LoopForest, LoopInvariants, LouvainOptions, MartinMetrics,
-    MaybeNull, MethodCall, MethodFieldAccess, MethodFieldGraph, ModuleAssignment, MotifCensus,
-    MotifOptions, MustBits, NaturalLoop, NullAnalysis, NullFlow, NullFlowKey, NullOriginKind,
-    NullSummary, PageRankOptions, ParamSinkKey, Pattern, Place, PostDominatorTree, ProgramCpg,
-    ProjectionError, ProjectionKind, Purity, ReachabilityReport, ReflexionDivergence,
-    ReflexionRules, ReflexionSummary, ReflexionVerdict, ResolveConfig, ReturnSourceKey,
-    SccAnalysisError, SccComponent, SccCondensationEdge, SccDecomposition, SccProjection,
-    SccpResult, SdpViolation, SinkClass, SliceCaps, SmellOptions, SolverConfig, SourceClass,
-    Spectral, SpectralOptions, SummaryCtx, SummaryDomain, SymbolCandidates, SymbolTable,
-    TaintAnalysis, TaintCatalog, TaintFact, TaintFlow, TaintSummary, TaintWitness, TripEvidence,
-    TrussEdge, TwoEdgeConnectedComponents, UndirectedProjection, VarFacts, VariableDefinition,
-    VeryBusyExpressions, DEFAULT_CENTRALITY_WORK_LIMIT, MAX_ATTACK_STEPS,
+    MaybeNull, MethodCall, MethodFieldAccess, MethodFieldGraph, MhpPair, MhpRelation,
+    ModuleAssignment, MotifCensus, MotifOptions, MustBits, NaturalLoop, NullAnalysis, NullFlow,
+    NullFlowKey, NullOriginKind, NullSummary, PageRankOptions, ParamSinkKey, Pattern, Place,
+    PostDominatorTree, ProgramCpg, ProjectionError, ProjectionKind, Purity, ReachabilityReport,
+    ReflexionDivergence, ReflexionRules, ReflexionSummary, ReflexionVerdict, ResolveConfig,
+    ReturnSourceKey, SccAnalysisError, SccComponent, SccCondensationEdge, SccDecomposition,
+    SccProjection, SccpResult, SdpViolation, SinkClass, SliceCaps, SmellOptions, SolverConfig,
+    SourceClass, Spectral, SpectralOptions, SummaryCtx, SummaryDomain, SymbolCandidates,
+    SymbolTable, TaintAnalysis, TaintCatalog, TaintFact, TaintFlow, TaintSummary, TaintWitness,
+    TripEvidence, TrussEdge, TwoEdgeConnectedComponents, UndirectedProjection, VarFacts,
+    VariableDefinition, VeryBusyExpressions, DEFAULT_CENTRALITY_WORK_LIMIT, MAX_ATTACK_STEPS,
     MAX_CENTRALITY_ITERATIONS, MAX_CONDENSATION_COMPONENTS, MAX_CYCLE_LENGTH, MAX_DSM_NODES,
-    MAX_GRAPHLET_NODES, MAX_K_TRUSS_EDGES, MAX_LOUVAIN_LEVELS, MAX_LOUVAIN_PASSES,
+    MAX_GRAPHLET_NODES, MAX_K_TRUSS_EDGES, MAX_LOUVAIN_LEVELS, MAX_LOUVAIN_PASSES, MAX_MHP_PAIRS,
     MAX_MIN_CUT_NODES, MAX_SIMPLE_CYCLES, MAX_SPECTRAL_ITERATIONS, MAX_SPECTRAL_STARTS,
     MAX_TRIAD_NODES, MAX_WL_ITERATIONS, SUMMARY_EDGE_LABEL, TRIAD_NAMES,
 };

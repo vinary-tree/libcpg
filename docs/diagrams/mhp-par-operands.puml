@@ -1,0 +1,51 @@
+@startuml
+!include _libcpg-theme.iuml
+title Typed AST may-happen-in-parallel analysis
+
+skinparam backgroundColor #FCFCFC
+skinparam component {
+  BorderColor #343A40
+  FontColor #212529
+}
+skinparam note {
+  BackgroundColor #F8F9FA
+  BorderColor #495057
+}
+
+component "CPG AST overlay\nBlock + MsgKind::Spawn" as INPUT #DBE4FF
+component "Stable direct children\noperand roots (direct or wrapped)" as OPERANDS #FFF3BF
+component "Cycle-guarded subtree walks\nstop at nested Function" as WALK #C3FAE8
+component "Execution sites\nstatements + explicit executable kinds" as SITES #D3F9D8
+component "Distinct-operand cross-products\n<latex>S(o_i) \\times S(o_j), i \\ne j</latex>" as PRODUCT #E5DBFF
+component "Canonical ordered set\n(min id, max id)" as CANON #FFE8CC
+component "MAX_MHP_PAIRS budget\nvisible truncation" as BOUND #FCC2D7
+component "MhpRelation\nsorted pairs + capped flag" as OUTPUT #FFE3E3
+
+INPUT --> OPERANDS : typed boundary only
+OPERANDS --> WALK : one traversal per operand
+WALK --> SITES : filter structural nodes
+SITES --> PRODUCT : pair different operands
+PRODUCT --> CANON : symmetric deduplication
+CANON --> BOUND : count materialized pairs
+BOUND --> OUTPUT : complete or capped
+
+note bottom of INPUT
+  No source parsing and no grammar dependency.
+end note
+
+note bottom of OUTPUT
+  Read-only advisory evidence. MHP is not by itself a data-race finding.
+end note
+
+legend bottom
+|= Colour |= Meaning |
+|<#DBE4FF>| typed frontend evidence |
+|<#FFF3BF>| AST operand boundary |
+|<#C3FAE8>| terminating traversal |
+|<#D3F9D8>| execution-site selection |
+|<#E5DBFF>| relation construction |
+|<#FFE8CC>| deterministic canonicalization |
+|<#FCC2D7>| resource safety boundary |
+|<#FFE3E3>| immutable public result |
+endlegend
+@enduml

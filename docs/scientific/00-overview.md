@@ -50,7 +50,7 @@ Two properties of the suite make this rigorous rather than merely suggestive:
 
 ## 3. The evidence base
 
-The maximal matrix contains **912 library tests**, **21 general public-API
+The maximal matrix contains **973 library tests**, **21 general public-API
 integration tests**, **5 malformed-input robustness tests**, **3 SCCP
 public/parser integration tests**, and **3 interval public/parser integration
 tests**, plus **3 loop-induction** and **3 complexity-evidence public/parser
@@ -59,8 +59,9 @@ integration tests**, plus **1 WL**, **2 centrality**, **2 community**, **2
 cohesion**, **2 spectral**, **2 cycle**, **2 motif**, **2 GED**, **2 function-clone**, **3 program-composition**, **2 IFDS/IDE**, **2 effect-summary**, **2 Martin**, **2 code-metric**, and
 **2 reflexion**, **2 layering**, **2 architectural-smell**, **2 field-access**,
 and **3 taint/nullflow public/parser integration tests**, plus **1 SDG-slicing
-public integration test**. These 994 executable cases combine fixed examples,
-differential oracles, and 69 exact source-level
+public integration test**, plus **3 channel-topology**, **3 deadlock-candidate**,
+and **2 MHP public/parser integration tests**. These 1,063 executable cases
+combine fixed examples, differential oracles, and 70 exact source-level
 `proptest!` blocks. The feature-free matrix remains
 independently runnable and exercises the exact graph/data-flow substrate
 without compiling any grammar. Nineteen active Criterion targets supplement
@@ -107,6 +108,7 @@ Because `default = []`, many tests are **feature-gated**. The end-to-end reachin
 | [30 — SDG slicing validation](30-sdg-slicing-validation.md) | Labeled summary construction, append-only idempotency, backward/forward two-pass context discipline, deterministic caps, and legacy PDG preservation | exact two-caller oracle, three 256-case generated properties, black-box effect-to-slice integration, serialization | feature-free / `serde` |
 | [31 — Channel-topology validation](31-channel-topology-validation.md) | Frontend message normalization, statement-precise definition identity, orphan/blocked/linearity predicates, non-consuming peek/persistent semantics, determinism, and advisory immutability | exact pgmcp-lineage examples, three 128-case generated properties, crate-root and real Rholang Mode-B integration, serialization | feature-free / `rholang` / `serde` |
 | [32 — Deadlock-candidate validation](32-deadlock-validation.md) | Initially blocked communication cycles, typed read/write lock order, interprocedural acquisition summaries, lexical capture, precise witnesses, determinism, and advisory immutability | direct and interprocedural examples, three 128-case generated properties, crate-root and real Rholang Mode-B integration, serialization | feature-free / `rholang` / `serde` |
+| [33 — MHP validation](33-mhp-validation.md) | Direct-or-wrapped parallel operands, cross-operand execution-site pairs, nested-region composition, function boundaries, canonical symmetry, determinism, visible caps, and immutability | exact examples, one 128-case generated Cartesian-product property, crate-root and real Rholang Mode-B integration, serialization | feature-free / `rholang` / `serde` |
 
 ## 5. What is proven, and what is advisory
 
@@ -175,6 +177,9 @@ Scientific honesty requires separating the two:
   Architectural-smell classification and numerical evidence are exact for the
   validated projection/SCC/assignment/Martin snapshot and options; whether a
   finding is harmful or warrants refactoring remains advisory.
+  MHP pairs are exact for the represented typed parallel AST up to the visible
+  output cap; runtime overlap, shared-memory conflict, and race severity remain
+  advisory questions outside this relation.
 - **Empirically bounded.** Performance results apply only to a target's named
   fixture, size, and controlled environment. DFG/PDG
   construction, whole-corpus analysis, and GNN propagation remain measurement gaps; no result

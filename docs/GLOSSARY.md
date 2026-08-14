@@ -614,6 +614,18 @@ statement sites and source ranges. See [Theory
 is retained in lock-order witnesses. A semantic adapter assigns the kind after
 API resolution; the deadlock analyzer does not guess from a function name.
 
+### May-happen-in-parallel relation / Parallel operand
+
+A **may-happen-in-parallel relation** (MHP relation) is a symmetric relation
+between execution sites whose typed AST structure permits concurrent execution.
+A **parallel operand** is one direct AST child of a `Block` carrying
+`MsgKind::Spawn`; the child may be a direct process root or a wrapper block.
+libcpg relates sites across different operands, stores each pair once in
+canonical `NodeId` order, and exposes whether its quadratic-output cap was
+reached. MHP is not by itself a conflicting access or data-race finding. See
+[Theory 31](theory/31-may-happen-in-parallel.md) and Naumovich–Avrunin
+[[45]](#references).
+
 ### Message passing (GNN)
 
 One round of GNN computation: every node updates its vector from its neighbours' vectors. `libcpg` uses mean aggregation with a ReLU nonlinearity over AST, CFG, and DFG neighbourhoods:
@@ -985,3 +997,4 @@ Findings remain advisory and carry stable nodes plus numerical evidence. See
 42. Horwitz, S., Reps, T., Binkley, D. (1990). *Interprocedural Slicing Using Dependence Graphs.* ACM Transactions on Programming Languages and Systems 12(1), 26–60. DOI: [10.1145/77606.77608](https://doi.org/10.1145/77606.77608).
 43. Meredith, L. G., Radestock, M. (2005). *A Reflective Higher-order Calculus.* Electronic Notes in Theoretical Computer Science 141(5), 49–67. DOI: [10.1016/j.entcs.2005.05.016](https://doi.org/10.1016/j.entcs.2005.05.016).
 44. Kobayashi, N. (2006). *A New Type System for Deadlock-Free Processes.* CONCUR 2006, LNCS 4137, 233–247. DOI: [10.1007/11817949_16](https://doi.org/10.1007/11817949_16).
+45. Naumovich, G., Avrunin, G. S. (1998). *A Conservative Data Flow Algorithm for Detecting All Pairs of Statements That May Happen in Parallel.* Proceedings of the 6th ACM SIGSOFT International Symposium on Foundations of Software Engineering, 24–34. DOI: [10.1145/288195.288213](https://doi.org/10.1145/288195.288213).

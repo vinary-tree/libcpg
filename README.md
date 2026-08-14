@@ -78,6 +78,9 @@ PDG). A query can therefore mix syntax, control flow, and data flow freely.
 - **Communication and lock-order deadlocks** — feature-free initially blocked
   wait-for SCCs, typed read/write lock-order SCCs, transitive acquisition
   summaries, and statement-precise advisory witnesses.
+- **May-happen-in-parallel relation** — feature-free typed parallel-operand
+  cross-products with canonical symmetric statement pairs, nested-region
+  composition, and an explicit quadratic-output cap.
 - **Projection centrality** — deterministic PageRank variants, vertex/edge
   betweenness, eigenvector, Katz, closeness, harmonic, HITS, and Burt
   structural-hole scores with explicit iteration and traversal budgets.

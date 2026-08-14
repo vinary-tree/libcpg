@@ -1,6 +1,6 @@
 # Diagram catalog
 
-Every figure in the `libcpg` documentation is a **committed source** (`.puml` for PlantUML, `.dot` for Graphviz) rendered to a **committed `.svg`** that the Markdown pages embed. Sources are version-controlled so figures are reproducible and reviewable; SVGs are committed so they render on GitHub (which does not render PlantUML/Graphviz inline). This directory holds all 91 figures plus the shared theme.
+Every figure in the `libcpg` documentation is a **committed source** (`.puml` for PlantUML, `.dot` for Graphviz) rendered to a **committed `.svg`** that the Markdown pages embed. Sources are version-controlled so figures are reproducible and reviewable; SVGs are committed so they render on GitHub (which does not render PlantUML/Graphviz inline). This directory holds all 92 figures plus the shared theme.
 
 ## Conventions
 
@@ -88,6 +88,7 @@ Grouped by subject. Each row: the source (its `.svg` sibling is embedded by the 
 | `channel-topology-classification.puml` | component/decision flow | per-channel producer/linear/persistent/peek tallies → orphan, blocked, and consumption-contention evidence | components/graph/channel-topology, theory/29, design/0036 |
 | `wait-for-deadlock.puml` | component/evidence flow | ordered channel events → initial waits and producer gate → process projection → cyclic SCC witnesses | components/graph/deadlock-analysis, theory/30, design/0037, security/05 |
 | `lock-order-deadlock.puml` | component/fixed-point flow | typed lock calls + resource identity + callee summaries → held-stack order → conflicting resource SCC witnesses | components/graph/deadlock-analysis, theory/30, design/0037, usage/13 |
+| `mhp-par-operands.puml` | component/relation flow | typed parallel block → direct operand subtrees → execution sites → canonical bounded symmetric pairs | components/graph/mhp-analysis, theory/31, design/0038, scientific/33, security/06, usage/14 |
 
 ### Control flow, data flow, dependence
 | Source | Type | Depicts | Embedded by |

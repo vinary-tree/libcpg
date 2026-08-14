@@ -491,6 +491,24 @@ See the [component guide](../components/graph/deadlock-analysis.md), [Theory
 30](../theory/30-cyclic-wait-and-lock-order.md), and [Usage
 13](../usage/13-deadlock-candidates.md).
 
+### May-happen-in-parallel relation (feature-free)
+
+`may_happen_in_parallel` consumes the same typed `MsgKind::Spawn` boundary but
+uses only AST structure. Each direct child of a parallel block is one operand
+root, whether it is a direct process node or a wrapper block. Cycle-guarded
+subtree walks collect execution sites while stopping at nested functions;
+cross-products between distinct operands become canonical symmetric pairs.
+
+The relation is immutable and out of graph. Ordered traversal and storage make
+it deterministic, while `MAX_MHP_PAIRS` bounds quadratic materialization and
+`MhpRelation::capped` exposes incomplete output.
+
+![Typed parallel operands become canonical MHP pairs](../diagrams/mhp-par-operands.svg)
+
+See the [component guide](../components/graph/mhp-analysis.md), [Theory
+31](../theory/31-may-happen-in-parallel.md), and [Usage
+14](../usage/14-may-happen-in-parallel.md).
+
 ### Pattern detection
 
 Two layers, at two feature levels:
