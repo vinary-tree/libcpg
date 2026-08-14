@@ -1,6 +1,6 @@
 # Measurement methodology
 
-`libcpg` ships seventeen runnable Criterion targets. Their baseline groups are
+`libcpg` ships eighteen runnable Criterion targets. Their baseline groups are
 feature-free; the `induction_analysis` target also registers an
 `algorithm-detection`-gated complexity-evidence group. Each active group
 asserts a deterministic correctness oracle **before** entering the timed loop.
@@ -19,7 +19,7 @@ the source transformation under study does not [[1]](#references).
 
 ## 1. Current evidence
 
-All seventeen targets use `harness = false`, which hands execution to Criterion
+All eighteen targets use `harness = false`, which hands execution to Criterion
 rather than Rust's test harness:
 
 ```toml

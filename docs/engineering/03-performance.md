@@ -124,8 +124,8 @@ once, loop bodies twice, and a path set cuts malformed AST cycles.
 
 ## Benchmark coverage and remaining gaps
 
-Seventeen Criterion targets are active. Their twenty-nine baseline operation groups are
-feature-free; `induction_analysis` also registers a thirtieth,
+Eighteen Criterion targets are active. Their thirty baseline operation groups are
+feature-free; `induction_analysis` also registers a thirty-first,
 `algorithm-detection`-gated operation. Every active group constructs and checks a deterministic oracle
 before Criterion enters the timed loop:
 
@@ -160,6 +160,11 @@ before Criterion enters the timed loop:
   over 16- and 64-file programs with 16 statement nodes per file. Exact summed
   counts, contiguous ids, embedded-reference totality, file scopes, resolution
   classes, and dependency counts are asserted before timing.
+- `ifds_summaries` measures one-pass acyclic and bounded recursive
+  procedure-summary solving over 256- and 1,024-function call graphs. Complete
+  first-function transitive closure and nonempty per-function summaries are
+  asserted before timing; call-graph SCC construction remains outside the timed
+  region.
 - `centrality` measures PageRank and shifted eigenvector iteration over 256-
   and 1,024-vertex paths, rings, and clustered graphs, plus directed Brandes
   and undirected closeness over the same shapes at 128 and 256 vertices. Its

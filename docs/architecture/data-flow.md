@@ -240,6 +240,23 @@ and the acyclic condensation graph. The analysis is exact for the projected
 edges and does not guess unresolved calls. See the
 [SCC component guide](../components/graph/scc-analysis.md) for the full contract.
 
+### IFDS/IDE procedure summaries (feature-free)
+
+`solve_summaries` combines the current call-graph SCC decomposition with a
+caller-defined `SummaryDomain`. It validates the public decomposition against
+the CPG, removes condensation sinks in stable callee-first order, evaluates
+acyclic functions once, and iterates self/mutually recursive components from
+lattice bottom under explicit caps. Results, retained seeds, cap events, and
+structural/domain issues stay out of graph in ordered collections; the solver
+does not mutate the CPG or create another graph store.
+
+The interprocedural trait is namespaced as `analysis::ifds::Lattice` and
+re-exported as `IfdsLattice`, distinct from the block-CFG `Lattice` above.
+`CalleeRef` keeps represented, external, and unresolved boundaries explicit.
+See the [IFDS/IDE component guide](../components/graph/ifds-ide-framework.md)
+for the domain contract and [Theory 25](../theory/25-ifds-ide-summary-solving.md)
+for the SCC fixed point.
+
 `condensation_metrics(&sccs, &options)` continues that pipeline without
 revisiting the CPG. A minimum-id Kahn order drives source-oriented longest-path
 levels and an SCC-member-weighted critical path; optional

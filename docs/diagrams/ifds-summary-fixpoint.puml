@@ -1,0 +1,69 @@
+@startuml
+!include _libcpg-theme.iuml
+title Bounded deterministic IFDS/IDE procedure-summary fixed point
+
+skinparam backgroundColor #FCFCFC
+skinparam component {
+  BorderColor #495057
+}
+skinparam note {
+  BackgroundColor #F1F3F5
+  BorderColor #495057
+}
+
+component "CodePropertyGraph\nfunctions and call sites" as CPG #DBE4FF
+component "SummaryDomain\nfacts · transfer · summary" as DOMAIN #FFF3BF
+component "call_graph_sccs\ncanonical SCC partition" as SCC #C3FAE8
+component "IfdsCaps\nfive explicit bounds" as CAPS #FFE8CC
+component "structural validation\ncurrent call graph · dense ids\nmembership · canonical DAG" as VALIDATE #F1F3F5
+component "callee-first Kahn order\ncondensation sinks first" as ORDER #D3F9D8
+component "acyclic singleton\nevaluate exactly once" as ACYCLIC #C3FAE8
+component "recursive SCC\nbottom initialization\nbounded Kleene rounds" as RECURSIVE #E5DBFF
+component "lattice contract check\njoin · subsumes · idempotence" as LATTICE #FCC2D7
+component "IfdsOutput\nBTree summaries · seeds\ncaps · issues · iterations" as OUTPUT #FFF3BF
+component "partial evidence\nno completeness claim" as PARTIAL #FFE3E3
+
+CPG --> VALIDATE
+SCC --> VALIDATE
+CAPS --> VALIDATE
+VALIDATE --> ORDER : exact current decomposition
+ORDER --> ACYCLIC : non-recursive component
+ORDER --> RECURSIVE : self or mutual recursion
+DOMAIN --> ACYCLIC
+DOMAIN --> RECURSIVE
+CAPS --> ORDER
+CAPS --> RECURSIVE
+ACYCLIC --> LATTICE : candidate summary
+RECURSIVE --> LATTICE : <latex>S_f^{(k+1)} = S_f^{(k)} \sqcup F_f(S^{(k)})</latex>
+LATTICE --> OUTPUT : monotone update
+OUTPUT --> RECURSIVE : current callee summaries
+VALIDATE --> PARTIAL : malformed or stale
+ORDER --> PARTIAL : work cap
+RECURSIVE --> PARTIAL : iteration or work cap
+PARTIAL --> OUTPUT : ordered evidence
+
+note bottom of ORDER
+  Condensation edges point caller to callee.
+  Removing sinks first gives callees-first order.
+  The smallest member NodeId breaks ties.
+end note
+
+note bottom of OUTPUT
+  The CPG is read-only. No parallel graph is created.
+  Capped output may omit may-analysis evidence;
+  consumers must check is_complete() before a verdict.
+end note
+
+legend bottom
+|= Colour |= Meaning |
+|<#DBE4FF>| represented program |
+|<#FFF3BF>| domain facts and ordered result |
+|<#C3FAE8>| call graph and non-recursive flow |
+|<#FFE8CC>| explicit resource policy |
+|<#F1F3F5>| input validation |
+|<#D3F9D8>| deterministic scheduling |
+|<#E5DBFF>| recursive fixed point |
+|<#FCC2D7>| lattice algebra boundary |
+|<#FFE3E3>| incomplete-result evidence |
+endlegend
+@enduml

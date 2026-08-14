@@ -124,7 +124,9 @@ from resolved field/call and normalized node-kind evidence
 ([Theory 22](22-object-oriented-and-function-metrics.md)), and deterministic
 [multi-file program composition](../GLOSSARY.md#program-cpg--file-scope)
 with evidence-bounded import linkage
-([Theory 24](24-program-composition.md)). Each
+([Theory 24](24-program-composition.md)), and bounded deterministic
+[IFDS/IDE](../GLOSSARY.md#ifds--ide) procedure-summary fixed points over the
+resolved call graph ([Theory 25](25-ifds-ide-summary-solving.md)). Each
 graph analysis consumes the same
 `CodePropertyGraph`; none needs its own bespoke intermediate representation.
 
@@ -231,7 +233,10 @@ development, or jump to the layer you need:
 24. **[24 — Multi-file program composition](24-program-composition.md).**
     Injective identifier translation, ordered file scopes, and conservative
     alias evidence define the unified program graph and import topology.
-    The final fourteen chapters define deterministic projection structure,
+25. **[25 — IFDS/IDE summary fixed points](25-ifds-ide-summary-solving.md).**
+    A summary lattice, callee-first condensation order, and bounded recursive
+    Kleene iteration define the generic interprocedural analysis engine.
+    The final fifteen chapters define deterministic projection structure,
     architecture metrics, inspectable evidence, and their interpretation
     limits.
 

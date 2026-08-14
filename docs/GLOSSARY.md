@@ -445,6 +445,17 @@ forward/reverse CSR contract before public-field consumers traverse it. See
 
 An operation that has the same effect whether applied once or many times. `CfgExtractor::extract`, `DfgExtractor::extract`, and `PdgBuilder::build` are idempotent: re-running them does not duplicate edges. This lets construction stages be re-applied safely.
 
+### IFDS / IDE
+
+**Interprocedural Finite Distributive Subset (IFDS)** analysis reduces
+finite-fact, distributive interprocedural data flow to reachability in an
+exploded supergraph. **Interprocedural Distributive Environment (IDE)**
+analysis generalizes the propagated value to a distributive environment
+transformer. libcpg's feature-free framework schedules analysis-defined
+procedure summaries in callee-first strongly-connected-component order and
+returns explicit cap or structural evidence [[41]](#references). See
+[`components/graph/ifds-ide-framework.md`](components/graph/ifds-ide-framework.md).
+
 ### Isomorphism / Subgraph isomorphism
 
 A **graph isomorphism** is a bijection between two graphs' nodes that preserves edges. **Subgraph isomorphism** asks whether a (small) *pattern* graph is isomorphic to some subgraph of a (large) *target* graph — the core question in pattern detection. It is NP-complete in general; `libcpg` solves it with [VF2](#vf2). See [`theory/05-subgraph-isomorphism-vf2.md`](theory/05-subgraph-isomorphism-vf2.md).
@@ -898,3 +909,4 @@ Findings remain advisory and carry stable nodes plus numerical evidence. See
 38. Fontana, F. A., Pigazzini, I., Roveda, R., Tamburri, D. A., Zanoni, M., Di Nitto, E. (2017). *Arcan: A Tool for Architectural Smells Detection.* 2017 IEEE International Conference on Software Architecture Workshops, 282–285. DOI: [10.1109/ICSAW.2017.16](https://doi.org/10.1109/ICSAW.2017.16).
 39. Fontana, F. A., Pigazzini, I., Roveda, R., Zanoni, M. (2016). *Automatic Detection of Instability Architectural Smells.* 2016 IEEE International Conference on Software Maintenance and Evolution, 433–437. DOI: [10.1109/ICSME.2016.33](https://doi.org/10.1109/ICSME.2016.33).
 40. Code-metric foundations: (**40a**) Chidamber, S. R., Kemerer, C. F. (1991). *Towards a Metrics Suite for Object Oriented Design.* DOI: [10.1145/117954.117970](https://doi.org/10.1145/117954.117970). (**40b**) Li, W., Henry, S. (1993). *Object-oriented metrics that predict maintainability.* DOI: [10.1016/0164-1212(93)90077-B](https://doi.org/10.1016/0164-1212(93)90077-B). (**40c**) Hitz, M., Montazeri, B. (1995). *Measuring Coupling and Cohesion in Object-Oriented Systems.* No DOI assigned. (**40d**) Henderson-Sellers, B. (1996). *Object-Oriented Metrics: Measures of Complexity.* ISBN 978-0-13-239872-5 (no DOI). (**40e**) Halstead, M. H. (1977). *Elements of Software Science.* ISBN 0-444-00205-7 (no DOI). (**40f**) Campbell, G. A. (2018). *Cognitive Complexity: An Overview and Evaluation.* DOI: [10.1145/3194164.3194186](https://doi.org/10.1145/3194164.3194186). (**40g**) Oman, P., Hagemeister, J. (1992). *Metrics for assessing a software system's maintainability.* DOI: [10.1109/ICSM.1992.242525](https://doi.org/10.1109/ICSM.1992.242525). (**40h**) Coleman, D., Ash, D., Lowther, B., Oman, P. (1994). *Using metrics to evaluate software system maintainability.* DOI: [10.1109/2.303623](https://doi.org/10.1109/2.303623).
+41. Interprocedural distributive-data-flow foundations: (**41a**) Reps, T., Horwitz, S., Sagiv, M. (1995). *Precise Interprocedural Dataflow Analysis via Graph Reachability.* DOI: [10.1145/199448.199462](https://doi.org/10.1145/199448.199462). (**41b**) Sagiv, M., Reps, T., Horwitz, S. (1996). *Precise Interprocedural Dataflow Analysis with Applications to Constant Propagation.* DOI: [10.1016/0304-3975(96)00072-2](https://doi.org/10.1016/0304-3975(96)00072-2).

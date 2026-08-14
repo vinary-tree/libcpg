@@ -23,6 +23,7 @@ Source: [`diagrams/resource-bounds.puml`](../diagrams/resource-bounds.puml).*
 | `ResolveConfig::max_scope_depth` | `128` | scope and callee-name walks | traversal stops at the configured depth or the first repeated node |
 | `ResolveConfig::max_candidates_per_name` | `64` | lexical/global symbol buckets | full ambiguity count is preserved, but excess candidate IDs are not retained |
 | `ResolveConfig::max_calls` | `100_000` | sorted call-node enumeration | higher `NodeId` calls remain untouched after the cap |
+| `IfdsCaps::{max_functions,max_facts_per_node,max_worklist_steps,max_scc_iters,max_call_depth}` | `100_000`, `4_096`, `1_000_000`, `64`, `128` | `solve_summaries`; default callee resolver | returns ordered partial evidence, never a false completeness claim; fact overflow stops before solving and recursive overflow stops before callers |
 | `Vf2Matcher::max_matches` | `0` (unlimited) | `pattern::Vf2Matcher` | search short-circuits once the match count is reached |
 | `Vf2Matcher` strict toggles | `strict_kinds`/`strict_edges` off | `pattern::Vf2Matcher` | tighter feasibility test prunes branches earlier |
 | Clone pair / PDG / VF2 budgets | `100_000` pairs, `300` PDG nodes, `10_000` VF2 calls | `pattern::detect_clones` | returns `AnalysisError::BudgetExceeded` before omitting a required comparison; hard maxima are `100_000`, `300`, and `100_000` |
@@ -139,6 +140,32 @@ hard prefix budget over deterministically sorted calls. Calls beyond it are not
 recorded or mutated. These controls bound resolver work without weakening the
 evidence boundary: ambiguous, external, and unresolved calls never create
 topology.
+
+## IFDS/IDE summaries: whole-program and recursion caps
+
+[`solve_summaries`](../components/graph/ifds-ide-framework.md) validates the
+supplied call-graph SCC value against a fresh decomposition before any domain
+evaluation. Public component fields therefore cannot redirect indexed
+traversal, omit a newly resolved callee, or introduce a cyclic condensation
+without an ordered `IfdsIssue`.
+
+`IfdsCaps` bounds five independent resources. `max_functions` rejects an
+oversized represented program before seed or summary allocation.
+`max_facts_per_node` deduplicates and deterministically truncates seed evidence,
+then stops before summary solving because a may analysis with missing seeds is
+incomplete. `max_worklist_steps` counts both condensation removals and domain
+summary evaluations. `max_scc_iters` bounds complete rounds inside each
+recursive component; on exhaustion, the solver retains the bottom-based
+monotone prefix but does not evaluate callers that depend on it.
+`max_call_depth` bounds the default resolver's cycle-safe callee-label descent
+and is passed to domains for their own call traversals.
+
+Every event sets `IfdsOutput::capped`; `is_complete()` additionally requires an
+empty structural/domain issue set. A capped may-analysis result can contain real
+positive evidence, but absence from that result is not evidence of safety.
+Domain implementations remain caller code: the framework cannot preempt an
+unbounded loop inside `SummaryDomain::summarize`, so every domain must honor the
+shared caps or stricter documented local limits.
 
 ## Pattern matching: VF2
 

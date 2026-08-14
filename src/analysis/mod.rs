@@ -14,6 +14,7 @@ mod cycles;
 pub mod dataflow;
 mod dominators;
 mod dsm;
+pub mod ifds;
 mod induction;
 mod layering;
 mod loops;
@@ -85,6 +86,11 @@ pub use dominators::{dominator_tree, post_dominator_tree, DominatorTree, PostDom
 pub use dsm::{
     analyze_dsm, classify_core_periphery, CorePeriphery, CorePeripheryResult, DsmAnalysis,
     MAX_DSM_NODES,
+};
+
+pub use ifds::{
+    solve_summaries, solve_summaries_with_resolver, CalleeRef, IfdsCapEvent, IfdsCaps, IfdsIssue,
+    IfdsOutput, Lattice as IfdsLattice, SummaryCtx, SummaryDomain,
 };
 
 pub use induction::{

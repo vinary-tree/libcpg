@@ -265,3 +265,7 @@ harness = false
 [[bench]]
 name = "program_merge"
 harness = false
+
+[[bench]]
+name = "ifds_summaries"
+harness = false

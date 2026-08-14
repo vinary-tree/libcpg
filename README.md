@@ -60,6 +60,9 @@ PDG). A query can therefore mix syntax, control flow, and data flow freely.
 - **Multi-file program composition** — deterministic collision-free merging,
   ordered per-file scopes, and evidence-bounded import/export overlays that
   disambiguate cross-file calls without language-specific reparsing.
+- **IFDS/IDE procedure summaries** — feature-free generic facts and summary
+  lattices, validated callee-first SCC scheduling, bounded recursive fixed
+  points, and explicit external/unresolved/capped evidence.
 - **Projection centrality** — deterministic PageRank variants, vertex/edge
   betweenness, eigenvector, Katz, closeness, harmonic, HITS, and Burt
   structural-hole scores with explicit iteration and traversal budgets.

@@ -75,8 +75,9 @@ alternatives is folklore, and a decision without its costs is marketing.
 | [0029 — Evidence-bounded code metrics](0029-evidence-bounded-code-metrics.md) | Derive CK/LCOM and function metrics from resolved CPG evidence, preserve method-field witnesses, condense inheritance cycles, and align numerical scoring with pgmcp. | Accepted |
 | [0030 — Bounded function clone detection](0030-bounded-function-clone-detection.md) | Classify strongest Type-1–4 function relations with stable AST Merkle, multiset, WL, and bounded existing-VF2 evidence. | Accepted |
 | [0031 — Deterministic program composition](0031-deterministic-program-composition.md) | Translate every per-file identity into one program CPG and emit import/export topology only for uniquely supported file aliases. | Accepted |
+| [0032 — Deterministic bounded IFDS/IDE summaries](0032-deterministic-ifds-ide-summaries.md) | Validate current call topology, schedule callees before callers, and expose bounded recursive summary fixed points as ordered evidence. | Accepted |
 
-These thirty-one are not independent. ADR-0001 fixes the substrate that all analyses
+These thirty-two are not independent. ADR-0001 fixes the substrate that all analyses
 write onto; ADR-0002 and ADR-0005 together explain how a language reaches that
 substrate and what you must switch on to get there; ADR-0003 and ADR-0004 are
 two analyses *over* the substrate (one always-on, one feature-gated) that each
@@ -150,6 +151,9 @@ ADR-0031 returns to ADR-0001's identity and overlay rules and ADR-0006's
 evidence boundary. It translates complete per-file reference sets into one
 program id space, retains ordered file scopes, and admits cross-file dependency
 and call evidence only after a unique strongest file alias is represented.
+ADR-0032 consumes that resolved call topology through the exact SCC substrate.
+It validates the decomposition as current, orders callee components first, and
+centralizes bounded monotone recursion for IFDS/IDE summary domains.
 
 ![Module architecture of libcpg, showing the graph core and the analysis modules layered over it](../diagrams/module-architecture.svg)
 

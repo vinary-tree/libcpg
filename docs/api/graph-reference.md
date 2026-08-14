@@ -246,6 +246,30 @@ ambiguous calls, external calls, and unresolved calls. See the complete
 the evidence matrix, ordering and cap contracts, pseudocode, complexity,
 examples, and validation.
 
+### IFDS/IDE procedure summaries
+
+The feature-free interprocedural framework evaluates a caller-defined
+`SummaryDomain` over the current resolved call graph:
+
+| Function | Signature | Result |
+|---|---|---|
+| `solve_summaries` | `fn<D: SummaryDomain>(&CodePropertyGraph, &D, &SccDecomposition, &IfdsCaps) -> IfdsOutput<D>` | Ordered summaries and completeness evidence using the built-in call-site resolver. |
+| `solve_summaries_with_resolver` | `fn<D: SummaryDomain>(&CodePropertyGraph, &D, &SccDecomposition, &IfdsCaps, &dyn Fn(NodeId) -> CalleeRef) -> IfdsOutput<D>` | The same fixed point with caller-authoritative external/unresolved resolution. |
+
+`SummaryDomain` declares an ordered finite `Fact`, a summary implementing
+`analysis::ifds::Lattice`, `seed_facts`, and `summarize`. The crate-root alias
+for that lattice is `IfdsLattice`; the existing root `Lattice` remains the
+block-CFG data-flow trait. `SummaryCtx` exposes current summaries, the resolver,
+and caps without mutating the CPG.
+
+`IfdsCaps` bounds functions, distinct seed facts per point, scheduler work,
+recursive SCC rounds, and default resolver depth. `IfdsOutput::is_complete()`
+requires no `IfdsCapEvent` and no `IfdsIssue`. `CalleeRef` distinguishes
+represented `Resolved`, caller-identified `External`, and evidence-insufficient
+`Unresolved` calls. See the complete
+[IFDS/IDE component guide](../components/graph/ifds-ide-framework.md) and
+[usage guide](../usage/08-ifds-summary-domains.md).
+
 ### Deterministic graph projections
 
 `GraphProjection` is the feature-free, payload-free compressed-sparse-row view

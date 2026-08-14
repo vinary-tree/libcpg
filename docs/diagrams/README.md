@@ -1,6 +1,6 @@
 # Diagram catalog
 
-Every figure in the `libcpg` documentation is a **committed source** (`.puml` for PlantUML, `.dot` for Graphviz) rendered to a **committed `.svg`** that the Markdown pages embed. Sources are version-controlled so figures are reproducible and reviewable; SVGs are committed so they render on GitHub (which does not render PlantUML/Graphviz inline). This directory holds all 81 figures plus the shared theme.
+Every figure in the `libcpg` documentation is a **committed source** (`.puml` for PlantUML, `.dot` for Graphviz) rendered to a **committed `.svg`** that the Markdown pages embed. Sources are version-controlled so figures are reproducible and reviewable; SVGs are committed so they render on GitHub (which does not render PlantUML/Graphviz inline). This directory holds all 82 figures plus the shared theme.
 
 ## Conventions
 
@@ -78,6 +78,7 @@ Grouped by subject. Each row: the source (its `.svg` sibling is embedded by the 
 | `induction-analysis.puml` | component/evidence flow | Semantic AST/CFG/DFG plus loop/dominance evidence → invariants, hoist candidates, induction variables, and counted bounds | components/graph/induction-analysis |
 | `call-resolution.puml` | activity | Lexical symbols and syntax evidence crossing the guarded topology boundary | components/graph/call-resolution |
 | `program-composition.puml` | component/evidence flow | Per-file identity translation → one program CPG → exact/ambiguous/external import evidence → cross-file resolution | components/graph/program-composition, design/0031, theory/24 |
+| `ifds-summary-fixpoint.puml` | component/fixed-point flow | validated call SCCs → callee-first one-pass or recursive bounded summaries → ordered completeness evidence | components/graph/ifds-ide-framework, design/0032, theory/25, scientific/27 |
 
 ### Control flow, data flow, dependence
 | Source | Type | Depicts | Embedded by |

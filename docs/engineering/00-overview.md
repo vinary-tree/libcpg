@@ -85,8 +85,8 @@ directly from that relationship, and both are visible in `Cargo.toml`:
 | Page | What it covers |
 | --- | --- |
 | [01 — Build and features](01-build-and-features.md) | The full feature matrix: 16 `lang-*` grammars, the language groups, the analysis features, the Mode-B toggles, `serde`, the reserved `gpu` flag, and the `full` umbrella; the pgmcp grammar-pin table; how to enable a language. |
-| [02 — Testing](02-testing.md) | The example-based and `proptest` suite plus the general, robustness, SCCP, interval, loop-induction, complexity-evidence, condensation, layering, architectural-smell, DSM, Martin, reflexion, WL, centrality, community, cohesion, spectral, cycle, motif, GED, function-clone, and program-composition public-API suites; the `arb_*` generators; how to run each feature subset; measured coverage; the defects the suite found; and the active Criterion benchmark substrate. |
-| [03 — Performance](03-performance.md) | The data-structure rationale, asymptotic costs, seventeen active oracle-guarded Criterion targets, controlled-measurement protocol, and explicit remaining benchmark gaps. |
+| [02 — Testing](02-testing.md) | The example-based and `proptest` suite plus the general, robustness, SCCP, interval, loop-induction, complexity-evidence, condensation, layering, architectural-smell, DSM, Martin, reflexion, WL, centrality, community, cohesion, spectral, cycle, motif, GED, function-clone, program-composition, and IFDS/IDE public-API suites; the `arb_*` generators; how to run each feature subset; measured coverage; the defects the suite found; and the active Criterion benchmark substrate. |
+| [03 — Performance](03-performance.md) | The data-structure rationale, asymptotic costs, eighteen active oracle-guarded Criterion targets, controlled-measurement protocol, and explicit remaining benchmark gaps. |
 | [04 — Contributing](04-contributing.md) | Step-by-step recipes: add a language mapper, add a Gang-of-Four template, add a similarity metric; plus the coding conventions the crate follows. |
 
 ## Map of the security pillar
@@ -94,7 +94,7 @@ directly from that relationship, and both are visible in `Cargo.toml`:
 | Page | What it covers |
 | --- | --- |
 | [`security/00` — Threat model](../security/00-threat-model.md) | Assets, attackers, and the two trust boundaries (untrusted source bytes; untrusted serialized graphs); why tree-sitter parsing executes no analyzed code; why detection results are advisory. |
-| [`security/01` — Input and resource hardening](../security/01-input-and-resource-hardening.md) | The concrete bounds — `max_file_size`, DFG structural passes, condensation/layering and DSM/WL/centrality/community limits, Martin/architectural-smell evidence validation, reflexion path-policy admission, k-truss/min-cut/attack ceilings, VF2 `max_matches`, and slice `max_nodes` — with recommended caps for hostile input and where caller-side parser timeouts belong. |
+| [`security/01` — Input and resource hardening](../security/01-input-and-resource-hardening.md) | The concrete bounds — `max_file_size`, DFG structural passes, IFDS/IDE functions/facts/work/recursion/depth, condensation/layering and DSM/WL/centrality/community limits, Martin/architectural-smell evidence validation, reflexion path-policy admission, k-truss/min-cut/attack ceilings, VF2 `max_matches`, and slice `max_nodes` — with recommended caps for hostile input and where caller-side parser timeouts belong. |
 
 ## Honest project status
 
@@ -106,7 +106,7 @@ maturity than exists. The most consequential items:
 | --- | --- | --- |
 | Default build | `default = []`; `build` fails without a `lang-*` feature | [01](01-build-and-features.md) |
 | `examples/` directory | present but **empty** — no runnable examples (`tests/` now holds the integration and robustness suites) | [02](02-testing.md) |
-| Benchmarks | seventeen oracle-guarded Criterion targets are active; twenty-nine operation groups are feature-free and the thirtieth, complexity evidence, is `algorithm-detection`-gated; DFG/PDG construction, whole-corpus analysis, and GNN propagation remain broader gaps | [02](02-testing.md), [03](03-performance.md) |
+| Benchmarks | eighteen oracle-guarded Criterion targets are active; thirty operation groups are feature-free and the thirty-first, complexity evidence, is `algorithm-detection`-gated; DFG/PDG construction, whole-corpus analysis, and GNN propagation remain broader gaps | [02](02-testing.md), [03](03-performance.md) |
 | `rayon`, `ahash`, `string_cache`, `regex` | declared in `Cargo.toml` but **not yet wired** into `src/` (`proptest` is now used throughout the test suite) | [02](02-testing.md), [03](03-performance.md) |
 | `gpu` feature | **reserved** — enables `wgpu`/`pollster` but no GPU code is written | [01](01-build-and-features.md) |
 | Detection results | pattern/algorithm/complexity outputs are **heuristics**, not proofs | [`security/00`](../security/00-threat-model.md) |

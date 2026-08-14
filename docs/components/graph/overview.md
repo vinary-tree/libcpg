@@ -393,6 +393,9 @@ So the safe pattern is: build (single-threaded, `&mut`), then analyse
 - [Multi-file program composition](program-composition.md) — collision-free
   per-file identity translation, explicit file scopes, and conservative
   import/export linkage that feeds cross-file call resolution.
+- [IFDS/IDE summary framework](ifds-ide-framework.md) — validated current call
+  topology, deterministic callee-first SCC scheduling, and explicitly bounded
+  recursive procedure summaries.
 - [`api/graph-reference.md`](../../api/graph-reference.md) — the precise,
   method-by-method API reference for `CodePropertyGraph`.
 - [`theory/01-code-property-graphs.md`](../../theory/01-code-property-graphs.md)
