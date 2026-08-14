@@ -14,6 +14,7 @@ mod cycles;
 pub mod dataflow;
 mod dominators;
 mod dsm;
+mod effects;
 pub mod ifds;
 mod induction;
 mod layering;
@@ -86,6 +87,10 @@ pub use dominators::{dominator_tree, post_dominator_tree, DominatorTree, PostDom
 pub use dsm::{
     analyze_dsm, classify_core_periphery, CorePeriphery, CorePeripheryResult, DsmAnalysis,
     MAX_DSM_NODES,
+};
+
+pub use effects::{
+    analyze_effects, effect_summaries, EffectAnalysis, EffectSummary, Place, Purity,
 };
 
 pub use ifds::{

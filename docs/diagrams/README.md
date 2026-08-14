@@ -1,6 +1,6 @@
 # Diagram catalog
 
-Every figure in the `libcpg` documentation is a **committed source** (`.puml` for PlantUML, `.dot` for Graphviz) rendered to a **committed `.svg`** that the Markdown pages embed. Sources are version-controlled so figures are reproducible and reviewable; SVGs are committed so they render on GitHub (which does not render PlantUML/Graphviz inline). This directory holds all 82 figures plus the shared theme.
+Every figure in the `libcpg` documentation is a **committed source** (`.puml` for PlantUML, `.dot` for Graphviz) rendered to a **committed `.svg`** that the Markdown pages embed. Sources are version-controlled so figures are reproducible and reviewable; SVGs are committed so they render on GitHub (which does not render PlantUML/Graphviz inline). This directory holds all 83 figures plus the shared theme.
 
 ## Conventions
 
@@ -79,6 +79,7 @@ Grouped by subject. Each row: the source (its `.svg` sibling is embedded by the 
 | `call-resolution.puml` | activity | Lexical symbols and syntax evidence crossing the guarded topology boundary | components/graph/call-resolution |
 | `program-composition.puml` | component/evidence flow | Per-file identity translation → one program CPG → exact/ambiguous/external import evidence → cross-file resolution | components/graph/program-composition, design/0031, theory/24 |
 | `ifds-summary-fixpoint.puml` | component/fixed-point flow | validated call SCCs → callee-first one-pass or recursive bounded summaries → ordered completeness evidence | components/graph/ifds-ide-framework, design/0032, theory/25, scientific/27 |
+| `effect-summary-composition.puml` | component/fixed-point flow | typed direct evidence + callee summaries → lawful effect/constant join → complete or visibly capped result | components/graph/effect-summaries, design/0033, theory/26, scientific/28, usage/09 |
 
 ### Control flow, data flow, dependence
 | Source | Type | Depicts | Embedded by |

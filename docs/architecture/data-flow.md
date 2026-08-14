@@ -257,6 +257,21 @@ See the [IFDS/IDE component guide](../components/graph/ifds-ide-framework.md)
 for the domain contract and [Theory 25](../theory/25-ifds-ide-summary-solving.md)
 for the SCC fixed point.
 
+### Effect summaries (feature-free)
+
+`analyze_effects` instantiates that summary framework without adding a second
+intermediate representation. It derives direct global, parameter, and field
+places from typed CPG nodes and DFG edges; composes resolved callee summaries;
+and reuses SCCP's checked scalar operators for constant returns. External or
+unresolved calls, throws, awaits, and yields widen purity to `Impure`.
+
+The result remains out of graph and keeps the shared cap and structural-issue
+evidence. Domain-local expression and dependence traversals use the shared
+depth cap; reaching it widens return-flow and constant facts instead of
+silently asserting precision. See the [effect-summary component
+guide](../components/graph/effect-summaries.md) and [Theory
+26](../theory/26-interprocedural-effect-lattice.md).
+
 `condensation_metrics(&sccs, &options)` continues that pipeline without
 revisiting the CPG. A minimum-id Kahn order drives source-oriented longest-path
 levels and an SCC-member-weighted critical path; optional

@@ -364,6 +364,19 @@ The **dominance frontier** of node $`d`$ is the set of nodes where $`d`$'s domin
 
 `libcpg`'s small YAML/TOML schema for declaring a pattern as roles (`DpmlRole`) and constraints (`DpmlConstraint`), loaded into a `DpmlTemplate` and compiled to a [`PatternTemplate`](#pattern-template). Malformed input yields `DpmlError`. Lets users add pattern templates without writing Rust. See [`components/patterns/dpml.md`](components/patterns/dpml.md).
 
+### Effect summary / Place / Purity
+
+An **effect summary** is a finite, compositional description of one function's
+observable reads, writes, return dependencies, and constant-return evidence. A
+`Place` identifies the affected storage abstractly as a global name, a
+zero-based parameter position, or a field name. `Purity` orders functions from
+`Pure` through `ReadsGlobal` and `WritesGlobal` to `Impure`; calling an
+unresolved or external target is conservatively impure. libcpg joins these
+facts over validated call-graph [SCCs](#strongly-connected-component-scc),
+using the IFDS/IDE summary schedule [[41]](#references) and a flat
+constant-propagation lattice related to SCCP [[22]](#references). See
+[`components/graph/effect-summaries.md`](components/graph/effect-summaries.md).
+
 ### Elementary cycle / simple cycle
 
 An **elementary** or **simple** directed cycle is a closed directed walk whose

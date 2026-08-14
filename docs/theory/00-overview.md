@@ -126,7 +126,10 @@ from resolved field/call and normalized node-kind evidence
 with evidence-bounded import linkage
 ([Theory 24](24-program-composition.md)), and bounded deterministic
 [IFDS/IDE](../GLOSSARY.md#ifds--ide) procedure-summary fixed points over the
-resolved call graph ([Theory 25](25-ifds-ide-summary-solving.md)). Each
+resolved call graph ([Theory 25](25-ifds-ide-summary-solving.md)), and
+[effect summaries](../GLOSSARY.md#effect-summary--place--purity) as a lawful
+compositional instance of that framework
+([Theory 26](26-interprocedural-effect-lattice.md)). Each
 graph analysis consumes the same
 `CodePropertyGraph`; none needs its own bespoke intermediate representation.
 
@@ -236,7 +239,10 @@ development, or jump to the layer you need:
 25. **[25 — IFDS/IDE summary fixed points](25-ifds-ide-summary-solving.md).**
     A summary lattice, callee-first condensation order, and bounded recursive
     Kleene iteration define the generic interprocedural analysis engine.
-    The final fifteen chapters define deterministic projection structure,
+26. **[26 — Interprocedural effect lattice](26-interprocedural-effect-lattice.md).**
+    Typed storage places, a worst-purity chain, return-dependency bits, and a
+    flat scalar lattice compose direct and callee evidence without reparsing.
+    The final sixteen chapters define deterministic projection structure,
     architecture metrics, inspectable evidence, and their interpretation
     limits.
 

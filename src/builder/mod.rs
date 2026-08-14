@@ -38,6 +38,7 @@ mod pdg;
 mod tree_sitter;
 
 pub use cfg::{BasicBlockIdentifier, CfgExtractor, CfgExtractorConfig};
+pub(crate) use dfg::call_arguments;
 pub use dfg::{
     build_def_use_chains, DefUseChain, Definition, DefinitionKind, DfgExtractor,
     DfgExtractorConfig, Use, UseKind,

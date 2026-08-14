@@ -98,6 +98,8 @@ function scope.
 | Function clone detection | $`O(N+PF+W)`$ before VF2; exponential verifier worst case | $`N`$ is total function AST size, $`P\le100{,}000`$ size-qualified pairs, $`F`$ is compared bag vocabulary, and $`W`$ is bounded WL work. Type-4 PDGs have at most 300 vertices, VF2 stops after one match, and invocation count is explicit. |
 | Multi-file merge | $`O(N\log N+E\log E+R)`$ time, $`O(N+E)`$ temporary space | Sorts source identities, translates $`R`$ embedded references, and appends fresh nodes/edges plus CFG metadata. |
 | Import graph construction | conservative $`O(DN+ITA)`$ time | Scans $`D`$ namespace declarations, then matches $`I`$ imports of at most $`T`$ tokens against finite alias buckets totaling $`A`$ entries; exact matches append idempotent overlay edges. |
+| IFDS/IDE summary solving | $`O(W + I\,S)`$ bounded domain evaluations | $`W`$ is scheduler work, $`I`$ the configured recursive-SCC round cap, and $`S`$ the cost of one domain summary; every unbounded dimension has an `IfdsCaps` ceiling. |
+| Effect summaries | $`O(W + I(F+E_c+E_d))`$ bounded work | Each domain evaluation scans a function scope of $`F`$ nodes, represented call edges $`E_c`$, and relevant DFG/AST evidence $`E_d`$; cycle-safe local walks use `max_call_depth` and widen visibly on exhaustion. |
 | PageRank / reverse / personalized | $`O(c(V+E))`$ time, $`O(V)`$ working space | Dense forward/reverse CSR and stable floating reduction; hard 10,000-round ceiling. |
 | Vertex/edge betweenness | $`O(V(V+E))`$ time, $`O(V+E)`$ working space | Directed vertex Brandes or undirected canonical edge Brandes; preflight work budgets; serial source partitions are public. |
 | Eigenvector / Katz / HITS | $`O(c(V+E))`$ time, $`O(V+E)`$ working space | Shifted spectral iteration, sufficient Katz row-sum bound, and paired HITS vectors. |
@@ -295,7 +297,7 @@ cargo bench --no-default-features --features algorithm-detection \
   --bench induction_analysis -- --test
 ```
 
-Martin metrics, CK/LCOM and function metrics, reflexion conformance,
+Effect summaries, Martin metrics, CK/LCOM and function metrics, reflexion conformance,
 architectural layering, and architectural-smell detection do not yet have
 dedicated Criterion targets. DFG/PDG construction, whole-corpus analysis, and
 GNN propagation remain the broader runnable-benchmark gaps. Every other

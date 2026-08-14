@@ -567,7 +567,7 @@ fn value_children(cpg: &CodePropertyGraph, node: NodeId) -> Vec<NodeId> {
         .collect()
 }
 
-fn literal_value(literal: &LiteralKind) -> ConstLattice {
+pub(crate) fn literal_value(literal: &LiteralKind) -> ConstLattice {
     let value = match literal {
         LiteralKind::Integer(value) => ConstValue::Int(*value),
         LiteralKind::Float(value) => ConstValue::Float(value.to_bits()),
@@ -582,7 +582,7 @@ fn literal_value(literal: &LiteralKind) -> ConstLattice {
     ConstLattice::Constant(value)
 }
 
-fn fold_unary(operator: &str, operand: &ConstLattice) -> ConstLattice {
+pub(crate) fn fold_unary(operator: &str, operand: &ConstLattice) -> ConstLattice {
     match operand {
         ConstLattice::Unknown => ConstLattice::Unknown,
         ConstLattice::Overdefined => ConstLattice::Overdefined,
@@ -609,7 +609,11 @@ fn fold_unary(operator: &str, operand: &ConstLattice) -> ConstLattice {
     }
 }
 
-fn fold_binary(operator: &str, left: &ConstLattice, right: &ConstLattice) -> ConstLattice {
+pub(crate) fn fold_binary(
+    operator: &str,
+    left: &ConstLattice,
+    right: &ConstLattice,
+) -> ConstLattice {
     if matches!(operator, "&&" | "and")
         && (matches!(left, ConstLattice::Constant(ConstValue::Bool(false)))
             || matches!(right, ConstLattice::Constant(ConstValue::Bool(false))))

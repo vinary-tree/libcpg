@@ -22,7 +22,7 @@ think to write down.
 
 | Kind | Count | Where |
 | --- | ---: | --- |
-| Maximal-matrix library tests | 848 | inline `#[cfg(test)] mod …` next to the code; includes examples and properties |
+| Maximal-matrix library tests | 862 | inline `#[cfg(test)] mod …` next to the code; includes examples and properties |
 | Public-API integration tests | 21 | `tests/integration.rs` |
 | Malformed-input robustness tests | 5 | `tests/robustness.rs` |
 | SCCP public/parser integration tests | 3 | `tests/sccp_integration.rs` |
@@ -43,13 +43,14 @@ think to write down.
 | Function-clone public integration tests | 2 | `tests/clones_integration.rs` |
 | Program-composition public integration tests | 3 | `tests/program_integration.rs` |
 | IFDS/IDE public integration tests | 2 | `tests/ifds_integration.rs` |
+| Effect-summary public integration tests | 2 | `tests/effects_integration.rs` |
 | Martin public/parser integration tests | 2 | `tests/martin_integration.rs` |
 | Reflexion public/serialization integration tests | 2 | `tests/reflexion_integration.rs` |
 | Architectural-smell public/serialization integration tests | 2 | `tests/smells_integration.rs` |
 | Field-access public/parser integration tests | 2 | `tests/field_access_integration.rs` |
 | Code-metrics public/parser integration tests | 2 | `tests/metrics_integration.rs` |
-| **Executable test cases** | **924** | excludes three ignored rustdoc examples |
-| `proptest!` blocks (subset of the library/robustness rows) | 64 | exact source-level macro count in `src/` and `tests/` |
+| **Executable test cases** | **940** | excludes three ignored rustdoc examples |
+| `proptest!` blocks (subset of the library/robustness rows) | 65 | exact source-level macro count in `src/` and `tests/` |
 
 The maximal-matrix library count is up from **99** inline tests and **zero**
 property tests before this work.
@@ -67,12 +68,13 @@ on the features enabled:
 
 | Command | Lib tests | Notes |
 | --- | ---: | --- |
-| `cargo test` | 520 | `default = []`: the feature-free surface only |
-| `cargo test --features "full rholang metta"` | 848 | the maximal matrix, including the Mode-B mappers and evidence-aware complexity |
+| `cargo test` | 533 | `default = []`: the feature-free surface only |
+| `cargo test --features "full rholang metta"` | 862 | the maximal matrix, including the Mode-B mappers and evidence-aware complexity |
 
-The feature-free 520 exercise the graph model, deterministic multi-file merge
+The feature-free 533 exercise the graph model, deterministic multi-file merge
 and import linkage, exact dominator/post-dominator,
-natural-loop, monotone data-flow, IFDS/IDE procedure summaries, variable-liveness/dead-store,
+natural-loop, monotone data-flow, IFDS/IDE procedure summaries,
+interprocedural effect/constant summaries, variable-liveness/dead-store,
 available/very-busy-expression, SCCP, interval value-range, CFG/call-graph
 SCC analyses, condensation-DAG analytics, DSM visibility/core–periphery, Martin
 package metrics and stable-dependency witnesses, CK/LCOM1–5 and function code
@@ -165,6 +167,8 @@ The invariants fall into complementary families.
 | **Available / very-busy expressions** | exhaustive path enumeration over generated acyclic CFGs of up to 12 nodes exactly matches forward/backward Must maps; 96-case node/edge insertion permutations preserve reports; every redundant pair is available, dominating, and kill-free from first to second; every PRE placement dominates all evaluations; examples cover operand kills, branch recomputation after a killed dominating value, diamonds, loops, unreachable/nested occurrences, bodyless functions, invalid selectors, serde, and graph non-mutation; public and malformed-graph harnesses exercise both APIs |
 | **SCC decomposition** | Every projected node occurs in exactly one component; the partition matches `petgraph::algo::tarjan_scc`; singleton cycles require a self-loop; the condensation graph is acyclic; a 50,000-node path does not overflow the native stack |
 | **Call resolution** | resolution records and call edges are invariant under node/edge insertion permutations; duplicate names add zero call topology and preserve the SCC partition; repeated resolution is idempotent; candidate/call caps preserve the evidence boundary |
+| **IFDS/IDE summaries** | generated call graphs equal an independent reachability oracle and preserve exact reports under reversed call insertion; summary joins satisfy semilattice laws; iteration/work/function/fact/depth caps are explicit and monotone; examples cover acyclic, self-recursive, mutually recursive, external, unresolved, malformed/stale-SCC, serde, public composition, and graph non-mutation behavior |
+| **Effect summaries** | full summary joins satisfy idempotence, commutativity, associativity, and subsumption; 256 generated call graphs match an independent transitive-purity DFS and reverse-insertion oracle; another 256 cases prove iteration-cap monotonicity; exact examples cover pure constants, global/field/parameter effects, actual-argument remapping, transitive constants and impurity, conflicting returns, mutual recursion, 65-parameter truncation, malformed topology, domain/shared caps, serde, crate-root composition, and graph non-mutation |
 | **Idempotency** | a second `CfgExtractor::extract` / `DfgExtractor::extract` / `PdgBuilder::build` adds no edges |
 | **Slicing** | $`\lvert S\rvert \le \mathit{max\_nodes}`$; the criterion is in its own backward slice; $`\mathit{max\_nodes} = 0 \Rightarrow S = \varnothing`$; $`S`$ is monotone in $`\mathit{max\_nodes}`$; every sliced id is a real node |
 | **Matching, similarity, and GED** | VF2 embeddings are injective, kind-consistent, and edge-preserving; relaxed matching $`\supseteq`$ strict; all four metrics land in $`[0,1]`$, are symmetric, and are maximal on self-comparison; Hungarian assignments equal brute-force permutations through order seven; 128 generated graph pairs through six nodes produce deterministic symmetric concrete-script bounds no smaller than exhaustive exact GED; examples cover typed multiedges, stable ids, caps, invalid numerics, serde, public/parser composition, robustness, stable WL hash vectors, and non-mutation |

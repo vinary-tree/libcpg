@@ -675,7 +675,7 @@ fn enclosing_field_owner(cpg: &CodePropertyGraph, field: NodeId) -> Option<NodeI
 /// below a `Call`; Mode-B process-calculus mappers may instead flatten the
 /// arguments directly. Supporting both shapes keeps the interprocedural DFG
 /// language-agnostic.
-fn call_arguments(cpg: &CodePropertyGraph, call: NodeId) -> Vec<NodeId> {
+pub(crate) fn call_arguments(cpg: &CodePropertyGraph, call: NodeId) -> Vec<NodeId> {
     let mut children = cpg.ast_children(call);
     if children.is_empty() {
         return Vec::new();

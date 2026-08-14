@@ -28,6 +28,7 @@ pub use facts::{
 };
 pub use intervals::{value_ranges, Bound, Interval, IntervalEnv, IntervalReport};
 pub use liveness::{dead_stores, liveness, DeadStore, DeadStoreReport, LivenessResult};
+pub(crate) use sccp::{fold_binary, fold_unary, literal_value};
 pub use sccp::{sccp, ConstLattice, ConstValue, SccpResult};
 
 #[cfg(feature = "serde")]

@@ -270,6 +270,26 @@ represented `Resolved`, caller-identified `External`, and evidence-insufficient
 [IFDS/IDE component guide](../components/graph/ifds-ide-framework.md) and
 [usage guide](../usage/08-ifds-summary-domains.md).
 
+### Interprocedural effect summaries
+
+The feature-free effect domain specializes the shared summary solver for
+observable reads/writes, transitive purity, parameter-to-return flow, and
+scalar return constants:
+
+| Function | Signature | Result |
+|---|---|---|
+| `analyze_effects` | `fn(&CodePropertyGraph, &SccDecomposition, &IfdsCaps) -> EffectAnalysis` | Ordered summaries plus processed-function, iteration, work, cap, and issue evidence. |
+| `effect_summaries` | `fn(&CodePropertyGraph, &SccDecomposition, &IfdsCaps) -> BTreeMap<NodeId, EffectSummary>` | Convenience projection of the summary map; it can be a capped prefix. |
+
+`Place::{Global, Param, Field}` identifies abstract storage. `Purity` is ordered
+as `Pure < ReadsGlobal < WritesGlobal < Impure`. `EffectSummary` also exposes a
+64-bit `param_to_return` mask, `const_return`, an explicit flat-lattice
+`const_return_overdefined` bit, and truncation/cap flags. Only
+`EffectAnalysis::is_complete()` licenses a negative claim; positive evidence
+in a capped result remains useful. See the
+[effect-summary component guide](../components/graph/effect-summaries.md) and
+[usage guide](../usage/09-effect-summaries.md).
+
 ### Deterministic graph projections
 
 `GraphProjection` is the feature-free, payload-free compressed-sparse-row view

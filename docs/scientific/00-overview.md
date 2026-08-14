@@ -50,16 +50,16 @@ Two properties of the suite make this rigorous rather than merely suggestive:
 
 ## 3. The evidence base
 
-The maximal matrix contains **848 library tests**, **21 general public-API
+The maximal matrix contains **862 library tests**, **21 general public-API
 integration tests**, **5 malformed-input robustness tests**, **3 SCCP
 public/parser integration tests**, and **3 interval public/parser integration
 tests**, plus **3 loop-induction** and **3 complexity-evidence public/parser
 integration tests**, plus **2 condensation** and **2 DSM public/parser
 integration tests**, plus **1 WL**, **2 centrality**, **2 community**, **2
-cohesion**, **2 spectral**, **2 cycle**, **2 motif**, **2 GED**, **2 function-clone**, **3 program-composition**, **2 IFDS/IDE**, **2 Martin**, **2 code-metric**, and
+cohesion**, **2 spectral**, **2 cycle**, **2 motif**, **2 GED**, **2 function-clone**, **3 program-composition**, **2 IFDS/IDE**, **2 effect-summary**, **2 Martin**, **2 code-metric**, and
 **2 reflexion**, **2 layering**, **2 architectural-smell**, and **2 field-access
-public/parser integration tests**. These 924 executable cases combine
-fixed examples, differential oracles, and 64 exact source-level
+public/parser integration tests**. These 940 executable cases combine
+fixed examples, differential oracles, and 65 exact source-level
 `proptest!` blocks. The feature-free matrix remains
 independently runnable and exercises the exact graph/data-flow substrate
 without compiling any grammar. Eighteen active Criterion targets supplement
@@ -101,6 +101,7 @@ Because `default = []`, many tests are **feature-gated**. The end-to-end reachin
 | [25 — Function-clone validation](25-function-clone-validation.md) | Type-1/2/3/4 fixtures, complete cap errors, malformed-AST termination, byte determinism, stable-ID relabeling, serde and public API | exact taxonomy examples, generated unique-ID permutation property, black-box integration | feature-free / `serde` |
 | [26 — Program-composition validation](26-program-composition-validation.md) | Collision-free fresh ids, complete embedded-reference translation, append-only merge, exact self-copy counts, deterministic file scopes, exact/ambiguous/external imports, idempotent topology, cross-file call selection, serialization | sparse/dangling-id oracles, three 256-case generated properties, black-box integration, benchmark oracles | feature-free / `serde` |
 | [27 — IFDS/IDE validation](27-ifds-ide-validation.md) | Callee-first summaries, recursive convergence, lattice laws, deterministic insertion order, explicit cap monotonicity, resolver boundaries, malformed/stale SCC rejection, serialization | exact closure examples, four 256-case generated properties, independent BFS oracle, black-box integration, benchmark oracles | feature-free / `serde` |
+| [28 — Effect-summary validation](28-effect-summary-validation.md) | Direct and transitive place effects, purity, actual-to-formal remapping, return dependencies/constants, recursion, lattice laws, insertion-order determinism, and visible cap widening | exact examples, three 256-case generated properties, independent purity DFS, black-box integration, serialization | feature-free / `serde` |
 
 ## 5. What is proven, and what is advisory
 

@@ -1,0 +1,62 @@
+@startuml
+!include _libcpg-theme.iuml
+title Compositional interprocedural constant and effect summaries
+
+skinparam backgroundColor #FCFCFC
+skinparam component {
+  BorderColor #495057
+}
+skinparam note {
+  BackgroundColor #F1F3F5
+  BorderColor #495057
+}
+
+component "CodePropertyGraph\nAST · DFG · resolved calls" as CPG #DBE4FF
+component "call_graph_sccs\nvalidated condensation" as SCC #C3FAE8
+component "direct evidence\nglobal/parameter/field\nthrow · await · yield" as DIRECT #FFF3BF
+component "callee-first solver\nacyclic once · recursive fixed point" as SOLVER #D3F9D8
+component "place substitution\nParam(i) through argument i" as SUBSTITUTE #E5DBFF
+component "return dependence\nAST + def-use + callee mask" as DEP #FFD8A8
+component "checked scalar fold\nliteral · unary · binary · callee" as CONST #C5F6FA
+component "product join" as JOIN #FCC2D7
+component "EffectAnalysis\nordered summaries · caps · issues" as OUTPUT #C3FAE8
+component "conservative widening\nall parameter bits · overdefined" as WIDEN #FFE3E3
+
+CPG --> DIRECT
+CPG --> DEP
+CPG --> CONST
+SCC --> SOLVER
+DIRECT --> SOLVER : local candidate
+SOLVER --> SUBSTITUTE : current callee summary
+SUBSTITUTE --> JOIN : mapped reads/writes
+DEP --> JOIN : <latex>M_f = M_f \lor \sigma_s(M_g)</latex>
+CONST --> JOIN : <latex>C_f = \bigsqcup_r \operatorname{eval}(r)</latex>
+JOIN --> SOLVER : monotone summary update
+SOLVER --> OUTPUT : fixed point and scheduler evidence
+DEP --> WIDEN : work/depth/cycle bound
+CONST --> WIDEN : work/depth/cycle bound
+WIDEN --> OUTPUT : capped function evidence
+
+note bottom of SUBSTITUTE
+  A callee parameter write becomes a caller global/field
+  write only when the actual argument carries that place.
+end note
+
+note bottom of OUTPUT
+  The source CPG is read-only.
+  Negative claims require is_complete().
+end note
+
+legend bottom
+|= Colour |= Meaning |
+|<#DBE4FF>| represented CPG evidence |
+|<#C3FAE8>| validated graph / completed result |
+|<#FFF3BF>| direct local effects |
+|<#D3F9D8>| deterministic SCC scheduling |
+|<#E5DBFF>| interprocedural place remapping |
+|<#FFD8A8>| parameter-return dependence |
+|<#C5F6FA>| scalar constant evaluation |
+|<#FCC2D7>| product lattice join |
+|<#FFE3E3>| incomplete conservative widening |
+endlegend
+@enduml

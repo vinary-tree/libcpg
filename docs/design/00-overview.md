@@ -76,8 +76,9 @@ alternatives is folklore, and a decision without its costs is marketing.
 | [0030 — Bounded function clone detection](0030-bounded-function-clone-detection.md) | Classify strongest Type-1–4 function relations with stable AST Merkle, multiset, WL, and bounded existing-VF2 evidence. | Accepted |
 | [0031 — Deterministic program composition](0031-deterministic-program-composition.md) | Translate every per-file identity into one program CPG and emit import/export topology only for uniquely supported file aliases. | Accepted |
 | [0032 — Deterministic bounded IFDS/IDE summaries](0032-deterministic-ifds-ide-summaries.md) | Validate current call topology, schedule callees before callers, and expose bounded recursive summary fixed points as ordered evidence. | Accepted |
+| [0033 — Compositional effect summaries](0033-compositional-effect-summaries.md) | Specialize the shared summary solver with typed storage places, transitive purity, return dependencies, and a lawful flat constant lattice. | Accepted |
 
-These thirty-two are not independent. ADR-0001 fixes the substrate that all analyses
+These thirty-three are not independent. ADR-0001 fixes the substrate that all analyses
 write onto; ADR-0002 and ADR-0005 together explain how a language reaches that
 substrate and what you must switch on to get there; ADR-0003 and ADR-0004 are
 two analyses *over* the substrate (one always-on, one feature-gated) that each
@@ -154,6 +155,10 @@ and call evidence only after a unique strongest file alias is represented.
 ADR-0032 consumes that resolved call topology through the exact SCC substrate.
 It validates the decomposition as current, orders callee components first, and
 centralizes bounded monotone recursion for IFDS/IDE summary domains.
+ADR-0033 instantiates that framework with typed CPG and DFG evidence. It maps
+callee parameter effects through actual arguments, uses a worst-purity chain
+and flat constant lattice, and widens visibly when a domain-local bound is
+reached.
 
 ![Module architecture of libcpg, showing the graph core and the analysis modules layered over it](../diagrams/module-architecture.svg)
 
@@ -165,7 +170,7 @@ centralizes bounded monotone recursion for IFDS/IDE summary domains.
   (`0001`…). Numbers are never reused; a reversed decision is marked
   *Superseded* and a new record supersedes it, so history stays legible.
 - **Status lifecycle.** `Proposed → Accepted → (Superseded by NNNN | Deprecated)`.
-  All thirty-one current records are **Accepted** and reflect the shipped `v0.1.1`
+  All thirty-three current records are **Accepted** and reflect the shipped `v0.1.1`
   code.
 - **Grounding.** Every claim here is traceable to source: the
   [`Cargo.toml`](../engineering/01-build-and-features.md) feature block, the

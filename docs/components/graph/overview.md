@@ -396,6 +396,9 @@ So the safe pattern is: build (single-threaded, `&mut`), then analyse
 - [IFDS/IDE summary framework](ifds-ide-framework.md) — validated current call
   topology, deterministic callee-first SCC scheduling, and explicitly bounded
   recursive procedure summaries.
+- [Interprocedural effect summaries](effect-summaries.md) — typed global,
+  parameter, and field effects; transitive purity; return-flow masks; and
+  checked scalar constants over that shared schedule.
 - [`api/graph-reference.md`](../../api/graph-reference.md) — the precise,
   method-by-method API reference for `CodePropertyGraph`.
 - [`theory/01-code-property-graphs.md`](../../theory/01-code-property-graphs.md)

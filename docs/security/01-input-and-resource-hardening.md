@@ -24,6 +24,7 @@ Source: [`diagrams/resource-bounds.puml`](../diagrams/resource-bounds.puml).*
 | `ResolveConfig::max_candidates_per_name` | `64` | lexical/global symbol buckets | full ambiguity count is preserved, but excess candidate IDs are not retained |
 | `ResolveConfig::max_calls` | `100_000` | sorted call-node enumeration | higher `NodeId` calls remain untouched after the cap |
 | `IfdsCaps::{max_functions,max_facts_per_node,max_worklist_steps,max_scc_iters,max_call_depth}` | `100_000`, `4_096`, `1_000_000`, `64`, `128` | `solve_summaries`; default callee resolver | returns ordered partial evidence, never a false completeness claim; fact overflow stops before solving and recursive overflow stops before callers |
+| Effect-domain traversal bound | inherits `IfdsCaps::max_call_depth` | `analyze_effects`; return-dependency and constant walks | cycles terminate by visited sets; depth exhaustion widens the parameter mask and constant lattice, records the function as capped, and prevents a false completeness claim |
 | `Vf2Matcher::max_matches` | `0` (unlimited) | `pattern::Vf2Matcher` | search short-circuits once the match count is reached |
 | `Vf2Matcher` strict toggles | `strict_kinds`/`strict_edges` off | `pattern::Vf2Matcher` | tighter feasibility test prunes branches earlier |
 | Clone pair / PDG / VF2 budgets | `100_000` pairs, `300` PDG nodes, `10_000` VF2 calls | `pattern::detect_clones` | returns `AnalysisError::BudgetExceeded` before omitting a required comparison; hard maxima are `100_000`, `300`, and `100_000` |
@@ -166,6 +167,22 @@ positive evidence, but absence from that result is not evidence of safety.
 Domain implementations remain caller code: the framework cannot preempt an
 unbounded loop inside `SummaryDomain::summarize`, so every domain must honor the
 shared caps or stricter documented local limits.
+
+### Effect-domain widening
+
+[`analyze_effects`](../components/graph/effect-summaries.md) is a built-in
+summary domain and therefore follows all five `IfdsCaps` bounds above. Its
+additional AST/DFG walks are cycle-safe and use `max_call_depth` as their
+maximum path depth. If that local bound is reached, the function summary sets
+`capped`, marks its return constant overdefined, and widens the parameter-flow
+mask to all bits. Functions with more than 64 formal parameters also set
+`param_mask_truncated` and `capped` because the public `u64` mask cannot encode
+the complete dependency relation.
+
+Callers making a negative claim such as “this function is pure” must use
+`analyze_effects` and require `EffectAnalysis::is_complete()`. The convenience
+`effect_summaries` map intentionally preserves the original API shape but can
+contain a capped prefix, so absence from that map is never safety evidence.
 
 ## Pattern matching: VF2
 
