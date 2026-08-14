@@ -94,6 +94,7 @@ Finding `processes` and `sites` are independently sorted and deduplicated.
 - [Scientific validation 31](../../scientific/31-channel-topology-validation.md)
 - [Security boundary](../../security/04-channel-topology.md)
 - [May-happen-in-parallel analysis](mhp-analysis.md)
+- [Advisory session-protocol analysis](session-analysis.md)
 
 ## References
 

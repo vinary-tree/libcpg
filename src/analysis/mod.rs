@@ -65,6 +65,12 @@ pub use concurrency::{
     DeadlockWitness, MhpPair, MhpRelation, MsgKind, MAX_MHP_PAIRS,
 };
 
+#[cfg(feature = "rholang")]
+pub use concurrency::{
+    session_sketches, SessionAction, SessionConformance, SessionDirection, SessionEndpoint,
+    SessionIssue, SessionIssueKind, SessionPayloadType, SessionSketch,
+};
+
 pub use condensation::{
     coffman_graham, condensation_metrics, CgLayering, CondensationMetrics, CondensationOptions,
     MAX_CONDENSATION_COMPONENTS,

@@ -509,6 +509,24 @@ See the [component guide](../components/graph/mhp-analysis.md), [Theory
 31](../theory/31-may-happen-in-parallel.md), and [Usage
 14](../usage/14-may-happen-in-parallel.md).
 
+### Session-protocol sketches (`rholang`)
+
+`session_sketches` reuses the ordered, definition-resolved events above. It
+groups actions by channel and top-level process, excludes the exact channel
+operand while inferring shallow event-local payload types, and compares exactly
+two endpoint vectors for linear binary duality. Known direction, length, arity,
+or type conflicts are nonconformant; missing types, non-linear receives, and
+non-binary participation remain inconclusive.
+
+The module is gated by `rholang`, deterministic, read-only, and out of graph.
+The analyzer consumes typed CPG evidence and never inspects Rholang source text.
+
+![Resolved channel events become endpoint traces and a three-valued duality result](../diagrams/session-duality.svg)
+
+See the [component guide](../components/graph/session-analysis.md), [Theory
+32](../theory/32-session-protocol-duality.md), and [Usage
+15](../usage/15-session-protocol-sketches.md).
+
 ### Pattern detection
 
 Two layers, at two feature levels:

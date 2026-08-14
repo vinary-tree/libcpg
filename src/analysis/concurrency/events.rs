@@ -105,6 +105,16 @@ fn has_function_ancestor(cpg: &CodePropertyGraph, node: NodeId) -> bool {
 /// Resolves only identifiers within this event's own syntax subtree. A nested
 /// channel event starts a new statement boundary and is deliberately skipped.
 pub(crate) fn resolve_event_variable(cpg: &CodePropertyGraph, site: NodeId) -> Option<NodeId> {
+    resolve_event_channel_operand(cpg, site).map(|(definition, _)| definition)
+}
+
+/// Returns the resolved channel definition and the identifier node that names
+/// it at `site`. The operand node lets sibling analyses exclude the channel
+/// itself while interpreting the remaining event-local syntax as payloads.
+pub(crate) fn resolve_event_channel_operand(
+    cpg: &CodePropertyGraph,
+    site: NodeId,
+) -> Option<(NodeId, NodeId)> {
     let mut visited = FxHashSet::default();
     let mut stack = cpg.ast_children(site);
     stack.reverse();
@@ -131,7 +141,9 @@ pub(crate) fn resolve_event_variable(cpg: &CodePropertyGraph, site: NodeId) -> O
     }
 
     candidates.sort_unstable();
-    candidates.first().map(|candidate| candidate.3)
+    candidates
+        .first()
+        .map(|candidate| (candidate.3, candidate.2))
 }
 
 fn variable_definitions(cpg: &CodePropertyGraph, identifier: NodeId) -> Vec<NodeId> {

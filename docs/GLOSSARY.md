@@ -626,6 +626,19 @@ reached. MHP is not by itself a conflicting access or data-race finding. See
 [Theory 31](theory/31-may-happen-in-parallel.md) and Naumovich–Avrunin
 [[45]](#references).
 
+### Session sketch / Endpoint trace / Duality
+
+A **session sketch** is libcpg's ordered, shallow behavioral summary for one
+resolved channel. An **endpoint trace** is the sequence of send/receive actions
+at one top-level process. Two binary linear traces satisfy **duality** when they
+have equal length and payload arity and every corresponding direction is
+opposite with an equal known payload type. `Conformant` is positive shallow
+evidence, `Nonconformant` records a concrete mismatch, and `Inconclusive`
+preserves missing, non-linear, or non-binary evidence. This is not a complete
+session type system or deadlock-freedom proof. See [Theory
+32](theory/32-session-protocol-duality.md) and Honda–Vasconcelos–Kubo
+[[46]](#references).
+
 ### Message passing (GNN)
 
 One round of GNN computation: every node updates its vector from its neighbours' vectors. `libcpg` uses mean aggregation with a ReLU nonlinearity over AST, CFG, and DFG neighbourhoods:
@@ -998,3 +1011,4 @@ Findings remain advisory and carry stable nodes plus numerical evidence. See
 43. Meredith, L. G., Radestock, M. (2005). *A Reflective Higher-order Calculus.* Electronic Notes in Theoretical Computer Science 141(5), 49–67. DOI: [10.1016/j.entcs.2005.05.016](https://doi.org/10.1016/j.entcs.2005.05.016).
 44. Kobayashi, N. (2006). *A New Type System for Deadlock-Free Processes.* CONCUR 2006, LNCS 4137, 233–247. DOI: [10.1007/11817949_16](https://doi.org/10.1007/11817949_16).
 45. Naumovich, G., Avrunin, G. S. (1998). *A Conservative Data Flow Algorithm for Detecting All Pairs of Statements That May Happen in Parallel.* Proceedings of the 6th ACM SIGSOFT International Symposium on Foundations of Software Engineering, 24–34. DOI: [10.1145/288195.288213](https://doi.org/10.1145/288195.288213).
+46. Honda, K., Vasconcelos, V. T., Kubo, M. (1998). *Language Primitives and Type Discipline for Structured Communication-Based Programming.* ESOP 1998. DOI: [10.1007/BFb0053567](https://doi.org/10.1007/BFb0053567).

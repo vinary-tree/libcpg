@@ -32,6 +32,7 @@ fork
   + typed channel topology / linearity
   + communication / lock-order deadlock SCCs
   + typed AST may-happen-in-parallel pairs
+  + rholang-gated advisory session sketches
   → exact structural relations + fixed points;<<#C3FAE8>>
 fork again
   :PdgBuilder.build
@@ -51,7 +52,7 @@ end fork
 stop
 legend right
   |= colour |= analysis (module) |
-  |<#C3FAE8>| structural — blocks / data flow / IFDS / effects / taint / SDG / channels / deadlocks / MHP / graph analytics |
+  |<#C3FAE8>| structural — blocks / data flow / IFDS / effects / taint / SDG / channels / deadlocks / MHP / session sketches / graph analytics |
   |<#E5DBFF>| PDG — program slicing |
   |<#FFE3E3>| pattern — VF2 / GED / similarity / GoF |
   |<#FFF3BF>| algorithm + complexity |

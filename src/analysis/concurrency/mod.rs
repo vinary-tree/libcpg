@@ -8,6 +8,8 @@ mod channels;
 mod deadlock;
 mod events;
 mod mhp;
+#[cfg(feature = "rholang")]
+mod session;
 
 pub use crate::{LockKind, LockMode, MsgKind};
 pub use channels::{channel_report, ChannelFinding, ChannelFindingKind};
@@ -16,3 +18,8 @@ pub use deadlock::{
 };
 pub use events::{extract_events, ChannelEvent, ChannelId};
 pub use mhp::{may_happen_in_parallel, MhpPair, MhpRelation, MAX_MHP_PAIRS};
+#[cfg(feature = "rholang")]
+pub use session::{
+    session_sketches, SessionAction, SessionConformance, SessionDirection, SessionEndpoint,
+    SessionIssue, SessionIssueKind, SessionPayloadType, SessionSketch,
+};

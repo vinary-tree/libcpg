@@ -59,6 +59,8 @@
 //!   blocked communication waits and typed interprocedural lock order
 //! - **May-Happen-in-Parallel**: Derive canonical symmetric execution-site
 //!   pairs from typed parallel operand subtrees under an explicit output cap
+//! - **Session Protocol Sketches** (`rholang`): Compare ordered per-channel
+//!   endpoint actions for advisory binary direction and payload-type duality
 //! - **Pattern Detection**: Detect design patterns using subgraph isomorphism (VF2/VF3)
 //! - **Algorithm Analysis**: Extract algorithm signatures and estimate complexity
 //! - **GNN Support**: Graph neural network message passing for semantic embeddings
@@ -166,6 +168,12 @@ pub use analysis::{
     MAX_GRAPHLET_NODES, MAX_K_TRUSS_EDGES, MAX_LOUVAIN_LEVELS, MAX_LOUVAIN_PASSES, MAX_MHP_PAIRS,
     MAX_MIN_CUT_NODES, MAX_SIMPLE_CYCLES, MAX_SPECTRAL_ITERATIONS, MAX_SPECTRAL_STARTS,
     MAX_TRIAD_NODES, MAX_WL_ITERATIONS, SUMMARY_EDGE_LABEL, TRIAD_NAMES,
+};
+
+#[cfg(feature = "rholang")]
+pub use analysis::{
+    session_sketches, SessionAction, SessionConformance, SessionDirection, SessionEndpoint,
+    SessionIssue, SessionIssueKind, SessionPayloadType, SessionSketch,
 };
 
 pub use builder::{

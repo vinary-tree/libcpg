@@ -13,6 +13,7 @@ package "feature-gated  (opt-in)" as gated #FFF9DB {
   component "patterns\nGoF — 23 patterns" <<feature "design-patterns">> as PS #FFE3E3
   component "algorithms\nDetector + ComplexityAnalyzer" <<feature "algorithm-detection">> as A #FFF3BF
   component "gnn\nCpgGnn embeddings" <<feature "gnn">> as GN #FCC2D7
+  component "analysis::concurrency::session\nendpoint sketches + duality" <<feature "rholang">> as SES #E5DBFF
 }
 
 B  --> G  : builds
@@ -22,6 +23,7 @@ PS --> P  : template + relaxed VF2
 PS --> G  : detects in
 A  --> G  : analyses
 GN --> G  : owns / propagates
+SES --> G : reads typed events
 
 note bottom of gated
   Feature-gated modules are absent from the build unless
@@ -37,5 +39,6 @@ legend right
   |<#FFE3E3>| pattern · patterns — VF2 / GED / similarity / GoF |
   |<#FFF3BF>| algorithms — complexity |
   |<#FCC2D7>| gnn — embeddings |
+  |<#E5DBFF>| session — Rholang-gated advisory protocol sketches |
 endlegend
 @enduml

@@ -113,7 +113,9 @@ initially blocked wait cycles and
 [`may_happen_in_parallel`](14-may-happen-in-parallel.md) for structural
 parallelism through the feature-free public API. A typed `par` block's direct
 operands can be process nodes such as sends or wrapper blocks; both layouts have
-the same MHP semantics.
+the same MHP semantics. With the `rholang` feature,
+[`session_sketches`](15-session-protocol-sketches.md) also groups resolved
+events into shallow endpoint traces and reports conservative binary duality.
 
 ![Rholang constructs mapped onto CPG node and edge kinds.](../diagrams/rholang-mapping.svg)
 

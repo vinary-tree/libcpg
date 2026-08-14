@@ -1,0 +1,53 @@
+@startuml
+!include _libcpg-theme.iuml
+title Advisory binary-session sketch and duality flow
+
+skinparam backgroundColor #FCFCFC
+skinparam component {
+  BorderColor #343A40
+  FontColor #212529
+}
+skinparam note {
+  BackgroundColor #F8F9FA
+  BorderColor #495057
+}
+
+component "Rholang Mode-B CPG\nMsgKind + AST + def-use" as INPUT #DBE4FF
+component "extract_events\nresolved ChannelId evidence" as EVENTS #FFF3BF
+component "Group by channel, then process\nstable NodeId order" as GROUP #C3FAE8
+component "Endpoint A trace\n!Int · ?String" as LEFT #D3F9D8
+component "Endpoint B trace\n?Int · !String" as RIGHT #D3F9D8
+component "Binary linear comparison\n<latex>\forall i:\; d_i^A \ne d_i^B \land \tau_i^A = \tau_i^B</latex>" as DUAL #E5DBFF
+component "Conformant\nknown exact dual" as YES #C3FAE8
+component "Nonconformant\nconcrete mismatch" as NO #FFE3E3
+component "Inconclusive\nmissing/non-linear/non-binary evidence" as MAYBE #FFE8CC
+
+INPUT --> EVENTS : typed evidence only
+EVENTS --> GROUP : omit unresolved channels
+GROUP --> LEFT : first process
+GROUP --> RIGHT : second process
+LEFT --> DUAL : ordered actions
+RIGHT --> DUAL : ordered actions
+DUAL --> YES : opposite + equal known type
+DUAL --> NO : direction / length / arity / type mismatch
+DUAL --> MAYBE : unknown / persistent / peek / endpoint count
+
+note bottom of INPUT
+  No analyzer source parsing and no name-based channel matching.
+end note
+
+note bottom of MAYBE
+  Read-only advisory evidence; no graph edges are materialized.
+end note
+
+legend bottom
+|= Colour |= Meaning |
+|<#DBE4FF>| normalized frontend evidence |
+|<#FFF3BF>| resolved event evidence |
+|<#C3FAE8>| deterministic grouping / positive result |
+|<#D3F9D8>| endpoint behavior |
+|<#E5DBFF>| duality decision |
+|<#FFE3E3>| proven mismatch |
+|<#FFE8CC>| explicit uncertainty |
+endlegend
+@enduml

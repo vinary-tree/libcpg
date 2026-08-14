@@ -146,6 +146,8 @@ let slice = backward_slice(&cpg, func, 256);         // bounded backward slice
 
 [May-happen-in-parallel relations](theory/31-may-happen-in-parallel.md)
 
+[Advisory session-protocol duality](theory/32-session-protocol-duality.md)
+
 ### Architecture — the "what / where"
 [Overview](architecture/overview.md) · [Graph data model](architecture/graph-data-model.md) · [Construction & analysis data flow](architecture/data-flow.md) · [Language frontends](architecture/language-frontends.md)
 
@@ -165,6 +167,8 @@ let slice = backward_slice(&cpg, func, 256);         // bounded backward slice
 [0037 Typed deadlock witnesses](design/0037-typed-deadlock-witnesses.md)
 
 [0038 Typed AST may-happen-in-parallel](design/0038-typed-ast-mhp.md)
+
+[0039 Advisory session-protocol sketches](design/0039-advisory-session-sketches.md)
 
 ### API reference
 [Graph / analysis reference](api/graph-reference.md) · [Builder reference](api/builder-reference.md) · [Pattern / algorithm / GNN reference](api/pattern-reference.md)
@@ -187,6 +191,8 @@ let slice = backward_slice(&cpg, func, 256);         // bounded backward slice
 [Communication and lock-order deadlock candidates](components/graph/deadlock-analysis.md)
 
 [May-happen-in-parallel analysis](components/graph/mhp-analysis.md)
+
+[Advisory session-protocol analysis](components/graph/session-analysis.md)
 
 #### Builder
 [Overview](components/builder/overview.md) · [CFG extraction](components/builder/cfg.md) · [DFG extraction](components/builder/dfg.md) · [PDG & slicing](components/builder/pdg-and-slicing.md) · [Node mapper](components/builder/node-mapper.md)
@@ -217,6 +223,8 @@ let slice = backward_slice(&cpg, func, 256);         // bounded backward slice
 
 [May-happen-in-parallel queries](usage/14-may-happen-in-parallel.md)
 
+[Rholang session-protocol sketches](usage/15-session-protocol-sketches.md)
+
 ### Engineering
 [Overview](engineering/00-overview.md) · [Build & features](engineering/01-build-and-features.md) · [Testing](engineering/02-testing.md) · [Performance](engineering/03-performance.md) · [Contributing](engineering/04-contributing.md)
 
@@ -237,8 +245,10 @@ let slice = backward_slice(&cpg, func, 256);         // bounded backward slice
 
 [May-happen-in-parallel validation](scientific/33-mhp-validation.md)
 
+[Session-protocol sketch validation](scientific/34-session-sketch-validation.md)
+
 ### Security
-[Threat model](security/00-threat-model.md) · [Input & resource hardening](security/01-input-and-resource-hardening.md) · [Taint-analysis security boundary](security/02-taint-analysis.md) · [Interprocedural-slicing security boundary](security/03-system-dependence-slicing.md) · [Channel-topology security boundary](security/04-channel-topology.md) · [Deadlock-analysis security boundary](security/05-deadlock-analysis.md) · [MHP-analysis security boundary](security/06-mhp-analysis.md)
+[Threat model](security/00-threat-model.md) · [Input & resource hardening](security/01-input-and-resource-hardening.md) · [Taint-analysis security boundary](security/02-taint-analysis.md) · [Interprocedural-slicing security boundary](security/03-system-dependence-slicing.md) · [Channel-topology security boundary](security/04-channel-topology.md) · [Deadlock-analysis security boundary](security/05-deadlock-analysis.md) · [MHP-analysis security boundary](security/06-mhp-analysis.md) · [Session-analysis security boundary](security/07-session-analysis.md)
 
 ### Reference
 [Glossary](GLOSSARY.md) · [Diagram catalog](diagrams/README.md)

@@ -22,7 +22,7 @@ think to write down.
 
 | Kind | Count | Where |
 | --- | ---: | --- |
-| Maximal-matrix library tests | 973 | inline `#[cfg(test)] mod …` next to the code; includes examples and properties |
+| Maximal-matrix library tests | 984 | inline `#[cfg(test)] mod …` next to the code; includes examples and properties |
 | Public-API integration tests | 21 | `tests/integration.rs` |
 | Malformed-input robustness tests | 5 | `tests/robustness.rs` |
 | SCCP public/parser integration tests | 3 | `tests/sccp_integration.rs` |
@@ -54,8 +54,9 @@ think to write down.
 | Channel-topology public/parser integration tests | 3 | `tests/concurrency_integration.rs` |
 | Deadlock-candidate public/parser integration tests | 3 | `tests/deadlock_integration.rs` |
 | MHP public/parser integration tests | 2 | `tests/mhp_integration.rs` |
-| **Executable test cases** | **1,063** | measured by the all-features test inventory; excludes three ignored rustdoc examples |
-| `proptest!` blocks (subset of the library/robustness rows) | 70 | exact source-level macro count in `src/` and `tests/` |
+| Session-sketch public/parser integration tests | 2 | `tests/session_integration.rs` |
+| **Executable test cases** | **1,076** | measured by the all-features test inventory; excludes three ignored rustdoc examples |
+| `proptest!` blocks (subset of the library/robustness rows) | 74 | exact source-level macro count in `src/` and `tests/` |
 
 The maximal-matrix library count is up from **99** inline tests and **zero**
 property tests before this work.
@@ -74,7 +75,7 @@ on the features enabled:
 | Command | Lib tests | Notes |
 | --- | ---: | --- |
 | `cargo test` | 634 | `default = []`: the feature-free surface only |
-| `cargo test --features "full rholang metta"` | 973 | the maximal matrix, including the Mode-B mappers and evidence-aware complexity |
+| `cargo test --features "full rholang metta"` | 984 | the maximal matrix, including the Mode-B mappers, session sketches, and evidence-aware complexity |
 
 The feature-free 634 exercise the graph model, deterministic multi-file merge
 and import linkage, exact dominator/post-dominator,
@@ -162,6 +163,7 @@ The invariants fall into complementary families.
 | **Round-trip / identity** | $`\mathit{deserialize} \circ \mathit{serialize} = \mathrm{id}`$ over the whole serializable surface; `NodeId`/`EdgeId`/`SourceRange` conversions; `Language` extension round-trip; $`\mathit{from\_kind} \circ \mathit{to\_cpg\_node\_kind} = \mathrm{id}`$ |
 | **Structural** | `add_node` yields sequential ids; `connect` is defined iff both endpoints exist; `ast_children` preserves insertion order; $`M = E - N + 2`$ (`cyclomatic_complexity`); `ast_depth` is bounded by the node count |
 | **Graph projections** | CSR nodes and adjacency are sorted; parallel-edge weights merge deterministically; transpose is an involution; all overlay constructors equal direct typed-edge traversal and do not mutate the CPG |
+| **Session-protocol sketches** | a 128-case exact-dual generator preserves complete sketches under reversed node/edge insertion and keeps all evidence in graph; examples cover every concrete mismatch, explicit uncertainty, literal/named/definition-backed payload types, nested/cyclic AST boundaries, real Rholang normalization, serde, and graph non-mutation |
 | **Function CFG scope** | the reachable CFG view is invariant under node, edge, and recorded-exit insertion permutations; call edges never enter the view; dense entry/exit identifiers map back to the same stable nodes |
 | **Dominance** | CHK immediate dominators equal `petgraph::algo::dominators::simple_fast` under edge permutations; post-dominators and control edges equal the former PDG oracle; `PdgBuilder` emits exactly `PostDominatorTree::control_dependence_edges`; a 25,000-node path is stack-safe |
 | **Natural loops** | insertion permutations preserve the forest; dominator-qualified back edges and reverse-closure bodies equal independent brute-force oracles through 24 nodes; every body lies in a cyclic SCC; child bodies are strict parent subsets; `LoopExit` exactly crosses AST loop scope and starts a basic block; a 25,000-node loop is stack-safe |

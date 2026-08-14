@@ -399,6 +399,28 @@ guide](../components/graph/mhp-analysis.md), [usage
 guide](../usage/14-may-happen-in-parallel.md), [theory](../theory/31-may-happen-in-parallel.md),
 and [security boundary](../security/06-mhp-analysis.md).
 
+### Advisory session-protocol sketches (`rholang`)
+
+With `feature = "rholang"`, `session_sketches(&CodePropertyGraph) ->
+Vec<SessionSketch>` groups definition-resolved channel events into deterministic
+per-process action vectors and checks ordinary binary linear duality.
+
+| Item | Contract |
+|---|---|
+| `SessionSketch` | Resolved channel, sorted endpoints, three-valued verdict, and ordered issues. |
+| `SessionEndpoint` | Top-level process plus actions sorted by event-site id. |
+| `SessionAction` | Direction, exact `MsgKind`, shallow payload vector, site, and source range. |
+| `SessionPayloadType` | Literal category, normalized explicit/named type, or `Unknown`. |
+| `SessionConformance` | `Conformant`, `Nonconformant`, or `Inconclusive`. |
+| `SessionIssueKind` | Cardinality, length, direction, arity, type, unknown-type, or non-linear-receive evidence. |
+
+The API is read-only and out of graph. `Conformant` requires exactly two
+equal-length linear traces with opposite directions and equal known payload
+types. Concrete mismatches dominate uncertainty. See the [component
+guide](../components/graph/session-analysis.md), [usage
+guide](../usage/15-session-protocol-sketches.md), [theory](../theory/32-session-protocol-duality.md),
+and [security boundary](../security/07-session-analysis.md).
+
 ### Deterministic graph projections
 
 `GraphProjection` is the feature-free, payload-free compressed-sparse-row view

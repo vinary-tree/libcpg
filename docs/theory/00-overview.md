@@ -196,7 +196,7 @@ same graph. Errors are the crate's own [`libcpg::Error`](../api/graph-reference.
 
 ## 6. Map of the theory pillar
 
-This overview sits above thirty-one formal chapters. Read them in order for a ground-up
+This overview sits above thirty-two formal chapters. Read them in order for a ground-up
 development, or jump to the layer you need:
 
 1. **[01 — Code Property Graphs](01-code-property-graphs.md).** The formal model:
@@ -264,6 +264,10 @@ development, or jump to the layer you need:
     Typed parallel operand subtrees, explicit execution-site boundaries,
     canonical symmetric pairs, and a visible output cap define immutable
     structural concurrency evidence.
+32. **[32 — Advisory session-protocol duality](32-session-protocol-duality.md).**
+    Definition-resolved channel events, ordered shallow payload types, and a
+    three-valued binary linear-duality rule define auditable Rholang protocol
+    sketches without claiming a complete session type system.
 
 The later chapters define deterministic projection structure, architecture
 metrics, inspectable evidence, and their interpretation limits.

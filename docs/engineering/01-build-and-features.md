@@ -90,7 +90,7 @@ modules, not a typo.
 
 | Feature | Enables (deps) | What it gates |
 | --- | --- | --- |
-| `rholang` | *(none — `= []`)* | the `map_rholang` node-mapper arm and its `#[cfg(feature = "rholang")]` unit tests |
+| `rholang` | *(none — `= []`)* | the `map_rholang` node-mapper arm, advisory `session_sketches` API, and their `#[cfg(feature = "rholang")]` tests |
 | `metta` | *(none — `= []`)* | the `map_metta` node-mapper arm and its `#[cfg(feature = "metta")]` unit tests |
 
 These are intentionally empty. The [Rholang](../GLOSSARY.md#rholang) and
@@ -102,6 +102,9 @@ S-expression CPG is built from a **caller-supplied** parse tree via
 Mode-B tests, and Cargo never propagates dev-dependencies downstream. The rationale
 — avoiding a duplicate `tree_sitter_<lang>` C symbol in consumers like pgmcp — is
 recorded in [`design/0002-mode-b-build-from-tree.md`](../design/0002-mode-b-build-from-tree.md).
+The same gate exposes session-protocol sketches because Rholang is currently the
+frontend that supplies the required behavioral message evidence; the analyzer
+still consumes normalized CPG nodes rather than grammar symbols or source text.
 
 ### Language grammars (`lang-*`)
 

@@ -81,6 +81,8 @@ PDG). A query can therefore mix syntax, control flow, and data flow freely.
 - **May-happen-in-parallel relation** — feature-free typed parallel-operand
   cross-products with canonical symmetric statement pairs, nested-region
   composition, and an explicit quadratic-output cap.
+- **Advisory session-protocol sketches** — Rholang-gated, definition-resolved
+  endpoint traces with three-valued binary direction and payload-type duality.
 - **Projection centrality** — deterministic PageRank variants, vertex/edge
   betweenness, eigenvector, Katz, closeness, harmonic, HITS, and Burt
   structural-hole scores with explicit iteration and traversal budgets.
