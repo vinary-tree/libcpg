@@ -399,6 +399,9 @@ So the safe pattern is: build (single-threaded, `&mut`), then analyse
 - [Interprocedural effect summaries](effect-summaries.md) — typed global,
   parameter, and field effects; transitive purity; return-flow masks; and
   checked scalar constants over that shared schedule.
+- [Advisory taint and maybe-null analysis](taint-analysis.md) — data-driven call
+  catalogs, typed AST/DFG propagation, interprocedural jump functions,
+  canonical witnesses, and explicit completeness evidence.
 - [`api/graph-reference.md`](../../api/graph-reference.md) — the precise,
   method-by-method API reference for `CodePropertyGraph`.
 - [`theory/01-code-property-graphs.md`](../../theory/01-code-property-graphs.md)

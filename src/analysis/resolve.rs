@@ -639,6 +639,97 @@ fn callee_name(cpg: &CodePropertyGraph, call: NodeId, max_depth: u32) -> Option<
     None
 }
 
+/// Result of bounded typed callee-path reconstruction.
+pub(crate) struct CalleePathEvidence {
+    /// Reconstructed path when typed evidence was sufficient.
+    pub(crate) path: Option<String>,
+    /// Whether depth or cycle protection stopped reconstruction.
+    pub(crate) capped: bool,
+}
+
+/// Reconstructs a call's typed callee path without reading or parsing source text.
+pub(crate) fn call_callee_path_evidence(
+    cpg: &CodePropertyGraph,
+    call: NodeId,
+    max_depth: u32,
+) -> CalleePathEvidence {
+    // A call grammar places the callee before its argument list. Restrict the
+    // search to that first subtree: falling through into later argument
+    // subtrees could fabricate a target from an argument identifier.
+    let Some(mut current) = sorted_ast_children(cpg, call).into_iter().next() else {
+        return CalleePathEvidence {
+            path: None,
+            capped: false,
+        };
+    };
+    let mut visited = BTreeSet::new();
+    let mut suffixes = Vec::new();
+    for depth in 0..=max_depth {
+        if !visited.insert(current) {
+            return CalleePathEvidence {
+                path: None,
+                capped: true,
+            };
+        }
+        let Some(cpg_node) = cpg.node(current) else {
+            return CalleePathEvidence {
+                path: None,
+                capped: false,
+            };
+        };
+        match &cpg_node.kind {
+            CpgNodeKind::MemberAccess { member } => {
+                suffixes.push(member.to_string());
+            }
+            CpgNodeKind::Identifier { name, .. } => {
+                let mut path = name.to_string();
+                for suffix in suffixes.iter().rev() {
+                    if !path.is_empty() {
+                        path.push_str("::");
+                    }
+                    path.push_str(suffix);
+                }
+                return CalleePathEvidence {
+                    path: (!path.is_empty()).then_some(path),
+                    capped: false,
+                };
+            }
+            CpgNodeKind::Call { .. } => {
+                return CalleePathEvidence {
+                    path: None,
+                    capped: false,
+                };
+            }
+            _ => {}
+        };
+        let Some(next) = sorted_ast_children(cpg, current).into_iter().next() else {
+            return CalleePathEvidence {
+                path: None,
+                capped: false,
+            };
+        };
+        if depth == max_depth {
+            return CalleePathEvidence {
+                path: None,
+                capped: true,
+            };
+        }
+        current = next;
+    }
+    CalleePathEvidence {
+        path: None,
+        capped: true,
+    }
+}
+
+pub(crate) fn call_callee_path(
+    cpg: &CodePropertyGraph,
+    call: NodeId,
+    max_depth: u32,
+) -> Option<String> {
+    call_callee_path_evidence(cpg, call, max_depth).path
+}
+
 fn sorted_ast_children(cpg: &CodePropertyGraph, node: NodeId) -> Vec<NodeId> {
     let mut children = cpg.ast_children(node);
     children.sort_by_key(|child| {

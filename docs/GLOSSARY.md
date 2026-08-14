@@ -766,9 +766,25 @@ A maximal set of vertices in a directed graph where every vertex can reach every
 
 A graph formed from a subset of another graph's nodes and the edges among them. `libcpg` extracts subgraphs (`subgraph`, `function_cfg`, `function_dfg`) and matches pattern subgraphs against the CPG. See [Subgraph isomorphism](#isomorphism--subgraph-isomorphism).
 
-### Taint analysis
+### Taint catalog / Taint witness
 
-A data-flow query that tracks whether values from *untrusted sources* can reach *sensitive sinks* without sanitisation — a classic CPG application (Yamaguchi et al. [[1]](#references)). Expressible in `libcpg` by traversing DFG/PDG edges from source nodes to sink nodes. See [`usage/02-querying-and-traversal.md`](usage/02-querying-and-traversal.md).
+A **taint catalog** is caller-owned policy that classifies represented call
+paths as open source, sink, sanitizer, or external-model classes. A **taint
+witness** is the canonical ordered CPG-node path supporting one candidate
+source-to-sink flow. `libcpg` propagates these facts through typed AST/DFG
+relations and interprocedural summaries; it does not infer policy by parsing
+source text. Findings are advisory, and only a complete report licenses an
+absence claim. This is a classic CPG application (Yamaguchi et al.
+[[1]](#references)). See [Theory 27](theory/27-interprocedural-taint-and-nullflow.md)
+and the [component guide](components/graph/taint-analysis.md).
+
+### Maybe-null flow
+
+An advisory flow from a null literal, uninitialized variable, or typed
+nullable return to a represented dereference. The maybe-null domain uses the
+same bounded summary and witness machinery as taint, but its origins and sinks
+come from typed CPG evidence rather than catalog policy. See
+[`security/02-taint-analysis.md`](security/02-taint-analysis.md).
 
 ### Terminal set (VF2)
 

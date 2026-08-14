@@ -25,6 +25,7 @@ Source: [`diagrams/resource-bounds.puml`](../diagrams/resource-bounds.puml).*
 | `ResolveConfig::max_calls` | `100_000` | sorted call-node enumeration | higher `NodeId` calls remain untouched after the cap |
 | `IfdsCaps::{max_functions,max_facts_per_node,max_worklist_steps,max_scc_iters,max_call_depth}` | `100_000`, `4_096`, `1_000_000`, `64`, `128` | `solve_summaries`; default callee resolver | returns ordered partial evidence, never a false completeness claim; fact overflow stops before solving and recursive overflow stops before callers |
 | Effect-domain traversal bound | inherits `IfdsCaps::max_call_depth` | `analyze_effects`; return-dependency and constant walks | cycles terminate by visited sets; depth exhaustion widens the parameter mask and constant lattice, records the function as capped, and prevents a false completeness claim |
+| Taint/nullflow traversal and retention bounds | inherit `IfdsCaps` | `analyze_taint_report`; `analyze_null_flows_report` | typed call-path/value walks terminate by depth and visited sets; parameter masks visibly truncate after 64 positions; solver fact/work/SCC caps and domain-local cap evidence prevent false absence claims |
 | `Vf2Matcher::max_matches` | `0` (unlimited) | `pattern::Vf2Matcher` | search short-circuits once the match count is reached |
 | `Vf2Matcher` strict toggles | `strict_kinds`/`strict_edges` off | `pattern::Vf2Matcher` | tighter feasibility test prunes branches earlier |
 | Clone pair / PDG / VF2 budgets | `100_000` pairs, `300` PDG nodes, `10_000` VF2 calls | `pattern::detect_clones` | returns `AnalysisError::BudgetExceeded` before omitting a required comparison; hard maxima are `100_000`, `300`, and `100_000` |
@@ -183,6 +184,25 @@ Callers making a negative claim such as “this function is pure” must use
 `analyze_effects` and require `EffectAnalysis::is_complete()`. The convenience
 `effect_summaries` map intentionally preserves the original API shape but can
 contain a capped prefix, so absence from that map is never safety evidence.
+
+### Taint and maybe-null cap evidence
+
+[`analyze_taint_report`](../components/graph/taint-analysis.md) and
+`analyze_null_flows_report` inherit all five `IfdsCaps` limits. Their local
+typed AST/DFG traversals are cycle-safe; call-path descent uses
+`max_call_depth`, and only parameter positions `0..63` fit the public return
+mask. Reaching either boundary marks the domain summary and affected witness as
+capped. Shared solver cap events and domain-capped function ids remain visible
+in the report.
+
+The catalog is finite caller input. Bound rule count and pattern/class byte
+length at ingress when policy itself is untrusted. Matching is literal over a
+represented typed call path—there is no regular-expression engine or source
+parser in the domain. Use the report APIs and require `is_complete()` before
+making an absence claim; the vector conveniences retain positive evidence but
+cannot represent an empty capped result. The separate [taint security
+boundary](02-taint-analysis.md) covers policy provenance and witness
+interpretation.
 
 ## Pattern matching: VF2
 
@@ -852,5 +872,7 @@ over each one — see
   defend.
 - [Performance](../engineering/03-performance.md) — the asymptotic costs these
   bounds cap.
+- [Taint-analysis security boundary](02-taint-analysis.md) — catalog trust,
+  advisory findings, witnesses, confidence, and absence claims.
 - [`usage/04-program-slicing.md`](../usage/04-program-slicing.md) — using slices in
   anger.

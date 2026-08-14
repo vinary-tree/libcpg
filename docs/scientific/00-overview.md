@@ -16,7 +16,7 @@ A CPG library makes three kinds of assertion, and each demands a different stand
 
 These are distinct from *performance* claims ("construction is fast", "VF2
 prunes well"), which require controlled measurement rather than assertion.
-`libcpg` ships eighteen oracle-guarded Criterion targets (thirty feature-free
+`libcpg` ships nineteen oracle-guarded Criterion targets (thirty-one feature-free
 operation groups plus the gated complexity-evidence group), but their evidence is limited to
 the named graph families, sizes, environment, and operation. The
 protocol and remaining gaps are specified in [04 — Measurement
@@ -50,20 +50,20 @@ Two properties of the suite make this rigorous rather than merely suggestive:
 
 ## 3. The evidence base
 
-The maximal matrix contains **862 library tests**, **21 general public-API
+The maximal matrix contains **897 library tests**, **21 general public-API
 integration tests**, **5 malformed-input robustness tests**, **3 SCCP
 public/parser integration tests**, and **3 interval public/parser integration
 tests**, plus **3 loop-induction** and **3 complexity-evidence public/parser
 integration tests**, plus **2 condensation** and **2 DSM public/parser
 integration tests**, plus **1 WL**, **2 centrality**, **2 community**, **2
 cohesion**, **2 spectral**, **2 cycle**, **2 motif**, **2 GED**, **2 function-clone**, **3 program-composition**, **2 IFDS/IDE**, **2 effect-summary**, **2 Martin**, **2 code-metric**, and
-**2 reflexion**, **2 layering**, **2 architectural-smell**, and **2 field-access
-public/parser integration tests**. These 940 executable cases combine
-fixed examples, differential oracles, and 65 exact source-level
+**2 reflexion**, **2 layering**, **2 architectural-smell**, **2 field-access**,
+and **3 taint/nullflow public/parser integration tests**. These 978 executable
+cases combine fixed examples, differential oracles, and 73 exact source-level
 `proptest!` blocks. The feature-free matrix remains
 independently runnable and exercises the exact graph/data-flow substrate
-without compiling any grammar. Eighteen active Criterion targets supplement
-correctness with thirty feature-free operation groups and a thirty-first when
+without compiling any grammar. Nineteen active Criterion targets supplement
+correctness with thirty-one feature-free operation groups and a thirty-second when
 `algorithm-detection` is enabled; see
 [Testing](../engineering/02-testing.md) for the census and [04](04-measurement-methodology.md)
 for the measurement contract.
@@ -77,7 +77,7 @@ Because `default = []`, many tests are **feature-gated**. The end-to-end reachin
 | [01 — Invariants & equivalence](01-cpg-invariants-and-equivalence.md) | Single shared node set; graph-assigned unique IDs; AST child/parent consistency; idempotent extractors; `build` ≡ `build_from_tree` (identical node payloads, typed edges, and language) | example + property `build_from_tree_matches_build` tests, `parsed_shadowing_and_idempotent`, `def_use_backward_slice`, `parsed_nested_use_resolves_and_chains` | `lang-rust` (equivalence, DFG) / feature-free (slice) |
 | [02 — Reaching-defs validation](02-reaching-defs-validation.md) | Nested-expression use resolution; latest-definition (strong update); non-flow of unrelated variables; shadowing scope; idempotency | `parsed_nested_use_resolves_and_chains`, `parsed_reassignment_uses_latest_definition`, `parsed_unrelated_variable_does_not_flow`, `parsed_shadowing_and_idempotent` | `lang-rust` |
 | [03 — VF2 completeness](03-vf2-completeness.md) | Soundness floor (empty pattern → no match); kind-feasibility pruning; **all** embeddings found (diamond → exactly 2) with exact backtracking | `test_empty_pattern`, `test_single_node_match`, `test_multi_embedding_backtracking` | feature-free |
-| [04 — Measurement methodology](04-measurement-methodology.md) | Environment control and exact-oracle timing for SCC, condensation analytics, arena construction, bounded VF2, liveness, loop induction, DSM, WL, centrality, community, cohesion, spectral, cycle, motif, GED, function clones, program composition, and IFDS/IDE summaries | eighteen `benches/*.rs` Criterion targets | feature-free baseline; one `algorithm-detection` group |
+| [04 — Measurement methodology](04-measurement-methodology.md) | Environment control and exact-oracle timing for SCC, condensation analytics, arena construction, bounded VF2, liveness, loop induction, DSM, WL, centrality, community, cohesion, spectral, cycle, motif, GED, function clones, program composition, IFDS/IDE, and taint summaries | nineteen `benches/*.rs` Criterion targets | feature-free baseline; one `algorithm-detection` group |
 | [05 — SCCP validation](05-sccp-validation.md) | Concrete value soundness, lattice laws, conditional-edge partition, refinement monotonicity, determinism, parser integration | `straight_line_literal_programs_match_the_concrete_interpreter`, SCCP unit/property tests, `sccp_integration` | feature-free / `lang-rust` parser case |
 | [06 — Interval validation](06-interval-analysis-validation.md) | Concrete range soundness, hull/widen/narrow laws, loop convergence, narrowing descent, determinism, SCCP cross-check, parser integration | interval unit/property tests, `intervals_integration` | feature-free / `lang-rust` parser case |
 | [07 — Loop-induction validation](07-induction-analysis-validation.md) | DFG invariant contract, unique latch-dominating recurrences, checked affine steps, comparison direction, determinism, parser integration, malformed/stack safety | induction unit/property tests, `induction_integration`, robustness harness | feature-free / `serde` / `lang-rust` parser case |
@@ -102,6 +102,7 @@ Because `default = []`, many tests are **feature-gated**. The end-to-end reachin
 | [26 — Program-composition validation](26-program-composition-validation.md) | Collision-free fresh ids, complete embedded-reference translation, append-only merge, exact self-copy counts, deterministic file scopes, exact/ambiguous/external imports, idempotent topology, cross-file call selection, serialization | sparse/dangling-id oracles, three 256-case generated properties, black-box integration, benchmark oracles | feature-free / `serde` |
 | [27 — IFDS/IDE validation](27-ifds-ide-validation.md) | Callee-first summaries, recursive convergence, lattice laws, deterministic insertion order, explicit cap monotonicity, resolver boundaries, malformed/stale SCC rejection, serialization | exact closure examples, four 256-case generated properties, independent BFS oracle, black-box integration, benchmark oracles | feature-free / `serde` |
 | [28 — Effect-summary validation](28-effect-summary-validation.md) | Direct and transitive place effects, purity, actual-to-formal remapping, return dependencies/constants, recursion, lattice laws, insertion-order determinism, and visible cap widening | exact examples, three 256-case generated properties, independent purity DFS, black-box integration, serialization | feature-free / `serde` |
+| [29 — Taint/nullflow validation](29-taint-nullflow-validation.md) | Data-driven source/sink/sanitizer/external policy, typed value propagation, interprocedural composition, canonical witness validity, maybe-null origins/dereferences, lattice laws, independent reachability, insertion determinism, and visible caps | twelve named scenarios, eight 256-case generated properties, independent BFS oracles, black-box integration, benchmark oracles, serialization | feature-free / `serde` |
 
 ## 5. What is proven, and what is advisory
 
@@ -173,7 +174,7 @@ Scientific honesty requires separating the two:
 - **Empirically bounded.** Performance results apply only to a target's named
   fixture, size, and controlled environment. DFG/PDG
   construction, whole-corpus analysis, and GNN propagation remain measurement gaps; no result
-  from the eighteen active targets (or thirty-one enabled operation groups) may be
+  from the nineteen active targets (or thirty-two enabled operation groups) may be
   generalized to them. Martin metrics, reflexion conformance, architectural
   layering, and architectural-smell detection have no dedicated targets, so
   their validation supports correctness but makes no

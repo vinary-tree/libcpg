@@ -77,8 +77,9 @@ alternatives is folklore, and a decision without its costs is marketing.
 | [0031 — Deterministic program composition](0031-deterministic-program-composition.md) | Translate every per-file identity into one program CPG and emit import/export topology only for uniquely supported file aliases. | Accepted |
 | [0032 — Deterministic bounded IFDS/IDE summaries](0032-deterministic-ifds-ide-summaries.md) | Validate current call topology, schedule callees before callers, and expose bounded recursive summary fixed points as ordered evidence. | Accepted |
 | [0033 — Compositional effect summaries](0033-compositional-effect-summaries.md) | Specialize the shared summary solver with typed storage places, transitive purity, return dependencies, and a lawful flat constant lattice. | Accepted |
+| [0034 — Data-driven advisory taint](0034-data-driven-advisory-taint.md) | Specialize the shared summary solver with caller-owned source/sink policy, typed value flow, canonical witnesses, maybe-null evidence, and explicit partial-result semantics. | Accepted |
 
-These thirty-three are not independent. ADR-0001 fixes the substrate that all analyses
+These thirty-four are not independent. ADR-0001 fixes the substrate that all analyses
 write onto; ADR-0002 and ADR-0005 together explain how a language reaches that
 substrate and what you must switch on to get there; ADR-0003 and ADR-0004 are
 two analyses *over* the substrate (one always-on, one feature-gated) that each
@@ -159,6 +160,10 @@ ADR-0033 instantiates that framework with typed CPG and DFG evidence. It maps
 callee parameter effects through actual arguments, uses a worst-purity chain
 and flat constant lattice, and widens visibly when a domain-local bound is
 reached.
+ADR-0034 builds on the same framework but keeps security policy outside the
+graph. It classifies typed call paths with a caller-owned catalog, composes
+source-to-return and parameter-to-sink jump functions, retains canonical
+positive witnesses, and treats maybe-null dereferences as advisory evidence.
 
 ![Module architecture of libcpg, showing the graph core and the analysis modules layered over it](../diagrams/module-architecture.svg)
 
@@ -170,7 +175,7 @@ reached.
   (`0001`…). Numbers are never reused; a reversed decision is marked
   *Superseded* and a new record supersedes it, so history stays legible.
 - **Status lifecycle.** `Proposed → Accepted → (Superseded by NNNN | Deprecated)`.
-  All thirty-three current records are **Accepted** and reflect the shipped `v0.1.1`
+  All thirty-four current records are **Accepted** and reflect the shipped `v0.1.1`
   code.
 - **Grounding.** Every claim here is traceable to source: the
   [`Cargo.toml`](../engineering/01-build-and-features.md) feature block, the

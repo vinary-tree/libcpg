@@ -1,6 +1,6 @@
 # Measurement methodology
 
-`libcpg` ships eighteen runnable Criterion targets. Their baseline groups are
+`libcpg` ships nineteen runnable Criterion targets. Their baseline groups are
 feature-free; the `induction_analysis` target also registers an
 `algorithm-detection`-gated complexity-evidence group. Each active group
 asserts a deterministic correctness oracle **before** entering the timed loop.
@@ -19,7 +19,7 @@ the source transformation under study does not [[1]](#references).
 
 ## 1. Current evidence
 
-All eighteen targets use `harness = false`, which hands execution to Criterion
+All nineteen targets use `harness = false`, which hands execution to Criterion
 rather than Rust's test harness:
 
 ```toml
@@ -93,6 +93,14 @@ harness = false
 [[bench]]
 name = "program_merge"
 harness = false
+
+[[bench]]
+name = "ifds_summaries"
+harness = false
+
+[[bench]]
+name = "ifds_taint"
+harness = false
 ```
 
 | Target | Public operation | Families and sizes | Pre-timing oracle |
@@ -115,6 +123,8 @@ harness = false
 | `ged` | `ged_upper_bound` | identical paths, relabeled isolates, and retyped paths at 16/48 vertices | exact edit costs $`0`$, $`n`$, and $`n-1`$, uncapped result |
 | `clones` | `detect_clones` | dense Type-1 equality, Type-3 insertion, and Type-4 reordering corpora at 16/64 functions | exact class taxonomy, complete membership, and similarity score |
 | `program_merge` | `merge_programs`, `build_import_graph` | 16/64 files with 16 statement nodes per file; represented import chains | summed counts, contiguous identities, embedded-reference totality, file scopes, exact resolutions, and dependency counts |
+| `ifds_summaries` | `solve_summaries` | acyclic and recursive call graphs at 256/1,024 functions | exact first-function transitive closure, complete reports, and nonempty per-function summaries |
+| `ifds_taint` | `analyze_taint_report` | call-graph paths, rings, and cyclic clusters at 32/128 workers | exact source-to-sink pair, valid witness endpoints, and complete reports before timing; SCC construction remains outside the timed closure |
 
 The evidence is deliberately local: a result for one named family, size,
 machine, toolchain, and environment is not a universal speed claim. DFG/PDG
@@ -166,6 +176,7 @@ tees Criterion output to one timestamped log:
 ./scripts/bench.sh community --save-baseline before
 ./scripts/bench.sh clones --save-baseline before
 ./scripts/bench.sh program_merge --save-baseline before
+./scripts/bench.sh ifds_taint --save-baseline before
 cargo bench --no-default-features --features algorithm-detection \
   --bench induction_analysis -- --test
 ```
@@ -282,6 +293,7 @@ $`d`$ is embedding dimension.
 | CPG arena construction | $`O(V + E)`$ insertion work | active path target |
 | bounded VF2 | factorial worst case; pruning-dependent [[3]](#references) | active bounded path target |
 | variable liveness | $`O(H(B + E_b)W + NW)`$ conventional bound | active chain/diamond/nested-loop target |
+| taint summaries | $`O(W+I(N_f+E_f)D_f\log D_f)`$ within shared/domain caps | active path/ring/clustered call-graph target |
 | DSM visibility / classification | $`O(V(V+E))`$ visibility plus SCC and median classification | active path/ring target |
 | Martin package metrics / SDP | $`O(E\log V+T\log K)`$ metrics plus $`O(E\log K)`$ SDP aggregation | benchmark deliberately deferred; exact oracle/property/integration validation is active |
 | Reflexion-model conformance | $`O(RHP+R\log R+A\log A)`$ for observations, layers/prefixes, and allowed pairs | benchmark deliberately deferred; exact oracle/property/integration validation is active |

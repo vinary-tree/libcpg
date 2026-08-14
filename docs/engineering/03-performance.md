@@ -100,6 +100,7 @@ function scope.
 | Import graph construction | conservative $`O(DN+ITA)`$ time | Scans $`D`$ namespace declarations, then matches $`I`$ imports of at most $`T`$ tokens against finite alias buckets totaling $`A`$ entries; exact matches append idempotent overlay edges. |
 | IFDS/IDE summary solving | $`O(W + I\,S)`$ bounded domain evaluations | $`W`$ is scheduler work, $`I`$ the configured recursive-SCC round cap, and $`S`$ the cost of one domain summary; every unbounded dimension has an `IfdsCaps` ceiling. |
 | Effect summaries | $`O(W + I(F+E_c+E_d))`$ bounded work | Each domain evaluation scans a function scope of $`F`$ nodes, represented call edges $`E_c`$, and relevant DFG/AST evidence $`E_d`$; cycle-safe local walks use `max_call_depth` and widen visibly on exhaustion. |
+| Taint and maybe-null summaries | $`O(W + I(N_f+E_f)D_f\log D_f)`$ bounded work | Each local relaxation propagates at most $`D_f`$ retained facts over typed nodes and admitted DFG edges; shared and domain-local caps qualify partial reports. |
 | PageRank / reverse / personalized | $`O(c(V+E))`$ time, $`O(V)`$ working space | Dense forward/reverse CSR and stable floating reduction; hard 10,000-round ceiling. |
 | Vertex/edge betweenness | $`O(V(V+E))`$ time, $`O(V+E)`$ working space | Directed vertex Brandes or undirected canonical edge Brandes; preflight work budgets; serial source partitions are public. |
 | Eigenvector / Katz / HITS | $`O(c(V+E))`$ time, $`O(V+E)`$ working space | Shifted spectral iteration, sufficient Katz row-sum bound, and paired HITS vectors. |
@@ -126,9 +127,9 @@ once, loop bodies twice, and a path set cuts malformed AST cycles.
 
 ## Benchmark coverage and remaining gaps
 
-Eighteen Criterion targets are active. Their thirty baseline operation groups are
-feature-free; `induction_analysis` also registers a thirty-first,
-`algorithm-detection`-gated operation. Every active group constructs and checks a deterministic oracle
+Nineteen Criterion targets are active. Their thirty-one baseline operation groups are
+feature-free; `induction_analysis` also registers a thirty-second,
+`algorithm-detection`-gated operation, making thirty-two in that build. Every active group constructs and checks a deterministic oracle
 before Criterion enters the timed loop:
 
 - `scc_analysis` measures public call-graph decomposition over 1,000- and
@@ -167,6 +168,10 @@ before Criterion enters the timed loop:
   first-function transitive closure and nonempty per-function summaries are
   asserted before timing; call-graph SCC construction remains outside the timed
   region.
+- `ifds_taint` measures advisory taint summaries over path, one-SCC ring, and
+  clustered recursive call graphs with 32 and 128 workers. The exact
+  source-to-sink pair and witness endpoints are asserted before timing;
+  call-graph SCC construction remains outside the timed closure.
 - `centrality` measures PageRank and shifted eigenvector iteration over 256-
   and 1,024-vertex paths, rings, and clustered graphs, plus directed Brandes
   and undirected closeness over the same shapes at 128 and 256 vertices. Its
@@ -293,6 +298,7 @@ cargo bench --bench motifs --no-default-features
 cargo bench --bench ged --no-default-features
 cargo bench --bench clones --no-default-features
 cargo bench --bench program_merge --no-default-features
+cargo bench --bench ifds_taint --no-default-features
 cargo bench --no-default-features --features algorithm-detection \
   --bench induction_analysis -- --test
 ```

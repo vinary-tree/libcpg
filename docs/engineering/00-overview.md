@@ -48,7 +48,8 @@ analytics](../GLOSSARY.md#condensation-graph--condensation-metrics),
 [architectural layering](../GLOSSARY.md#architectural-layer--layering-violation),
 [DSM visibility/core–periphery analysis](../GLOSSARY.md#design-structure-matrix-dsm),
 [Martin package metrics](../GLOSSARY.md#martin-package-metrics),
-[interprocedural effect summaries](../GLOSSARY.md#effect-summary--place--purity), pure
+[interprocedural effect summaries](../GLOSSARY.md#effect-summary--place--purity),
+[advisory taint and maybe-null summaries](../GLOSSARY.md#taint-catalog--taint-witness), pure
 [architectural-smell analysis](../GLOSSARY.md#architectural-smell),
 [reflexion-model conformance](../GLOSSARY.md#reflexion-model),
 [WL structural-clone analysis](../GLOSSARY.md#weisfeilerleman-wl-refinement),
@@ -86,8 +87,8 @@ directly from that relationship, and both are visible in `Cargo.toml`:
 | Page | What it covers |
 | --- | --- |
 | [01 — Build and features](01-build-and-features.md) | The full feature matrix: 16 `lang-*` grammars, the language groups, the analysis features, the Mode-B toggles, `serde`, the reserved `gpu` flag, and the `full` umbrella; the pgmcp grammar-pin table; how to enable a language. |
-| [02 — Testing](02-testing.md) | The example-based and `proptest` suite plus the general, robustness, SCCP, interval, loop-induction, complexity-evidence, condensation, layering, architectural-smell, DSM, Martin, reflexion, WL, centrality, community, cohesion, spectral, cycle, motif, GED, function-clone, program-composition, IFDS/IDE, and effect-summary public-API suites; the `arb_*` generators; how to run each feature subset; measured coverage; the defects the suite found; and the active Criterion benchmark substrate. |
-| [03 — Performance](03-performance.md) | The data-structure rationale, asymptotic costs, eighteen active oracle-guarded Criterion targets, controlled-measurement protocol, and explicit remaining benchmark gaps. |
+| [02 — Testing](02-testing.md) | The example-based and `proptest` suite plus the general, robustness, SCCP, interval, loop-induction, complexity-evidence, condensation, layering, architectural-smell, DSM, Martin, reflexion, WL, centrality, community, cohesion, spectral, cycle, motif, GED, function-clone, program-composition, IFDS/IDE, effect-summary, taint, and maybe-null public-API suites; the `arb_*` generators; how to run each feature subset; measured coverage; the defects the suite found; and the active Criterion benchmark substrate. |
+| [03 — Performance](03-performance.md) | The data-structure rationale, asymptotic costs, nineteen active oracle-guarded Criterion targets, controlled-measurement protocol, and explicit remaining benchmark gaps. |
 | [04 — Contributing](04-contributing.md) | Step-by-step recipes: add a language mapper, add a Gang-of-Four template, add a similarity metric; plus the coding conventions the crate follows. |
 
 ## Map of the security pillar
@@ -96,6 +97,7 @@ directly from that relationship, and both are visible in `Cargo.toml`:
 | --- | --- |
 | [`security/00` — Threat model](../security/00-threat-model.md) | Assets, attackers, and the two trust boundaries (untrusted source bytes; untrusted serialized graphs); why tree-sitter parsing executes no analyzed code; why detection results are advisory. |
 | [`security/01` — Input and resource hardening](../security/01-input-and-resource-hardening.md) | The concrete bounds — `max_file_size`, DFG structural passes, IFDS/IDE functions/facts/work/recursion/depth, effect-summary traversal widening, condensation/layering and DSM/WL/centrality/community limits, Martin/architectural-smell evidence validation, reflexion path-policy admission, k-truss/min-cut/attack ceilings, VF2 `max_matches`, and slice `max_nodes` — with recommended caps for hostile input and where caller-side parser timeouts belong. |
+| [`security/02` — Taint-analysis boundary](../security/02-taint-analysis.md) | Why catalog policy is caller-owned, why findings are advisory, how confidence and witnesses should be interpreted, and why capped empty results cannot support absence claims. |
 
 ## Honest project status
 
@@ -107,7 +109,7 @@ maturity than exists. The most consequential items:
 | --- | --- | --- |
 | Default build | `default = []`; `build` fails without a `lang-*` feature | [01](01-build-and-features.md) |
 | `examples/` directory | present but **empty** — no runnable examples (`tests/` now holds the integration and robustness suites) | [02](02-testing.md) |
-| Benchmarks | eighteen oracle-guarded Criterion targets are active; thirty operation groups are feature-free and the thirty-first, complexity evidence, is `algorithm-detection`-gated; effect summaries, DFG/PDG construction, whole-corpus analysis, and GNN propagation remain broader gaps | [02](02-testing.md), [03](03-performance.md) |
+| Benchmarks | nineteen oracle-guarded Criterion targets are active; thirty-one operation groups are feature-free and the thirty-second, complexity evidence, is `algorithm-detection`-gated; effect summaries, DFG/PDG construction, whole-corpus analysis, and GNN propagation remain broader gaps | [02](02-testing.md), [03](03-performance.md) |
 | `rayon`, `ahash`, `string_cache`, `regex` | declared in `Cargo.toml` but **not yet wired** into `src/` (`proptest` is now used throughout the test suite) | [02](02-testing.md), [03](03-performance.md) |
 | `gpu` feature | **reserved** — enables `wgpu`/`pollster` but no GPU code is written | [01](01-build-and-features.md) |
 | Detection results | pattern/algorithm/complexity outputs are **heuristics**, not proofs | [`security/00`](../security/00-threat-model.md) |

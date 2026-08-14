@@ -30,6 +30,7 @@ mod resolve;
 mod scc;
 mod smells;
 mod spectral;
+mod taint;
 pub(crate) mod wl;
 
 use crate::NodeId;
@@ -140,6 +141,14 @@ pub use smells::{architecture_smells, ArchSmell, ArchSmellKind, SmellOptions};
 pub use spectral::{
     algebraic_connectivity, try_algebraic_connectivity, Spectral, SpectralOptions,
     MAX_SPECTRAL_ITERATIONS, MAX_SPECTRAL_STARTS,
+};
+
+pub use taint::{
+    analyze_null_flows, analyze_null_flows_report, analyze_taint, analyze_taint_report,
+    AmbientFlowKey, CatalogClassification, CatalogMatch, CatalogRule, ExternalModel, MaybeNull,
+    NullAnalysis, NullFlow, NullFlowKey, NullOriginKind, NullSummary, ParamSinkKey, Pattern,
+    ReturnSourceKey, SinkClass, SourceClass, TaintAnalysis, TaintCatalog, TaintFact, TaintFlow,
+    TaintSummary, TaintWitness,
 };
 
 pub use wl::{structural_clone_classes, wl_labels, MAX_WL_ITERATIONS};

@@ -129,7 +129,10 @@ with evidence-bounded import linkage
 resolved call graph ([Theory 25](25-ifds-ide-summary-solving.md)), and
 [effect summaries](../GLOSSARY.md#effect-summary--place--purity) as a lawful
 compositional instance of that framework
-([Theory 26](26-interprocedural-effect-lattice.md)). Each
+([Theory 26](26-interprocedural-effect-lattice.md)), and data-driven advisory
+[taint and maybe-null summaries](../GLOSSARY.md#taint-catalog--taint-witness)
+with canonical interprocedural evidence
+([Theory 27](27-interprocedural-taint-and-nullflow.md)). Each
 graph analysis consumes the same
 `CodePropertyGraph`; none needs its own bespoke intermediate representation.
 
@@ -242,7 +245,11 @@ development, or jump to the layer you need:
 26. **[26 — Interprocedural effect lattice](26-interprocedural-effect-lattice.md).**
     Typed storage places, a worst-purity chain, return-dependency bits, and a
     flat scalar lattice compose direct and callee evidence without reparsing.
-    The final sixteen chapters define deterministic projection structure,
+27. **[27 — Interprocedural taint and maybe-null summaries](27-interprocedural-taint-and-nullflow.md).**
+    Open catalog classes, origin-sensitive facts, typed value propagation, and
+    canonical witnesses define advisory source-to-sink and null-dereference
+    evidence without source-text parsing.
+    The later chapters define deterministic projection structure,
     architecture metrics, inspectable evidence, and their interpretation
     limits.
 

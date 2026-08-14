@@ -66,6 +66,9 @@ PDG). A query can therefore mix syntax, control flow, and data flow freely.
 - **Interprocedural effect summaries** — feature-free global, parameter, and
   field read/write places; transitive purity; parameter-to-return flow; and
   checked constant returns over the same bounded call-SCC schedule.
+- **Advisory taint and maybe-null analysis** — feature-free, data-driven source,
+  sink, sanitizer, external-model, and dereference findings with deterministic
+  interprocedural witnesses and explicit completeness evidence.
 - **Projection centrality** — deterministic PageRank variants, vertex/edge
   betweenness, eigenvector, Katz, closeness, harmonic, HITS, and Burt
   structural-hole scores with explicit iteration and traversal budgets.
@@ -183,7 +186,7 @@ Comprehensive documentation lives under [`docs/`](docs/README.md):
 - **[API reference](docs/api/graph-reference.md)** — graph/program/projection/block-CFG/SCC/condensation/layering/architectural-smell/DSM/Martin/code-metric/reflexion/centrality/community/cohesion/reachability, builder, and pattern/algorithm/GNN reference.
 - **[Components](docs/README.md#components)** — graph projections, basic blocks, dominators, SCC/condensation/layering/architectural-smell/DSM/Martin/code-metric/reflexion/centrality/community/cohesion analytics, reachability, builders, patterns, algorithms, and GNN internals.
 - **[Usage guides](docs/usage/00-getting-started.md)** — task-oriented how-tos.
-- **[Engineering](docs/engineering/00-overview.md)** · **[Scientific validation](docs/scientific/00-overview.md)** · **[Security](docs/security/00-threat-model.md)**.
+- **[Engineering](docs/engineering/00-overview.md)** · **[Scientific validation](docs/scientific/00-overview.md)** · **[Security](docs/security/00-threat-model.md)** · **[Taint-analysis usage](docs/usage/10-taint-and-nullflow.md)**.
 - **[Glossary](docs/GLOSSARY.md)** and the **[diagram catalog](docs/diagrams/README.md)**.
 
 ## License

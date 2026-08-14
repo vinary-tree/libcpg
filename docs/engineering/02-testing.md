@@ -22,7 +22,7 @@ think to write down.
 
 | Kind | Count | Where |
 | --- | ---: | --- |
-| Maximal-matrix library tests | 862 | inline `#[cfg(test)] mod …` next to the code; includes examples and properties |
+| Maximal-matrix library tests | 897 | inline `#[cfg(test)] mod …` next to the code; includes examples and properties |
 | Public-API integration tests | 21 | `tests/integration.rs` |
 | Malformed-input robustness tests | 5 | `tests/robustness.rs` |
 | SCCP public/parser integration tests | 3 | `tests/sccp_integration.rs` |
@@ -44,13 +44,14 @@ think to write down.
 | Program-composition public integration tests | 3 | `tests/program_integration.rs` |
 | IFDS/IDE public integration tests | 2 | `tests/ifds_integration.rs` |
 | Effect-summary public integration tests | 2 | `tests/effects_integration.rs` |
+| Taint/nullflow public integration tests | 3 | `tests/taint_integration.rs` |
 | Martin public/parser integration tests | 2 | `tests/martin_integration.rs` |
 | Reflexion public/serialization integration tests | 2 | `tests/reflexion_integration.rs` |
 | Architectural-smell public/serialization integration tests | 2 | `tests/smells_integration.rs` |
 | Field-access public/parser integration tests | 2 | `tests/field_access_integration.rs` |
 | Code-metrics public/parser integration tests | 2 | `tests/metrics_integration.rs` |
-| **Executable test cases** | **940** | excludes three ignored rustdoc examples |
-| `proptest!` blocks (subset of the library/robustness rows) | 65 | exact source-level macro count in `src/` and `tests/` |
+| **Executable test cases** | **978** | excludes three ignored rustdoc examples |
+| `proptest!` blocks (subset of the library/robustness rows) | 73 | exact source-level macro count in `src/` and `tests/` |
 
 The maximal-matrix library count is up from **99** inline tests and **zero**
 property tests before this work.
@@ -68,13 +69,13 @@ on the features enabled:
 
 | Command | Lib tests | Notes |
 | --- | ---: | --- |
-| `cargo test` | 533 | `default = []`: the feature-free surface only |
-| `cargo test --features "full rholang metta"` | 862 | the maximal matrix, including the Mode-B mappers and evidence-aware complexity |
+| `cargo test` | 568 | `default = []`: the feature-free surface only |
+| `cargo test --features "full rholang metta"` | 897 | the maximal matrix, including the Mode-B mappers and evidence-aware complexity |
 
-The feature-free 533 exercise the graph model, deterministic multi-file merge
+The feature-free 568 exercise the graph model, deterministic multi-file merge
 and import linkage, exact dominator/post-dominator,
 natural-loop, monotone data-flow, IFDS/IDE procedure summaries,
-interprocedural effect/constant summaries, variable-liveness/dead-store,
+interprocedural effect/constant, taint, and maybe-null summaries, variable-liveness/dead-store,
 available/very-busy-expression, SCCP, interval value-range, CFG/call-graph
 SCC analyses, condensation-DAG analytics, DSM visibility/core–periphery, Martin
 package metrics and stable-dependency witnesses, CK/LCOM1–5 and function code
@@ -169,6 +170,7 @@ The invariants fall into complementary families.
 | **Call resolution** | resolution records and call edges are invariant under node/edge insertion permutations; duplicate names add zero call topology and preserve the SCC partition; repeated resolution is idempotent; candidate/call caps preserve the evidence boundary |
 | **IFDS/IDE summaries** | generated call graphs equal an independent reachability oracle and preserve exact reports under reversed call insertion; summary joins satisfy semilattice laws; iteration/work/function/fact/depth caps are explicit and monotone; examples cover acyclic, self-recursive, mutually recursive, external, unresolved, malformed/stale-SCC, serde, public composition, and graph non-mutation behavior |
 | **Effect summaries** | full summary joins satisfy idempotence, commutativity, associativity, and subsumption; 256 generated call graphs match an independent transitive-purity DFS and reverse-insertion oracle; another 256 cases prove iteration-cap monotonicity; exact examples cover pure constants, global/field/parameter effects, actual-argument remapping, transitive constants and impurity, conflicting returns, mutual recursion, 65-parameter truncation, malformed topology, domain/shared caps, serde, crate-root composition, and graph non-mutation |
+| **Taint and maybe-null summaries** | both summary joins satisfy idempotence, commutativity, associativity, and subsumption; generated typed value-flow graphs match independent breadth-first reachability oracles and preserve exact reports under reversed insertion; catalog properties pin pattern specificity and caller-policy replacement; examples cover twelve source/sink/sanitizer/external/interprocedural scenarios, witness validity, 65-parameter truncation, caps, serde, crate-root composition, nullable-return and uninitialized-variable origins, and graph non-mutation |
 | **Idempotency** | a second `CfgExtractor::extract` / `DfgExtractor::extract` / `PdgBuilder::build` adds no edges |
 | **Slicing** | $`\lvert S\rvert \le \mathit{max\_nodes}`$; the criterion is in its own backward slice; $`\mathit{max\_nodes} = 0 \Rightarrow S = \varnothing`$; $`S`$ is monotone in $`\mathit{max\_nodes}`$; every sliced id is a real node |
 | **Matching, similarity, and GED** | VF2 embeddings are injective, kind-consistent, and edge-preserving; relaxed matching $`\supseteq`$ strict; all four metrics land in $`[0,1]`$, are symmetric, and are maximal on self-comparison; Hungarian assignments equal brute-force permutations through order seven; 128 generated graph pairs through six nodes produce deterministic symmetric concrete-script bounds no smaller than exhaustive exact GED; examples cover typed multiedges, stable ids, caps, invalid numerics, serde, public/parser composition, robustness, stable WL hash vectors, and non-mutation |
@@ -503,7 +505,7 @@ dependencies and are not part of the `full` feature set.
 | --- | --- |
 | `examples/` directory | present but **empty** — no runnable `cargo run --example …` programs. |
 | Doctests | none run — every code fence in a doc comment is marked `ignore` / `rust,ignore`, so `cargo test --doc` executes nothing. Feature-gating individual doctests in a `default = []` crate is awkward; the snippets are instead validated by the documentation snippet-check harness. |
-| Benchmarks | Eighteen active Criterion targets cover SCC paths/rings/clusters, condensation paths/independent chains with and without CG layering, graph-arena paths, bounded VF2 paths, liveness chains/diamond ladders/nested loops, counted-loop induction regions, DSM paths/rings, WL rings/stars, centrality paths/rings/clusters, Louvain rings of cliques, disconnected-community refinement, cohesion lattices/clique chains/weighted seams/star attacks, spectral stars/complete-bipartite/disconnected-star families, bounded cycles over acyclic paths/disjoint triangles/dense digraphs, motif censuses over paths/bidirected cliques/out-stars, GED over identical/relabelled/retyped graphs, function clones over equality/insertion/reordering corpora, program merge/import linkage, IFDS/IDE summaries, and—under `algorithm-detection`—complexity evidence on the counted-loop fixtures. Each active group asserts a deterministic oracle before timing. See [performance](03-performance.md). |
+| Benchmarks | Nineteen active Criterion targets cover SCC paths/rings/clusters, condensation paths/independent chains with and without CG layering, graph-arena paths, bounded VF2 paths, liveness chains/diamond ladders/nested loops, counted-loop induction regions, DSM paths/rings, WL rings/stars, centrality paths/rings/clusters, Louvain rings of cliques, disconnected-community refinement, cohesion lattices/clique chains/weighted seams/star attacks, spectral stars/complete-bipartite/disconnected-star families, bounded cycles over acyclic paths/disjoint triangles/dense digraphs, motif censuses over paths/bidirected cliques/out-stars, GED over identical/relabelled/retyped graphs, function clones over equality/insertion/reordering corpora, program merge/import linkage, IFDS/IDE summaries, and taint summaries over path/ring/clustered call graphs, plus—under `algorithm-detection`—complexity evidence on the counted-loop fixtures. Each active group asserts a deterministic oracle before timing. See [performance](03-performance.md). |
 | `ml-linfa`, `gpu` | not exercised: optional heavy dependencies outside the `full` feature set. |
 
 ## Related pages

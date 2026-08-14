@@ -290,6 +290,32 @@ in a capped result remains useful. See the
 [effect-summary component guide](../components/graph/effect-summaries.md) and
 [usage guide](../usage/09-effect-summaries.md).
 
+### Advisory taint and maybe-null summaries
+
+The feature-free taint domains consume the same resolved call graph and typed
+AST/DFG evidence. They never scan retained source text:
+
+| Function | Signature | Result |
+|---|---|---|
+| `analyze_taint_report` | `fn(&CodePropertyGraph, &CallGraphResolution, &TaintCatalog, &IfdsCaps) -> TaintAnalysis` | Ordered source-to-sink findings, per-function summaries, shared solver evidence, and domain-local cap state. |
+| `analyze_taint` | `fn(&CodePropertyGraph, &CallGraphResolution, &TaintCatalog, &IfdsCaps) -> Vec<TaintFlow>` | Convenience finding vector; inspect the report API before making negative claims. |
+| `analyze_null_flows_report` | `fn(&CodePropertyGraph, &CallGraphResolution, &IfdsCaps) -> NullAnalysis` | Ordered maybe-null dereference candidates with summaries and completeness evidence. |
+| `analyze_null_flows` | `fn(&CodePropertyGraph, &CallGraphResolution, &IfdsCaps) -> Vec<NullFlow>` | Convenience finding vector with the same positive evidence boundary. |
+
+`TaintCatalog` owns ordered `sources`, `sinks`, `sanitizers`, and `externals`.
+Rules select call paths with `Pattern::{Exact, Segment, Suffix, Substring}` and
+use open `Arc<str>` classes; external calls use
+`ExternalModel::{Passthrough, Havoc, Source, Sink, Sanitizer}`. Every finding
+retains concrete source/sink ids, optional CWE metadata, confidence, and a
+canonical `TaintWitness`. `NullOriginKind` distinguishes literal,
+uninitialized-variable, and typed nullable-return evidence.
+
+`TaintAnalysis::is_complete()` and `NullAnalysis::is_complete()` are the only
+licenses for absence claims. The `Vec` conveniences deliberately preserve
+positive findings while omitting that qualification. See the [component
+guide](../components/graph/taint-analysis.md), [usage guide](../usage/10-taint-and-nullflow.md),
+and [security boundary](../security/02-taint-analysis.md).
+
 ### Deterministic graph projections
 
 `GraphProjection` is the feature-free, payload-free compressed-sparse-row view

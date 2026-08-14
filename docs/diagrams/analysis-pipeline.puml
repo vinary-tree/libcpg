@@ -27,6 +27,7 @@ fork
   + algebraic connectivity / Fiedler sign partition
   + bounded canonical simple-cycle witnesses
   + complete triad census / selected graphlets
+  + IFDS / effect / taint / maybe-null summaries
   → exact structural relations + fixed points;<<#C3FAE8>>
 fork again
   :PdgBuilder.build
@@ -46,7 +47,7 @@ end fork
 stop
 legend right
   |= colour |= analysis (module) |
-  |<#C3FAE8>| structural — blocks / data flow / liveness / expressions / SCCP / intervals / induction / reachability / dominance / loops / SCCs / condensation / layering / DSM / Martin metrics / architectural smells / WL / centrality / communities / cohesion / spectral connectivity / simple cycles / directed motifs |
+  |<#C3FAE8>| structural — blocks / data flow / IFDS / effects / taint / nullflow / graph analytics |
   |<#E5DBFF>| PDG — program slicing |
   |<#FFE3E3>| pattern — VF2 / GED / similarity / GoF |
   |<#FFF3BF>| algorithm + complexity |

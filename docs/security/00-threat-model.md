@@ -150,6 +150,7 @@ and its build pipeline.
 | Expensive/adversarial call resolution | Scope-depth, retained-candidate, and sorted-call caps plus cycle guards | [hardening §call resolution](01-input-and-resource-hardening.md#call-resolution-scope-candidate-and-call-caps) |
 | Explosive pattern search | VF2 `max_matches` cap + strict toggles | [hardening §VF2](01-input-and-resource-hardening.md#pattern-matching-vf2) |
 | Non-terminating data flow | Structural AST sweep, two loop passes, and a malformed-cycle path guard | [hardening §DFG](01-input-and-resource-hardening.md#data-flow-structural-sweep-bounds) |
+| Oversized or untrusted taint policy; capped negative claim | caller admission for catalog rule/string counts, literal path matching, shared/domain caps, and report-level completeness checks | [taint-analysis boundary](02-taint-analysis.md) |
 | Unbounded slice | `backward_slice` / `forward_slice` `max_nodes` cap | [hardening §slicing](01-input-and-resource-hardening.md#slicing-max_nodes) |
 | Expensive or divergent centrality | hard iteration ceiling, explicit traversal budgets, finite-option validation, and complete projection validation | [hardening §centrality](01-input-and-resource-hardening.md#centrality-iteration-ceilings-traversal-budgets-and-safe-numerics) |
 | Adversarial community search or weights | 50-pass/10-level ceilings plus complete CSR, resolution, weight, and overflow validation | [hardening §community detection](01-input-and-resource-hardening.md#community-detection-pass-level-and-numeric-bounds) |
@@ -164,7 +165,7 @@ and its build pipeline.
 | Forged or oversized smell evidence bundle | complete projection/options/metric/assignment validation, exact SCC recomputation, fail-closed empty result; caller-side projection cap | [hardening §architectural smells](01-input-and-resource-hardening.md#architectural-smells-validated-bundle-and-ingress-cap) |
 | Oversized or misleading code-metric evidence | finite iterative graph traversals, inheritance-SCC condensation, stable ordered sets, defined arithmetic edge cases; caller-side CPG cap and retained resolver policy | [hardening §code metrics](01-input-and-resource-hardening.md#code-metrics-finite-evidence-and-ingress-cap) |
 | Untrusted serialized graph | Deserialize only trusted bytes | [`usage/05-serialization.md`](../usage/05-serialization.md) |
-| Over-trusting heuristics, rankings, partitions, edit bounds, architecture/code metrics, cut/robustness evidence, bounded cycle prefixes, or motif frequencies | Treat pattern/algorithm/GNN, GED, Martin, CK/LCOM/function metrics, reflexion, layering, smells, centrality, community, cohesion, spectral, truncated-cycle, and motif output as advisory | this page |
+| Over-trusting heuristics, taint/nullflow findings, rankings, partitions, edit bounds, architecture/code metrics, cut/robustness evidence, bounded cycle prefixes, or motif frequencies | Treat taint/nullflow, pattern/algorithm/GNN, GED, Martin, CK/LCOM/function metrics, reflexion, layering, smells, centrality, community, cohesion, spectral, truncated-cycle, and motif output as advisory | this page |
 
 ## References
 

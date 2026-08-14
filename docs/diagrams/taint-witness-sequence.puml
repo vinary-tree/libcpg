@@ -1,0 +1,43 @@
+@startuml
+!include _libcpg-theme.iuml
+title Canonical interprocedural taint witness
+
+skinparam backgroundColor #FCFCFC
+
+participant "Source call\nAmbient(env)" as Source #FFE8CC
+participant "Caller DFG\nargument 0" as Caller #FFF3BF
+participant "Resolved call\nconfidence tier" as Call #C3FAE8
+participant "Callee summary\nParam(0) → command" as Summary #E5DBFF
+participant "Sink call\nCWE-78" as Sink #FFE3E3
+participant "TaintAnalysis\nordered finding" as Report #FCC2D7
+
+Source -> Caller : DefUse / value composition
+Caller -> Call : actual argument 0
+Call -> Summary : Parameter edge + current jump function
+Summary -> Sink : canonical parameter-to-sink suffix
+Sink -> Report : source, sink, class, CWE, witness
+
+note over Source,Caller #FFF3BF
+  Prefix confidence is the source-pattern score.
+end note
+
+note over Call,Summary #C3FAE8
+  Composition takes the minimum of catalog,
+  call-resolution, and suffix confidence.
+end note
+
+note over Sink,Report #FFE3E3
+  Ties prefer uncapped, higher-confidence,
+  shorter, then lexicographically smaller NodeId paths.
+end note
+
+legend bottom
+|= Colour |= Meaning |
+|<#FFE8CC>| classified source |
+|<#FFF3BF>| caller-local data flow |
+|<#C3FAE8>| resolved call boundary |
+|<#E5DBFF>| reusable procedure summary |
+|<#FFE3E3>| classified sink |
+|<#FCC2D7>| canonical advisory report |
+endlegend
+@enduml

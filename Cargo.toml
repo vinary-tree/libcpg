@@ -269,3 +269,7 @@ harness = false
 [[bench]]
 name = "ifds_summaries"
 harness = false
+
+[[bench]]
+name = "ifds_taint"
+harness = false

@@ -1,0 +1,65 @@
+@startuml
+!include _libcpg-theme.iuml
+title Data-driven interprocedural taint and null-flow analysis
+
+skinparam backgroundColor #FCFCFC
+skinparam component {
+  BorderColor #495057
+}
+skinparam note {
+  BackgroundColor #F1F3F5
+  BorderColor #495057
+}
+
+component "CodePropertyGraph\ntyped AST · DFG · calls · types" as CPG #DBE4FF
+component "callee-path reconstruction\nIdentifier / MemberAccess only" as PATH #E9ECEF
+component "TaintCatalog\nsource · sink · sanitizer\nexternal model" as CATALOG #FFE8CC
+component "local exploded facts\nParam(i) · Ambient(class)\nMaybeNull(origin)" as FACTS #FFF3BF
+component "typed transfer\nAST value composition · DFG" as TRANSFER #D3F9D8
+component "call-SCC summary solver\ncallee-first · bounded Kleene" as IFDS #C3FAE8
+component "summary edges\nparameter→sink · parameter→return\nsource→return" as SUMMARY #E5DBFF
+component "canonical predecessor map\nshortest stable NodeId witness" as WITNESS #FCC2D7
+component "advisory findings\nclass · CWE · confidence · cap" as OUTPUT #FFE3E3
+component "completeness evidence\ncap events · issues · iterations" as COMPLETE #F1F3F5
+
+CPG --> PATH : typed child traversal
+PATH --> CATALOG : reconstructed path
+CPG --> FACTS : parameters / nulls / DFG
+CATALOG --> FACTS : source seeds / sanitizer kills
+FACTS --> TRANSFER
+TRANSFER --> IFDS : local candidate summary
+CPG --> IFDS : validated call SCCs
+IFDS --> SUMMARY : <latex>S_f^{(k+1)} = S_f^{(k)} \sqcup F_f(S^{(k)})</latex>
+SUMMARY --> IFDS : current callee facts
+TRANSFER --> WITNESS : predecessor relaxation
+SUMMARY --> WITNESS : interprocedural composition
+CATALOG --> OUTPUT : sink class and CWE
+WITNESS --> OUTPUT
+IFDS --> COMPLETE
+COMPLETE --> OUTPUT : capped flag
+
+note bottom of PATH
+  This is not a source parser.
+  The first typed callee subtree is traversed with a depth and cycle guard.
+end note
+
+note bottom of OUTPUT
+  The source CPG is read-only.
+  A candidate flow is evidence for review, never a vulnerability verdict.
+  Negative claims require is_complete().
+end note
+
+legend bottom
+|= Colour |= Meaning |
+|<#DBE4FF>| represented CPG evidence |
+|<#E9ECEF>| typed callee-path reconstruction |
+|<#FFE8CC>| caller-supplied policy catalog |
+|<#FFF3BF>| finite IFDS facts |
+|<#D3F9D8>| intraprocedural transfer |
+|<#C3FAE8>| call graph and fixed-point schedule |
+|<#E5DBFF>| procedure summary edges |
+|<#FCC2D7>| canonical witness evidence |
+|<#FFE3E3>| advisory security finding |
+|<#F1F3F5>| completeness and bounds |
+endlegend
+@enduml

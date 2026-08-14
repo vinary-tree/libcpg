@@ -36,6 +36,15 @@ would be extracted beyond the hard cap.;
 ***[#F1F3F5]:widen_after + narrow_passes
 widening is confined to LoopForest headers,
 narrowing runs exactly the bounded pass count.;
+**[#FFE3E3] IFDS / effect / taint summaries
+***[#F1F3F5]:IfdsCaps bounds functions, facts, work,
+recursive SCC rounds, and call-path depth.;
+***[#F1F3F5]:effect, taint, and maybe-null reports
+retain shared and domain-local cap evidence —
+only complete reports license absence claims.;
+***[#F1F3F5]:taint and nullflow parameter masks
+represent positions 0..63 and visibly mark
+larger signatures as truncated and capped.;
 **[#FFE3E3] Condensation analytics
 ***[#F1F3F5]:max_components = 1,000,000 hard ceiling
 total metrics return a capped incomplete report and
@@ -72,7 +81,7 @@ module count, and name bytes at ingress.;
 rejects malformed CSR, stale SCC, partial assignment,
 invalid options, and missing/duplicate/invalid metrics.;
 ***[#F1F3F5]:input-sized work
-iterative SCC recomputation and one-pass graph evidence;
+iterative SCC recomputation and one-pass graph evidence —
 hosts cap projection, module, and name size at ingress.;
 **[#FFE3E3] WL refinement
 ***[#F1F3F5]:MAX_WL_ITERATIONS = 16
@@ -83,7 +92,7 @@ rejects malformed node, CSR, weight, or reverse state
 before indexed traversal and returns empty output.;
 **[#FFE3E3] Centrality
 ***[#F1F3F5]:MAX_CENTRALITY_ITERATIONS = 10,000
-clamps PageRank, eigenvector, Katz, and HITS;
+clamps PageRank, eigenvector, Katz, and HITS,
 ***[#F1F3F5]:explicit work budgets
 preflight Brandes, distance, edge-betweenness,
 and Burt neighborhood operations before traversal.;

@@ -272,6 +272,22 @@ silently asserting precision. See the [effect-summary component
 guide](../components/graph/effect-summaries.md) and [Theory
 26](../theory/26-interprocedural-effect-lattice.md).
 
+### Taint and maybe-null summaries (feature-free)
+
+`analyze_taint_report` and `analyze_null_flows_report` are two more lawful
+summary domains over the same callee-first fixed point. They propagate facts
+through typed AST value composition and `DataFlow` edges, classify represented
+call paths with caller-owned catalog data, and retain canonical predecessor
+chains as evidence. They do not parse or match source text.
+
+Resolved calls compose callee parameter-to-return and parameter-to-sink jump
+functions through typed actual arguments. Cataloged external calls instead
+apply an explicit passthrough, havoc, source, sink, or sanitizer model.
+Domain-local traversals and output retention use `IfdsCaps`; a reached bound is
+visible in the report and its affected witnesses. See the [taint component
+guide](../components/graph/taint-analysis.md) and [Theory
+27](../theory/27-interprocedural-taint-and-nullflow.md).
+
 `condensation_metrics(&sccs, &options)` continues that pipeline without
 revisiting the CPG. A minimum-id Kahn order drives source-oriented longest-path
 levels and an SCC-member-weighted critical path; optional
