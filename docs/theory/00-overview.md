@@ -121,7 +121,10 @@ Martin-instability, and assigned component-size evidence
 ([Theory 21](21-advisory-architectural-smells.md)), and
 [object-oriented and function metrics](../GLOSSARY.md#code-metrics)
 from resolved field/call and normalized node-kind evidence
-([Theory 22](22-object-oriented-and-function-metrics.md)). Each
+([Theory 22](22-object-oriented-and-function-metrics.md)), and deterministic
+[multi-file program composition](../GLOSSARY.md#program-cpg--file-scope)
+with evidence-bounded import linkage
+([Theory 24](24-program-composition.md)). Each
 graph analysis consumes the same
 `CodePropertyGraph`; none needs its own bespoke intermediate representation.
 
@@ -185,7 +188,7 @@ same graph. Errors are the crate's own [`libcpg::Error`](../api/graph-reference.
 
 ## 6. Map of the theory pillar
 
-This overview sits above twenty-three formal chapters. Read them in order for a ground-up
+This overview sits above twenty-four formal chapters. Read them in order for a ground-up
 development, or jump to the layer you need:
 
 1. **[01 — Code Property Graphs](01-code-property-graphs.md).** The formal model:
@@ -225,7 +228,10 @@ development, or jump to the layer you need:
 23. **[23 — Function clone detection](23-function-clone-detection.md).**
     Ordered AST fingerprints, multiset similarity, and bounded PDG WL/VF2
     verification define the four function-clone relations.
-    The final thirteen chapters define deterministic projection structure,
+24. **[24 — Multi-file program composition](24-program-composition.md).**
+    Injective identifier translation, ordered file scopes, and conservative
+    alias evidence define the unified program graph and import topology.
+    The final fourteen chapters define deterministic projection structure,
     architecture metrics, inspectable evidence, and their interpretation
     limits.
 

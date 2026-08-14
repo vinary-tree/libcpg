@@ -261,3 +261,7 @@ harness = false
 [[bench]]
 name = "clones"
 harness = false
+
+[[bench]]
+name = "program_merge"
+harness = false

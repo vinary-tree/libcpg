@@ -22,7 +22,7 @@ think to write down.
 
 | Kind | Count | Where |
 | --- | ---: | --- |
-| Maximal-matrix library tests | 810 | inline `#[cfg(test)] mod …` next to the code; includes examples and properties |
+| Maximal-matrix library tests | 829 | inline `#[cfg(test)] mod …` next to the code; includes examples and properties |
 | Public-API integration tests | 21 | `tests/integration.rs` |
 | Malformed-input robustness tests | 5 | `tests/robustness.rs` |
 | SCCP public/parser integration tests | 3 | `tests/sccp_integration.rs` |
@@ -41,13 +41,14 @@ think to write down.
 | Motif public/parser integration tests | 2 | `tests/motifs_integration.rs` |
 | GED public/parser integration tests | 2 | `tests/ged_integration.rs` |
 | Function-clone public integration tests | 2 | `tests/clones_integration.rs` |
+| Program-composition public integration tests | 3 | `tests/program_integration.rs` |
 | Martin public/parser integration tests | 2 | `tests/martin_integration.rs` |
 | Reflexion public/serialization integration tests | 2 | `tests/reflexion_integration.rs` |
 | Architectural-smell public/serialization integration tests | 2 | `tests/smells_integration.rs` |
 | Field-access public/parser integration tests | 2 | `tests/field_access_integration.rs` |
 | Code-metrics public/parser integration tests | 2 | `tests/metrics_integration.rs` |
-| **Executable test cases** | **881** | excludes three ignored rustdoc examples |
-| `proptest!` blocks (subset of the library/robustness rows) | 62 | exact source-level macro count in `src/` and `tests/` |
+| **Executable test cases** | **903** | excludes three ignored rustdoc examples |
+| `proptest!` blocks (subset of the library/robustness rows) | 63 | exact source-level macro count in `src/` and `tests/` |
 
 The maximal-matrix library count is up from **99** inline tests and **zero**
 property tests before this work.
@@ -65,10 +66,11 @@ on the features enabled:
 
 | Command | Lib tests | Notes |
 | --- | ---: | --- |
-| `cargo test` | 484 | `default = []`: the feature-free surface only |
-| `cargo test --features "full rholang metta"` | 810 | the maximal matrix, including the Mode-B mappers and evidence-aware complexity |
+| `cargo test` | 502 | `default = []`: the feature-free surface only |
+| `cargo test --features "full rholang metta"` | 829 | the maximal matrix, including the Mode-B mappers and evidence-aware complexity |
 
-The feature-free 484 exercise the graph model, exact dominator/post-dominator,
+The feature-free 502 exercise the graph model, deterministic multi-file merge
+and import linkage, exact dominator/post-dominator,
 natural-loop, monotone data-flow, variable-liveness/dead-store,
 available/very-busy-expression, SCCP, interval value-range, CFG/call-graph
 SCC analyses, condensation-DAG analytics, DSM visibility/core–periphery, Martin

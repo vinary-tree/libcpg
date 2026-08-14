@@ -1,0 +1,61 @@
+@startuml
+!include _libcpg-theme.iuml
+title Deterministic multi-file CPG composition and import evidence
+
+skinparam backgroundColor #FCFCFC
+skinparam component {
+  BorderColor #495057
+}
+skinparam note {
+  BackgroundColor #F1F3F5
+  BorderColor #495057
+}
+
+component "File CPG 0\nlocal NodeId space" as F0 #DBE4FF
+component "File CPG 1\nlocal NodeId space" as F1 #DBE4FF
+component "File CPG n\nlocal NodeId space" as FN #DBE4FF
+component "merge_programs\ninput-file order" as MERGE #F1F3F5
+component "merge_from\nsorted source NodeId\nfresh node and edge ids" as REMAP #FFF3BF
+component "ProgramCpg\none shared node set\nFileScope partitions" as PROGRAM #D3F9D8
+component "build_import_graph\nlongest unique alias" as IMPORT #FFE8CC
+component "ImportGraph\nexact / ambiguous / external" as EVIDENCE #E5DBFF
+component "Imports / Exports\ntyped overlay edges" as OVERLAY #FFE8CC
+component "resolve_calls\nExactViaImport" as CALLS #C3FAE8
+
+F0 --> MERGE
+F1 --> MERGE
+FN --> MERGE
+MERGE --> REMAP : each file
+REMAP --> PROGRAM : translated nodes, edges,\nmetadata, embedded references
+PROGRAM --> IMPORT : file roots, paths,\nmodules, declarations
+IMPORT --> EVIDENCE : every import statement
+IMPORT --> OVERLAY : unique matches only
+OVERLAY --> PROGRAM : append-only
+PROGRAM --> CALLS : declaration-level\nimport evidence
+
+note right of REMAP
+  parent, children, Call.target,
+  Identifier.definition, and
+  Lambda.captures are translated.
+  Unmapped references are cleared.
+end note
+
+note right of IMPORT
+  A tie emits no dependency edge.
+  Declaration edges carry the local
+  binding, including explicit renames.
+  Re-running adds zero duplicate
+  Imports or Exports edges.
+end note
+
+legend bottom
+|= Colour |= Meaning |
+|<#DBE4FF>| per-file syntax and overlays |
+|<#FFF3BF>| identifier translation |
+|<#D3F9D8>| unified program CPG |
+|<#FFE8CC>| import/export topology |
+|<#E5DBFF>| out-of-graph evidence |
+|<#C3FAE8>| uniquely supported call topology |
+|<#F1F3F5>| deterministic orchestration |
+endlegend
+@enduml

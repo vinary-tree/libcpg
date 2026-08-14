@@ -628,6 +628,18 @@ The Rust graph library `libcpg` builds on. `CodePropertyGraph` wraps a `petgraph
 
 The overlay of [control-dependence](#control-dependence) and [data-dependence](#data-dependence) edges, introduced by Ferrante–Ottenstein–Warren [[2]](#references). It is the substrate for [program slicing](#program-slicing). Added on demand by `PdgBuilder::build(&mut cpg, function)` (it is *not* built during initial construction). See [`theory/04-program-dependence-and-slicing.md`](theory/04-program-dependence-and-slicing.md).
 
+### Program CPG / File scope / Import graph
+
+A **program CPG** (`ProgramCpg`) is one collision-free, append-only
+[CPG](#code-property-graph-cpg) made from independently identified file CPGs.
+A **file scope** (`FileScope`) records one input's metadata, translated root,
+sorted program nodes, and source-to-program `NodeId` map. The **import graph**
+(`ImportGraph`) is an ordered evidence summary paired with `Imports` and
+`Exports` overlay edges on those same nodes; it is not a second authoritative
+graph store. Declaration-level `Imports` labels name the local binding used by
+cross-file call resolution. See
+[`components/graph/program-composition.md`](components/graph/program-composition.md).
+
 ### Program slicing
 
 Reducing a program to just the statements that affect (or are affected by) a chosen point of interest, the **slicing criterion**. Introduced by Weiser [[8]](#references). `libcpg` computes [backward and forward slices](#backward-slice--forward-slice) over the PDG. See [`usage/04-program-slicing.md`](usage/04-program-slicing.md).

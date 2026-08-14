@@ -20,6 +20,7 @@ mod loops;
 mod martin;
 mod metrics;
 mod motifs;
+mod program;
 mod projection;
 mod reachability;
 mod reflexion;
@@ -72,6 +73,11 @@ pub use dataflow::{
 pub use projection::{
     call_graph_projection, cfg_projection, dfg_projection, module_graph_projection, pdg_projection,
     projection_of, GraphProjection, ProjectionError, ProjectionKind, UndirectedProjection,
+};
+
+pub use program::{
+    build_import_graph, merge_programs, FileScope, ImportDependency, ImportGraph, ImportResolution,
+    ImportResolutionKind, ProgramCpg,
 };
 
 pub use dominators::{dominator_tree, post_dominator_tree, DominatorTree, PostDominatorTree};

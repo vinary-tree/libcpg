@@ -1,6 +1,6 @@
 # Measurement methodology
 
-`libcpg` ships sixteen runnable Criterion targets. Their baseline groups are
+`libcpg` ships seventeen runnable Criterion targets. Their baseline groups are
 feature-free; the `induction_analysis` target also registers an
 `algorithm-detection`-gated complexity-evidence group. Each active group
 asserts a deterministic correctness oracle **before** entering the timed loop.
@@ -19,7 +19,7 @@ the source transformation under study does not [[1]](#references).
 
 ## 1. Current evidence
 
-All sixteen targets use `harness = false`, which hands execution to Criterion
+All seventeen targets use `harness = false`, which hands execution to Criterion
 rather than Rust's test harness:
 
 ```toml
@@ -89,6 +89,10 @@ harness = false
 [[bench]]
 name = "clones"
 harness = false
+
+[[bench]]
+name = "program_merge"
+harness = false
 ```
 
 | Target | Public operation | Families and sizes | Pre-timing oracle |
@@ -110,6 +114,7 @@ harness = false
 | `motifs` | `motif_census` | paths and out-stars at 24/50 vertices; complete bidirected graphs at 16/30 vertices | exact class/graphlet binomial counts, conservation, and repeatability |
 | `ged` | `ged_upper_bound` | identical paths, relabeled isolates, and retyped paths at 16/48 vertices | exact edit costs $`0`$, $`n`$, and $`n-1`$, uncapped result |
 | `clones` | `detect_clones` | dense Type-1 equality, Type-3 insertion, and Type-4 reordering corpora at 16/64 functions | exact class taxonomy, complete membership, and similarity score |
+| `program_merge` | `merge_programs`, `build_import_graph` | 16/64 files with 16 statement nodes per file; represented import chains | summed counts, contiguous identities, embedded-reference totality, file scopes, exact resolutions, and dependency counts |
 
 The evidence is deliberately local: a result for one named family, size,
 machine, toolchain, and environment is not a universal speed claim. DFG/PDG
@@ -160,6 +165,7 @@ tees Criterion output to one timestamped log:
 ./scripts/bench.sh centrality --save-baseline before
 ./scripts/bench.sh community --save-baseline before
 ./scripts/bench.sh clones --save-baseline before
+./scripts/bench.sh program_merge --save-baseline before
 cargo bench --no-default-features --features algorithm-detection \
   --bench induction_analysis -- --test
 ```

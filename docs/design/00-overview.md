@@ -74,8 +74,9 @@ alternatives is folklore, and a decision without its costs is marketing.
 | [0028 — Evidence-bounded member-to-field resolution](0028-evidence-bounded-member-field-resolution.md) | Emit complex-l-value writes and resolve only uniquely supported `self`/`this` accesses to same-scope field declarations. | Accepted |
 | [0029 — Evidence-bounded code metrics](0029-evidence-bounded-code-metrics.md) | Derive CK/LCOM and function metrics from resolved CPG evidence, preserve method-field witnesses, condense inheritance cycles, and align numerical scoring with pgmcp. | Accepted |
 | [0030 — Bounded function clone detection](0030-bounded-function-clone-detection.md) | Classify strongest Type-1–4 function relations with stable AST Merkle, multiset, WL, and bounded existing-VF2 evidence. | Accepted |
+| [0031 — Deterministic program composition](0031-deterministic-program-composition.md) | Translate every per-file identity into one program CPG and emit import/export topology only for uniquely supported file aliases. | Accepted |
 
-These thirty are not independent. ADR-0001 fixes the substrate that all analyses
+These thirty-one are not independent. ADR-0001 fixes the substrate that all analyses
 write onto; ADR-0002 and ADR-0005 together explain how a language reaches that
 substrate and what you must switch on to get there; ADR-0003 and ADR-0004 are
 two analyses *over* the substrate (one always-on, one feature-gated) that each
@@ -145,6 +146,10 @@ feature-free by classifying common CPG node kinds rather than reparsing source.
 ADR-0030 composes ADR-0016's fixed WL combiner and labels with ADR-0004's
 corrected relaxed VF2 verifier over pure function PDGs, while keeping pair,
 PDG-size, and invocation limits observable as typed errors.
+ADR-0031 returns to ADR-0001's identity and overlay rules and ADR-0006's
+evidence boundary. It translates complete per-file reference sets into one
+program id space, retains ordered file scopes, and admits cross-file dependency
+and call evidence only after a unique strongest file alias is represented.
 
 ![Module architecture of libcpg, showing the graph core and the analysis modules layered over it](../diagrams/module-architecture.svg)
 
@@ -156,7 +161,7 @@ PDG-size, and invocation limits observable as typed errors.
   (`0001`…). Numbers are never reused; a reversed decision is marked
   *Superseded* and a new record supersedes it, so history stays legible.
 - **Status lifecycle.** `Proposed → Accepted → (Superseded by NNNN | Deprecated)`.
-  All thirty current records are **Accepted** and reflect the shipped `v0.1.1`
+  All thirty-one current records are **Accepted** and reflect the shipped `v0.1.1`
   code.
 - **Grounding.** Every claim here is traceable to source: the
   [`Cargo.toml`](../engineering/01-build-and-features.md) feature block, the

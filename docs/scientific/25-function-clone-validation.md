@@ -53,7 +53,7 @@ cargo bench --bench clones --no-default-features -- --test
 ```
 
 Coverage measurement includes all unit and integration test binaries. The
-clean maximal-feature matrices execute 810 library tests and all public/parser
+clean maximal-feature matrices execute 829 library tests and all public/parser
 integration binaries. They measure `pattern/clones.rs` at **95.28% line**
 (929/975), **93.37% region** (1,366/1,463), **96.88% function** (62/64), and
 **92.11% branch coverage** (70/76). Repository totals are **98.19% line**,

@@ -57,6 +57,9 @@ PDG). A query can therefore mix syntax, control flow, and data flow freely.
 - **Function clone detection** — strongest Type-1/2 ordered AST fingerprints,
   Type-3 kind/name multiset similarity, and bounded Type-4 PDG WL/VF2
   verification with all-or-error pair, graph-size, and invocation budgets.
+- **Multi-file program composition** — deterministic collision-free merging,
+  ordered per-file scopes, and evidence-bounded import/export overlays that
+  disambiguate cross-file calls without language-specific reparsing.
 - **Projection centrality** — deterministic PageRank variants, vertex/edge
   betweenness, eigenvector, Katz, closeness, harmonic, HITS, and Burt
   structural-hole scores with explicit iteration and traversal budgets.
@@ -168,10 +171,10 @@ through Mode B (`build_from_tree`) with a caller-supplied grammar; see
 
 Comprehensive documentation lives under [`docs/`](docs/README.md):
 
-- **[Theory](docs/theory/00-overview.md)** — the CPG model, control/data flow, program dependence & slicing, subgraph isomorphism, similarity, pattern detection, complexity, and GNNs, with proofs, math, and citations.
+- **[Theory](docs/theory/00-overview.md)** — the CPG model, control/data flow, program dependence & slicing, multi-file composition, subgraph isomorphism, similarity, pattern detection, complexity, and GNNs, with proofs, math, and citations.
 - **[Architecture](docs/architecture/overview.md)** — module map, the graph data model, construction & analysis pipelines, and language frontends.
 - **[Design decisions](docs/design/00-overview.md)** — ADR-style records for load-bearing graph, construction, analysis, and feature choices.
-- **[API reference](docs/api/graph-reference.md)** — graph/projection/block-CFG/SCC/condensation/layering/architectural-smell/DSM/Martin/code-metric/reflexion/centrality/community/cohesion/reachability, builder, and pattern/algorithm/GNN reference.
+- **[API reference](docs/api/graph-reference.md)** — graph/program/projection/block-CFG/SCC/condensation/layering/architectural-smell/DSM/Martin/code-metric/reflexion/centrality/community/cohesion/reachability, builder, and pattern/algorithm/GNN reference.
 - **[Components](docs/README.md#components)** — graph projections, basic blocks, dominators, SCC/condensation/layering/architectural-smell/DSM/Martin/code-metric/reflexion/centrality/community/cohesion analytics, reachability, builders, patterns, algorithms, and GNN internals.
 - **[Usage guides](docs/usage/00-getting-started.md)** — task-oriented how-tos.
 - **[Engineering](docs/engineering/00-overview.md)** · **[Scientific validation](docs/scientific/00-overview.md)** · **[Security](docs/security/00-threat-model.md)**.

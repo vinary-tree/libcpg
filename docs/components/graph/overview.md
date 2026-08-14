@@ -390,6 +390,9 @@ So the safe pattern is: build (single-threaded, `&mut`), then analyse
 - [Evidence-bounded call resolution](call-resolution.md) — deterministic
   lexical symbols, confidence tiers, and the conservative boundary between
   recorded evidence and definite call topology.
+- [Multi-file program composition](program-composition.md) — collision-free
+  per-file identity translation, explicit file scopes, and conservative
+  import/export linkage that feeds cross-file call resolution.
 - [`api/graph-reference.md`](../../api/graph-reference.md) — the precise,
   method-by-method API reference for `CodePropertyGraph`.
 - [`theory/01-code-property-graphs.md`](../../theory/01-code-property-graphs.md)

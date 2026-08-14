@@ -86,6 +86,7 @@ graph has `Language::Unknown`).
 | `contains_node` | `fn contains_node(&self, id: NodeId) -> bool` | Membership test. |
 | `nodes` | `fn nodes(&self) -> impl Iterator<Item = &CpgNode>` | Iterate all nodes. |
 | `node_ids` | `fn node_ids(&self) -> impl Iterator<Item = NodeId> + '_` | Iterate all node ids. |
+| `merge_from` | `fn merge_from(&mut self, other: &CodePropertyGraph) -> FxHashMap<NodeId, NodeId>` | Appends a collision-free copy in sorted source-id order and returns the complete source-to-destination map. |
 
 > There is no `remove_node` / `remove_edge`: a CPG is built once and analyzed;
 > extraction stages *add* overlay edges rather than mutate topology in place.
@@ -200,6 +201,24 @@ where $`E`$ is the number of CFG edges and $`N`$ the number of CFG
 nodes (`cfg_nodes().count()`); when there are no CFG nodes it returns $`1`$.
 The implementation uses a saturating subtraction, so it never underflows.
 
+### Multi-file program composition
+
+The feature-free program API combines independently built file CPGs without
+colliding their local identifiers:
+
+| Function | Signature | Result |
+|---|---|---|
+| `merge_programs` | `fn(Vec<CodePropertyGraph>) -> ProgramCpg` | Unified append-only CPG plus one ordered `FileScope` per input. |
+| `build_import_graph` | `fn(&mut ProgramCpg) -> ImportGraph` | Ordered exact/ambiguous/external evidence plus idempotent `Imports`/`Exports` overlays. |
+
+`FileScope` retains path, source, language, translated root, sorted member
+nodes, and its `node_map`. `ImportResolution` records the matched alias,
+candidate files, and selected declarations. Exact declaration-level `Imports`
+edges carry the symbol's local binding as their label, so renamed imports feed
+`ExactViaImport` correctly. See the complete
+[program-composition component guide](../components/graph/program-composition.md)
+and [usage guide](../usage/07-multi-file-programs.md).
+
 ### Evidence-bounded call resolution
 
 The feature-free resolver turns parsed call syntax into definite call topology
@@ -208,7 +227,7 @@ and `libcpg::analysis`:
 
 | Function | Signature | Result |
 |---|---|---|
-| `build_symbol_table` | `fn(&mut CodePropertyGraph, &ResolveConfig) -> SymbolTable` | Deterministic lexical function/import index; idempotently emits `EnclosingScope` and `ContainedIn`. |
+| `build_symbol_table` | `fn(&mut CodePropertyGraph, &ResolveConfig) -> SymbolTable` | Deterministic lexical, represented-import, and global function index; idempotently emits `EnclosingScope` and `ContainedIn`. |
 | `resolve_calls` | `fn(&mut CodePropertyGraph, &ResolveConfig) -> CallGraphResolution` | Per-call evidence records plus uniquely supported `Reference`, `StaticCall`/`DynamicCall`, and `CallSite` edges. |
 
 `ResolveConfig` exposes `max_scope_depth`,

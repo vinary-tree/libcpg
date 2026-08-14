@@ -63,7 +63,7 @@ ranking signal; `creates_topology` is the authoritative emission boundary.
 | Tier | Score | Evidence | Creates topology? |
 |---|---:|---|:---:|
 | `ExactInFile` | $`1.0`$ | One declaration with the name is visible in the lexical scope chain. | yes |
-| `ExactViaImport` | $`0.95`$ | A visible import names exactly one function represented in the CPG. | yes |
+| `ExactViaImport` | $`0.95`$ | A declaration-level import edge names exactly one represented function, including a renamed local binding; or the legacy visible-import fallback finds one global declaration. | yes |
 | `ExactViaBinding` | $`0.9`$ | The input call already points to an existing function node. | yes |
 | `BareNameUnique` | $`0.7`$ | No lexical/import match exists, but exactly one in-graph function has the bare name. | yes |
 | `BareNameAmbiguous` | $`0.3`$ | At least two in-graph functions have that name. | **no** |
@@ -129,6 +129,7 @@ It emits two reserved scope relations:
 | `functions_by_scope` | function declarations keyed first by containing scope, then by name |
 | `functions_by_name` | global bare-name index used only after lexical/import lookup |
 | `imports_by_scope` | visible imports keyed by terminal path name |
+| `imported_functions_by_scope` | functions selected by declaration-level `Imports` edges, keyed by the edge's local-binding label or the declaration name |
 
 Every candidate bucket is a `SymbolCandidates { nodes, total }`. `nodes` is
 sorted, deduplicated, and capped; `total` preserves the pre-cap cardinality and
@@ -153,7 +154,9 @@ resolve_calls(cpg, config):
             decision = Unresolved
         else if nearest lexical scope containing name has candidates:
             decision = unique ? ExactInFile : BareNameAmbiguous
-        else if a visible import has name:
+        else if nearest declaration-level import binding has candidates:
+            decision = unique ? ExactViaImport : BareNameAmbiguous
+        else if a legacy visible import has name:
             decision = global candidate count is
                        1 ? ExactViaImport :
                        >1 ? BareNameAmbiguous : External
@@ -198,6 +201,11 @@ a first-callee subtree that spans the whole malformed graph. Ordinary callee
 expressions are tiny, and visited sets ensure each reachable node is examined
 at most once per call. Typical scope lookup is also much shallower than
 $`D`$. No recursive resolver traversal consumes the native call stack.
+
+`build_import_graph` labels every import-to-declaration edge with the local
+binding (`sum` in `from math import add as sum`). Repeated statements are first
+deduplicated as `(binding, target)` pairs, so importing one declaration twice
+does not manufacture ambiguity. File-root dependency edges remain unlabeled.
 
 ## Builder integration
 

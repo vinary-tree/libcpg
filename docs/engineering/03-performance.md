@@ -96,6 +96,8 @@ function scope.
 | Bipartite GED upper bound | $`O(N^3+E_1+E_2)`$ time, $`O(N^2+E_1+E_2)`$ space | Two deterministic Hungarian solves plus concrete typed-edge script evaluation; each input is capped at 512 nodes, beyond which a flagged linear surrogate is returned. |
 | Projection WL labels / clone classes | $`O(q(V\log V+E+\sum_v d(v)\log d(v)))`$ time, $`O(V+d_{max})`$ temporary space | Directed-degree seeds; sorted incident-label multisets; sorted raw-label ranks each round; clone grouping adds $`O(V\log V)`$ time and $`O(V)`$ space. |
 | Function clone detection | $`O(N+PF+W)`$ before VF2; exponential verifier worst case | $`N`$ is total function AST size, $`P\le100{,}000`$ size-qualified pairs, $`F`$ is compared bag vocabulary, and $`W`$ is bounded WL work. Type-4 PDGs have at most 300 vertices, VF2 stops after one match, and invocation count is explicit. |
+| Multi-file merge | $`O(N\log N+E\log E+R)`$ time, $`O(N+E)`$ temporary space | Sorts source identities, translates $`R`$ embedded references, and appends fresh nodes/edges plus CFG metadata. |
+| Import graph construction | conservative $`O(DN+ITA)`$ time | Scans $`D`$ namespace declarations, then matches $`I`$ imports of at most $`T`$ tokens against finite alias buckets totaling $`A`$ entries; exact matches append idempotent overlay edges. |
 | PageRank / reverse / personalized | $`O(c(V+E))`$ time, $`O(V)`$ working space | Dense forward/reverse CSR and stable floating reduction; hard 10,000-round ceiling. |
 | Vertex/edge betweenness | $`O(V(V+E))`$ time, $`O(V+E)`$ working space | Directed vertex Brandes or undirected canonical edge Brandes; preflight work budgets; serial source partitions are public. |
 | Eigenvector / Katz / HITS | $`O(c(V+E))`$ time, $`O(V+E)`$ working space | Shifted spectral iteration, sufficient Katz row-sum bound, and paired HITS vectors. |
@@ -122,8 +124,8 @@ once, loop bodies twice, and a path set cuts malformed AST cycles.
 
 ## Benchmark coverage and remaining gaps
 
-Sixteen Criterion targets are active. Their twenty-seven baseline operation groups are
-feature-free; `induction_analysis` also registers a twenty-eighth,
+Seventeen Criterion targets are active. Their twenty-nine baseline operation groups are
+feature-free; `induction_analysis` also registers a thirtieth,
 `algorithm-detection`-gated operation. Every active group constructs and checks a deterministic oracle
 before Criterion enters the timed loop:
 
@@ -154,6 +156,10 @@ before Criterion enters the timed loop:
 - `clones` measures Type-1 equality, Type-3 statement insertion, and Type-4
   PDG-preserving reordering over 16- and 64-function corpora; exact taxonomy,
   membership, and similarity oracles run before timing.
+- `program_merge` measures collision-free merge and import-graph construction
+  over 16- and 64-file programs with 16 statement nodes per file. Exact summed
+  counts, contiguous ids, embedded-reference totality, file scopes, resolution
+  classes, and dependency counts are asserted before timing.
 - `centrality` measures PageRank and shifted eigenvector iteration over 256-
   and 1,024-vertex paths, rings, and clustered graphs, plus directed Brandes
   and undirected closeness over the same shapes at 128 and 256 vertices. Its
@@ -248,6 +254,14 @@ harness = false
 [[bench]]
 name = "ged"
 harness = false
+
+[[bench]]
+name = "clones"
+harness = false
+
+[[bench]]
+name = "program_merge"
+harness = false
 ```
 
 Run it directly, or save and compare named baselines:
@@ -271,6 +285,7 @@ cargo bench --bench cycles --no-default-features
 cargo bench --bench motifs --no-default-features
 cargo bench --bench ged --no-default-features
 cargo bench --bench clones --no-default-features
+cargo bench --bench program_merge --no-default-features
 cargo bench --no-default-features --features algorithm-detection \
   --bench induction_analysis -- --test
 ```

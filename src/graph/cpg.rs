@@ -178,6 +178,114 @@ impl CodePropertyGraph {
         self.node_index_map.keys().copied()
     }
 
+    /// Appends every node and edge from `other` using fresh identifiers.
+    ///
+    /// Source nodes are visited in ascending [`NodeId`] order, so an identical
+    /// destination and source produce an identical mapping regardless of the
+    /// source graph's insertion order. Every embedded node reference is
+    /// translated through that mapping: AST parents and children, resolved
+    /// call targets, identifier definitions, and lambda captures. A reference
+    /// that does not name a node in `other` is discarded instead of becoming a
+    /// dangling reference or accidentally binding to a colliding destination
+    /// identifier.
+    ///
+    /// Edges are appended in ascending source [`EdgeId`] order with freshly
+    /// allocated edge identifiers. CFG entry and exit metadata is translated
+    /// as well. Existing destination nodes, edges, and metadata are never
+    /// removed.
+    ///
+    /// The returned map translates each source identifier to its fresh
+    /// destination identifier.
+    pub fn merge_from(&mut self, other: &CodePropertyGraph) -> FxHashMap<NodeId, NodeId> {
+        let destination_was_empty = self.node_count() == 0;
+        let mut source_nodes: Vec<_> = other.nodes().cloned().collect();
+        source_nodes.sort_by_key(|node| node.id);
+
+        let mut remap = FxHashMap::default();
+        for node in source_nodes {
+            let source = node.id;
+            let destination = self.add_node(node);
+            remap.insert(source, destination);
+        }
+
+        let mut translated: Vec<_> = remap.iter().map(|(&old, &new)| (old, new)).collect();
+        translated.sort_unstable_by_key(|(old, _)| *old);
+        for (source, destination) in translated {
+            let Some(source_node) = other.node(source) else {
+                continue;
+            };
+            let Some(node) = self.node_mut(destination) else {
+                continue;
+            };
+
+            node.parent = source_node
+                .parent
+                .and_then(|parent| remap.get(&parent).copied());
+            node.children = source_node
+                .children
+                .iter()
+                .filter_map(|child| remap.get(child).copied())
+                .collect();
+            match &mut node.kind {
+                CpgNodeKind::Call { target, .. } => {
+                    *target = target.and_then(|target| remap.get(&target).copied());
+                }
+                CpgNodeKind::Identifier { definition, .. } => {
+                    *definition = definition.and_then(|definition| remap.get(&definition).copied());
+                }
+                CpgNodeKind::Lambda { captures } => {
+                    *captures = captures
+                        .iter()
+                        .filter_map(|capture| remap.get(capture).copied())
+                        .collect();
+                }
+                _ => {}
+            }
+        }
+
+        let mut source_edges: Vec<_> = other.edges().cloned().collect();
+        source_edges.sort_by_key(|edge| edge.id.0);
+        for mut edge in source_edges {
+            let (Some(source), Some(target)) = (
+                remap.get(&edge.source).copied(),
+                remap.get(&edge.target).copied(),
+            ) else {
+                continue;
+            };
+            edge.source = source;
+            edge.target = target;
+            let _ = self.add_edge(edge);
+        }
+
+        let mut entries: Vec<_> = other
+            .cfg_entries
+            .iter()
+            .filter_map(|entry| remap.get(entry).copied())
+            .collect();
+        entries.sort_unstable();
+        for entry in entries {
+            self.add_cfg_entry(entry);
+        }
+
+        let mut exits: Vec<_> = other
+            .cfg_exits
+            .iter()
+            .filter_map(|exit| remap.get(exit).copied())
+            .collect();
+        exits.sort_unstable();
+        for exit in exits {
+            self.add_cfg_exit(exit);
+        }
+
+        if destination_was_empty {
+            if let Some(root) = other.root.and_then(|root| remap.get(&root).copied()) {
+                self.root = Some(root);
+            }
+        }
+
+        remap
+    }
+
     // ========== Edge Operations ==========
 
     /// Adds an edge to the graph and returns its ID.
@@ -761,6 +869,289 @@ impl Clone for CodePropertyGraph {
 impl Default for CodePropertyGraph {
     fn default() -> Self {
         Self::new(Language::Unknown)
+    }
+}
+
+#[cfg(test)]
+mod merge_tests {
+    use super::*;
+    use crate::{MethodSignature, ScopeId, Visibility};
+    use smallvec::smallvec;
+
+    fn node(id: u32, kind: CpgNodeKind) -> CpgNode {
+        CpgNode::new(NodeId::new(id), kind, SourceRange::default())
+    }
+
+    fn function(name: &str) -> CpgNodeKind {
+        CpgNodeKind::Function {
+            signature: MethodSignature {
+                name: name.into(),
+                params: Default::default(),
+                return_type: None,
+                is_static: false,
+                is_async: false,
+                visibility: Visibility::Public,
+            },
+        }
+    }
+
+    pub(super) fn all_references_resolve(cpg: &CodePropertyGraph, nodes: &[NodeId]) -> bool {
+        nodes.iter().all(|&id| {
+            let Some(node) = cpg.node(id) else {
+                return false;
+            };
+            node.parent.is_none_or(|target| cpg.contains_node(target))
+                && node
+                    .children
+                    .iter()
+                    .all(|&target| cpg.contains_node(target))
+                && match &node.kind {
+                    CpgNodeKind::Call { target, .. } => {
+                        target.is_none_or(|target| cpg.contains_node(target))
+                    }
+                    CpgNodeKind::Identifier { definition, .. } => {
+                        definition.is_none_or(|target| cpg.contains_node(target))
+                    }
+                    CpgNodeKind::Lambda { captures } => {
+                        captures.iter().all(|&target| cpg.contains_node(target))
+                    }
+                    _ => true,
+                }
+        })
+    }
+
+    pub(super) fn shape(
+        cpg: &CodePropertyGraph,
+    ) -> (Vec<String>, Vec<String>, Vec<NodeId>, Vec<NodeId>) {
+        let mut nodes: Vec<_> = cpg
+            .nodes()
+            .map(|node| {
+                format!(
+                    "{:?}|{:?}|{:?}|{:?}",
+                    node.id, node.kind, node.parent, node.children
+                )
+            })
+            .collect();
+        nodes.sort();
+        let mut edges: Vec<_> = cpg
+            .edges()
+            .map(|edge| {
+                format!(
+                    "{:?}|{:?}|{:?}|{:?}|{:?}",
+                    edge.id, edge.source, edge.target, edge.kind, edge.label
+                )
+            })
+            .collect();
+        edges.sort();
+        let mut entries = cpg.cfg_entries().to_vec();
+        entries.sort_unstable();
+        let mut exits = cpg.cfg_exits().to_vec();
+        exits.sort_unstable();
+        (nodes, edges, entries, exits)
+    }
+
+    #[test]
+    fn merge_remaps_the_complete_embedded_reference_set_and_metadata() {
+        let mut source = CodePropertyGraph::new(Language::Rust);
+        let root = source.add_node_with_id(
+            node(40, CpgNodeKind::Root)
+                .with_child(NodeId::new(10))
+                .with_child(NodeId::new(20))
+                .with_child(NodeId::new(30)),
+        );
+        let declaration = source.add_node_with_id(node(10, function("target")).with_parent(root));
+        let identifier = source.add_node_with_id(
+            node(
+                20,
+                CpgNodeKind::Identifier {
+                    name: "target".into(),
+                    definition: Some(declaration),
+                },
+            )
+            .with_parent(root),
+        );
+        let call = source.add_node_with_id(
+            node(
+                30,
+                CpgNodeKind::Call {
+                    target: Some(declaration),
+                    is_method: false,
+                },
+            )
+            .with_parent(root),
+        );
+        let lambda = source.add_node_with_id(
+            node(
+                50,
+                CpgNodeKind::Lambda {
+                    captures: smallvec![declaration, identifier],
+                },
+            )
+            .with_parent(root),
+        );
+        source.node_mut(root).expect("root").children.push(lambda);
+        source.connect(root, declaration, CpgEdgeKind::AstChild);
+        source.connect(root, identifier, CpgEdgeKind::AstChild);
+        source.connect(root, call, CpgEdgeKind::AstChild);
+        source.connect(root, lambda, CpgEdgeKind::AstChild);
+        source.add_edge(
+            CpgEdge::new(
+                EdgeId::new(900),
+                identifier,
+                declaration,
+                CpgEdgeKind::Reference,
+            )
+            .with_label("fixture"),
+        );
+        source.add_cfg_entry(declaration);
+        source.add_cfg_exit(call);
+
+        let mut destination = CodePropertyGraph::new(Language::Rust);
+        let retained = destination.add_node(node(
+            0,
+            CpgNodeKind::Block {
+                scope: ScopeId::GLOBAL,
+            },
+        ));
+        let retained_root = destination.root();
+        let map = destination.merge_from(&source);
+
+        assert_eq!(map[&NodeId::new(10)], NodeId::new(1));
+        assert_eq!(map[&NodeId::new(20)], NodeId::new(2));
+        assert_eq!(map[&NodeId::new(30)], NodeId::new(3));
+        assert_eq!(map[&NodeId::new(40)], NodeId::new(4));
+        assert_eq!(map[&NodeId::new(50)], NodeId::new(5));
+        assert_eq!(destination.root(), retained_root);
+        assert_eq!(destination.node_count(), 6);
+        assert_eq!(destination.node(retained).expect("retained").parent, None);
+
+        let mapped_root = map[&root];
+        let mapped_declaration = map[&declaration];
+        let mapped_identifier = map[&identifier];
+        let mapped_call = map[&call];
+        let mapped_lambda = map[&lambda];
+        assert_eq!(
+            destination
+                .node(mapped_root)
+                .expect("mapped root")
+                .children
+                .as_slice(),
+            &[
+                mapped_declaration,
+                mapped_identifier,
+                mapped_call,
+                mapped_lambda
+            ]
+        );
+        assert_eq!(
+            destination
+                .node(mapped_identifier)
+                .expect("identifier")
+                .kind,
+            CpgNodeKind::Identifier {
+                name: "target".into(),
+                definition: Some(mapped_declaration),
+            }
+        );
+        assert_eq!(
+            destination.node(mapped_call).expect("call").kind,
+            CpgNodeKind::Call {
+                target: Some(mapped_declaration),
+                is_method: false,
+            }
+        );
+        assert_eq!(
+            destination.node(mapped_lambda).expect("lambda").kind,
+            CpgNodeKind::Lambda {
+                captures: smallvec![mapped_declaration, mapped_identifier],
+            }
+        );
+        assert!(destination.cfg_entries().contains(&mapped_declaration));
+        assert!(destination.cfg_exits().contains(&mapped_call));
+        assert!(
+            destination.edges_between(mapped_identifier, mapped_declaration)[0]
+                .label
+                .as_deref()
+                .is_some_and(|label| label == "fixture")
+        );
+        let mapped_nodes: Vec<_> = map.values().copied().collect();
+        assert!(all_references_resolve(&destination, &mapped_nodes));
+    }
+
+    #[test]
+    fn merge_clears_source_dangling_references_instead_of_binding_collisions() {
+        let absent = NodeId::new(777);
+        let mut source = CodePropertyGraph::new(Language::Rust);
+        let call = source.add_node(
+            node(
+                0,
+                CpgNodeKind::Call {
+                    target: Some(absent),
+                    is_method: false,
+                },
+            )
+            .with_parent(absent)
+            .with_child(absent),
+        );
+        let identifier = source.add_node(node(
+            0,
+            CpgNodeKind::Identifier {
+                name: "missing".into(),
+                definition: Some(absent),
+            },
+        ));
+        let lambda = source.add_node(node(
+            0,
+            CpgNodeKind::Lambda {
+                captures: smallvec![absent],
+            },
+        ));
+
+        let mut destination = CodePropertyGraph::new(Language::Rust);
+        for _ in 0..=absent.as_u32() {
+            destination.add_node(node(0, CpgNodeKind::Return));
+        }
+        assert!(destination.contains_node(absent));
+        let map = destination.merge_from(&source);
+
+        let mapped_call = destination.node(map[&call]).expect("call");
+        assert!(mapped_call.parent.is_none());
+        assert!(mapped_call.children.is_empty());
+        assert!(matches!(
+            mapped_call.kind,
+            CpgNodeKind::Call { target: None, .. }
+        ));
+        assert!(matches!(
+            destination.node(map[&identifier]).expect("identifier").kind,
+            CpgNodeKind::Identifier {
+                definition: None,
+                ..
+            }
+        ));
+        assert!(matches!(
+            &destination.node(map[&lambda]).expect("lambda").kind,
+            CpgNodeKind::Lambda { captures } if captures.is_empty()
+        ));
+    }
+
+    #[test]
+    fn merging_an_equal_snapshot_doubles_counts_without_mutating_the_snapshot() {
+        let mut cpg = CodePropertyGraph::new(Language::Rust);
+        let root = cpg.add_node(node(0, CpgNodeKind::Root));
+        let child = cpg.add_node(node(0, CpgNodeKind::Return).with_parent(root));
+        cpg.node_mut(root).expect("root").children.push(child);
+        cpg.connect(root, child, CpgEdgeKind::AstChild);
+        let snapshot = cpg.clone();
+        let source_shape = shape(&snapshot);
+        let node_count = cpg.node_count();
+        let edge_count = cpg.edge_count();
+
+        let map = cpg.merge_from(&snapshot);
+
+        assert_eq!(cpg.node_count(), node_count * 2);
+        assert_eq!(cpg.edge_count(), edge_count * 2);
+        assert_eq!(map.len(), node_count);
+        assert_eq!(shape(&snapshot), source_shape);
     }
 }
 
@@ -1583,6 +1974,62 @@ mod proptests {
             let after_first = g.edge_count();
             g.connect_unique(s, t, CpgEdgeKind::TypeOf);
             prop_assert_eq!(g.edge_count(), after_first);
+        }
+
+        #[test]
+        fn prop_merge_is_deterministic_append_only_and_reference_total(
+            left in arb_well_formed_cpg(),
+            right in arb_well_formed_cpg(),
+        ) {
+            let expected_nodes = left.node_count() + right.node_count();
+            let expected_edges = left.edge_count() + right.edge_count();
+
+            let mut first = CodePropertyGraph::new(Language::Rust);
+            let left_map = first.merge_from(&left);
+            let right_map = first.merge_from(&right);
+            let mut second = CodePropertyGraph::new(Language::Rust);
+            second.merge_from(&left);
+            second.merge_from(&right);
+
+            prop_assert_eq!(first.node_count(), expected_nodes);
+            prop_assert_eq!(first.edge_count(), expected_edges);
+            let mut ids: Vec<_> = first.node_ids().collect();
+            ids.sort_unstable();
+            let expected_ids: Vec<_> = (0..expected_nodes as u32).map(NodeId::new).collect();
+            prop_assert_eq!(&ids, &expected_ids);
+            let mut mapped: Vec<_> = left_map
+                .values()
+                .chain(right_map.values())
+                .copied()
+                .collect();
+            mapped.sort_unstable();
+            prop_assert_eq!(&mapped, &expected_ids);
+            prop_assert!(crate::graph::cpg::merge_tests::all_references_resolve(
+                &first,
+                &mapped
+            ));
+            prop_assert_eq!(
+                crate::graph::cpg::merge_tests::shape(&first),
+                crate::graph::cpg::merge_tests::shape(&second)
+            );
+        }
+
+        #[test]
+        fn prop_merging_equal_snapshot_exactly_doubles_counts(
+            mut graph in arb_well_formed_cpg(),
+        ) {
+            let snapshot = graph.clone();
+            let nodes = graph.node_count();
+            let edges = graph.edge_count();
+            let map = graph.merge_from(&snapshot);
+            prop_assert_eq!(graph.node_count(), nodes * 2);
+            prop_assert_eq!(graph.edge_count(), edges * 2);
+            prop_assert_eq!(map.len(), nodes);
+            let mapped: Vec<_> = map.values().copied().collect();
+            prop_assert!(crate::graph::cpg::merge_tests::all_references_resolve(
+                &graph,
+                &mapped
+            ));
         }
     }
 }

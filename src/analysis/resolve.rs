@@ -155,6 +155,12 @@ pub struct SymbolTable {
     pub functions_by_name: BTreeMap<String, SymbolCandidates>,
     /// Import nodes grouped by containing scope and terminal path name.
     pub imports_by_scope: BTreeMap<NodeId, BTreeMap<String, SymbolCandidates>>,
+    /// Imported function declarations grouped by containing scope and name.
+    ///
+    /// These candidates come from declaration-level `Imports` edges emitted by
+    /// [`crate::build_import_graph`]. Unlike the global bare-name index, they
+    /// retain which represented file an import actually selected.
+    pub imported_functions_by_scope: BTreeMap<NodeId, BTreeMap<String, SymbolCandidates>>,
 }
 
 /// Authoritative out-of-graph record for one call node.
@@ -209,6 +215,8 @@ pub fn build_symbol_table(cpg: &mut CodePropertyGraph, cfg: &ResolveConfig) -> S
 
     let mut table = SymbolTable::default();
     let mut scope_edges = Vec::new();
+    let mut imported_functions: BTreeMap<NodeId, BTreeMap<String, BTreeSet<NodeId>>> =
+        BTreeMap::new();
     for &node in &node_ids {
         let enclosing = nearest_scope(cpg, node, &scope_nodes, cfg.max_scope_depth);
         if let Some(scope) = enclosing {
@@ -243,17 +251,72 @@ pub fn build_symbol_table(cpg: &mut CodePropertyGraph, cfg: &ResolveConfig) -> S
                 }
             }
             CpgNodeKind::Import { path } => {
-                if let (Some(scope), Some(name)) = (enclosing, terminal_name(path)) {
-                    insert_scoped_candidate(
-                        &mut table.imports_by_scope,
-                        scope,
-                        name,
-                        node,
-                        cfg.max_candidates_per_name,
-                    );
+                if let Some(scope) = enclosing {
+                    let mut represented_names = BTreeSet::new();
+                    let mut targets: Vec<_> = cpg
+                        .outgoing_edges(node)
+                        .filter(|edge| matches!(edge.kind, CpgEdgeKind::Imports))
+                        .filter_map(|edge| {
+                            let target = cpg.node(edge.target)?;
+                            match &target.kind {
+                                CpgNodeKind::Function { signature } => Some((
+                                    edge.label
+                                        .as_deref()
+                                        .filter(|name| !name.is_empty())
+                                        .unwrap_or(signature.name.as_ref())
+                                        .to_owned(),
+                                    edge.target,
+                                )),
+                                _ => None,
+                            }
+                        })
+                        .collect();
+                    targets.sort();
+                    targets.dedup();
+                    for (name, target) in targets {
+                        represented_names.insert(name.clone());
+                        imported_functions
+                            .entry(scope)
+                            .or_default()
+                            .entry(name.clone())
+                            .or_default()
+                            .insert(target);
+                        insert_scoped_candidate(
+                            &mut table.imports_by_scope,
+                            scope,
+                            &name,
+                            node,
+                            cfg.max_candidates_per_name,
+                        );
+                    }
+                    if let Some(name) = terminal_name(path) {
+                        if represented_names.insert(name.clone()) {
+                            insert_scoped_candidate(
+                                &mut table.imports_by_scope,
+                                scope,
+                                &name,
+                                node,
+                                cfg.max_candidates_per_name,
+                            );
+                        }
+                    }
                 }
             }
             _ => {}
+        }
+    }
+
+    for (scope, symbols) in imported_functions {
+        for (name, targets) in symbols {
+            for target in targets {
+                insert_scoped_candidate(
+                    &mut table.imported_functions_by_scope,
+                    scope,
+                    &name,
+                    target,
+                    cfg.max_candidates_per_name,
+                );
+            }
         }
     }
 
@@ -415,6 +478,25 @@ fn decide_call(
             .and_then(|symbols| symbols.get(name))
         {
             return decision_from_candidates(candidates, Confidence::ExactInFile);
+        }
+        current_scope = table.enclosing_scope.get(&current).copied();
+    }
+
+    let mut current_scope = evidence.scope;
+    let mut visited = BTreeSet::new();
+    for _ in 0..=cfg.max_scope_depth {
+        let Some(current) = current_scope else {
+            break;
+        };
+        if !visited.insert(current) {
+            break;
+        }
+        if let Some(candidates) = table
+            .imported_functions_by_scope
+            .get(&current)
+            .and_then(|symbols| symbols.get(name))
+        {
+            return decision_from_candidates(candidates, Confidence::ExactViaImport);
         }
         current_scope = table.enclosing_scope.get(&current).copied();
     }
@@ -609,20 +691,25 @@ fn is_function(cpg: &CodePropertyGraph, node: NodeId) -> bool {
         .is_some_and(|node| matches!(node.kind, CpgNodeKind::Function { .. }))
 }
 
-fn terminal_name(path: &str) -> Option<&str> {
-    path.trim()
-        .trim_end_matches([';', '*'])
-        .rsplit(|character: char| {
-            character == ':'
-                || character == '.'
-                || character == '/'
-                || character == '\\'
-                || character.is_whitespace()
-                || character == '{'
-                || character == '}'
-                || character == ','
-        })
-        .find(|segment| !segment.is_empty() && *segment != "as")
+fn terminal_name(path: &str) -> Option<String> {
+    let mut tokens = Vec::new();
+    let mut current = String::new();
+    for character in path.chars() {
+        if character == '_' || character == '$' || character.is_alphanumeric() {
+            current.push(character);
+        } else if !current.is_empty() {
+            tokens.push(std::mem::take(&mut current));
+        }
+    }
+    if !current.is_empty() {
+        tokens.push(current);
+    }
+    tokens.into_iter().rev().find(|token| {
+        !matches!(
+            token.as_str(),
+            "as" | "from" | "import" | "use" | "include" | "require" | "export"
+        )
+    })
 }
 
 fn insert_named_candidate(
@@ -992,7 +1079,7 @@ mod tests {
             "prefix::name;",
             "prefix::name*",
         ] {
-            assert_eq!(terminal_name(path), Some("name"), "path: {path}");
+            assert_eq!(terminal_name(path).as_deref(), Some("name"), "path: {path}");
         }
         assert_eq!(terminal_name(""), None);
         assert_eq!(terminal_name(";**"), None);

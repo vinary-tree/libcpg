@@ -19,6 +19,7 @@ Source: [`diagrams/resource-bounds.puml`](../diagrams/resource-bounds.puml).*
 | Bound | Default | Enforced in | Effect when exceeded |
 | --- | --- | --- | --- |
 | `CpgBuilderConfig::max_file_size` | 10 MB | `build` only (not `build_from_tree`) | `build` returns `Error::Construction` before parsing |
+| Program-composition admission | caller-selected file/node/edge/path-byte limits | `merge_programs`; `build_import_graph` | finite and non-recursive, but intentionally has no independent cap; reject an oversized aggregate before composition |
 | `ResolveConfig::max_scope_depth` | `128` | scope and callee-name walks | traversal stops at the configured depth or the first repeated node |
 | `ResolveConfig::max_candidates_per_name` | `64` | lexical/global symbol buckets | full ambiguity count is preserved, but excess candidate IDs are not retained |
 | `ResolveConfig::max_calls` | `100_000` | sorted call-node enumeration | higher `NodeId` calls remain untouched after the cap |
@@ -88,6 +89,24 @@ apply the `max_file_size` check** — the caller already parsed the source and o
 the tree. If your Mode-B input is untrusted, you must bound it yourself before
 parsing (next section). This is a deliberate design property, not an oversight; see
 [`design/0002-mode-b-build-from-tree.md`](../design/0002-mode-b-build-from-tree.md).
+
+## Program composition: aggregate admission and evidence safety
+
+[`merge_programs`](../components/graph/program-composition.md) clones the finite
+node, edge, metadata, and retained-source inventories supplied by the caller.
+It performs no parser, filesystem, package-manager, or network access, and all
+walks are iterative or finite sorted scans. It deliberately has no built-in
+aggregate cap because trusted build systems may compose programs much larger
+than one source file. At an untrusted boundary, cap the number of files, summed
+nodes and edges, source-path bytes, and retained-source bytes before calling it.
+
+Malformed embedded `NodeId` values are translated only when they belong to the
+source graph; otherwise optional references are cleared and sequence members
+are omitted. A numeric collision with an existing destination node therefore
+cannot forge a reference. `build_import_graph` creates topology only for one
+uniquely strongest represented file alias. Ties and absent files remain
+ordered evidence with no dependency edge. These rules protect semantic
+integrity; caller admission limits protect memory and sorting work.
 
 ## Call resolution: scope, candidate, and call caps
 
