@@ -316,6 +316,25 @@ positive findings while omitting that qualification. See the [component
 guide](../components/graph/taint-analysis.md), [usage guide](../usage/10-taint-and-nullflow.md),
 and [security boundary](../security/02-taint-analysis.md).
 
+### System dependence and interprocedural slices
+
+The feature-free SDG surface composes PDG, parameter, return, and effect
+summary evidence without creating a parallel graph:
+
+| Function | Signature | Result |
+|---|---|---|
+| `build_summary_edges` | `fn(&mut CodePropertyGraph, &BTreeMap<NodeId, EffectSummary>) -> usize` | Number of new `DataDependence(label="summary")` actual-to-call edges. |
+| `interprocedural_backward_slice` | `fn(&CodePropertyGraph, NodeId, &SliceCaps) -> BTreeSet<NodeId>` | Deterministic two-pass predecessor slice. |
+| `interprocedural_forward_slice` | `fn(&CodePropertyGraph, NodeId, &SliceCaps) -> BTreeSet<NodeId>` | Deterministic direction-dual successor slice. |
+
+`SliceCaps::new(max_nodes, max_call_depth)` bounds distinct result nodes and
+`Parameter`/`ReturnValue` boundary crossings. `SUMMARY_EDGE_LABEL` is the
+stable `summary` label. Summary construction is append-only and idempotent;
+unknown criteria and zero node caps return an empty set. See the
+[component guide](../components/graph/system-dependence-slicing.md), [usage
+guide](../usage/11-interprocedural-slicing.md), and [security
+boundary](../security/03-system-dependence-slicing.md).
+
 ### Deterministic graph projections
 
 `GraphProjection` is the feature-free, payload-free compressed-sparse-row view

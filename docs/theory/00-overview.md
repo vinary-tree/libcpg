@@ -249,6 +249,9 @@ development, or jump to the layer you need:
     Open catalog classes, origin-sensitive facts, typed value propagation, and
     canonical witnesses define advisory source-to-sink and null-dereference
     evidence without source-text parsing.
+28. **[28 — System dependence and context-sensitive slicing](28-system-dependence-and-slicing.md).**
+    Effect-derived summary edges and direction-aware two-pass traversal define
+    deterministic bounded slices without unrealizable sibling-call paths.
     The later chapters define deterministic projection structure,
     architecture metrics, inspectable evidence, and their interpretation
     limits.

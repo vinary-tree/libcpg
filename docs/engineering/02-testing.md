@@ -45,13 +45,14 @@ think to write down.
 | IFDS/IDE public integration tests | 2 | `tests/ifds_integration.rs` |
 | Effect-summary public integration tests | 2 | `tests/effects_integration.rs` |
 | Taint/nullflow public integration tests | 3 | `tests/taint_integration.rs` |
+| SDG-slicing public integration tests | 1 | `tests/sdg_integration.rs` |
 | Martin public/parser integration tests | 2 | `tests/martin_integration.rs` |
 | Reflexion public/serialization integration tests | 2 | `tests/reflexion_integration.rs` |
 | Architectural-smell public/serialization integration tests | 2 | `tests/smells_integration.rs` |
 | Field-access public/parser integration tests | 2 | `tests/field_access_integration.rs` |
 | Code-metrics public/parser integration tests | 2 | `tests/metrics_integration.rs` |
-| **Executable test cases** | **978** | excludes three ignored rustdoc examples |
-| `proptest!` blocks (subset of the library/robustness rows) | 73 | exact source-level macro count in `src/` and `tests/` |
+| **Executable test cases** | **994** | measured by the all-features test inventory; excludes three ignored rustdoc examples |
+| `proptest!` blocks (subset of the library/robustness rows) | 69 | exact source-level macro count in `src/` and `tests/` |
 
 The maximal-matrix library count is up from **99** inline tests and **zero**
 property tests before this work.
@@ -173,6 +174,7 @@ The invariants fall into complementary families.
 | **Taint and maybe-null summaries** | both summary joins satisfy idempotence, commutativity, associativity, and subsumption; generated typed value-flow graphs match independent breadth-first reachability oracles and preserve exact reports under reversed insertion; catalog properties pin pattern specificity and caller-policy replacement; examples cover twelve source/sink/sanitizer/external/interprocedural scenarios, witness validity, 65-parameter truncation, caps, serde, crate-root composition, nullable-return and uninitialized-variable origins, and graph non-mutation |
 | **Idempotency** | a second `CfgExtractor::extract` / `DfgExtractor::extract` / `PdgBuilder::build` adds no edges |
 | **Slicing** | $`\lvert S\rvert \le \mathit{max\_nodes}`$; the criterion is in its own backward slice; $`\mathit{max\_nodes} = 0 \Rightarrow S = \varnothing`$; $`S`$ is monotone in $`\mathit{max\_nodes}`$; every sliced id is a real node |
+| **System dependence slicing** | labeled summary edges are selective, append-only, idempotent, and conservative under cap/truncation; exact two-caller oracles prove both directions cross the intended call without a sibling return; 256-case generated multigraphs preserve exact slices under reversed edge insertion, prove node/depth cap monotonicity, and retain every legacy PDG-only predecessor; examples cover missing and multi-target summaries, zero caps, unknown criteria, serde, and the public effect-to-slice pipeline |
 | **Matching, similarity, and GED** | VF2 embeddings are injective, kind-consistent, and edge-preserving; relaxed matching $`\supseteq`$ strict; all four metrics land in $`[0,1]`$, are symmetric, and are maximal on self-comparison; Hungarian assignments equal brute-force permutations through order seven; 128 generated graph pairs through six nodes produce deterministic symmetric concrete-script bounds no smaller than exhaustive exact GED; examples cover typed multiedges, stable ids, caps, invalid numerics, serde, public/parser composition, robustness, stable WL hash vectors, and non-mutation |
 | **Ordering & confidence** | `ComplexityClass::is_better_than` is a strict order (irreflexive, asymmetric, transitive); complexity is monotone in loop nesting; every detector's results are sorted by descending confidence and clear its `min_confidence` |
 | **Complexity evidence** | fully counted reducible depth maps to the exact polynomial degree; opposite storage orders produce identical class/confidence/justification; every generated CFG-free function returns the exact legacy estimate; fixed examples decide unknown-trip and irreducible confidence precedence, provenance, recursion composition, public parsing, and graph non-mutation |

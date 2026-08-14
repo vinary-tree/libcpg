@@ -428,6 +428,27 @@ let fwd = forward_slice(&cpg, criterion, 256);            // nodes `criterion` c
 
 The full construction and worked slices are in [`../components/builder/pdg-and-slicing.md`](../components/builder/pdg-and-slicing.md) and [`../usage/04-program-slicing.md`](../usage/04-program-slicing.md).
 
+### System dependence and context-sensitive slicing (feature-free)
+
+`build_summary_edges(&mut cpg, &effects)` extends the on-demand PDG overlay
+with caller-local `DataDependence(label="summary")` edges. It selects actual
+arguments from each resolved callee's `EffectSummary::param_to_return` mask;
+`Parameter` and `ReturnValue` DFG edges remain the interprocedural spine.
+
+`interprocedural_backward_slice` and `interprocedural_forward_slice` then run
+two masked phases over those edges. The backward driver first excludes
+`ReturnValue` while ascending and then excludes `Parameter` while descending.
+The forward driver swaps those two interprocedural families because their
+directions are dual. Stable neighbor sorting, `BTreeMap` depth state,
+`BTreeSet` output, and explicit `SliceCaps` make both the complete result and a
+node-capped prefix deterministic.
+
+![Call, DFG, PDG, and effect evidence compose into an SDG overlay](../diagrams/sdg-summary-overlay.svg)
+
+See the [component guide](../components/graph/system-dependence-slicing.md),
+[Theory 28](../theory/28-system-dependence-and-slicing.md), and [Usage
+11](../usage/11-interprocedural-slicing.md).
+
 ### Pattern detection
 
 Two layers, at two feature levels:

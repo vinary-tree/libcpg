@@ -402,6 +402,9 @@ So the safe pattern is: build (single-threaded, `&mut`), then analyse
 - [Advisory taint and maybe-null analysis](taint-analysis.md) — data-driven call
   catalogs, typed AST/DFG propagation, interprocedural jump functions,
   canonical witnesses, and explicit completeness evidence.
+- [System dependence and interprocedural slicing](system-dependence-slicing.md)
+  — effect-derived labeled summary edges and deterministic context-sensitive
+  two-pass slices with explicit node and call-depth caps.
 - [`api/graph-reference.md`](../../api/graph-reference.md) — the precise,
   method-by-method API reference for `CodePropertyGraph`.
 - [`theory/01-code-property-graphs.md`](../../theory/01-code-property-graphs.md)

@@ -28,6 +28,7 @@ mod reachability;
 mod reflexion;
 mod resolve;
 mod scc;
+mod sdg;
 mod smells;
 mod spectral;
 mod taint;
@@ -128,6 +129,11 @@ pub use reflexion::{
 pub use resolve::{
     build_symbol_table, resolve_calls, CallGraphResolution, CallResolution, Confidence,
     ResolveConfig, SymbolCandidates, SymbolTable,
+};
+
+pub use sdg::{
+    build_summary_edges, interprocedural_backward_slice, interprocedural_forward_slice, SliceCaps,
+    SUMMARY_EDGE_LABEL,
 };
 
 pub(crate) use scc::function_scope_nodes;

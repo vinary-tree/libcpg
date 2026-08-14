@@ -1,6 +1,6 @@
 # Diagram catalog
 
-Every figure in the `libcpg` documentation is a **committed source** (`.puml` for PlantUML, `.dot` for Graphviz) rendered to a **committed `.svg`** that the Markdown pages embed. Sources are version-controlled so figures are reproducible and reviewable; SVGs are committed so they render on GitHub (which does not render PlantUML/Graphviz inline). This directory holds all 85 figures plus the shared theme.
+Every figure in the `libcpg` documentation is a **committed source** (`.puml` for PlantUML, `.dot` for Graphviz) rendered to a **committed `.svg`** that the Markdown pages embed. Sources are version-controlled so figures are reproducible and reviewable; SVGs are committed so they render on GitHub (which does not render PlantUML/Graphviz inline). This directory holds all 87 figures plus the shared theme.
 
 ## Conventions
 
@@ -82,6 +82,8 @@ Grouped by subject. Each row: the source (its `.svg` sibling is embedded by the 
 | `effect-summary-composition.puml` | component/fixed-point flow | typed direct evidence + callee summaries → lawful effect/constant join → complete or visibly capped result | components/graph/effect-summaries, design/0033, theory/26, scientific/28, usage/09 |
 | `taint-summary-flow.puml` | component/fixed-point flow | typed CPG evidence + caller-owned catalog → origin-sensitive facts → bounded summaries, witnesses, and qualified findings | components/graph/taint-analysis, design/0034, theory/27, scientific/29, security/02 |
 | `taint-witness-sequence.puml` | sequence | source classification, interprocedural propagation, sink matching, and canonical witness emission | components/graph/taint-analysis, usage/10 |
+| `sdg-summary-overlay.puml` | component/overlay flow | call, DFG, PDG, and effect evidence → labeled caller-local summary dependences → bounded slice | components/graph/system-dependence-slicing, theory/28, security/03 |
+| `sdg-two-pass-slicing.puml` | two-lane phase flow | backward and forward ascent/descent masks, depth state, and context-preserving ordered results | theory/28, design/0035, usage/11, scientific/30 |
 
 ### Control flow, data flow, dependence
 | Source | Type | Depicts | Embedded by |

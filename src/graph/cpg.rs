@@ -346,6 +346,30 @@ impl CodePropertyGraph {
         }
     }
 
+    /// Connects an edge whose label participates in its identity.
+    ///
+    /// This crate-internal variant keeps labeled overlays idempotent without
+    /// conflating them with an unlabeled edge of the same kind and endpoints.
+    pub(crate) fn connect_unique_labeled(
+        &mut self,
+        source: NodeId,
+        target: NodeId,
+        kind: CpgEdgeKind,
+        label: &str,
+    ) -> Option<EdgeId> {
+        let existing = self
+            .edges_between(source, target)
+            .into_iter()
+            .find(|edge| edge.kind == kind && edge.label.as_deref() == Some(label))
+            .map(|edge| edge.id);
+        match existing {
+            Some(id) => Some(id),
+            None => {
+                self.add_edge(CpgEdge::new(EdgeId::new(0), source, target, kind).with_label(label))
+            }
+        }
+    }
+
     /// Returns edges between two nodes.
     pub fn edges_between(&self, source: NodeId, target: NodeId) -> Vec<&CpgEdge> {
         let source_idx = match self.node_index_map.get(&source) {

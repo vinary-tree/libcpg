@@ -46,7 +46,7 @@
 //!   `while` guard is a recorded exit (its false branch leaves the loop) yet
 //!   still has a successor (the body), so it is not a sink.
 
-use std::collections::VecDeque;
+use std::collections::{BTreeMap, BTreeSet, VecDeque};
 
 use petgraph::Direction;
 use rustc_hash::FxHashSet;
@@ -173,6 +173,112 @@ pub fn forward_slice(
     slice(cpg, criterion, max_nodes, Direction::Outgoing)
 }
 
+/// Edge families admitted by one phase of a dependence-graph traversal.
+///
+/// Program-dependence edges are always admitted. The two interprocedural
+/// parameter families are toggled independently so the SDG driver can prevent
+/// a traversal from returning through a different call site.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) struct SliceEdgeMask {
+    pub(crate) parameter: bool,
+    pub(crate) return_value: bool,
+}
+
+impl SliceEdgeMask {
+    pub(crate) const PDG_ONLY: Self = Self {
+        parameter: false,
+        return_value: false,
+    };
+}
+
+/// Deterministic bounded traversal shared by intraprocedural and SDG slices.
+///
+/// `seeds` maps each starting node to the number of call boundaries already
+/// crossed. `reached` is an accumulator shared across phases. The returned map
+/// records the smallest call depth found for each node in this phase, allowing
+/// a later shallower discovery to be expanded even if the node was seen first
+/// through a deeper path.
+pub(crate) fn slice_phase(
+    cpg: &CodePropertyGraph,
+    seeds: &BTreeMap<NodeId, usize>,
+    max_nodes: usize,
+    max_call_depth: usize,
+    direction: Direction,
+    mask: SliceEdgeMask,
+    reached: &mut BTreeSet<NodeId>,
+) -> BTreeMap<NodeId, usize> {
+    let mut best_depth = BTreeMap::new();
+    if max_nodes == 0 {
+        return best_depth;
+    }
+
+    let mut queue = VecDeque::new();
+    for (&seed, &depth) in seeds {
+        if depth > max_call_depth || cpg.node(seed).is_none() {
+            continue;
+        }
+        if !reached.contains(&seed) && reached.len() >= max_nodes {
+            break;
+        }
+        reached.insert(seed);
+        best_depth.insert(seed, depth);
+        queue.push_back((seed, depth));
+    }
+
+    while let Some((node, depth)) = queue.pop_front() {
+        if best_depth.get(&node).is_some_and(|&best| depth > best) {
+            continue;
+        }
+
+        let mut neighbors: Vec<(NodeId, usize)> = match direction {
+            Direction::Incoming => cpg
+                .incoming_edges(node)
+                .filter_map(|edge| {
+                    slice_edge_cost(&edge.kind, mask).map(|cost| (edge.source, cost))
+                })
+                .collect(),
+            Direction::Outgoing => cpg
+                .outgoing_edges(node)
+                .filter_map(|edge| {
+                    slice_edge_cost(&edge.kind, mask).map(|cost| (edge.target, cost))
+                })
+                .collect(),
+        };
+        neighbors.sort_unstable();
+        neighbors.dedup();
+
+        for (next, edge_cost) in neighbors {
+            let Some(next_depth) = depth.checked_add(edge_cost) else {
+                continue;
+            };
+            if next_depth > max_call_depth
+                || best_depth
+                    .get(&next)
+                    .is_some_and(|&known| known <= next_depth)
+            {
+                continue;
+            }
+            if !reached.contains(&next) && reached.len() >= max_nodes {
+                continue;
+            }
+            reached.insert(next);
+            best_depth.insert(next, next_depth);
+            queue.push_back((next, next_depth));
+        }
+    }
+
+    best_depth
+}
+
+fn slice_edge_cost(kind: &CpgEdgeKind, mask: SliceEdgeMask) -> Option<usize> {
+    match kind {
+        CpgEdgeKind::ControlDependence | CpgEdgeKind::DataDependence => Some(0),
+        CpgEdgeKind::DataFlow(DfgEdgeKind::Parameter) if mask.parameter => Some(1),
+        CpgEdgeKind::DataFlow(DfgEdgeKind::ReturnValue) if mask.return_value => Some(1),
+        _ => None,
+    }
+}
+
 /// Shared BFS over PDG edges in a single direction.
 fn slice(
     cpg: &CodePropertyGraph,
@@ -180,39 +286,18 @@ fn slice(
     max_nodes: usize,
     direction: Direction,
 ) -> FxHashSet<NodeId> {
-    let mut slice: FxHashSet<NodeId> = FxHashSet::default();
-    if max_nodes == 0 || cpg.node(criterion).is_none() {
-        return slice;
-    }
-    slice.insert(criterion);
-
-    let mut queue: VecDeque<NodeId> = VecDeque::new();
-    queue.push_back(criterion);
-    while let Some(node) = queue.pop_front() {
-        // Collect PDG neighbors in `direction` (owned, so the immutable borrow
-        // of `cpg` ends before we mutate `slice`).
-        let neighbors: Vec<NodeId> = match direction {
-            Direction::Incoming => cpg
-                .incoming_edges(node)
-                .filter(|e| e.kind.is_pdg())
-                .map(|e| e.source)
-                .collect(),
-            Direction::Outgoing => cpg
-                .outgoing_edges(node)
-                .filter(|e| e.kind.is_pdg())
-                .map(|e| e.target)
-                .collect(),
-        };
-        for next in neighbors {
-            if slice.len() >= max_nodes {
-                return slice;
-            }
-            if slice.insert(next) {
-                queue.push_back(next);
-            }
-        }
-    }
-    slice
+    let seeds = BTreeMap::from([(criterion, 0)]);
+    let mut reached = BTreeSet::new();
+    slice_phase(
+        cpg,
+        &seeds,
+        max_nodes,
+        0,
+        direction,
+        SliceEdgeMask::PDG_ONLY,
+        &mut reached,
+    );
+    reached.into_iter().collect()
 }
 
 #[cfg(test)]

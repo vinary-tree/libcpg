@@ -652,6 +652,19 @@ The Rust graph library `libcpg` builds on. `CodePropertyGraph` wraps a `petgraph
 
 The overlay of [control-dependence](#control-dependence) and [data-dependence](#data-dependence) edges, introduced by Ferrante–Ottenstein–Warren [[2]](#references). It is the substrate for [program slicing](#program-slicing). Added on demand by `PdgBuilder::build(&mut cpg, function)` (it is *not* built during initial construction). See [`theory/04-program-dependence-and-slicing.md`](theory/04-program-dependence-and-slicing.md).
 
+### System Dependence Graph (SDG) / Summary edge
+
+A **System Dependence Graph (SDG)** extends per-function PDGs with
+actual-to-formal `Parameter`, return-expression-to-call `ReturnValue`, and
+caller-local **summary edges**. In libcpg a summary edge is
+`DataDependence(label="summary")` from an actual argument to its call when the
+callee effect summary says that formal may influence the return. The SDG is an
+overlay on the CPG's shared node set, not a parallel graph. Two-pass slicing
+excludes return flow while ascending and parameter flow while descending to
+avoid unrealizable sibling-call paths, following Horwitz, Reps, and Binkley
+[[42]](#references). See
+[`theory/28-system-dependence-and-slicing.md`](theory/28-system-dependence-and-slicing.md).
+
 ### Program CPG / File scope / Import graph
 
 A **program CPG** (`ProgramCpg`) is one collision-free, append-only
@@ -939,3 +952,4 @@ Findings remain advisory and carry stable nodes plus numerical evidence. See
 39. Fontana, F. A., Pigazzini, I., Roveda, R., Zanoni, M. (2016). *Automatic Detection of Instability Architectural Smells.* 2016 IEEE International Conference on Software Maintenance and Evolution, 433–437. DOI: [10.1109/ICSME.2016.33](https://doi.org/10.1109/ICSME.2016.33).
 40. Code-metric foundations: (**40a**) Chidamber, S. R., Kemerer, C. F. (1991). *Towards a Metrics Suite for Object Oriented Design.* DOI: [10.1145/117954.117970](https://doi.org/10.1145/117954.117970). (**40b**) Li, W., Henry, S. (1993). *Object-oriented metrics that predict maintainability.* DOI: [10.1016/0164-1212(93)90077-B](https://doi.org/10.1016/0164-1212(93)90077-B). (**40c**) Hitz, M., Montazeri, B. (1995). *Measuring Coupling and Cohesion in Object-Oriented Systems.* No DOI assigned. (**40d**) Henderson-Sellers, B. (1996). *Object-Oriented Metrics: Measures of Complexity.* ISBN 978-0-13-239872-5 (no DOI). (**40e**) Halstead, M. H. (1977). *Elements of Software Science.* ISBN 0-444-00205-7 (no DOI). (**40f**) Campbell, G. A. (2018). *Cognitive Complexity: An Overview and Evaluation.* DOI: [10.1145/3194164.3194186](https://doi.org/10.1145/3194164.3194186). (**40g**) Oman, P., Hagemeister, J. (1992). *Metrics for assessing a software system's maintainability.* DOI: [10.1109/ICSM.1992.242525](https://doi.org/10.1109/ICSM.1992.242525). (**40h**) Coleman, D., Ash, D., Lowther, B., Oman, P. (1994). *Using metrics to evaluate software system maintainability.* DOI: [10.1109/2.303623](https://doi.org/10.1109/2.303623).
 41. Interprocedural distributive-data-flow foundations: (**41a**) Reps, T., Horwitz, S., Sagiv, M. (1995). *Precise Interprocedural Dataflow Analysis via Graph Reachability.* DOI: [10.1145/199448.199462](https://doi.org/10.1145/199448.199462). (**41b**) Sagiv, M., Reps, T., Horwitz, S. (1996). *Precise Interprocedural Dataflow Analysis with Applications to Constant Propagation.* DOI: [10.1016/0304-3975(96)00072-2](https://doi.org/10.1016/0304-3975(96)00072-2).
+42. Horwitz, S., Reps, T., Binkley, D. (1990). *Interprocedural Slicing Using Dependence Graphs.* ACM Transactions on Programming Languages and Systems 12(1), 26–60. DOI: [10.1145/77606.77608](https://doi.org/10.1145/77606.77608).

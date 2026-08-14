@@ -50,7 +50,7 @@ Two properties of the suite make this rigorous rather than merely suggestive:
 
 ## 3. The evidence base
 
-The maximal matrix contains **897 library tests**, **21 general public-API
+The maximal matrix contains **912 library tests**, **21 general public-API
 integration tests**, **5 malformed-input robustness tests**, **3 SCCP
 public/parser integration tests**, and **3 interval public/parser integration
 tests**, plus **3 loop-induction** and **3 complexity-evidence public/parser
@@ -58,8 +58,9 @@ integration tests**, plus **2 condensation** and **2 DSM public/parser
 integration tests**, plus **1 WL**, **2 centrality**, **2 community**, **2
 cohesion**, **2 spectral**, **2 cycle**, **2 motif**, **2 GED**, **2 function-clone**, **3 program-composition**, **2 IFDS/IDE**, **2 effect-summary**, **2 Martin**, **2 code-metric**, and
 **2 reflexion**, **2 layering**, **2 architectural-smell**, **2 field-access**,
-and **3 taint/nullflow public/parser integration tests**. These 978 executable
-cases combine fixed examples, differential oracles, and 73 exact source-level
+and **3 taint/nullflow public/parser integration tests**, plus **1 SDG-slicing
+public integration test**. These 994 executable cases combine fixed examples,
+differential oracles, and 69 exact source-level
 `proptest!` blocks. The feature-free matrix remains
 independently runnable and exercises the exact graph/data-flow substrate
 without compiling any grammar. Nineteen active Criterion targets supplement
@@ -103,6 +104,7 @@ Because `default = []`, many tests are **feature-gated**. The end-to-end reachin
 | [27 — IFDS/IDE validation](27-ifds-ide-validation.md) | Callee-first summaries, recursive convergence, lattice laws, deterministic insertion order, explicit cap monotonicity, resolver boundaries, malformed/stale SCC rejection, serialization | exact closure examples, four 256-case generated properties, independent BFS oracle, black-box integration, benchmark oracles | feature-free / `serde` |
 | [28 — Effect-summary validation](28-effect-summary-validation.md) | Direct and transitive place effects, purity, actual-to-formal remapping, return dependencies/constants, recursion, lattice laws, insertion-order determinism, and visible cap widening | exact examples, three 256-case generated properties, independent purity DFS, black-box integration, serialization | feature-free / `serde` |
 | [29 — Taint/nullflow validation](29-taint-nullflow-validation.md) | Data-driven source/sink/sanitizer/external policy, typed value propagation, interprocedural composition, canonical witness validity, maybe-null origins/dereferences, lattice laws, independent reachability, insertion determinism, and visible caps | twelve named scenarios, eight 256-case generated properties, independent BFS oracles, black-box integration, benchmark oracles, serialization | feature-free / `serde` |
+| [30 — SDG slicing validation](30-sdg-slicing-validation.md) | Labeled summary construction, append-only idempotency, backward/forward two-pass context discipline, deterministic caps, and legacy PDG preservation | exact two-caller oracle, three 256-case generated properties, black-box effect-to-slice integration, serialization | feature-free / `serde` |
 
 ## 5. What is proven, and what is advisory
 

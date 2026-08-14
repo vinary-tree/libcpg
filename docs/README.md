@@ -138,6 +138,8 @@ let slice = backward_slice(&cpg, func, 256);         // bounded backward slice
 
 [Interprocedural taint and maybe-null summaries](theory/27-interprocedural-taint-and-nullflow.md)
 
+[System dependence and context-sensitive slicing](theory/28-system-dependence-and-slicing.md)
+
 ### Architecture — the "what / where"
 [Overview](architecture/overview.md) · [Graph data model](architecture/graph-data-model.md) · [Construction & analysis data flow](architecture/data-flow.md) · [Language frontends](architecture/language-frontends.md)
 
@@ -149,6 +151,8 @@ let slice = backward_slice(&cpg, func, 256);         // bounded backward slice
 [0033 Compositional effect summaries](design/0033-compositional-effect-summaries.md)
 
 [0034 Data-driven advisory taint](design/0034-data-driven-advisory-taint.md)
+
+[0035 Overlay SDG summary edges and two-pass slicing](design/0035-system-dependence-summary-slicing.md)
 
 ### API reference
 [Graph / analysis reference](api/graph-reference.md) · [Builder reference](api/builder-reference.md) · [Pattern / algorithm / GNN reference](api/pattern-reference.md)
@@ -163,6 +167,8 @@ let slice = backward_slice(&cpg, func, 256);         // bounded backward slice
 [Interprocedural effect summaries](components/graph/effect-summaries.md)
 
 [Advisory taint and maybe-null analysis](components/graph/taint-analysis.md)
+
+[System dependence and interprocedural slicing](components/graph/system-dependence-slicing.md)
 
 #### Builder
 [Overview](components/builder/overview.md) · [CFG extraction](components/builder/cfg.md) · [DFG extraction](components/builder/dfg.md) · [PDG & slicing](components/builder/pdg-and-slicing.md) · [Node mapper](components/builder/node-mapper.md)
@@ -185,6 +191,8 @@ let slice = backward_slice(&cpg, func, 256);         // bounded backward slice
 
 [Taint and maybe-null analysis](usage/10-taint-and-nullflow.md)
 
+[Context-sensitive interprocedural slicing](usage/11-interprocedural-slicing.md)
+
 ### Engineering
 [Overview](engineering/00-overview.md) · [Build & features](engineering/01-build-and-features.md) · [Testing](engineering/02-testing.md) · [Performance](engineering/03-performance.md) · [Contributing](engineering/04-contributing.md)
 
@@ -197,8 +205,10 @@ let slice = backward_slice(&cpg, func, 256);         // bounded backward slice
 
 [Taint and maybe-null validation](scientific/29-taint-nullflow-validation.md)
 
+[SDG slicing validation](scientific/30-sdg-slicing-validation.md)
+
 ### Security
-[Threat model](security/00-threat-model.md) · [Input & resource hardening](security/01-input-and-resource-hardening.md) · [Taint-analysis security boundary](security/02-taint-analysis.md)
+[Threat model](security/00-threat-model.md) · [Input & resource hardening](security/01-input-and-resource-hardening.md) · [Taint-analysis security boundary](security/02-taint-analysis.md) · [Interprocedural-slicing security boundary](security/03-system-dependence-slicing.md)
 
 ### Reference
 [Glossary](GLOSSARY.md) · [Diagram catalog](diagrams/README.md)

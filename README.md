@@ -69,6 +69,9 @@ PDG). A query can therefore mix syntax, control flow, and data flow freely.
 - **Advisory taint and maybe-null analysis** — feature-free, data-driven source,
   sink, sanitizer, external-model, and dereference findings with deterministic
   interprocedural witnesses and explicit completeness evidence.
+- **System dependence and interprocedural slicing** — feature-free labeled
+  summary edges plus deterministic node/depth-capped two-pass backward and
+  forward slices that preserve represented call context.
 - **Projection centrality** — deterministic PageRank variants, vertex/edge
   betweenness, eigenvector, Katz, closeness, harmonic, HITS, and Burt
   structural-hole scores with explicit iteration and traversal budgets.

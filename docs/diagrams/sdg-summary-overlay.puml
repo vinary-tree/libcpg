@@ -1,0 +1,56 @@
+@startuml
+!include _libcpg-theme.iuml
+title System Dependence Graph overlay construction
+
+skinparam backgroundColor #FCFCFC
+skinparam component {
+  BorderColor #343A40
+  FontColor #212529
+}
+skinparam note {
+  BackgroundColor #F8F9FA
+  BorderColor #495057
+}
+
+component "Resolved call topology\nCallSite · StaticCall · DynamicCall" as CALLS #DBE4FF
+component "Interprocedural DFG\nactual → formal: Parameter\nreturn expression → call: ReturnValue" as DFG #D3F9D8
+component "Per-function PDG\nControlDependence\nDataDependence" as PDG #FFF3BF
+component "EffectSummary map\n<latex>M_f = \mathtt{param\_to\_return}</latex>" as EFFECT #E5DBFF
+component "build_summary_edges\nresolved target union\nsorted labeled uniqueness" as BUILD #FFE8CC
+component "Unified CodePropertyGraph\none shared node set" as CPG #C3FAE8
+component "SDG summary overlay\nactual → call\nDataDependence(label=summary)" as SUMMARY #FCC2D7
+component "Two-pass slicer\nBTreeSet<NodeId>\nnode + call-depth caps" as SLICE #FFE3E3
+
+CALLS --> DFG : resolution precedes extraction
+CALLS --> BUILD : call → callee
+EFFECT --> BUILD : bit <latex>i</latex> selects actual <latex>a_i</latex>
+PDG --> CPG : append typed edges
+DFG --> CPG : append typed edges
+CPG --> BUILD : call arguments / endpoints
+BUILD --> SUMMARY : append only
+SUMMARY --> CPG : same nodes, labeled edge
+CPG --> SLICE : PDG + Parameter + ReturnValue + summary
+
+note bottom of BUILD
+  A capped effect summary connects every actual.
+  A truncated mask connects positions beyond bit 63.
+  Repeating the builder adds zero edges.
+end note
+
+note bottom of SLICE
+  The slicer reads graph evidence only.
+  It does not parse source and does not create a parallel graph.
+end note
+
+legend bottom
+|= Colour |= Meaning |
+|<#DBE4FF>| resolved call evidence |
+|<#D3F9D8>| parameter and return value flow |
+|<#FFF3BF>| intraprocedural dependence |
+|<#E5DBFF>| procedure effect summaries |
+|<#FFE8CC>| deterministic construction |
+|<#C3FAE8>| unified CPG storage |
+|<#FCC2D7>| caller-local summary dependence |
+|<#FFE3E3>| bounded public slice |
+endlegend
+@enduml

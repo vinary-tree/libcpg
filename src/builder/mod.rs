@@ -46,6 +46,7 @@ pub use dfg::{
 pub use node_mapper::NodeMapper;
 pub use parser_registry::ParserRegistry;
 pub use pdg::{backward_slice, forward_slice, PdgBuilder};
+pub(crate) use pdg::{slice_phase, SliceEdgeMask};
 pub use tree_sitter::TreeSitterCpgBuilder;
 
 use crate::{CodePropertyGraph, Language, Result};
