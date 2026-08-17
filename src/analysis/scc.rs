@@ -5,7 +5,10 @@
 //! explicit work stacks, so deeply
 //! nested source or long graph paths cannot overflow the native stack.
 
-use std::collections::BTreeMap;
+use std::{
+    cmp::Reverse,
+    collections::{BTreeMap, BinaryHeap},
+};
 
 use rustc_hash::{FxHashMap, FxHashSet};
 
@@ -225,9 +228,7 @@ pub(crate) fn call_graph_edges(cpg: &CodePropertyGraph, nodes: &[NodeId]) -> Vec
         }
     }
 
-    let mut edges: Vec<_> = edges.into_iter().collect();
-    edges.sort_unstable_by_key(|(source, target)| (*source, *target));
-    edges
+    heap_sorted(edges)
 }
 
 /// Returns a function and its AST descendants, stopping before nested
@@ -259,10 +260,27 @@ pub(crate) fn function_scope_nodes(cpg: &CodePropertyGraph, function: NodeId) ->
 }
 
 pub(crate) fn sorted_nodes(nodes: impl IntoIterator<Item = NodeId>) -> Vec<NodeId> {
-    let mut nodes: Vec<NodeId> = nodes.into_iter().collect();
-    nodes.sort_unstable_by_key(|node| node.as_u32());
+    let mut nodes = heap_sorted(nodes);
     nodes.dedup();
     nodes
+}
+
+/// Returns values in ascending order with all traversal state on the heap.
+///
+/// Rust's slice sorting implementation may use native-stack recursion. Graph
+/// projections deliberately support deep inputs on small stacks, so the SCC
+/// substrate uses a binary heap for every input-sized canonicalization step.
+fn heap_sorted<T: Ord>(values: impl IntoIterator<Item = T>) -> Vec<T> {
+    let iterator = values.into_iter();
+    let mut heap = BinaryHeap::with_capacity(iterator.size_hint().0);
+    for value in iterator {
+        heap.push(Reverse(value));
+    }
+    let mut ordered = Vec::with_capacity(heap.len());
+    while let Some(Reverse(value)) = heap.pop() {
+        ordered.push(value);
+    }
+    ordered
 }
 
 pub(crate) type DenseNodeId = u32;
@@ -297,8 +315,9 @@ pub(crate) fn adjacency_from_edges(
 
 pub(crate) fn normalize_adjacency(adjacency: &mut [Vec<DenseNodeId>]) {
     for successors in adjacency {
-        successors.sort_unstable();
-        successors.dedup();
+        let mut ordered = heap_sorted(std::mem::take(successors));
+        ordered.dedup();
+        *successors = ordered;
     }
 }
 
@@ -383,8 +402,7 @@ pub(crate) fn decompose(
                         break;
                     }
                 }
-                component.sort_unstable();
-                component_nodes.push(component);
+                component_nodes.push(heap_sorted(component));
             }
 
             if let Some(parent) = dfs_stack.last() {
@@ -394,8 +412,14 @@ pub(crate) fn decompose(
     }
 
     debug_assert!(active_nodes.is_empty());
-    component_nodes
-        .sort_unstable_by_key(|component| component.first().copied().unwrap_or(usize::MAX));
+    let component_nodes = heap_sorted(
+        component_nodes
+            .into_iter()
+            .map(|component| (component[0], component)),
+    )
+    .into_iter()
+    .map(|(_, component)| component)
+    .collect::<Vec<_>>();
 
     let mut components = Vec::with_capacity(component_nodes.len());
     let mut component_by_node = BTreeMap::new();
@@ -431,11 +455,10 @@ pub(crate) fn decompose(
             }
         }
     }
-    let mut condensation_edges: Vec<SccCondensationEdge> = condensation_set
+    let condensation_edges = heap_sorted(condensation_set)
         .into_iter()
         .map(|(source, target)| SccCondensationEdge { source, target })
         .collect();
-    condensation_edges.sort_unstable_by_key(|edge| (edge.source, edge.target));
 
     SccDecomposition {
         projection,

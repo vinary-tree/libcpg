@@ -4,7 +4,10 @@
 //! copies only node identifiers, edge endpoints, and optional weights; it never
 //! clones [`CpgNode`] payloads or mutates the source [`CodePropertyGraph`].
 
-use std::collections::BTreeMap;
+use std::{
+    cmp::{Ordering, Reverse},
+    collections::{BTreeMap, BinaryHeap},
+};
 
 use crate::{CfgEdgeKind, CodePropertyGraph, CpgEdge, CpgEdgeKind, CpgNode, CpgNodeKind, NodeId};
 
@@ -88,18 +91,14 @@ impl GraphProjection {
         edges: impl IntoIterator<Item = (NodeId, NodeId, f64)>,
     ) -> Self {
         let nodes = sorted_nodes(nodes);
-        let dense_by_node: BTreeMap<NodeId, u32> = nodes
-            .iter()
-            .copied()
-            .enumerate()
-            .map(|(dense, node)| {
-                (
-                    node,
-                    u32::try_from(dense)
-                        .expect("projection node count exceeds the u32 dense-index domain"),
-                )
-            })
-            .collect();
+        let mut dense_by_node = BTreeMap::new();
+        for (dense, node) in nodes.iter().copied().enumerate() {
+            dense_by_node.insert(
+                node,
+                u32::try_from(dense)
+                    .expect("projection node count exceeds the u32 dense-index domain"),
+            );
+        }
 
         let mut dense_edges = Vec::new();
         for (source, target, weight) in edges {
@@ -112,11 +111,12 @@ impl GraphProjection {
         let dense_edges = merge_dense_edges(dense_edges);
         let (offsets, targets) = csr_from_sorted_edges(nodes.len(), &dense_edges);
 
-        let mut reverse_edges: Vec<_> = dense_edges
-            .iter()
-            .map(|&(source, target, weight)| (target, source, weight))
-            .collect();
-        reverse_edges.sort_unstable_by_key(|&(source, target, _)| (source, target));
+        let reverse_edges = merge_dense_edges(
+            dense_edges
+                .iter()
+                .map(|&(source, target, weight)| (target, source, weight))
+                .collect(),
+        );
         let (rev_offsets, rev_targets) = csr_from_sorted_edges(nodes.len(), &reverse_edges);
 
         let weights = if dense_edges.iter().all(|edge| edge.2 == 1.0) {
@@ -263,7 +263,7 @@ impl GraphProjection {
                 symmetric.push((target, source, weight));
             }
         }
-        symmetric.sort_unstable_by_key(|&(source, target, _)| (source, target));
+        let symmetric = merge_dense_edges(symmetric);
         let (offsets, targets) = csr_from_sorted_edges(self.nodes.len(), &symmetric);
         let weights = if symmetric.iter().all(|edge| edge.2 == 1.0) {
             None
@@ -544,14 +544,58 @@ fn validate_function(cpg: &CodePropertyGraph, function: NodeId) -> Result<(), Pr
     Ok(())
 }
 
-fn merge_dense_edges(mut edges: Vec<(u32, u32, f64)>) -> Vec<(u32, u32, f64)> {
-    edges.sort_by(|left, right| {
-        (left.0, left.1)
-            .cmp(&(right.0, right.1))
-            .then_with(|| left.2.total_cmp(&right.2))
-    });
-    let mut merged: Vec<(u32, u32, f64)> = Vec::with_capacity(edges.len());
+#[derive(Debug, Clone, Copy)]
+struct OrderedDenseEdge {
+    source: u32,
+    target: u32,
+    weight: f64,
+}
+
+impl PartialEq for OrderedDenseEdge {
+    fn eq(&self, other: &Self) -> bool {
+        self.cmp(other) == Ordering::Equal
+    }
+}
+
+impl Eq for OrderedDenseEdge {}
+
+impl PartialOrd for OrderedDenseEdge {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
+impl Ord for OrderedDenseEdge {
+    fn cmp(&self, other: &Self) -> Ordering {
+        (self.source, self.target)
+            .cmp(&(other.source, other.target))
+            .then_with(|| self.weight.total_cmp(&other.weight))
+    }
+}
+
+/// Orders and merges dense edges without a native-stack sorting recursion.
+///
+/// The binary heap owns its traversal state. Popping its reversed total order
+/// preserves the prior `(source, target, weight.total_cmp())` contract,
+/// including deterministic addition of parallel floating-point weights.
+fn merge_dense_edges(edges: Vec<(u32, u32, f64)>) -> Vec<(u32, u32, f64)> {
+    let edge_count = edges.len();
+    let mut ordered = BinaryHeap::with_capacity(edge_count);
     for (source, target, weight) in edges {
+        ordered.push(Reverse(OrderedDenseEdge {
+            source,
+            target,
+            weight,
+        }));
+    }
+
+    let mut merged: Vec<(u32, u32, f64)> = Vec::with_capacity(edge_count);
+    while let Some(Reverse(OrderedDenseEdge {
+        source,
+        target,
+        weight,
+    })) = ordered.pop()
+    {
         if let Some(last) = merged
             .last_mut()
             .filter(|last| last.0 == source && last.1 == target)

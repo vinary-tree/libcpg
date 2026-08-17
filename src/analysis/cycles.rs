@@ -6,7 +6,10 @@
 //! vertices, and successor vertices in canonical order. Every returned cycle
 //! is rotation-normalized to its smallest stable node identifier.
 
-use std::collections::BTreeSet;
+use std::{
+    cmp::Reverse,
+    collections::{BTreeSet, BinaryHeap},
+};
 
 use crate::NodeId;
 
@@ -165,19 +168,18 @@ pub fn simple_cycles(
             }
         }
     }
-
-    result.cycles = seen
-        .into_iter()
-        .map(|cycle| {
-            cycle
-                .into_iter()
-                .map(|dense| graph.node_id(dense))
-                .collect()
-        })
-        .collect();
-    result
-        .cycles
-        .sort_unstable_by(|left, right| left.len().cmp(&right.len()).then_with(|| left.cmp(right)));
+    let mut ordered = BinaryHeap::with_capacity(seen.len());
+    for cycle in seen {
+        let cycle: Vec<_> = cycle
+            .into_iter()
+            .map(|dense| graph.node_id(dense))
+            .collect();
+        ordered.push(Reverse((cycle.len(), cycle)));
+    }
+    result.cycles = Vec::with_capacity(ordered.len());
+    while let Some(Reverse((_, cycle))) = ordered.pop() {
+        result.cycles.push(cycle);
+    }
     Ok(result)
 }
 
@@ -561,6 +563,45 @@ mod tests {
         assert!(result.cycles.is_empty());
         assert_eq!(result.max_length, MAX_CYCLE_LENGTH);
         assert!(!result.truncated);
+    }
+
+    #[test]
+    fn projection_scc_and_cycle_canonicalization_fit_a_small_native_stack() {
+        std::thread::Builder::new()
+            .name("small-stack-cycle-pipeline".into())
+            .stack_size(64 * 1024)
+            .spawn(|| {
+                const NODE_COUNT: u32 = 4_096;
+                let nodes = (0..NODE_COUNT).map(NodeId::new);
+                let edges = (0..NODE_COUNT - 1)
+                    .map(|node| (NodeId::new(node), NodeId::new(node + 1), 1.0))
+                    .chain(std::iter::once((
+                        NodeId::new(NODE_COUNT - 1),
+                        NodeId::new(NODE_COUNT - 2),
+                        1.0,
+                    )));
+                let graph = GraphProjection::from_edges(ProjectionKind::External, nodes, edges);
+                let result = simple_cycles(
+                    &graph,
+                    &CycleOptions {
+                        max_length: 2,
+                        max_cycles: 1,
+                    },
+                )
+                .expect("the projection/SCC/cycle pipeline is stack safe");
+
+                assert_eq!(
+                    result.cycles,
+                    vec![vec![
+                        NodeId::new(NODE_COUNT - 2),
+                        NodeId::new(NODE_COUNT - 1),
+                    ]]
+                );
+                assert!(!result.truncated);
+            })
+            .expect("spawn the bounded-stack regression thread")
+            .join()
+            .expect("the bounded-stack regression completes without overflow");
     }
 
     fn graph_from_mask(node_count: usize, mask: u64, reverse: bool) -> GraphProjection {
