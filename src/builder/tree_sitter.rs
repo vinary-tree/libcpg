@@ -8,7 +8,8 @@
 //!
 //! The CPG construction pipeline:
 //! 1. **Parsing**: Tree-sitter parses source code into a concrete syntax tree
-//! 2. **AST Construction**: Convert tree-sitter nodes to CPG nodes with AST edges
+//! 2. **AST Construction**: An explicit preorder work stack converts tree-sitter
+//!    nodes to CPG nodes with AST edges without native recursion
 //! 3. **CFG Extraction**: [`CfgExtractor`] analyzes control flow constructs
 //! 4. **Call Resolution** (opt-in): the feature-free resolver materializes
 //!    uniquely supported call targets
@@ -193,84 +194,77 @@ impl TreeSitterCpgBuilder {
         mapper: &NodeMapper,
         cpg: &mut CodePropertyGraph,
     ) -> Result<()> {
-        let root_node = tree.root_node();
+        let mut work = Vec::new();
+        work.try_reserve(1).map_err(|error| {
+            Error::Construction(format!(
+                "failed to allocate the AST traversal work stack: {error}"
+            ))
+        })?;
+        work.push((tree.root_node(), None));
 
-        // Recursively convert tree-sitter nodes to CPG nodes
-        self.convert_node(&root_node, None, source, mapper, cpg)?;
+        while let Some((ts_node, parent_id)) = work.pop() {
+            let ts_kind = ts_node.kind();
+
+            // An omitted syntax node is transparent: its included descendants
+            // retain the nearest included ancestor as their effective parent.
+            // Keeping that continuation in the frame replaces the former
+            // input-depth recursive call chain.
+            let child_parent = if mapper.should_include_node(&ts_node, self.config.include_comments)
+            {
+                let cpg_kind = mapper.map_kind(ts_kind, &ts_node, source);
+                let is_function = matches!(cpg_kind, CpgNodeKind::Function { .. });
+
+                // Preserve both byte offsets and tree-sitter's zero-based source
+                // points. Downstream graph consumers use the byte range for source
+                // slicing and the line/column range for durable symbol anchoring.
+                let start = ts_node.start_position();
+                let end = ts_node.end_position();
+                let range = SourceRange::new(
+                    ts_node.start_byte() as u32,
+                    ts_node.end_byte() as u32,
+                    start.row as u32,
+                    start.column as u32,
+                    end.row as u32,
+                    end.column as u32,
+                );
+
+                let mut cpg_node = CpgNode::new(NodeId::new(0), cpg_kind, range);
+                cpg_node.message_kind = mapper.message_kind(ts_kind);
+                let node_id = cpg.add_node(cpg_node);
+
+                // Maintain the AST edge and parent pointer as one invariant.
+                if let Some(parent) = parent_id {
+                    cpg.connect(parent, node_id, CpgEdgeKind::AstChild);
+                    if let Some(node) = cpg.node_mut(node_id) {
+                        node.parent = Some(parent);
+                    }
+                }
+
+                if is_function {
+                    cpg.add_cfg_entry(node_id);
+                }
+                Some(node_id)
+            } else {
+                parent_id
+            };
+
+            let child_count = ts_node.child_count();
+            work.try_reserve(child_count).map_err(|error| {
+                Error::Construction(format!(
+                    "failed to grow the AST traversal work stack for {child_count} children: {error}"
+                ))
+            })?;
+            let first_child = work.len();
+            let mut cursor = ts_node.walk();
+            work.extend(
+                ts_node
+                    .children(&mut cursor)
+                    .map(|child| (child, child_parent)),
+            );
+            work[first_child..].reverse();
+        }
 
         Ok(())
-    }
-
-    /// Recursively converts a tree-sitter node and its children to CPG nodes.
-    fn convert_node(
-        &self,
-        ts_node: &tree_sitter::Node,
-        parent_id: Option<NodeId>,
-        source: &str,
-        mapper: &NodeMapper,
-        cpg: &mut CodePropertyGraph,
-    ) -> Result<Option<NodeId>> {
-        let ts_kind = ts_node.kind();
-
-        // Check if this node should be included. Uses the node-aware test so a
-        // language mapper can distinguish an anonymous keyword/operator *token*
-        // from a same-named semantic *rule* node (e.g. Rholang's `contract`).
-        if !mapper.should_include_node(ts_node, self.config.include_comments) {
-            // Still process children even if this node is skipped
-            let mut cursor = ts_node.walk();
-            for child in ts_node.children(&mut cursor) {
-                self.convert_node(&child, parent_id, source, mapper, cpg)?;
-            }
-            return Ok(None);
-        }
-
-        // Map the tree-sitter node kind to CPG node kind
-        let cpg_kind = mapper.map_kind(ts_kind, ts_node, source);
-
-        // Preserve both byte offsets and tree-sitter's zero-based source
-        // points. Downstream graph consumers use the byte range for source
-        // slicing and the line/column range for durable symbol anchoring; a
-        // byte-only range silently located every parsed node at line 1.
-        let start = ts_node.start_position();
-        let end = ts_node.end_position();
-        let range = SourceRange::new(
-            ts_node.start_byte() as u32,
-            ts_node.end_byte() as u32,
-            start.row as u32,
-            start.column as u32,
-            end.row as u32,
-            end.column as u32,
-        );
-
-        // Create the CPG node
-        let mut cpg_node = CpgNode::new(NodeId::new(0), cpg_kind.clone(), range);
-        cpg_node.message_kind = mapper.message_kind(ts_kind);
-        let node_id = cpg.add_node(cpg_node);
-
-        // Create the AST edge from parent to this node AND record the parent
-        // pointer on the node itself. `ast_parent`/`ast_ancestors` read the
-        // pointer, not the edge; leaving it unset made every parsed node look
-        // like an AST root, silently breaking every ancestor-based analysis
-        // (def/use classification, enclosing-statement lookup, program slicing).
-        if let Some(parent) = parent_id {
-            cpg.connect(parent, node_id, CpgEdgeKind::AstChild);
-            if let Some(node) = cpg.node_mut(node_id) {
-                node.parent = Some(parent);
-            }
-        }
-
-        // Mark function nodes as CFG entry points
-        if matches!(cpg_kind, CpgNodeKind::Function { .. }) {
-            cpg.add_cfg_entry(node_id);
-        }
-
-        // Recursively convert children
-        let mut cursor = ts_node.walk();
-        for child in ts_node.children(&mut cursor) {
-            self.convert_node(&child, Some(node_id), source, mapper, cpg)?;
-        }
-
-        Ok(Some(node_id))
     }
 }
 
@@ -285,6 +279,71 @@ mod tests {
         feature = "lang-cpp"
     ))]
     use crate::DfgEdgeKind;
+
+    #[cfg(feature = "lang-rust")]
+    #[derive(Debug)]
+    struct ExpectedAstNode {
+        kind: CpgNodeKind,
+        range: SourceRange,
+        message_kind: Option<crate::MsgKind>,
+        parent: Option<NodeId>,
+    }
+
+    #[cfg(feature = "lang-rust")]
+    fn recursive_expected_ast(
+        node: tree_sitter::Node<'_>,
+        parent: Option<NodeId>,
+        source: &str,
+        mapper: &NodeMapper,
+        include_comments: bool,
+        output: &mut Vec<ExpectedAstNode>,
+    ) {
+        let child_parent = if mapper.should_include_node(&node, include_comments) {
+            let start = node.start_position();
+            let end = node.end_position();
+            let id = NodeId::new(u32::try_from(output.len()).expect("shallow oracle node id"));
+            output.push(ExpectedAstNode {
+                kind: mapper.map_kind(node.kind(), &node, source),
+                range: SourceRange::new(
+                    node.start_byte() as u32,
+                    node.end_byte() as u32,
+                    start.row as u32,
+                    start.column as u32,
+                    end.row as u32,
+                    end.column as u32,
+                ),
+                message_kind: mapper.message_kind(node.kind()),
+                parent,
+            });
+            Some(id)
+        } else {
+            parent
+        };
+
+        let mut cursor = node.walk();
+        for child in node.children(&mut cursor) {
+            recursive_expected_ast(
+                child,
+                child_parent,
+                source,
+                mapper,
+                include_comments,
+                output,
+            );
+        }
+    }
+
+    #[cfg(feature = "lang-rust")]
+    fn max_tree_depth(root: tree_sitter::Node<'_>) -> usize {
+        let mut maximum = 0usize;
+        let mut work = vec![(root, 1usize)];
+        while let Some((node, depth)) = work.pop() {
+            maximum = maximum.max(depth);
+            let mut cursor = node.walk();
+            work.extend(node.children(&mut cursor).map(|child| (child, depth + 1)));
+        }
+        maximum
+    }
 
     #[cfg(any(
         feature = "lang-rust",
@@ -616,6 +675,129 @@ mod tests {
         assert!(from_source
             .edges()
             .any(|edge| matches!(edge.kind, CpgEdgeKind::Reference)));
+    }
+
+    #[test]
+    #[cfg(feature = "lang-rust")]
+    fn iterative_ast_machine_matches_the_shallow_recursive_equations() {
+        let source = "// file comment\nfn main() { /* inner */ let x = (((1))); x + 2; }";
+        let ts_language = ParserRegistry::global()
+            .get(Language::Rust)
+            .expect("rust grammar should be registered");
+        let mut parser = tree_sitter::Parser::new();
+        parser
+            .set_language(&ts_language)
+            .expect("set language should succeed");
+        let tree = parser.parse(source, None).expect("parse should succeed");
+        let mapper = NodeMapper::new(Language::Rust);
+
+        for include_comments in [false, true] {
+            let mut expected = Vec::new();
+            recursive_expected_ast(
+                tree.root_node(),
+                None,
+                source,
+                &mapper,
+                include_comments,
+                &mut expected,
+            );
+            let builder = TreeSitterCpgBuilder::with_config(
+                CpgBuilderConfig::new()
+                    .with_cfg(false)
+                    .with_dfg(false)
+                    .with_comments(include_comments),
+            );
+            let cpg = builder
+                .build_from_tree(&tree, source, Language::Rust)
+                .expect("iterative AST build");
+
+            assert_eq!(cpg.node_count(), expected.len());
+            assert_eq!(cpg.root(), (!expected.is_empty()).then_some(NodeId::new(0)));
+            for (dense, expected_node) in expected.iter().enumerate() {
+                let id = NodeId::new(u32::try_from(dense).expect("shallow oracle node id"));
+                let actual = cpg.node(id).expect("expected preorder node");
+                assert_eq!(actual.kind, expected_node.kind);
+                assert_eq!(actual.range, expected_node.range);
+                assert_eq!(actual.message_kind, expected_node.message_kind);
+                assert_eq!(actual.parent, expected_node.parent);
+
+                let incoming_ast: Vec<_> = cpg
+                    .incoming_edges(id)
+                    .filter(|edge| matches!(edge.kind, CpgEdgeKind::AstChild))
+                    .map(|edge| edge.source)
+                    .collect();
+                assert_eq!(
+                    incoming_ast,
+                    expected_node.parent.into_iter().collect::<Vec<_>>()
+                );
+            }
+
+            let expected_entries: Vec<_> = expected
+                .iter()
+                .enumerate()
+                .filter(|(_, node)| matches!(node.kind, CpgNodeKind::Function { .. }))
+                .map(|(dense, _)| {
+                    NodeId::new(u32::try_from(dense).expect("shallow oracle function id"))
+                })
+                .collect();
+            assert_eq!(cpg.cfg_entries(), expected_entries);
+        }
+    }
+
+    #[test]
+    #[cfg(feature = "lang-rust")]
+    fn deep_and_wide_ast_builds_are_stack_safe_on_a_small_native_stack() {
+        const DEPTH: usize = 100_000;
+        const WIDTH: usize = 50_000;
+
+        let handle = std::thread::Builder::new()
+            .name("tree-sitter-cpg-small-stack".into())
+            .stack_size(256 * 1024)
+            .spawn(|| {
+                let ts_language = ParserRegistry::global()
+                    .get(Language::Rust)
+                    .expect("rust grammar should be registered");
+                let builder = TreeSitterCpgBuilder::with_config(
+                    CpgBuilderConfig::new().with_cfg(false).with_dfg(false),
+                );
+                let mut parser = tree_sitter::Parser::new();
+                parser
+                    .set_language(&ts_language)
+                    .expect("set language should succeed");
+
+                let mut deep = String::with_capacity(32 + DEPTH * 2);
+                deep.push_str("fn deep(){let _x=");
+                deep.push_str(&"(".repeat(DEPTH));
+                deep.push('0');
+                deep.push_str(&")".repeat(DEPTH));
+                deep.push_str(";}");
+                let tree = parser.parse(&deep, None).expect("parse deep Rust source");
+                assert!(
+                    max_tree_depth(tree.root_node()) >= DEPTH,
+                    "anti-vacuity: the parser must retain the requested nesting"
+                );
+                let deep_cpg = builder
+                    .build_from_tree(&tree, &deep, Language::Rust)
+                    .expect("build deeply nested CPG");
+                assert!(deep_cpg.node_count() >= DEPTH);
+                drop(deep_cpg);
+                drop(tree);
+
+                let mut wide = String::with_capacity(16 + WIDTH * 2);
+                wide.push_str("fn wide(){");
+                for _ in 0..WIDTH {
+                    wide.push_str("0;");
+                }
+                wide.push('}');
+                let tree = parser.parse(&wide, None).expect("parse wide Rust source");
+                let wide_cpg = builder
+                    .build_from_tree(&tree, &wide, Language::Rust)
+                    .expect("build wide CPG");
+                assert!(wide_cpg.node_count() > WIDTH);
+            })
+            .expect("spawn small-stack builder test");
+
+        handle.join().expect("small-stack builder test completes");
     }
 
     #[test]
