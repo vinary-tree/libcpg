@@ -1,45 +1,73 @@
 @startuml
 !include _libcpg-theme.iuml
-title DfgExtractor::visit_reaching — AST-ordered reaching-definitions sweep
+title DfgExtractor::visit_reaching — stack-safe AST-ordered sweep
+
 start
-:initialize ReachingEnv = empty
-a map from name to its reaching definitions,
-binding parameters before the function body;<<#FFF3BF>>
-repeat
-:visit next AST node in source (AST child) order;<<#DBE4FF>>
-if (node is a definition?) then (yes)
-  if (enclosing context?) then (straight-line)
-    :strong update (kill + gen) in straight-line context;<<#FFF3BF>>
-  else (conditional region)
-    :weak update (add, no kill);<<#FFF3BF>>
+:initialize ReachingEnv and active_path;<<#D0EBFF>>
+:push Enter(root, conditional = false);<<#E5DBFF>>
+
+while (work stack non-empty?) is (yes)
+  :pop typed heap frame;<<#FFF3BF>>
+  if (frame kind?) then (Exit)
+    :remove node from active_path;<<#FFE3E3>>
+  elseif (frame kind?) then (Bind)
+    if (conditional context?) then (yes)
+      :weak update — add definition without kill;<<#FFD8A8>>
+    else (no)
+      :strong update — kill then generate definition;<<#D3F9D8>>
+    endif
+  else (Enter)
+    if (node exists and enters active_path?) then (yes)
+      :push matching Exit(node);<<#FFE3E3>>
+      if (node kind?) then (Variable / Parameter)
+        :push Bind continuation;
+        :push non-binder children
+        in reverse source order;<<#E5DBFF>>
+      elseif (node kind?) then (Assignment)
+        :push identifier-target Bind;
+        :push read children in reverse order;<<#E5DBFF>>
+      elseif (node kind?) then (Identifier use)
+        :append every current (definition, use) pair;<<#C3FAE8>>
+      elseif (node kind?) then (Function boundary)
+        :do not enter nested function body;<<#D0EBFF>>
+      else (other AST node)
+        if (While / For / Loop?) then (yes)
+          :push two reverse-ordered child sweeps;<<#E5DBFF>>
+        else (no)
+          :push one reverse-ordered child sweep;<<#E5DBFF>>
+        endif
+      endif
+    else (absent / active cycle)
+      :skip without scheduling Exit;<<#F1F3F5>>
+    endif
   endif
-else (no)
-endif
-if (node is a use?) then (yes)
-  :link use to current ReachingEnv definitions
-(incl. nested-expression uses);<<#FFF3BF>>
-else (no)
-endif
-if (node is a loop region: While / For / Loop?) then (yes)
-  :sweep loop body twice for loop-carried deps;<<#FFF3BF>>
-else (no)
-endif
-repeat while (more AST nodes in source order?) is (yes) not (no)
+endwhile (no)
+
+:emit deduplicated DefUse edges;<<#C3FAE8>>
 stop
 
 note right
-  Idempotent, flow-sensitive sweep.
-  <b>NOT SSA</b> — no phi nodes.
-  <b>NOT CFG-propagated</b> — reaching
-  definitions flow along AST child
-  order, threaded down into the
-  nested-expression uses of each
-  statement (e.g. x in return f(x)).
+  <b>Search stack</b>: Enter / Bind / Exit frames are
+  heap-resident defunctionalized continuations.
+  Native call depth is independent of AST depth.
+
+  <b>Active path</b>: Exit removes exactly the node
+  accepted by Enter. Cycles are cut, while shared
+  subtrees and the second loop pass may re-enter.
+
+  <b>Semantics</b>: not SSA and not CFG propagation;
+  the environment reaches nested expression uses.
 end note
 
 legend right
-  |= colour |= sweep step |
-  |<#DBE4FF>| AST traversal (visit node) |
-  |<#FFF3BF>| DataFlow — reaching-definition update / use link |
+  |= colour |= machine role |
+  |<#D0EBFF>| initialization / lexical boundary |
+  |<#E5DBFF>| heap continuation scheduling |
+  |<#FFF3BF>| frame dispatch |
+  |<#D3F9D8>| strong reaching-definition update |
+  |<#FFD8A8>| weak reaching-definition update |
+  |<#C3FAE8>| def-use evidence |
+  |<#FFE3E3>| active-path restoration |
+  |<#F1F3F5>| malformed-node rejection |
 endlegend
 @enduml

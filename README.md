@@ -123,8 +123,8 @@ PDG). A query can therefore mix syntax, control flow, and data flow freely.
 - **Loop invariants and induction variables** — DFG-backed invariant fixed
   points, unique latch-dominating additive/affine IVs, conservative hoist
   candidates, and counted-trip evidence.
-- **DFG extraction** — intraprocedural, AST-ordered reaching definitions
-  (Kildall 1973) and def-use chains (13 `DfgEdgeKind` variants).
+- **DFG extraction** — intraprocedural, stack-safe AST-ordered reaching
+  definitions (Kildall 1973) and def-use chains (13 `DfgEdgeKind` variants).
 - **PDG + program slicing** — control-dependence edges via the reverse dominance
   frontier (Ferrante–Ottenstein–Warren 1987; Cytron et al. 1991) plus
   data-dependence edges, with bounded backward/forward Weiser slices

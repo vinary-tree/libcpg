@@ -92,8 +92,8 @@ use rustc_hash::FxHashMap;
 use libcpg::NodeId;
 
 // Per-name set of currently-reaching definition nodes.
-// The inline capacity keeps the common single-definition (straight-line) case
-// allocation-free; multiple entries appear only after a branch or loop merge.
+// The inline capacity keeps the common single-definition value inside its
+// hash-map bucket; multiple entries allocate only after a branch or loop merge.
 type ReachingEnv = FxHashMap<Arc<str>, SmallVec<[NodeId; 2]>>;
 ```
 
@@ -143,63 +143,65 @@ once conditional, the flag stays set for all descendants.
 
 ## The core walk: `visit_reaching`
 
-`visit_reaching(cpg, node, env, conditional, pairs)` recurses over the AST in source order,
-mutating `env` and appending `(def, use)` pairs. Here it is as literate pseudocode,
-faithful to the implementation:
+`visit_reaching(cpg, node, env, conditional, pairs)` is a typed pushdown machine over the
+AST. Its heap-resident `ReachingFrame` alphabet has three instructions:
+
+- `Enter(node, conditional)` interprets one node;
+- `Bind(name, definition, conditional)` resumes after a definition's children; and
+- `Exit(node)` removes that node from the active path.
+
+The last two frames are defunctionalized continuations: they retain what a recursive call
+would have done after returning, while source depth consumes no native call-stack frames.
+Here is the implementation as literate pseudocode:
 
 ```text
 visit_reaching(node, env, conditional, pairs):
-    kind ← cpg.node(node).kind
+  work ← [Enter(node, conditional)]
+  while work is not empty:
+    frame ← work.pop()
 
-    match kind:
+    Exit(node):
+      active_path.remove(node)
 
-      # `let x = init` — evaluate the initializer FIRST (its uses see the
-      # pre-binding env), then bind the name. The binder identifier (the `x`
-      # itself) is a definition site, not a use, and is skipped.
-      Variable { name }:
-          binder ← binder_identifier(node, name)
-          for child in cpg.ast_children(node):
-              if child ≠ binder: visit_reaching(child, env, conditional, pairs)
-          bind_definition(env, name, node, conditional)
+    Bind(name, definition, conditional):
+      bind_definition(env, name, definition, conditional)
 
-      # A parameter binds its name; any non-binder child (e.g. a default value)
-      # is visited as a use.
-      Parameter { name }:
-          binder ← binder_identifier(node, name)
-          for child in cpg.ast_children(node):
-              if child ≠ binder: visit_reaching(child, env, conditional, pairs)
-          bind_definition(env, name, node, conditional)
+    Enter(node, conditional):
+      kind ← cpg.node(node).kind; if absent, continue
+      if not active_path.insert(node): continue          # malformed AST cycle
+      work.push(Exit(node))
 
-      # Assignment. The first child is the target l-value.
-      #  - simple `x = …`      : target is a pure WRITE → skip it as a use
-      #  - compound `x += …`   : target is read-then-written → visit it
-      #  - complex `a.f = …`   : target is not a bare identifier → visit it
-      Assignment { operator }:
-          compound ← (operator ≠ "=")
-          [target, …] ← cpg.ast_children(node)
-          target_is_ident ← target is an Identifier
-          for child in cpg.ast_children(node):
-              if child = target and target_is_ident and not compound: continue
-              visit_reaching(child, env, conditional, pairs)
-          if target_is_ident:
-              bind_definition(env, name_of(target), node, conditional)
+      match kind:
+        Function:
+          continue                                      # lexical boundary
 
-      # Identifier in USE position: link every currently-reaching definition of
-      # its name to this node. Binder identifiers never reach here — their
-      # parent construct skipped them above.
-      Identifier { name }:
-          for def in env.get(name):
-              pairs.push( (def, node) )
+        Variable{name} or Parameter{name}:
+          work.push(Bind(name, node, conditional))       # runs AFTER children
+          push Enter(non-binder children) in reverse source order
 
-      # Everything else: recurse in source order. Branch/loop bodies switch to
-      # conditional (weak-update) context; loop bodies are swept TWICE.
-      _:
+        Assignment{operator}:
+          target ← first AST child
+          if target is an Identifier:
+            work.push(Bind(name_of(target), node, conditional))
+          push Enter(children) in reverse source order,
+            excluding a simple `=` identifier target    # pure write, not use
+
+        Identifier{name}:
+          for definition in env[name]:
+            pairs.push((definition, node))
+
+        otherwise:
           child_conditional ← conditional or is_conditional_region(kind)
           passes ← 2 if is_loop_region(kind) else 1
           repeat passes times:
-              for child in cpg.ast_children(node): 
-                  visit_reaching(child, env, child_conditional, pairs)
+            push Enter(children, child_conditional) in reverse source order
 ```
+
+Reverse pushes make the last-in/first-out (LIFO) work stack visit children in source order.
+Every successfully entered node schedules exactly one `Exit`, including early lexical
+boundaries; a cycle-rejected node schedules none. Thus the active-path set is restored
+exactly, shared subtrees remain eligible on distinct paths, and the second loop sweep can
+re-enter its body after the first sweep exits.
 
 `build_def_use_edges` seeds this by binding the function's parameters (they precede the
 body in AST child order) and then sweeping each child, finally emitting the deduplicated
@@ -225,14 +227,16 @@ miss it. `visit_reaching` therefore sweeps loop-region bodies (`While`, `For`, `
 **twice** — a bounded, two-iteration fixed point — so the second pass observes the
 definitions the first pass installed.
 
-![Reaching-definitions sweep: the AST-ordered walk maintains a per-name reaching set, applying strong updates in straight-line code, weak updates in branches, and a double pass over loop bodies.](../../diagrams/reaching-defs-sweep.svg)
+![Reaching-definitions pushdown machine: Enter, Bind, and Exit heap frames maintain a per-name reaching set, apply strong or weak updates, double-sweep loops, and restore the active path.](../../diagrams/reaching-defs-sweep.svg)
 
-*Figure — the flow-sensitive sweep: strong/weak updates and the loop double-pass. Source: [`diagrams/reaching-defs-sweep.puml`](../../diagrams/reaching-defs-sweep.puml).*
+*Figure — the stack-safe flow-sensitive sweep: typed continuation frames, exact active-path restoration, strong/weak updates, and the loop double-pass. Source: [`diagrams/reaching-defs-sweep.puml`](../../diagrams/reaching-defs-sweep.puml).*
 
 **Cost.** The sweep visits each node once outside loops; a node nested inside $`d`$ loop
 regions is visited $`2^d`$ times, so the total work is $`O(n \cdot 2^d)`$ for $`n`$
 AST nodes and maximum loop-nesting depth $`d`$ — and $`d`$ is a tiny constant in real
-code. There is no worklist and no global fixed point.
+code. There is no global fixed point. The work stack and active path use $`O(V+E)`$
+conservative heap space for $`V`$ AST nodes and $`E`$ AST-child edges; native call-stack
+use is $`O(1)`$ with respect to AST depth.
 
 ---
 

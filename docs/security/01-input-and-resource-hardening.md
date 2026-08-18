@@ -31,7 +31,7 @@ Source: [`diagrams/resource-bounds.puml`](../diagrams/resource-bounds.puml).*
 | `Vf2Matcher::max_matches` | `0` (unlimited) | `pattern::Vf2Matcher` | search short-circuits once the match count is reached |
 | `Vf2Matcher` strict toggles | `strict_kinds`/`strict_edges` off | `pattern::Vf2Matcher` | tighter feasibility test prunes branches earlier |
 | Clone pair / PDG / VF2 budgets | `100_000` pairs, `300` PDG nodes, `10_000` VF2 calls | `pattern::detect_clones` | returns `AnalysisError::BudgetExceeded` before omitting a required comparison; hard maxima are `100_000`, `300`, and `100_000` |
-| DFG structural guards | always on | `DfgExtractor` | loop bodies receive exactly two passes; an AST path set cuts malformed cycles |
+| DFG structural guards | always on | `DfgExtractor` | typed heap frames retain source order and post-child binding with constant native depth; loop bodies receive exactly two passes; an active AST path cuts malformed cycles |
 | `backward_slice` / `forward_slice` `max_nodes` | *(caller-supplied argument)* | crate-root slice fns | BFS returns as soon as the slice reaches `max_nodes` |
 | AST traversal guards | *(always on)* | `ast_descendants` / `ast_ancestors` / `ast_depth`, SCC scope discovery, `CfgExtractor`, DFG reaching-defs | a cyclic `AstChild` graph terminates instead of looping or overflowing the stack |
 | CFG reachability guard | *(always on)* | `unreachable_code` | iterative DFS expands each function-scoped CFG node at most once; `Call` edges and nested functions are excluded |
@@ -838,11 +838,13 @@ therefore hand the analyses a shape no builder would produce:
 - an `AstChild` **cycle**, so the "tree" is not a tree;
 - a `Call` whose `target` names a node that does not exist.
 
-Several analyses walk the AST recursively, and an `AstChild` cycle turns such a
-walk into an unbounded descent. Two of them — the CFG extractor's mutually
-recursive `process_*` handlers and the DFG's reaching-definitions sweep — would
-overflow the stack and **abort the process**, which is a denial of service
-reachable from any caller that builds a graph by hand.
+An `AstChild` cycle turns an unguarded recursive walk into an unbounded descent.
+Historically, both the CFG extractor's mutually recursive `process_*` handlers
+and the former recursive DFG reaching-definitions sweep could overflow the stack
+and **abort the process**, a denial of service reachable from any caller that
+builds a graph by hand. Both now cut active-path cycles; the DFG additionally
+uses typed heap frames so even a deep valid AST cannot consume native stack by
+source depth.
 
 ### The contract
 
@@ -869,13 +871,15 @@ correctness**: an analysis may return a meaningless answer, but it must
 | `loop_induction` | validates every supplied loop reference; finite invariant rounds, depth-three affine recognition, checked arithmetic, and iterative visited-set AST walks; a 25,000-node region is regression-tested |
 | `build_symbol_table` / `resolve_calls` | visited sets cut parent and callee-subtree cycles; deterministic scope-depth, candidate-retention, and call-count caps bound configured work |
 | `CfgExtractor::process_node` (and every `process_*` handler) | a **path set** on `CfgContext` — a node already on the current recursion path becomes its own exit instead of being re-entered |
-| DFG reaching definitions (`visit_reaching`) | a **path set** — same rule |
+| DFG reaching definitions (`visit_reaching`) | typed heap `Enter`/`Bind`/`Exit` frames plus an **active-path set**; source depth consumes no native call frames, and a node may re-enter after its matching `Exit` |
 | DFG member-to-field resolution | one immutable declaration index; every owner/scope walk uses cycle-bounded `ast_ancestors`; exact lexical/type/field names and uniqueness are required, so malformed, missing, or ambiguous evidence emits no `Reference` |
 | `method_field_graph` / `ck_metrics` / `function_metrics` | iterative visited function/member walks, declaration uniqueness, typed field/call evidence, inheritance SCC condensation, ordered sets, saturating counts, and finite arithmetic edge cases; nested functions remain separate scopes |
 
-A *path* set rather than a global visited set is used in the two extractors so
-that a node legitimately reachable from two disjoint branches is still processed
-on each path; only a genuine cycle is cut. Tree input is therefore unaffected.
+A *path* set rather than a global visited set is used in both extractors so that
+a node legitimately reachable from two disjoint branches is still processed on
+each path; only a genuine cycle is cut. The DFG machine stores that path and its
+continuations on the heap, while the CFG extractor currently threads the path
+through its recursive construct handlers. Tree input is therefore unaffected.
 
 Field resolution has a different threat: a hostile graph can repeat names or
 forge parent pointers to induce a false declaration link. The resolver therefore

@@ -720,8 +720,8 @@ impl Default for DfgExtractor {
 }
 
 /// Per-variable set of currently-reaching definition nodes, keyed by bound name.
-/// The small on-stack vector keeps the common single-definition (straight-line)
-/// case allocation-free; multiple entries arise only after a branch/loop merge.
+/// `SmallVec` keeps the common single-definition value inline in its hash-map
+/// bucket; multiple entries allocate only after a branch/loop merge.
 type ReachingEnv = FxHashMap<Arc<str>, SmallVec<[NodeId; 2]>>;
 
 /// Returns true for node kinds whose children execute *conditionally* (a branch
@@ -845,7 +845,29 @@ fn lexical_parent(cpg: &CodePropertyGraph, node: NodeId) -> Option<NodeId> {
         .min()
 }
 
-/// Core AST-ordered reaching-definitions walk. See
+/// One instruction in the stack-safe AST-ordered reaching-definitions machine.
+///
+/// `Enter` replaces a recursive call, `Bind` is the continuation that runs
+/// after a definition's children, and `Exit` removes the node from the active
+/// path. Keeping these phases distinct preserves evaluation order without
+/// retaining source depth on the native call stack.
+#[derive(Debug)]
+enum ReachingFrame {
+    Enter {
+        node: NodeId,
+        conditional: bool,
+    },
+    Bind {
+        name: Arc<str>,
+        definition: NodeId,
+        conditional: bool,
+    },
+    Exit {
+        node: NodeId,
+    },
+}
+
+/// Core AST-ordered reaching-definitions pushdown machine. See
 /// [`DfgExtractor::build_def_use_edges`] for the algorithm and its rationale.
 fn visit_reaching(
     cpg: &CodePropertyGraph,
@@ -855,110 +877,118 @@ fn visit_reaching(
     pairs: &mut Vec<(NodeId, NodeId)>,
     on_path: &mut FxHashSet<NodeId>,
 ) {
-    // Clone the kind so the immutable borrow of `cpg.node(node)` ends before we
-    // recurse (each arm re-borrows `cpg` immutably via `ast_children`).
-    let kind = match cpg.node(node) {
-        Some(n) => n.kind.clone(),
-        None => return,
-    };
+    let mut work = vec![ReachingFrame::Enter { node, conditional }];
 
-    // The walk descends `ast_children`, which is a tree for any graph a builder
-    // produces. A malformed graph can close an `AstChild` cycle, which would
-    // make this descent unbounded and overflow the stack. `on_path` holds the
-    // nodes on the *current* path only — so the deliberate two-pass sweep of a
-    // loop body below (which re-enters siblings, never an ancestor) is
-    // unaffected, while a genuine cycle is cut.
-    if !on_path.insert(node) {
-        return;
-    }
+    while let Some(frame) = work.pop() {
+        match frame {
+            ReachingFrame::Enter { node, conditional } => {
+                let Some(kind) = cpg.node(node).map(|node| node.kind.clone()) else {
+                    continue;
+                };
 
-    match &kind {
-        // Nested and lexically preceding functions own independent local
-        // environments. Their bodies cannot define names in the function
-        // currently being analyzed.
-        CpgNodeKind::Function { .. } => {}
-
-        // `let` / local declaration: evaluate the initializer (whose uses see the
-        // pre-binding environment), then bind the declared name.
-        CpgNodeKind::Variable { name, .. } => {
-            let binder = binder_identifier(cpg, node, name);
-            for child in cpg.ast_children(node) {
-                if Some(child) == binder {
+                // A malformed graph can close an `AstChild` cycle. The active
+                // path is not a global visited set: a shared subtree is still
+                // interpreted once per legitimate occurrence, and the second
+                // loop pass can re-enter every node after its matching `Exit`.
+                if !on_path.insert(node) {
                     continue;
                 }
-                visit_reaching(cpg, child, env, conditional, pairs, on_path);
-            }
-            bind_definition(env, name.clone(), node, conditional);
-        }
+                work.push(ReachingFrame::Exit { node });
 
-        // Parameter: its identifier child is the binder (a definition), not a
-        // use; any remaining children (e.g. a default-value expression, in
-        // languages that have them) are visited as uses.
-        CpgNodeKind::Parameter { name, .. } => {
-            let binder = binder_identifier(cpg, node, name);
-            for child in cpg.ast_children(node) {
-                if Some(child) == binder {
-                    continue;
+                match kind {
+                    // Nested and lexically preceding functions own independent
+                    // local environments.
+                    CpgNodeKind::Function { .. } => {}
+
+                    // Initializer/default children run before the definition
+                    // becomes visible. Binder identifiers are not uses.
+                    CpgNodeKind::Variable { name, .. } | CpgNodeKind::Parameter { name, .. } => {
+                        let binder = binder_identifier(cpg, node, &name);
+                        work.push(ReachingFrame::Bind {
+                            name,
+                            definition: node,
+                            conditional,
+                        });
+                        for child in cpg.ast_children(node).into_iter().rev() {
+                            if Some(child) != binder {
+                                work.push(ReachingFrame::Enter {
+                                    node: child,
+                                    conditional,
+                                });
+                            }
+                        }
+                    }
+
+                    // The l-value rules distinguish pure writes, compound
+                    // read-then-writes, and complex access sites exactly as the
+                    // recursive equations did.
+                    CpgNodeKind::Assignment { operator } => {
+                        let compound = &*operator != "=";
+                        let children = cpg.ast_children(node);
+                        let target = children.first().copied();
+                        let target_is_ident = matches!(
+                            target
+                                .and_then(|target| cpg.node(target))
+                                .map(|node| &node.kind),
+                            Some(CpgNodeKind::Identifier { .. })
+                        );
+                        if target_is_ident {
+                            if let Some(name) =
+                                target.and_then(|target| identifier_name(cpg, target))
+                            {
+                                work.push(ReachingFrame::Bind {
+                                    name,
+                                    definition: node,
+                                    conditional,
+                                });
+                            }
+                        }
+                        for child in children.into_iter().rev() {
+                            if Some(child) != target || !target_is_ident || compound {
+                                work.push(ReachingFrame::Enter {
+                                    node: child,
+                                    conditional,
+                                });
+                            }
+                        }
+                    }
+
+                    // A use links every definition currently retained for its
+                    // bound name. Its `Exit` remains on the work stack.
+                    CpgNodeKind::Identifier { name, .. } => {
+                        if let Some(definitions) = env.get(&name) {
+                            pairs.extend(definitions.iter().map(|&definition| (definition, node)));
+                        }
+                    }
+
+                    // Reverse pushes preserve source order under LIFO. Loop
+                    // regions push two identical child sweeps, implementing the
+                    // bounded loop-carried-dependence approximation.
+                    _ => {
+                        let child_conditional = conditional || is_conditional_region(&kind);
+                        let passes = usize::from(is_loop_region(&kind)) + 1;
+                        let children = cpg.ast_children(node);
+                        for _ in 0..passes {
+                            for &child in children.iter().rev() {
+                                work.push(ReachingFrame::Enter {
+                                    node: child,
+                                    conditional: child_conditional,
+                                });
+                            }
+                        }
+                    }
                 }
-                visit_reaching(cpg, child, env, conditional, pairs, on_path);
             }
-            bind_definition(env, name.clone(), node, conditional);
-        }
-
-        // Assignment: the first child is the target l-value. For a plain `=` to a
-        // simple variable the target is a pure write (skipped as a use); for a
-        // compound assignment (`+=`, …) it is read-then-written; for a complex
-        // l-value (`a.f = …`, `a[i] = …`) the target is not a simple identifier,
-        // so it is visited normally (its base is a genuine use).
-        CpgNodeKind::Assignment { operator } => {
-            let compound = &**operator != "=";
-            let kids = cpg.ast_children(node);
-            let target = kids.first().copied();
-            let target_is_ident = matches!(
-                target.and_then(|t| cpg.node(t)).map(|n| &n.kind),
-                Some(CpgNodeKind::Identifier { .. })
-            );
-
-            for &child in &kids {
-                if Some(child) == target && target_is_ident && !compound {
-                    continue; // simple `x = …`: the target is written, not read
-                }
-                visit_reaching(cpg, child, env, conditional, pairs, on_path);
-            }
-
-            if target_is_ident {
-                if let Some(name) = target.and_then(|t| identifier_name(cpg, t)) {
-                    bind_definition(env, name, node, conditional);
-                }
-            }
-        }
-
-        // Identifier in use position: link every currently-reaching definition
-        // of its name. Binder identifiers never reach this arm — their parent
-        // construct skips them above.
-        CpgNodeKind::Identifier { name, .. } => {
-            if let Some(defs) = env.get(name) {
-                for &def in defs {
-                    pairs.push((def, node));
-                }
-            }
-        }
-
-        // Everything else (blocks, calls, arguments, control flow, …): recurse in
-        // source order. Branch/loop bodies switch to conditional (weak-update)
-        // context; loop bodies are swept twice for loop-carried dependences.
-        _ => {
-            let child_conditional = conditional || is_conditional_region(&kind);
-            let passes = if is_loop_region(&kind) { 2 } else { 1 };
-            for _ in 0..passes {
-                for child in cpg.ast_children(node) {
-                    visit_reaching(cpg, child, env, child_conditional, pairs, on_path);
-                }
+            ReachingFrame::Bind {
+                name,
+                definition,
+                conditional,
+            } => bind_definition(env, name, definition, conditional),
+            ReachingFrame::Exit { node } => {
+                on_path.remove(&node);
             }
         }
     }
-
-    on_path.remove(&node);
 }
 
 /// Collects definitions and uses from a function.
@@ -2730,9 +2760,9 @@ mod config_flags {
     }
 }
 
-/// REGRESSION (malformed input): `visit_reaching` descends `ast_children`
-/// recursively. A cyclic `AstChild` edge used to make that descent unbounded
-/// and overflow the stack; the path guard cuts the cycle. Found by the
+/// REGRESSION (malformed input): the former recursive `visit_reaching` could
+/// descend a cyclic `AstChild` edge without bound and overflow the stack. The
+/// pushdown machine's active-path set cuts the cycle. Found by the
 /// `tests/robustness.rs` corruption suite.
 #[cfg(test)]
 mod cyclic_ast_regression {
@@ -2807,6 +2837,109 @@ mod proptests {
         Visibility,
     };
     use proptest::prelude::*;
+
+    /// Bounded recursive specification retained only for differential tests.
+    /// [`arb_cpg_raw`] supplies at most eight nodes, so this oracle's native
+    /// recursion depth is fixed by the test generator rather than caller input.
+    fn recursive_visit_reaching_oracle(
+        cpg: &CodePropertyGraph,
+        node: NodeId,
+        env: &mut ReachingEnv,
+        conditional: bool,
+        pairs: &mut Vec<(NodeId, NodeId)>,
+        on_path: &mut FxHashSet<NodeId>,
+    ) {
+        let Some(kind) = cpg.node(node).map(|node| node.kind.clone()) else {
+            return;
+        };
+        if !on_path.insert(node) {
+            return;
+        }
+
+        match &kind {
+            CpgNodeKind::Function { .. } => {}
+            CpgNodeKind::Variable { name, .. } | CpgNodeKind::Parameter { name, .. } => {
+                let binder = binder_identifier(cpg, node, name);
+                for child in cpg.ast_children(node) {
+                    if Some(child) != binder {
+                        recursive_visit_reaching_oracle(
+                            cpg,
+                            child,
+                            env,
+                            conditional,
+                            pairs,
+                            on_path,
+                        );
+                    }
+                }
+                bind_definition(env, name.clone(), node, conditional);
+            }
+            CpgNodeKind::Assignment { operator } => {
+                let compound = &**operator != "=";
+                let children = cpg.ast_children(node);
+                let target = children.first().copied();
+                let target_is_ident = matches!(
+                    target
+                        .and_then(|target| cpg.node(target))
+                        .map(|node| &node.kind),
+                    Some(CpgNodeKind::Identifier { .. })
+                );
+                for &child in &children {
+                    if Some(child) != target || !target_is_ident || compound {
+                        recursive_visit_reaching_oracle(
+                            cpg,
+                            child,
+                            env,
+                            conditional,
+                            pairs,
+                            on_path,
+                        );
+                    }
+                }
+                if target_is_ident {
+                    if let Some(name) = target.and_then(|target| identifier_name(cpg, target)) {
+                        bind_definition(env, name, node, conditional);
+                    }
+                }
+            }
+            CpgNodeKind::Identifier { name, .. } => {
+                if let Some(definitions) = env.get(name) {
+                    pairs.extend(definitions.iter().map(|&definition| (definition, node)));
+                }
+            }
+            _ => {
+                let child_conditional = conditional || is_conditional_region(&kind);
+                let passes = usize::from(is_loop_region(&kind)) + 1;
+                for _ in 0..passes {
+                    for child in cpg.ast_children(node) {
+                        recursive_visit_reaching_oracle(
+                            cpg,
+                            child,
+                            env,
+                            child_conditional,
+                            pairs,
+                            on_path,
+                        );
+                    }
+                }
+            }
+        }
+
+        on_path.remove(&node);
+    }
+
+    fn seeded_reaching_environment(cpg: &CodePropertyGraph, seed: NodeId) -> ReachingEnv {
+        let mut env = ReachingEnv::default();
+        for node in cpg.nodes() {
+            if let CpgNodeKind::Identifier { name, .. } = &node.kind {
+                let definitions = env.entry(name.clone()).or_default();
+                if !definitions.contains(&seed) {
+                    definitions.push(seed);
+                }
+            }
+        }
+        env
+    }
 
     fn fixed_field_graph(
         type_name: &str,
@@ -3009,6 +3142,47 @@ mod proptests {
 
     proptest! {
         #![proptest_config(ProptestConfig::with_cases(256))]
+
+        /// The typed heap machine is the exact defunctionalization of the
+        /// previous recursive equations, including pair order, environment
+        /// updates, two-pass loops, nested-function cuts, and active-path cycle
+        /// behavior.
+        #[test]
+        fn prop_reaching_machine_matches_bounded_recursive_oracle(
+            cpg in arb_cpg_raw(),
+            conditional in any::<bool>(),
+        ) {
+            let root = cpg.node_ids().min().expect("raw CPG is non-empty");
+            let initial = seeded_reaching_environment(&cpg, root);
+            let mut actual_env = initial.clone();
+            let mut expected_env = initial;
+            let mut actual_pairs = Vec::new();
+            let mut expected_pairs = Vec::new();
+            let mut actual_path = FxHashSet::default();
+            let mut expected_path = FxHashSet::default();
+
+            visit_reaching(
+                &cpg,
+                root,
+                &mut actual_env,
+                conditional,
+                &mut actual_pairs,
+                &mut actual_path,
+            );
+            recursive_visit_reaching_oracle(
+                &cpg,
+                root,
+                &mut expected_env,
+                conditional,
+                &mut expected_pairs,
+                &mut expected_path,
+            );
+
+            prop_assert_eq!(actual_pairs, expected_pairs);
+            prop_assert_eq!(actual_env, expected_env);
+            prop_assert_eq!(&actual_path, &expected_path);
+            prop_assert!(actual_path.is_empty());
+        }
 
         /// Field/index extraction depends only on semantic shape, not petgraph
         /// node insertion order. Both receiver representations accepted from

@@ -129,7 +129,7 @@ fn data_flow(cpg: &CodePropertyGraph, use_site: NodeId, definition: NodeId) {
 }
 ```
 
-libcpg's [reaching definitions](../GLOSSARY.md#reaching-definition) are computed by a single AST-ordered sweep, **not** [SSA](../GLOSSARY.md#static-single-assignment-ssa) and not a CFG fixed point; the rationale and the loop-double-sweep detail are in [DFG construction](../components/builder/dfg.md) and [ADR-0003](../design/0003-ast-ordered-reaching-defs.md).
+libcpg's [reaching definitions](../GLOSSARY.md#reaching-definition) are computed by a single AST-ordered sweep, **not** [SSA](../GLOSSARY.md#static-single-assignment-ssa) and not a CFG fixed point. Typed heap frames retain the sweep's continuation, so AST depth does not consume native call-stack frames. The rationale, stack discipline, and loop-double-sweep detail are in [DFG construction](../components/builder/dfg.md) and [ADR-0003](../design/0003-ast-ordered-reaching-defs.md).
 
 ### Finding resolved field writes
 

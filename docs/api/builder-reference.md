@@ -351,7 +351,10 @@ generates a definition; in straight-line context it performs a
 [strong update](../GLOSSARY.md#strong-update--weak-update) (latest write wins),
 and inside a conditional region a weak update; loop bodies are swept twice for
 loop-carried dependence. Each currently-reaching definition is linked to a use
-with a `DataFlow(DefUse)` edge, and the pass is idempotent. It also emits
+with a `DataFlow(DefUse)` edge. Typed heap `Enter`/`Bind`/`Exit` frames preserve
+that order while keeping AST depth off the native call stack; an active-path set
+cuts malformed cycles without suppressing legitimate shared-subtree visits. The
+pass is idempotent. It also emits
 `Parameter`, `ReturnValue`, and field/index access edges per config. (Two earlier
 CFG-fixpoint-based approaches are retained but compiled out under `#[cfg(any())]`;
 this is **not** [SSA](../GLOSSARY.md#static-single-assignment-ssa).)

@@ -251,45 +251,57 @@ infer arbitrary receiver types. The exact predicate and alternatives are in
 *Figure — the DFG storage-access relation and its conservative declaration
 reference. Source: [`diagrams/member-field-flow.puml`](../diagrams/member-field-flow.puml).*
 
-![The AST-ordered reaching-definitions sweep: strong updates, weak updates, and the loop double pass](../diagrams/reaching-defs-sweep.svg)
+![The AST-ordered reaching-definitions machine: heap Enter, Bind, and Exit frames; strong and weak updates; loop double pass; and active-path restoration](../diagrams/reaching-defs-sweep.svg)
 
-*Figure — the AST-ordered reaching-definitions sweep, showing strong updates in straight-line context, weak updates inside conditional regions, and the two-pass loop-body handling. Source: [`diagrams/reaching-defs-sweep.puml`](../diagrams/reaching-defs-sweep.puml).*
+*Figure — the AST-ordered reaching-definitions pushdown machine, showing heap continuation scheduling, active-path restoration, strong updates in straight-line context, weak updates inside conditional regions, and two-pass loop handling. Source: [`diagrams/reaching-defs-sweep.puml`](../diagrams/reaching-defs-sweep.puml).*
 
 ## 4. Literate procedure
 
-The core walk (`visit_reaching`) descends the AST, mutating $`\rho`$ in place
-and collecting `(definition, use)` pairs:
+The core walk (`visit_reaching`) is a pushdown machine that mutates $`\rho`$ in place and
+collects `(definition, use)` pairs. `Enter` interprets a node, `Bind` is the continuation
+after a definition's children, and `Exit` restores the active path. All three frame kinds
+live on a heap `Vec`, so AST depth does not consume native call-stack frames:
 
 ```text
-visit(node, ρ, conditional, pairs):
-  match kind(node):
+visit(root, ρ, conditional, pairs):
+  work ← [Enter(root, conditional)]
+  while work is not empty:
+    match work.pop():
+      Exit(node):
+        active_path.remove(node)
 
-    Variable{name} | Parameter{name}:
-        binder ← the Identifier child equal to `name`     # a def site, not a use
-        for child in ast_children(node) except binder:
-            visit(child, ρ, conditional, pairs)           # RHS uses see old ρ
-        bind(ρ, name, node, conditional)                  # strong if !conditional
+      Bind(name, definition, c):
+        bind(ρ, name, definition, c)
 
-    Assignment{op}:
-        target ← first child
-        for child in children:
-            skip if child = target and target is Identifier and op = "="
-            visit(child, ρ, conditional, pairs)
-        if target is Identifier: bind(ρ, name(target), node, conditional)
-
-    Identifier{name}:                                     # a use
-        for d in ρ.get(name):  pairs.push((d, node))
-
-    _ (blocks, calls, control flow, …):
-        c ← conditional or is_conditional_region(kind)
-        passes ← 2 if is_loop_region(kind) else 1         # loop double sweep
-        repeat passes times:
-            for child in ast_children(node): visit(child, ρ, c, pairs)
+      Enter(node, c):
+        if node is absent or not active_path.insert(node): continue
+        work.push(Exit(node))
+        match kind(node):
+          Function: continue                              # lexical boundary
+          Variable{name} | Parameter{name}:
+            work.push(Bind(name, node, c))                 # after children
+            push Enter(non-binder children) in reverse source order
+          Assignment{op}:
+            target ← first child
+            if target is Identifier: work.push(Bind(name(target), node, c))
+            push Enter(children) in reverse source order,
+              skipping a simple `=` identifier target
+          Identifier{name}:
+            for d in ρ[name]: pairs.push((d, node))
+          otherwise:
+            child_c ← c or is_conditional_region(kind(node))
+            passes ← 2 if is_loop_region(kind(node)) else 1
+            repeat passes times:
+              push Enter(children, child_c) in reverse source order
 
 bind(ρ, name, def, conditional):
     if conditional: ρ[name] ← ρ[name] ∪ {def}             # weak update
     else:           ρ[name] ← {def}                       # strong update (kill+gen)
 ```
+
+Last-in/first-out reversal recovers source order. An entered node always schedules one
+matching `Exit`; a cycle-rejected node schedules none. The active path therefore cuts only
+malformed ancestor cycles, while shared subtrees and the second loop sweep remain eligible.
 
 ## 5. Real snippet
 

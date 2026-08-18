@@ -66,7 +66,7 @@ into nested expression uses. It is **not** SSA and **not** a CFG fixed point.
 
 ```rust
 // A per-variable set of currently-reaching definition NODES, keyed by name.
-// The on-stack SmallVec keeps the common single-definition case allocation-free.
+// SmallVec keeps the common single-definition value inline in its map bucket.
 type ReachingEnv = FxHashMap<Arc<str>, SmallVec<[NodeId; 2]>>;
 ```
 
@@ -76,9 +76,10 @@ current position*.
 
 ### The sweep
 
-The walk `visit_reaching(node, env, conditional, pairs)` recurses over AST
-children in order, updating `env` in place and pushing `(def, use)` pairs.
-Expressed as literate pseudocode:
+The walk `visit_reaching(node, env, conditional, pairs)` is a typed pushdown
+machine. Heap frames retain the enter action, the after-children bind
+continuation, and the active-path exit action while updating `env` in place and
+pushing `(def, use)` pairs. Expressed as literate pseudocode:
 
 ```text
 seed(function, env):
@@ -87,46 +88,46 @@ seed(function, env):
       for each source-ordered sibling before child:
           visit(sibling, env, false, ignored_pairs)
 
-visit(node, env, conditional, pairs):
-  1. kind ← kind(node); if the node is gone, return.
-  2. dispatch on kind:
+visit(root, env, conditional, pairs):
+  work ← [Enter(root, conditional)]
+  while work is not empty:
+    dispatch work.pop():
+      Exit(node):
+        active_path.remove(node)
 
-     Function:
-        return                                          # separate lexical environment
+      Bind(name, definition, c):
+        bind(env, name, definition, c)
 
-     Variable{name}  (a `let` / local declaration):
-        for each child EXCEPT the binder identifier:
-            visit(child, env, conditional, pairs)      # initializer sees the PRE-binding env
-        bind(env, name, node, conditional)             # then the name is (re)bound
-
-     Parameter{name}:
-        like Variable — the identifier child is the binder (a def, not a use);
-        visit any remaining children (e.g. a default value), then bind(name).
-
-     Assignment{operator}:
-        compound ← operator != "="                     # `+=` reads before it writes
-        target  ← first child (the l-value)
-        for each child:
-            if child is the simple-identifier target AND not compound:
-                skip it                                # plain `x = …`: target is written, not read
-            else visit(child, env, conditional, pairs)
-        if target is a simple identifier: bind(env, targetName, node, conditional)
-
-     Identifier{name}  (a USE):
-        for each def in env[name]: emit pair (def, node)
-
-     otherwise (blocks, calls, arguments, control flow, …):
-        child_conditional ← conditional OR is_conditional_region(kind)
-        passes ← 2 if is_loop_region(kind) else 1      # loop bodies swept twice
-        repeat `passes` times:
-            for each child: visit(child, env, child_conditional, pairs)
+      Enter(node, c):
+        kind ← kind(node); if absent, continue
+        if not active_path.insert(node): continue       # malformed cycle
+        work.push(Exit(node))
+        dispatch kind:
+          Function:
+            continue                                   # separate lexical environment
+          Variable{name} | Parameter{name}:
+            work.push(Bind(name, node, c))              # runs after children
+            push Enter(non-binder children) in reverse source order
+          Assignment{operator}:
+            target ← first child
+            if target is Identifier:
+              work.push(Bind(targetName, node, c))
+            push Enter(children) in reverse source order,
+              except a simple `=` identifier target
+          Identifier{name}:
+            for each def in env[name]: emit pair (def, node)
+          otherwise:
+            child_c ← c OR is_conditional_region(kind)
+            passes ← 2 if is_loop_region(kind) else 1
+            repeat passes times:
+              push Enter(children, child_c) in reverse source order
 
 bind(env, name, def, conditional):
     if conditional:  add def to env[name]              # WEAK update: no kill
     else:            replace env[name] with just {def} # STRONG update: kill + gen
 ```
 
-Four design points make this correct where the CFG approach failed:
+Six design points make this correct where the CFG approach failed:
 
 - **Uses are reached because the environment is threaded, not looked up.** When
   the walk reaches the `buf` `Identifier` inside `decode(buf)`, `env["buf"]`
@@ -151,6 +152,12 @@ Four design points make this correct where the CFG approach failed:
   that precede each path child. This seeds outer definitions such as Rholang
   `new` bindings. Encountering any other `Function` is a hard boundary, so a
   preceding sibling function cannot leak its local definitions into the seed.
+- **Stack-safe exact continuation order.** Reverse child pushes make the
+  last-in/first-out work stack execute source order. Every entered node schedules
+  exactly one `Exit`; a cycle-rejected node schedules none. The active-path set
+  therefore cuts only malformed ancestor cycles, while a shared subtree and the
+  second loop pass can re-enter after the prior `Exit`. AST depth consumes heap
+  frames rather than native call-stack frames.
 
 ### Emission and idempotency
 
@@ -217,9 +224,11 @@ let cpg = TreeSitterCpgBuilder::new().build(
 - **Simple, language-agnostic, and cheap.** The sweep dispatches on
   [`CpgNodeKind`](../GLOSSARY.md#node-kind--edge-kind), never on grammar
   specifics, so it works for every frontend including the Mode-B F1R3FLY
-  languages ([ADR-0002](0002-mode-b-build-from-tree.md)). It runs in time linear
-  in the number of AST nodes, $`O(n)`$, up to a small constant from the
-  two-pass loop bodies — no global fixed-point iteration.
+  languages ([ADR-0002](0002-mode-b-build-from-tree.md)). For $`n`$ AST nodes
+  nested inside at most $`d`$ loop regions, structural work is bounded by
+  $`O(n\,2^d)`$; ordinary non-loop nodes are visited once and there is no global
+  fixed-point iteration. Traversal state is heap-resident and native depth is
+  constant.
 - **Idempotent.** Re-running `extract` adds nothing, so construction stages
   compose safely (see [idempotent](../GLOSSARY.md#idempotent)).
 
@@ -272,9 +281,9 @@ let cpg = TreeSitterCpgBuilder::new().build(
    with explanatory doc-comments preserves that reasoning at near-zero runtime
    cost.
 
-![The AST-ordered reaching-definitions sweep threading an environment down into nested expression uses](../diagrams/reaching-defs-sweep.svg)
+![The stack-safe AST-ordered reaching-definitions machine threading an environment down into nested expression uses with Enter, Bind, and Exit heap frames](../diagrams/reaching-defs-sweep.svg)
 
-*Figure — the sweep in execution order: `let`/assignment nodes update `ReachingEnv` (strong update in straight-line code, weak update in branch/loop bodies) and each identifier use links to every currently-reaching definition. Source: [`diagrams/reaching-defs-sweep.puml`](../diagrams/reaching-defs-sweep.puml).*
+*Figure — the heap-frame sweep in execution order: `let`/assignment nodes update `ReachingEnv` after their children (strong in straight-line code, weak in branch/loop bodies), each identifier use links to every currently-reaching definition, and `Exit` restores the active path exactly. Source: [`diagrams/reaching-defs-sweep.puml`](../diagrams/reaching-defs-sweep.puml).*
 
 ## Related decisions and further reading
 
