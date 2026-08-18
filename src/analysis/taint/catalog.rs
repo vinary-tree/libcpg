@@ -22,6 +22,11 @@ pub enum Pattern {
     Suffix(Arc<str>),
     /// The pattern may occur anywhere in the callee path.
     Substring(Arc<str>),
+    /// Every listed fragment must occur somewhere in the callee path.
+    ///
+    /// This flat conjunction represents compound library/method evidence
+    /// without introducing recursively nested pattern values.
+    AllSubstrings(Vec<Arc<str>>),
     /// One identifier segment must equal the pattern.
     Segment(Arc<str>),
 }
@@ -33,6 +38,12 @@ impl Pattern {
             Self::Exact(pattern) => callee_path == pattern.as_ref(),
             Self::Suffix(pattern) => callee_path.ends_with(pattern.as_ref()),
             Self::Substring(pattern) => callee_path.contains(pattern.as_ref()),
+            Self::AllSubstrings(patterns) => {
+                !patterns.is_empty()
+                    && patterns
+                        .iter()
+                        .all(|pattern| callee_path.contains(pattern.as_ref()))
+            }
             Self::Segment(pattern) => callee_path
                 .split(|character: char| !character.is_alphanumeric() && character != '_')
                 .any(|segment| segment == pattern.as_ref()),
@@ -46,6 +57,7 @@ impl Pattern {
             Self::Segment(_) => 0.95,
             Self::Suffix(_) => 0.9,
             Self::Substring(_) => 0.8,
+            Self::AllSubstrings(_) => 0.85,
         }
     }
 
@@ -55,6 +67,7 @@ impl Pattern {
             Self::Segment(_) => 3,
             Self::Suffix(_) => 2,
             Self::Substring(_) => 1,
+            Self::AllSubstrings(_) => 2,
         }
     }
 }
@@ -270,6 +283,7 @@ impl TaintCatalog {
             "parseInt",
             "parseFloat",
             "to_int",
+            "parse::<",
             ".bind",
         ] {
             catalog
@@ -294,6 +308,13 @@ impl TaintCatalog {
             ),
             (
                 Pattern::Substring("diesel::sql_query".into()),
+                ExternalModel::Sink {
+                    class: "sql".into(),
+                    cwe: Some(89),
+                },
+            ),
+            (
+                Pattern::AllSubstrings(vec!["rusqlite".into(), "execute".into()]),
                 ExternalModel::Sink {
                     class: "sql".into(),
                     cwe: Some(89),

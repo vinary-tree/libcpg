@@ -8,12 +8,22 @@ fn pattern_variants_have_distinct_documented_semantics() {
     assert!(!Pattern::Exact("eval".into()).matches("js::eval"));
     assert!(Pattern::Suffix("::eval".into()).matches("js::eval"));
     assert!(Pattern::Substring("process".into()).matches("std::process::Command"));
+    assert!(
+        Pattern::AllSubstrings(vec!["rusqlite".into(), "execute".into()])
+            .matches("rusqlite::Connection::execute")
+    );
+    assert!(
+        !Pattern::AllSubstrings(vec!["rusqlite".into(), "execute".into()])
+            .matches("rusqlite::Connection::prepare")
+    );
+    assert!(!Pattern::AllSubstrings(Vec::new()).matches("anything"));
     assert!(Pattern::Segment("eval".into()).matches("js::eval::run"));
     assert!(!Pattern::Segment("eval".into()).matches("evaluate"));
     assert_eq!(Pattern::Exact("x".into()).confidence(), 1.0);
     assert_eq!(Pattern::Segment("x".into()).confidence(), 0.95);
     assert_eq!(Pattern::Suffix("x".into()).confidence(), 0.9);
     assert_eq!(Pattern::Substring("x".into()).confidence(), 0.8);
+    assert_eq!(Pattern::AllSubstrings(vec!["x".into()]).confidence(), 0.85);
 }
 
 #[test]
@@ -37,6 +47,15 @@ fn generic_catalog_preserves_open_source_sink_and_cwe_classes() {
         .iter()
         .any(|matched| matched.class.as_ref() == "deserialize" && matched.cwe == Some(502)));
     assert!(catalog.classify("safe::sum").sources.is_empty());
+    assert!(!catalog.classify("input.parse::<i64>").sanitizers.is_empty());
+    assert!(matches!(
+        catalog.external_model("rusqlite::Connection::execute"),
+        ExternalModel::Sink { cwe: Some(89), .. }
+    ));
+    assert_eq!(
+        catalog.external_model("rusqlite::Connection::prepare"),
+        ExternalModel::Passthrough
+    );
 }
 
 #[test]
@@ -104,5 +123,18 @@ proptest! {
     ) {
         let path = format!("{left}::{segment}.{right}");
         prop_assert!(Pattern::Segment(segment.into()).matches(&path));
+    }
+
+    #[test]
+    fn flat_conjunction_agrees_with_a_direct_substring_oracle(
+        path in ".{0,96}",
+        fragments in prop::collection::vec(".{0,12}", 0..8),
+    ) {
+        let expected = !fragments.is_empty()
+            && fragments.iter().all(|fragment| path.contains(fragment));
+        let pattern = Pattern::AllSubstrings(
+            fragments.into_iter().map(Arc::<str>::from).collect()
+        );
+        prop_assert_eq!(pattern.matches(&path), expected);
     }
 }
