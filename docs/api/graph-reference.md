@@ -286,7 +286,10 @@ as `Pure < ReadsGlobal < WritesGlobal < Impure`. `EffectSummary` also exposes a
 64-bit `param_to_return` mask, `const_return`, an explicit flat-lattice
 `const_return_overdefined` bit, and truncation/cap flags. Only
 `EffectAnalysis::is_complete()` licenses a negative claim; positive evidence
-in a capped result remains useful. See the
+in a capped result remains useful. Return dependence and scalar folding use
+typed heap continuation machines: accepted AST/def-use depth does not grow the
+native call stack, while `IfdsCaps::{max_call_depth,max_worklist_steps}` still
+bound logical evidence and work. See the
 [effect-summary component guide](../components/graph/effect-summaries.md) and
 [usage guide](../usage/09-effect-summaries.md).
 

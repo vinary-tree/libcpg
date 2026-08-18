@@ -1,0 +1,70 @@
+@startuml
+!include _libcpg-theme.iuml
+title Stack-safe local effect evaluation: two typed continuation machines
+
+skinparam backgroundColor #FCFCFC
+skinparam component {
+  BorderColor #495057
+}
+skinparam note {
+  BackgroundColor #F1F3F5
+  BorderColor #495057
+}
+
+component "represented return expression\nAST · DFG · resolved call" as ROOT #DBE4FF
+component "parameter-dependence machine\nEnter · Visit · Combine · Exit" as DEP #FFF3BF
+component "constant-evaluation machine\nEnter · Join · Binary · Unary · Forward · Exit" as CONST #C5F6FA
+component "typed frame stack\n+ intermediate value stack" as FRAMES #E5DBFF
+component "active-path set\ncycle semantics" as PATH #FFE8CC
+component "terminal-only cache\nentry work still charged" as CACHE #D3F9D8
+component "TraversalBudget\nlogical depth · node-entry work" as BUDGET #C3FAE8
+component "parameter mask\nordered child OR" as MASK #FFD8A8
+component "constant lattice\nbottom · exact · overdefined" as LATTICE #FCC2D7
+component "fail-closed output\ncapped · all bits · overdefined" as WIDEN #FFE3E3
+
+ROOT --> DEP : parameter-return evidence
+ROOT --> CONST : scalar-return evidence
+DEP --> FRAMES : push/pop typed continuations
+CONST --> FRAMES : push/pop typed continuations
+DEP --> PATH : enter / exit node
+CONST --> PATH : enter / exit node
+DEP --> CACHE : terminal mask only
+CONST --> CACHE : terminal lattice value only
+DEP --> BUDGET : charge Enter(depth)
+CONST --> BUDGET : charge Enter(depth)
+DEP --> MASK : deterministic AST/DFG/call order
+CONST --> LATTICE : checked SCCP folds and joins
+PATH --> WIDEN : dependency cycle
+BUDGET --> WIDEN : logical cap exhausted
+FRAMES --> WIDEN : allocation failure
+
+note bottom of FRAMES
+  Every suspended child evaluation is data on the heap.
+  Native call depth is constant as represented depth grows.
+end note
+
+note bottom of PATH
+  Dependency cycle -> all bits + capped.
+  Constant cycle -> overdefined, no fabricated cap.
+end note
+
+note bottom of BUDGET
+  max_call_depth is semantic path policy.
+  max_worklist_steps is charged node entries.
+  Neither configures thread-stack size.
+end note
+
+legend bottom
+|= Colour |= Meaning |
+|<#DBE4FF>| typed CPG input |
+|<#FFF3BF>| dependence continuation machine |
+|<#C5F6FA>| constant continuation machine |
+|<#E5DBFF>| explicit heap continuation/value state |
+|<#FFE8CC>| active-path cycle state |
+|<#D3F9D8>| context-independent terminal cache |
+|<#C3FAE8>| logical resource accounting |
+|<#FFD8A8>| parameter-return result |
+|<#FCC2D7>| constant-lattice result |
+|<#FFE3E3>| visible conservative failure |
+endlegend
+@enduml

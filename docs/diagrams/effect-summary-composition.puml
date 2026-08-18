@@ -33,8 +33,8 @@ DEP --> JOIN : <latex>M_f = M_f \lor \sigma_s(M_g)</latex>
 CONST --> JOIN : <latex>C_f = \bigsqcup_r \operatorname{eval}(r)</latex>
 JOIN --> SOLVER : monotone summary update
 SOLVER --> OUTPUT : fixed point and scheduler evidence
-DEP --> WIDEN : work/depth/cycle bound
-CONST --> WIDEN : work/depth/cycle bound
+DEP --> WIDEN : work/depth/allocation or dependency cycle
+CONST --> WIDEN : work/depth/allocation bound
 WIDEN --> OUTPUT : capped function evidence
 
 note bottom of SUBSTITUTE
@@ -45,6 +45,11 @@ end note
 note bottom of OUTPUT
   The source CPG is read-only.
   Negative claims require is_complete().
+end note
+
+note bottom of DEP
+  Typed heap continuation frames hold source-depth state.
+  Native call depth is constant in both return evaluators.
 end note
 
 legend bottom

@@ -465,6 +465,577 @@ fn analysis_round_trips_with_ordered_effect_evidence() {
     assert_eq!(decoded, analysis);
 }
 
+#[allow(clippy::too_many_arguments)]
+fn recursive_parameter_dependencies(
+    cpg: &CodePropertyGraph,
+    node: NodeId,
+    local: &LocalEffects,
+    ctx: &SummaryCtx<'_, EffectDomain>,
+    depth: u32,
+    seen: &mut BTreeSet<NodeId>,
+    budget: &mut TraversalBudget,
+) -> u64 {
+    if !budget.enter(depth, ctx.caps) {
+        return 0;
+    }
+    if !seen.insert(node) {
+        budget.capped = true;
+        return u64::MAX;
+    }
+    let mut mask = parameter_mask_for_node(cpg, node, local);
+    if matches!(
+        cpg.node(node).map(|node| &node.kind),
+        Some(CpgNodeKind::Call { .. })
+    ) {
+        let arguments = call_arguments(cpg, node);
+        match (ctx.resolve)(node) {
+            CalleeRef::Resolved(callee) => {
+                if let Some(callee_summary) = ctx.summaries.get(&callee) {
+                    for (index, argument) in arguments.into_iter().enumerate() {
+                        if callee_summary.param_mask_truncated {
+                            budget.capped = true;
+                        }
+                        let represented =
+                            index < 64 && callee_summary.param_to_return & (1u64 << index) != 0;
+                        if represented || callee_summary.param_mask_truncated {
+                            mask |= recursive_parameter_dependencies(
+                                cpg,
+                                argument,
+                                local,
+                                ctx,
+                                depth.saturating_add(1),
+                                seen,
+                                budget,
+                            );
+                        }
+                    }
+                }
+            }
+            CalleeRef::External(_) | CalleeRef::Unresolved(_) => {
+                for argument in arguments {
+                    mask |= recursive_parameter_dependencies(
+                        cpg,
+                        argument,
+                        local,
+                        ctx,
+                        depth.saturating_add(1),
+                        seen,
+                        budget,
+                    );
+                }
+            }
+        }
+    } else {
+        for child in cpg.ast_children(node) {
+            mask |= recursive_parameter_dependencies(
+                cpg,
+                child,
+                local,
+                ctx,
+                depth.saturating_add(1),
+                seen,
+                budget,
+            );
+        }
+        for definition in cpg.reaching_definitions(node) {
+            mask |= recursive_parameter_dependencies(
+                cpg,
+                definition,
+                local,
+                ctx,
+                depth.saturating_add(1),
+                seen,
+                budget,
+            );
+        }
+    }
+    seen.remove(&node);
+    mask
+}
+
+#[allow(clippy::too_many_arguments)]
+fn recursive_evaluate_constant(
+    cpg: &CodePropertyGraph,
+    node: NodeId,
+    ctx: &SummaryCtx<'_, EffectDomain>,
+    depth: u32,
+    on_path: &mut BTreeSet<NodeId>,
+    budget: &mut TraversalBudget,
+) -> ConstLattice {
+    if !budget.enter(depth, ctx.caps) {
+        return ConstLattice::Overdefined;
+    }
+    if !on_path.insert(node) {
+        return ConstLattice::Overdefined;
+    }
+    let value =
+        match cpg.node(node).map(|node| &node.kind) {
+            Some(CpgNodeKind::Literal { kind }) => literal_value(kind),
+            Some(CpgNodeKind::Call { .. }) => match (ctx.resolve)(node) {
+                CalleeRef::Resolved(callee) => ctx
+                    .summaries
+                    .get(&callee)
+                    .map_or(ConstLattice::Overdefined, const_lattice),
+                CalleeRef::External(_) | CalleeRef::Unresolved(_) => ConstLattice::Overdefined,
+            },
+            Some(CpgNodeKind::Identifier { .. }) => {
+                let mut definitions = cpg.reaching_definitions(node);
+                if let Some(CpgNodeKind::Identifier {
+                    definition: Some(definition),
+                    ..
+                }) = cpg.node(node).map(|node| &node.kind)
+                {
+                    definitions.push(*definition);
+                }
+                definitions.sort_unstable();
+                definitions.dedup();
+                if definitions.is_empty() {
+                    ConstLattice::Overdefined
+                } else {
+                    let mut result = ConstLattice::Unknown;
+                    for definition in definitions {
+                        let value = recursive_evaluate_constant(
+                            cpg,
+                            definition,
+                            ctx,
+                            depth.saturating_add(1),
+                            on_path,
+                            budget,
+                        );
+                        DataflowLattice::join(&mut result, &value);
+                    }
+                    result
+                }
+            }
+            Some(CpgNodeKind::BinaryOp { operator }) => {
+                let children = cpg.ast_children(node);
+                match children.as_slice() {
+                    [left, right, ..] => {
+                        let left = recursive_evaluate_constant(
+                            cpg,
+                            *left,
+                            ctx,
+                            depth.saturating_add(1),
+                            on_path,
+                            budget,
+                        );
+                        let right = recursive_evaluate_constant(
+                            cpg,
+                            *right,
+                            ctx,
+                            depth.saturating_add(1),
+                            on_path,
+                            budget,
+                        );
+                        fold_binary(operator, &left, &right)
+                    }
+                    _ => ConstLattice::Overdefined,
+                }
+            }
+            Some(CpgNodeKind::UnaryOp { operator }) => cpg
+                .ast_children(node)
+                .first()
+                .copied()
+                .map_or(ConstLattice::Overdefined, |operand| {
+                    let operand = recursive_evaluate_constant(
+                        cpg,
+                        operand,
+                        ctx,
+                        depth.saturating_add(1),
+                        on_path,
+                        budget,
+                    );
+                    fold_unary(operator, &operand)
+                }),
+            Some(CpgNodeKind::Assignment { .. }) => {
+                cpg.ast_children(node)
+                    .get(1)
+                    .copied()
+                    .map_or(ConstLattice::Overdefined, |rhs| {
+                        recursive_evaluate_constant(
+                            cpg,
+                            rhs,
+                            ctx,
+                            depth.saturating_add(1),
+                            on_path,
+                            budget,
+                        )
+                    })
+            }
+            Some(CpgNodeKind::Variable { name, .. }) => cpg
+                .ast_children(node)
+                .into_iter()
+                .rev()
+                .find(|&child| {
+                    !matches!(
+                        cpg.node(child).map(|node| &node.kind),
+                        Some(CpgNodeKind::Identifier { name: child_name, .. }) if child_name == name
+                    )
+                })
+                .map_or(ConstLattice::Overdefined, |initializer| {
+                    recursive_evaluate_constant(
+                        cpg,
+                        initializer,
+                        ctx,
+                        depth.saturating_add(1),
+                        on_path,
+                        budget,
+                    )
+                }),
+            Some(CpgNodeKind::Return) => cpg.ast_children(node).first().copied().map_or(
+                ConstLattice::Overdefined,
+                |returned| {
+                    recursive_evaluate_constant(
+                        cpg,
+                        returned,
+                        ctx,
+                        depth.saturating_add(1),
+                        on_path,
+                        budget,
+                    )
+                },
+            ),
+            Some(CpgNodeKind::Parameter { .. }) | None | Some(_) => ConstLattice::Overdefined,
+        };
+    on_path.remove(&node);
+    value
+}
+
+fn shallow_machine_fixture(
+    steps: &[u8],
+    parameter_leaf: bool,
+) -> (CodePropertyGraph, NodeId, NodeId) {
+    let mut cpg = CodePropertyGraph::new(Language::Rust);
+    let function = add(&mut cpg, 10, function_kind("generated"));
+    let param = child(&mut cpg, function, 11, parameter("p"));
+    let mut next = 20u32;
+    let mut root = if parameter_leaf {
+        let leaf = add(&mut cpg, next, identifier("p", Some(param)));
+        next += 1;
+        leaf
+    } else {
+        let leaf = add(&mut cpg, next, literal(1));
+        next += 1;
+        leaf
+    };
+    for &step in steps {
+        if step % 3 == 0 {
+            let parent = add(
+                &mut cpg,
+                next,
+                CpgNodeKind::UnaryOp {
+                    operator: "-".into(),
+                },
+            );
+            next += 1;
+            connect_ast(&mut cpg, parent, root);
+            root = parent;
+        } else {
+            let parent = add(
+                &mut cpg,
+                next,
+                CpgNodeKind::BinaryOp {
+                    operator: "+".into(),
+                },
+            );
+            next += 1;
+            let right = add(&mut cpg, next, literal(i64::from(step % 7)));
+            next += 1;
+            connect_ast(&mut cpg, parent, root);
+            connect_ast(&mut cpg, parent, right);
+            root = parent;
+        }
+    }
+    returned(&mut cpg, function, next, root);
+    (cpg, function, root)
+}
+
+fn reaching_join_fixture(values: &[i64], reverse_edges: bool) -> (CodePropertyGraph, NodeId) {
+    let mut cpg = CodePropertyGraph::new(Language::Rust);
+    let function = add(&mut cpg, 10, function_kind("join"));
+    let root = add(&mut cpg, 11, identifier("joined", None));
+    returned(&mut cpg, function, 12, root);
+    let definitions: Vec<_> = values
+        .iter()
+        .enumerate()
+        .map(|(index, &value)| add(&mut cpg, 100 + index as u32, literal(value)))
+        .collect();
+    let order: Box<dyn Iterator<Item = &NodeId>> = if reverse_edges {
+        Box::new(definitions.iter().rev())
+    } else {
+        Box::new(definitions.iter())
+    };
+    for &definition in order {
+        cpg.connect(
+            definition,
+            root,
+            CpgEdgeKind::DataFlow(DfgEdgeKind::ReachingDef),
+        )
+        .expect("reaching-definition endpoints exist");
+    }
+    (cpg, function)
+}
+
+#[test]
+fn terminal_cache_and_uncached_machines_have_identical_semantics_and_accounting() {
+    let mut cpg = CodePropertyGraph::new(Language::Rust);
+    let function = add(&mut cpg, 10, function_kind("shared"));
+    let root = add(
+        &mut cpg,
+        11,
+        CpgNodeKind::BinaryOp {
+            operator: "+".into(),
+        },
+    );
+    let shared = add(&mut cpg, 12, literal(1));
+    connect_ast(&mut cpg, root, shared);
+    connect_ast(&mut cpg, root, shared);
+    returned(&mut cpg, function, 13, root);
+
+    let local = local_effects(&cpg, function);
+    let summaries = BTreeMap::new();
+    let resolve = |_| CalleeRef::Unresolved("fixture".into());
+    let caps = IfdsCaps::default();
+    let ctx = SummaryCtx {
+        summaries: &summaries,
+        resolve: &resolve,
+        caps: &caps,
+    };
+    let mut cached_budget = TraversalBudget::default();
+    let mut cached_stats = EvaluationMachineStats::default();
+    let cached = evaluate_constant_machine(
+        &cpg,
+        root,
+        &ctx,
+        &mut cached_budget,
+        true,
+        &mut cached_stats,
+    );
+    let mut plain_budget = TraversalBudget::default();
+    let mut plain_stats = EvaluationMachineStats::default();
+    let plain =
+        evaluate_constant_machine(&cpg, root, &ctx, &mut plain_budget, false, &mut plain_stats);
+    assert_eq!(cached, ConstLattice::Constant(ConstValue::Int(2)));
+    assert_eq!(cached, plain);
+    assert_eq!(cached_budget.steps, plain_budget.steps);
+    assert_eq!(cached_budget.capped, plain_budget.capped);
+    assert_eq!(cached_stats.cache_hits, 1);
+    assert_eq!(plain_stats.cache_hits, 0);
+
+    let mut cached_budget = TraversalBudget::default();
+    let mut cached_stats = EvaluationMachineStats::default();
+    let cached = parameter_dependencies_machine(
+        &cpg,
+        root,
+        &local,
+        &ctx,
+        &mut cached_budget,
+        true,
+        &mut cached_stats,
+    );
+    let mut plain_budget = TraversalBudget::default();
+    let mut plain_stats = EvaluationMachineStats::default();
+    let plain = parameter_dependencies_machine(
+        &cpg,
+        root,
+        &local,
+        &ctx,
+        &mut plain_budget,
+        false,
+        &mut plain_stats,
+    );
+    assert_eq!(cached, 0);
+    assert_eq!(cached, plain);
+    assert_eq!(cached_budget.steps, plain_budget.steps);
+    assert_eq!(cached_budget.capped, plain_budget.capped);
+    assert_eq!(cached_stats.cache_hits, 1);
+    assert_eq!(plain_stats.cache_hits, 0);
+}
+
+#[test]
+fn cycles_missing_nodes_and_exact_caps_are_conservative_and_monotone() {
+    let mut cpg = CodePropertyGraph::new(Language::Rust);
+    let function = add(&mut cpg, 10, function_kind("cycle"));
+    let cyclic = add(
+        &mut cpg,
+        11,
+        CpgNodeKind::UnaryOp {
+            operator: "-".into(),
+        },
+    );
+    connect_ast(&mut cpg, cyclic, cyclic);
+    returned(&mut cpg, function, 12, cyclic);
+    let local = local_effects(&cpg, function);
+    let summaries = BTreeMap::new();
+    let resolve = |_| CalleeRef::Unresolved("fixture".into());
+    let generous = IfdsCaps::default();
+    let ctx = SummaryCtx {
+        summaries: &summaries,
+        resolve: &resolve,
+        caps: &generous,
+    };
+    let mut dependency_budget = TraversalBudget::default();
+    assert_eq!(
+        parameter_dependencies(&cpg, cyclic, &local, &ctx, &mut dependency_budget),
+        u64::MAX
+    );
+    assert!(dependency_budget.capped);
+    let mut constant_budget = TraversalBudget::default();
+    assert_eq!(
+        evaluate_constant(&cpg, cyclic, &ctx, &mut constant_budget),
+        ConstLattice::Overdefined
+    );
+    assert!(!constant_budget.capped);
+
+    let missing = NodeId::new(u32::MAX);
+    let mut missing_budget = TraversalBudget::default();
+    assert_eq!(
+        parameter_dependencies(&cpg, missing, &local, &ctx, &mut missing_budget),
+        0
+    );
+    assert!(!missing_budget.capped);
+    assert_eq!(
+        evaluate_constant(&cpg, missing, &ctx, &mut missing_budget),
+        ConstLattice::Overdefined
+    );
+
+    let mut shallow = CodePropertyGraph::new(Language::Rust);
+    let shallow_function = add(&mut shallow, 20, function_kind("caps"));
+    let unary = add(
+        &mut shallow,
+        21,
+        CpgNodeKind::UnaryOp {
+            operator: "-".into(),
+        },
+    );
+    let one = add(&mut shallow, 22, literal(1));
+    connect_ast(&mut shallow, unary, one);
+    returned(&mut shallow, shallow_function, 23, unary);
+    let shallow_local = local_effects(&shallow, shallow_function);
+
+    for (caps, expected_capped) in [
+        (
+            IfdsCaps {
+                max_call_depth: 1,
+                max_worklist_steps: 2,
+                ..IfdsCaps::default()
+            },
+            false,
+        ),
+        (
+            IfdsCaps {
+                max_call_depth: 0,
+                max_worklist_steps: 2,
+                ..IfdsCaps::default()
+            },
+            true,
+        ),
+        (
+            IfdsCaps {
+                max_call_depth: 1,
+                max_worklist_steps: 1,
+                ..IfdsCaps::default()
+            },
+            true,
+        ),
+    ] {
+        let ctx = SummaryCtx {
+            summaries: &summaries,
+            resolve: &resolve,
+            caps: &caps,
+        };
+        let mut dependency_budget = TraversalBudget::default();
+        let dependency = parameter_dependencies(
+            &shallow,
+            unary,
+            &shallow_local,
+            &ctx,
+            &mut dependency_budget,
+        );
+        let mut constant_budget = TraversalBudget::default();
+        let constant = evaluate_constant(&shallow, unary, &ctx, &mut constant_budget);
+        assert_eq!(dependency_budget.capped, expected_capped);
+        assert_eq!(constant_budget.capped, expected_capped);
+        if expected_capped {
+            assert_eq!(constant, ConstLattice::Overdefined);
+        } else {
+            assert_eq!(dependency, 0);
+            assert_eq!(constant, ConstLattice::Constant(ConstValue::Int(-1)));
+        }
+    }
+}
+
+#[test]
+fn transitive_reaching_definitions_preserve_parameters_and_constants() {
+    let mut cpg = CodePropertyGraph::new(Language::Rust);
+
+    let parameter_function = add(&mut cpg, 10, function_kind("parameter_alias"));
+    let parameter = child(&mut cpg, parameter_function, 11, parameter("p"));
+    let intermediate = add(&mut cpg, 12, identifier("p", Some(parameter)));
+    let parameter_result = add(&mut cpg, 13, identifier("alias", None));
+    cpg.connect(
+        intermediate,
+        parameter_result,
+        CpgEdgeKind::DataFlow(DfgEdgeKind::ReachingDef),
+    )
+    .expect("transitive parameter definition endpoints exist");
+    returned(&mut cpg, parameter_function, 14, parameter_result);
+
+    let constant_function = add(&mut cpg, 20, function_kind("constant_alias"));
+    let variable = child(
+        &mut cpg,
+        constant_function,
+        21,
+        CpgNodeKind::Variable {
+            name: "value".into(),
+            var_type: None,
+            scope: ScopeId::new(1),
+            is_mutable: false,
+        },
+    );
+    child(&mut cpg, variable, 22, identifier("value", Some(variable)));
+    child(&mut cpg, variable, 23, literal(9));
+    let constant_result = add(&mut cpg, 24, identifier("value", None));
+    cpg.connect(
+        variable,
+        constant_result,
+        CpgEdgeKind::DataFlow(DfgEdgeKind::ReachingDef),
+    )
+    .expect("transitive constant definition endpoints exist");
+    returned(&mut cpg, constant_function, 25, constant_result);
+
+    let analysis = analyze_effects(&cpg, &call_graph_sccs(&cpg), &IfdsCaps::default());
+    assert!(analysis.is_complete());
+    assert_eq!(analysis.summaries[&parameter_function].param_to_return, 1);
+    assert_eq!(
+        analysis.summaries[&constant_function].const_return,
+        Some(ConstValue::Int(9))
+    );
+}
+
+#[test]
+fn wide_reaching_definition_join_is_stack_safe_and_deterministic() {
+    const WIDTH: usize = 10_000;
+    let values = vec![7; WIDTH];
+    let (forward, function) = reaching_join_fixture(&values, false);
+    let (reverse, reverse_function) = reaching_join_fixture(&values, true);
+    let caps = IfdsCaps {
+        max_call_depth: 1,
+        max_worklist_steps: WIDTH * 3,
+        ..IfdsCaps::default()
+    };
+    let forward = analyze_effects(&forward, &call_graph_sccs(&forward), &caps);
+    let reverse = analyze_effects(&reverse, &call_graph_sccs(&reverse), &caps);
+    assert!(forward.is_complete());
+    assert!(reverse.is_complete());
+    assert_eq!(forward.summaries, reverse.summaries);
+    assert_eq!(
+        forward.summaries[&function].const_return,
+        Some(ConstValue::Int(7))
+    );
+    assert_eq!(function, reverse_function);
+}
+
 fn summary_from_bits(reads: u8, writes: u8, mask: u8, constant: u8) -> EffectSummary {
     let places = [
         Place::Global("g".into()),
@@ -592,6 +1163,152 @@ proptest! {
         prop_assert!(!idempotent.join(&left));
         prop_assert_eq!(&idempotent, &left);
         prop_assert!(associated_left.subsumes(&left));
+    }
+
+    #[test]
+    fn flat_machines_match_the_bounded_recursive_oracles(
+        steps in prop::collection::vec(any::<u8>(), 0..32),
+        parameter_leaf in any::<bool>(),
+    ) {
+        let (cpg, function, root) = shallow_machine_fixture(&steps, parameter_leaf);
+        let local = local_effects(&cpg, function);
+        let summaries = BTreeMap::new();
+        let resolve = |_| CalleeRef::Unresolved("generated".into());
+        let caps = IfdsCaps::default();
+        let ctx = SummaryCtx {
+            summaries: &summaries,
+            resolve: &resolve,
+            caps: &caps,
+        };
+
+        let mut machine_budget = TraversalBudget::default();
+        let machine_dependencies = parameter_dependencies(
+            &cpg,
+            root,
+            &local,
+            &ctx,
+            &mut machine_budget,
+        );
+        let mut oracle_budget = TraversalBudget::default();
+        let oracle_dependencies = recursive_parameter_dependencies(
+            &cpg,
+            root,
+            &local,
+            &ctx,
+            0,
+            &mut BTreeSet::new(),
+            &mut oracle_budget,
+        );
+        prop_assert_eq!(machine_dependencies, oracle_dependencies);
+        prop_assert_eq!(machine_budget.steps, oracle_budget.steps);
+        prop_assert_eq!(machine_budget.capped, oracle_budget.capped);
+
+        let mut machine_budget = TraversalBudget::default();
+        let machine_constant = evaluate_constant(&cpg, root, &ctx, &mut machine_budget);
+        let mut oracle_budget = TraversalBudget::default();
+        let oracle_constant = recursive_evaluate_constant(
+            &cpg,
+            root,
+            &ctx,
+            0,
+            &mut BTreeSet::new(),
+            &mut oracle_budget,
+        );
+        prop_assert_eq!(machine_constant, oracle_constant);
+        prop_assert_eq!(machine_budget.steps, oracle_budget.steps);
+        prop_assert_eq!(machine_budget.capped, oracle_budget.capped);
+    }
+
+    #[test]
+    fn raising_machine_caps_never_invalidates_a_complete_result(
+        steps in prop::collection::vec(any::<u8>(), 0..24),
+        parameter_leaf in any::<bool>(),
+        low_depth in 0u32..28,
+        extra_depth in 0u32..28,
+        low_work in 0usize..64,
+        extra_work in 0usize..64,
+    ) {
+        let (cpg, function, root) = shallow_machine_fixture(&steps, parameter_leaf);
+        let local = local_effects(&cpg, function);
+        let summaries = BTreeMap::new();
+        let resolve = |_| CalleeRef::Unresolved("generated".into());
+        let low_caps = IfdsCaps {
+            max_call_depth: low_depth,
+            max_worklist_steps: low_work,
+            ..IfdsCaps::default()
+        };
+        let high_caps = IfdsCaps {
+            max_call_depth: low_depth.saturating_add(extra_depth),
+            max_worklist_steps: low_work.saturating_add(extra_work),
+            ..IfdsCaps::default()
+        };
+
+        let low_ctx = SummaryCtx {
+            summaries: &summaries,
+            resolve: &resolve,
+            caps: &low_caps,
+        };
+        let high_ctx = SummaryCtx {
+            summaries: &summaries,
+            resolve: &resolve,
+            caps: &high_caps,
+        };
+        let mut low_dependency_budget = TraversalBudget::default();
+        let low_dependencies = parameter_dependencies(
+            &cpg,
+            root,
+            &local,
+            &low_ctx,
+            &mut low_dependency_budget,
+        );
+        let mut high_dependency_budget = TraversalBudget::default();
+        let high_dependencies = parameter_dependencies(
+            &cpg,
+            root,
+            &local,
+            &high_ctx,
+            &mut high_dependency_budget,
+        );
+        if !low_dependency_budget.capped {
+            prop_assert!(!high_dependency_budget.capped);
+            prop_assert_eq!(low_dependencies, high_dependencies);
+        }
+        if high_dependency_budget.capped {
+            prop_assert!(low_dependency_budget.capped);
+        }
+
+        let mut low_constant_budget = TraversalBudget::default();
+        let low_constant = evaluate_constant(&cpg, root, &low_ctx, &mut low_constant_budget);
+        let mut high_constant_budget = TraversalBudget::default();
+        let high_constant = evaluate_constant(&cpg, root, &high_ctx, &mut high_constant_budget);
+        if !low_constant_budget.capped {
+            prop_assert!(!high_constant_budget.capped);
+            prop_assert_eq!(low_constant, high_constant);
+        }
+        if high_constant_budget.capped {
+            prop_assert!(low_constant_budget.capped);
+        }
+    }
+
+    #[test]
+    fn reaching_definition_insertion_order_does_not_change_joins(
+        values in prop::collection::vec(-8i64..=8, 1..24),
+    ) {
+        let (forward, _) = reaching_join_fixture(&values, false);
+        let (reverse, _) = reaching_join_fixture(&values, true);
+        let forward = analyze_effects(
+            &forward,
+            &call_graph_sccs(&forward),
+            &IfdsCaps::default(),
+        );
+        let reverse = analyze_effects(
+            &reverse,
+            &call_graph_sccs(&reverse),
+            &IfdsCaps::default(),
+        );
+        prop_assert!(forward.is_complete());
+        prop_assert!(reverse.is_complete());
+        prop_assert_eq!(forward, reverse);
     }
 
     #[test]

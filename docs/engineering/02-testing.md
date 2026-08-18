@@ -43,7 +43,7 @@ think to write down.
 | Function-clone public integration tests | 2 | `tests/clones_integration.rs` |
 | Program-composition public integration tests | 3 | `tests/program_integration.rs` |
 | IFDS/IDE public integration tests | 2 | `tests/ifds_integration.rs` |
-| Effect-summary public integration tests | 2 | `tests/effects_integration.rs` |
+| Effect-summary public integration tests | 3 | `tests/effects_integration.rs` |
 | Taint/nullflow public integration tests | 3 | `tests/taint_integration.rs` |
 | SDG-slicing public integration tests | 1 | `tests/sdg_integration.rs` |
 | Martin public/parser integration tests | 2 | `tests/martin_integration.rs` |
@@ -55,7 +55,7 @@ think to write down.
 | Deadlock-candidate public/parser integration tests | 3 | `tests/deadlock_integration.rs` |
 | MHP public/parser integration tests | 2 | `tests/mhp_integration.rs` |
 | Session-sketch public/parser integration tests | 2 | `tests/session_integration.rs` |
-| **Executable test cases** | **1,076** | measured by the all-features test inventory; excludes three ignored rustdoc examples |
+| **Executable test cases** | **1,084** | measured by the all-features test inventory; excludes three ignored rustdoc examples |
 | `proptest!` blocks (subset of the library/robustness rows) | 74 | exact source-level macro count in `src/` and `tests/` |
 
 The maximal-matrix library count is up from **99** inline tests and **zero**
@@ -176,7 +176,7 @@ The invariants fall into complementary families.
 | **SCC decomposition** | Every projected node occurs in exactly one component; the partition matches `petgraph::algo::tarjan_scc`; singleton cycles require a self-loop; the condensation graph is acyclic; a 50,000-node path does not overflow the native stack |
 | **Call resolution** | resolution records and call edges are invariant under node/edge insertion permutations; duplicate names add zero call topology and preserve the SCC partition; repeated resolution is idempotent; candidate/call caps preserve the evidence boundary |
 | **IFDS/IDE summaries** | generated call graphs equal an independent reachability oracle and preserve exact reports under reversed call insertion; summary joins satisfy semilattice laws; iteration/work/function/fact/depth caps are explicit and monotone; examples cover acyclic, self-recursive, mutually recursive, external, unresolved, malformed/stale-SCC, serde, public composition, and graph non-mutation behavior |
-| **Effect summaries** | full summary joins satisfy idempotence, commutativity, associativity, and subsumption; 256 generated call graphs match an independent transitive-purity DFS and reverse-insertion oracle; another 256 cases prove iteration-cap monotonicity; exact examples cover pure constants, global/field/parameter effects, actual-argument remapping, transitive constants and impurity, conflicting returns, mutual recursion, 65-parameter truncation, malformed topology, domain/shared caps, serde, crate-root composition, and graph non-mutation |
+| **Effect summaries** | full summary joins satisfy idempotence, commutativity, associativity, and subsumption; six 256-case campaigns cover an independent transitive-purity DFS, bounded recursive specifications for both flat local machines, call/def-use insertion order, and local/SCC cap monotonicity; exact examples cover pure constants, global/field/parameter effects, actual-argument remapping, transitive definitions/constants/impurity, conflicting returns, mutual recursion, calls, cycles, missing nodes, terminal-cache equivalence, exact caps, 65-parameter truncation, 10,000-way joins, malformed topology, serde, crate-root composition, and graph non-mutation; a 100,000-level public expression completes on a 256 KiB stack |
 | **Taint and maybe-null summaries** | both summary joins satisfy idempotence, commutativity, associativity, and subsumption; generated typed value-flow graphs match independent breadth-first reachability oracles and preserve exact reports under reversed insertion; catalog properties pin pattern specificity and caller-policy replacement; examples cover twelve source/sink/sanitizer/external/interprocedural scenarios, witness validity, 65-parameter truncation, caps, serde, crate-root composition, nullable-return and uninitialized-variable origins, and graph non-mutation |
 | **Idempotency** | a second `CfgExtractor::extract` / `DfgExtractor::extract` / `PdgBuilder::build` adds no edges |
 | **Slicing** | $`\lvert S\rvert \le \mathit{max\_nodes}`$; the criterion is in its own backward slice; $`\mathit{max\_nodes} = 0 \Rightarrow S = \varnothing`$; $`S`$ is monotone in $`\mathit{max\_nodes}`$; every sliced id is a real node |

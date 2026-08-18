@@ -143,3 +143,59 @@ fn public_api_maps_a_callee_parameter_write_to_the_callers_global() {
         .contains(&Place::Global("STATE".into())));
     assert_eq!(cpg.ast_parent(callee_syntax), Some(call));
 }
+
+#[test]
+fn public_effect_evaluators_handle_depth_100_000_on_a_small_stack() {
+    std::thread::Builder::new()
+        .name("effect-evaluation-small-stack".into())
+        .stack_size(256 * 1024)
+        .spawn(|| {
+            const DEPTH: usize = 100_000;
+            let mut cpg = CodePropertyGraph::new(Language::Rust);
+            let function = add(&mut cpg, function("deep_identity"));
+            let parameter = child(
+                &mut cpg,
+                function,
+                CpgNodeKind::Parameter {
+                    name: "value".into(),
+                    param_type: None,
+                    is_variadic: false,
+                },
+            );
+            let mut expression = add(
+                &mut cpg,
+                CpgNodeKind::Identifier {
+                    name: "value".into(),
+                    definition: Some(parameter),
+                },
+            );
+            for _ in 0..DEPTH {
+                let parent = add(
+                    &mut cpg,
+                    CpgNodeKind::UnaryOp {
+                        operator: "-".into(),
+                    },
+                );
+                connect_ast(&mut cpg, parent, expression);
+                expression = parent;
+            }
+            let returned = child(&mut cpg, function, CpgNodeKind::Return);
+            connect_ast(&mut cpg, returned, expression);
+
+            let caps = IfdsCaps {
+                max_call_depth: u32::try_from(DEPTH + 1).expect("depth fits u32"),
+                max_worklist_steps: 1_000_000,
+                ..IfdsCaps::default()
+            };
+            let analysis = analyze_effects(&cpg, &call_graph_sccs(&cpg), &caps);
+            assert!(analysis.is_complete(), "{analysis:?}");
+            let summary = &analysis.summaries[&function];
+            assert_eq!(summary.param_to_return, 1);
+            assert!(summary.const_return_overdefined);
+            assert!(!summary.capped);
+            assert_eq!(cpg.ast_parent(expression), Some(returned));
+        })
+        .expect("spawn small-stack effect test")
+        .join()
+        .expect("small-stack effect analysis");
+}

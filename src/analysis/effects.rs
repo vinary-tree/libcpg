@@ -6,7 +6,7 @@
 //! scalar AST expressions. It never parses source text or dispatches on a
 //! language.
 
-use std::collections::{BTreeMap, BTreeSet};
+use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 use std::sync::Arc;
 
 use crate::{CodePropertyGraph, CpgEdgeKind, CpgNodeKind, DfgEdgeKind, NodeId};
@@ -338,18 +338,8 @@ fn summarize_function(
             DataflowLattice::join(&mut return_state, &ConstLattice::Overdefined);
             continue;
         };
-        let mut dependency_seen = BTreeSet::new();
-        summary.param_to_return |= parameter_dependencies(
-            cpg,
-            expression,
-            local,
-            ctx,
-            0,
-            &mut dependency_seen,
-            &mut budget,
-        );
-        let mut on_path = BTreeSet::new();
-        let value = evaluate_constant(cpg, expression, ctx, 0, &mut on_path, &mut budget);
+        summary.param_to_return |= parameter_dependencies(cpg, expression, local, ctx, &mut budget);
+        let value = evaluate_constant(cpg, expression, ctx, &mut budget);
         DataflowLattice::join(&mut return_state, &value);
     }
     if budget.capped {
@@ -559,29 +549,39 @@ fn places_for_value(
     local: &LocalEffects,
     seen: &mut BTreeSet<NodeId>,
 ) -> BTreeSet<Place> {
-    if !seen.insert(node) {
-        return BTreeSet::new();
-    }
-    let result = match cpg.node(node).map(|node| &node.kind) {
-        Some(CpgNodeKind::Identifier { .. }) => places_for_identifier(cpg, node, local),
-        Some(CpgNodeKind::Parameter { .. }) => local
-            .params
-            .get(&node)
-            .copied()
-            .map_or_else(BTreeSet::new, |index| BTreeSet::from([Place::Param(index)])),
-        Some(CpgNodeKind::Field { name, .. } | CpgNodeKind::MemberAccess { member: name }) => {
-            BTreeSet::from([Place::Field(name.clone())])
+    let mut entered = Vec::new();
+    let mut current = node;
+    let result = loop {
+        if !seen.insert(current) {
+            break BTreeSet::new();
         }
-        Some(CpgNodeKind::IndexAccess) => cpg
-            .ast_children(node)
-            .first()
-            .copied()
-            .map_or_else(BTreeSet::new, |base| {
-                places_for_value(cpg, base, local, seen)
-            }),
-        _ => BTreeSet::new(),
+        entered.push(current);
+        match cpg.node(current).map(|node| &node.kind) {
+            Some(CpgNodeKind::Identifier { .. }) => {
+                break places_for_identifier(cpg, current, local)
+            }
+            Some(CpgNodeKind::Parameter { .. }) => {
+                break local
+                    .params
+                    .get(&current)
+                    .copied()
+                    .map_or_else(BTreeSet::new, |index| BTreeSet::from([Place::Param(index)]))
+            }
+            Some(CpgNodeKind::Field { name, .. } | CpgNodeKind::MemberAccess { member: name }) => {
+                break BTreeSet::from([Place::Field(name.clone())])
+            }
+            Some(CpgNodeKind::IndexAccess) => {
+                let Some(base) = cpg.ast_children(current).first().copied() else {
+                    break BTreeSet::new();
+                };
+                current = base;
+            }
+            _ => break BTreeSet::new(),
+        }
     };
-    seen.remove(&node);
+    for entered_node in entered {
+        seen.remove(&entered_node);
+    }
     result
 }
 
@@ -646,92 +646,291 @@ impl TraversalBudget {
     }
 }
 
-#[allow(clippy::too_many_arguments)]
 fn parameter_dependencies(
     cpg: &CodePropertyGraph,
     node: NodeId,
     local: &LocalEffects,
     ctx: &SummaryCtx<'_, EffectDomain>,
-    depth: u32,
-    seen: &mut BTreeSet<NodeId>,
     budget: &mut TraversalBudget,
 ) -> u64 {
-    if !budget.enter(depth, ctx.caps) {
-        return 0;
-    }
-    if !seen.insert(node) {
-        budget.capped = true;
+    let mut stats = EvaluationMachineStats::default();
+    parameter_dependencies_machine(cpg, node, local, ctx, budget, true, &mut stats)
+}
+
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
+struct EvaluationMachineStats {
+    max_frames: usize,
+    cache_hits: usize,
+}
+
+enum DependencyFrame {
+    Enter {
+        node: NodeId,
+        depth: u32,
+    },
+    Visit {
+        node: NodeId,
+        depth: u32,
+        children: Vec<NodeId>,
+        next: usize,
+        mask: u64,
+        cacheable: bool,
+    },
+    Combine {
+        node: NodeId,
+        depth: u32,
+        children: Vec<NodeId>,
+        next: usize,
+        mask: u64,
+        cacheable: bool,
+    },
+    Exit {
+        node: NodeId,
+        mask: u64,
+        cacheable: bool,
+    },
+}
+
+#[allow(clippy::too_many_arguments)]
+fn parameter_dependencies_machine(
+    cpg: &CodePropertyGraph,
+    root: NodeId,
+    local: &LocalEffects,
+    ctx: &SummaryCtx<'_, EffectDomain>,
+    budget: &mut TraversalBudget,
+    cache_enabled: bool,
+    stats: &mut EvaluationMachineStats,
+) -> u64 {
+    let mut frames = Vec::new();
+    let mut values = Vec::new();
+    let mut on_path = HashSet::new();
+    let mut terminal_cache: HashMap<NodeId, u64> = HashMap::new();
+    if !push_machine_frame(
+        &mut frames,
+        DependencyFrame::Enter {
+            node: root,
+            depth: 0,
+        },
+        budget,
+        stats,
+    ) {
         return u64::MAX;
     }
-    let mut mask = parameter_mask_for_node(cpg, node, local);
+
+    while let Some(frame) = frames.pop() {
+        match frame {
+            DependencyFrame::Enter { node, depth } => {
+                if !budget.enter(depth, ctx.caps) {
+                    if !push_machine_value(&mut values, 0, budget) {
+                        return u64::MAX;
+                    }
+                    continue;
+                }
+                if on_path.contains(&node) {
+                    budget.capped = true;
+                    if !push_machine_value(&mut values, u64::MAX, budget) {
+                        return u64::MAX;
+                    }
+                    continue;
+                }
+                if on_path.try_reserve(1).is_err() {
+                    budget.capped = true;
+                    return u64::MAX;
+                }
+                on_path.insert(node);
+                if cache_enabled {
+                    if let Some(&cached) = terminal_cache.get(&node) {
+                        stats.cache_hits = stats.cache_hits.saturating_add(1);
+                        on_path.remove(&node);
+                        if !push_machine_value(&mut values, cached, budget) {
+                            return u64::MAX;
+                        }
+                        continue;
+                    }
+                }
+                let Some(children) = dependency_children(cpg, node, ctx, budget) else {
+                    on_path.remove(&node);
+                    if !push_machine_value(&mut values, u64::MAX, budget) {
+                        return u64::MAX;
+                    }
+                    continue;
+                };
+                let cacheable = children.is_empty();
+                if !push_machine_frame(
+                    &mut frames,
+                    DependencyFrame::Visit {
+                        node,
+                        depth,
+                        children,
+                        next: 0,
+                        mask: parameter_mask_for_node(cpg, node, local),
+                        cacheable,
+                    },
+                    budget,
+                    stats,
+                ) {
+                    on_path.clear();
+                    return u64::MAX;
+                }
+            }
+            DependencyFrame::Visit {
+                node,
+                depth,
+                children,
+                next,
+                mask,
+                cacheable,
+            } => {
+                if let Some(&child) = children.get(next) {
+                    if !push_machine_frame(
+                        &mut frames,
+                        DependencyFrame::Combine {
+                            node,
+                            depth,
+                            children,
+                            next: next + 1,
+                            mask,
+                            cacheable,
+                        },
+                        budget,
+                        stats,
+                    ) || !push_machine_frame(
+                        &mut frames,
+                        DependencyFrame::Enter {
+                            node: child,
+                            depth: depth.saturating_add(1),
+                        },
+                        budget,
+                        stats,
+                    ) {
+                        on_path.clear();
+                        return u64::MAX;
+                    }
+                } else if !push_machine_frame(
+                    &mut frames,
+                    DependencyFrame::Exit {
+                        node,
+                        mask,
+                        cacheable,
+                    },
+                    budget,
+                    stats,
+                ) {
+                    on_path.clear();
+                    return u64::MAX;
+                }
+            }
+            DependencyFrame::Combine {
+                node,
+                depth,
+                children,
+                next,
+                mask,
+                cacheable,
+            } => {
+                let child = values.pop().unwrap_or(u64::MAX);
+                if !push_machine_frame(
+                    &mut frames,
+                    DependencyFrame::Visit {
+                        node,
+                        depth,
+                        children,
+                        next,
+                        mask: mask | child,
+                        cacheable,
+                    },
+                    budget,
+                    stats,
+                ) {
+                    on_path.clear();
+                    return u64::MAX;
+                }
+            }
+            DependencyFrame::Exit {
+                node,
+                mask,
+                cacheable,
+            } => {
+                if cache_enabled && cacheable && terminal_cache.try_reserve(1).is_ok() {
+                    terminal_cache.insert(node, mask);
+                }
+                on_path.remove(&node);
+                if !push_machine_value(&mut values, mask, budget) {
+                    return u64::MAX;
+                }
+            }
+        }
+    }
+    values.pop().unwrap_or(u64::MAX)
+}
+
+fn dependency_children(
+    cpg: &CodePropertyGraph,
+    node: NodeId,
+    ctx: &SummaryCtx<'_, EffectDomain>,
+    budget: &mut TraversalBudget,
+) -> Option<Vec<NodeId>> {
     if matches!(
         cpg.node(node).map(|node| &node.kind),
         Some(CpgNodeKind::Call { .. })
     ) {
-        let arguments = call_arguments(cpg, node);
+        let mut arguments = call_arguments(cpg, node);
         match (ctx.resolve)(node) {
             CalleeRef::Resolved(callee) => {
-                if let Some(callee_summary) = ctx.summaries.get(&callee) {
-                    for (index, argument) in arguments.into_iter().enumerate() {
-                        if callee_summary.param_mask_truncated {
-                            budget.capped = true;
-                        }
-                        let represented_dependency =
-                            index < 64 && callee_summary.param_to_return & (1u64 << index) != 0;
-                        if represented_dependency || callee_summary.param_mask_truncated {
-                            mask |= parameter_dependencies(
-                                cpg,
-                                argument,
-                                local,
-                                ctx,
-                                depth.saturating_add(1),
-                                seen,
-                                budget,
-                            );
-                        }
+                let Some(callee_summary) = ctx.summaries.get(&callee) else {
+                    return Some(Vec::new());
+                };
+                if callee_summary.param_mask_truncated && !arguments.is_empty() {
+                    budget.capped = true;
+                }
+                let mut retained = 0usize;
+                for index in 0..arguments.len() {
+                    let represented =
+                        index < 64 && callee_summary.param_to_return & (1u64 << index) != 0;
+                    if represented || callee_summary.param_mask_truncated {
+                        arguments.swap(retained, index);
+                        retained += 1;
                     }
                 }
+                arguments.truncate(retained);
+                Some(arguments)
             }
-            CalleeRef::External(_) | CalleeRef::Unresolved(_) => {
-                for argument in arguments {
-                    mask |= parameter_dependencies(
-                        cpg,
-                        argument,
-                        local,
-                        ctx,
-                        depth.saturating_add(1),
-                        seen,
-                        budget,
-                    );
-                }
-            }
+            CalleeRef::External(_) | CalleeRef::Unresolved(_) => Some(arguments),
         }
     } else {
-        for child in cpg.ast_children(node) {
-            mask |= parameter_dependencies(
-                cpg,
-                child,
-                local,
-                ctx,
-                depth.saturating_add(1),
-                seen,
-                budget,
-            );
+        let mut children = cpg.ast_children(node);
+        let definitions = cpg.reaching_definitions(node);
+        if children.try_reserve(definitions.len()).is_err() {
+            budget.capped = true;
+            return None;
         }
-        for definition in cpg.reaching_definitions(node) {
-            mask |= parameter_dependencies(
-                cpg,
-                definition,
-                local,
-                ctx,
-                depth.saturating_add(1),
-                seen,
-                budget,
-            );
-        }
+        children.extend(definitions);
+        Some(children)
     }
-    seen.remove(&node);
-    mask
+}
+
+fn push_machine_frame<T>(
+    frames: &mut Vec<T>,
+    frame: T,
+    budget: &mut TraversalBudget,
+    stats: &mut EvaluationMachineStats,
+) -> bool {
+    if frames.try_reserve(1).is_err() {
+        budget.capped = true;
+        return false;
+    }
+    frames.push(frame);
+    stats.max_frames = stats.max_frames.max(frames.len());
+    true
+}
+
+fn push_machine_value<T>(values: &mut Vec<T>, value: T, budget: &mut TraversalBudget) -> bool {
+    if values.try_reserve(1).is_err() {
+        budget.capped = true;
+        return false;
+    }
+    values.push(value);
+    true
 }
 
 fn parameter_mask_for_node(cpg: &CodePropertyGraph, node: NodeId, local: &LocalEffects) -> u64 {
@@ -749,138 +948,498 @@ fn parameter_mask_for_node(cpg: &CodePropertyGraph, node: NodeId, local: &LocalE
         .map_or(0, |index| 1u64 << index)
 }
 
-#[allow(clippy::too_many_arguments)]
 fn evaluate_constant(
     cpg: &CodePropertyGraph,
     node: NodeId,
     ctx: &SummaryCtx<'_, EffectDomain>,
-    depth: u32,
-    on_path: &mut BTreeSet<NodeId>,
     budget: &mut TraversalBudget,
 ) -> ConstLattice {
-    if !budget.enter(depth, ctx.caps) {
+    let mut stats = EvaluationMachineStats::default();
+    evaluate_constant_machine(cpg, node, ctx, budget, true, &mut stats)
+}
+
+enum ConstantFrame {
+    Enter {
+        node: NodeId,
+        depth: u32,
+    },
+    JoinNext {
+        node: NodeId,
+        depth: u32,
+        definitions: Vec<NodeId>,
+        next: usize,
+        value: ConstLattice,
+    },
+    JoinCombine {
+        node: NodeId,
+        depth: u32,
+        definitions: Vec<NodeId>,
+        next: usize,
+        value: ConstLattice,
+    },
+    BinaryLeft {
+        node: NodeId,
+        depth: u32,
+        operator: Arc<str>,
+        right: NodeId,
+    },
+    BinaryRight {
+        node: NodeId,
+        operator: Arc<str>,
+        left: ConstLattice,
+    },
+    Unary {
+        node: NodeId,
+        operator: Arc<str>,
+    },
+    Forward {
+        node: NodeId,
+    },
+    Exit {
+        node: NodeId,
+        value: ConstLattice,
+        cacheable: bool,
+    },
+}
+
+fn evaluate_constant_machine(
+    cpg: &CodePropertyGraph,
+    root: NodeId,
+    ctx: &SummaryCtx<'_, EffectDomain>,
+    budget: &mut TraversalBudget,
+    cache_enabled: bool,
+    stats: &mut EvaluationMachineStats,
+) -> ConstLattice {
+    let mut frames = Vec::new();
+    let mut values = Vec::new();
+    let mut on_path = HashSet::new();
+    let mut terminal_cache: HashMap<NodeId, ConstLattice> = HashMap::new();
+    if !push_machine_frame(
+        &mut frames,
+        ConstantFrame::Enter {
+            node: root,
+            depth: 0,
+        },
+        budget,
+        stats,
+    ) {
         return ConstLattice::Overdefined;
     }
-    if !on_path.insert(node) {
-        return ConstLattice::Overdefined;
+
+    while let Some(frame) = frames.pop() {
+        match frame {
+            ConstantFrame::Enter { node, depth } => {
+                if !budget.enter(depth, ctx.caps) {
+                    if !push_machine_value(&mut values, ConstLattice::Overdefined, budget) {
+                        return ConstLattice::Overdefined;
+                    }
+                    continue;
+                }
+                if on_path.contains(&node) {
+                    if !push_machine_value(&mut values, ConstLattice::Overdefined, budget) {
+                        return ConstLattice::Overdefined;
+                    }
+                    continue;
+                }
+                if on_path.try_reserve(1).is_err() {
+                    budget.capped = true;
+                    return ConstLattice::Overdefined;
+                }
+                on_path.insert(node);
+                if cache_enabled {
+                    if let Some(cached) = terminal_cache.get(&node) {
+                        stats.cache_hits = stats.cache_hits.saturating_add(1);
+                        let cached = cached.clone();
+                        on_path.remove(&node);
+                        if !push_machine_value(&mut values, cached, budget) {
+                            return ConstLattice::Overdefined;
+                        }
+                        continue;
+                    }
+                }
+                let kind = cpg.node(node).map(|node| &node.kind);
+                let frame = match kind {
+                    Some(CpgNodeKind::Literal { kind }) => ConstantFrame::Exit {
+                        node,
+                        value: literal_value(kind),
+                        cacheable: true,
+                    },
+                    Some(CpgNodeKind::Call { .. }) => {
+                        let value = match (ctx.resolve)(node) {
+                            CalleeRef::Resolved(callee) => ctx
+                                .summaries
+                                .get(&callee)
+                                .map_or(ConstLattice::Overdefined, const_lattice),
+                            CalleeRef::External(_) | CalleeRef::Unresolved(_) => {
+                                ConstLattice::Overdefined
+                            }
+                        };
+                        ConstantFrame::Exit {
+                            node,
+                            value,
+                            cacheable: true,
+                        }
+                    }
+                    Some(CpgNodeKind::Identifier { .. }) => {
+                        let mut definitions = cpg.reaching_definitions(node);
+                        if let Some(CpgNodeKind::Identifier {
+                            definition: Some(definition),
+                            ..
+                        }) = kind
+                        {
+                            if definitions.try_reserve(1).is_err() {
+                                budget.capped = true;
+                                on_path.clear();
+                                return ConstLattice::Overdefined;
+                            }
+                            definitions.push(*definition);
+                        }
+                        definitions.sort_unstable();
+                        definitions.dedup();
+                        if definitions.is_empty() {
+                            ConstantFrame::Exit {
+                                node,
+                                value: ConstLattice::Overdefined,
+                                cacheable: true,
+                            }
+                        } else {
+                            ConstantFrame::JoinNext {
+                                node,
+                                depth,
+                                definitions,
+                                next: 0,
+                                value: ConstLattice::Unknown,
+                            }
+                        }
+                    }
+                    Some(CpgNodeKind::BinaryOp { operator }) => {
+                        let children = cpg.ast_children(node);
+                        if let [left, right, ..] = children.as_slice() {
+                            if !push_machine_frame(
+                                &mut frames,
+                                ConstantFrame::BinaryLeft {
+                                    node,
+                                    depth,
+                                    operator: operator.clone(),
+                                    right: *right,
+                                },
+                                budget,
+                                stats,
+                            ) || !push_machine_frame(
+                                &mut frames,
+                                ConstantFrame::Enter {
+                                    node: *left,
+                                    depth: depth.saturating_add(1),
+                                },
+                                budget,
+                                stats,
+                            ) {
+                                on_path.clear();
+                                return ConstLattice::Overdefined;
+                            }
+                            continue;
+                        }
+                        ConstantFrame::Exit {
+                            node,
+                            value: ConstLattice::Overdefined,
+                            cacheable: true,
+                        }
+                    }
+                    Some(CpgNodeKind::UnaryOp { operator }) => {
+                        if let Some(operand) = cpg.ast_children(node).first().copied() {
+                            if !push_machine_frame(
+                                &mut frames,
+                                ConstantFrame::Unary {
+                                    node,
+                                    operator: operator.clone(),
+                                },
+                                budget,
+                                stats,
+                            ) || !push_machine_frame(
+                                &mut frames,
+                                ConstantFrame::Enter {
+                                    node: operand,
+                                    depth: depth.saturating_add(1),
+                                },
+                                budget,
+                                stats,
+                            ) {
+                                on_path.clear();
+                                return ConstLattice::Overdefined;
+                            }
+                            continue;
+                        }
+                        ConstantFrame::Exit {
+                            node,
+                            value: ConstLattice::Overdefined,
+                            cacheable: true,
+                        }
+                    }
+                    Some(CpgNodeKind::Assignment { .. }) => {
+                        if let Some(rhs) = cpg.ast_children(node).get(1).copied() {
+                            if !push_machine_frame(
+                                &mut frames,
+                                ConstantFrame::Forward { node },
+                                budget,
+                                stats,
+                            ) || !push_machine_frame(
+                                &mut frames,
+                                ConstantFrame::Enter {
+                                    node: rhs,
+                                    depth: depth.saturating_add(1),
+                                },
+                                budget,
+                                stats,
+                            ) {
+                                on_path.clear();
+                                return ConstLattice::Overdefined;
+                            }
+                            continue;
+                        }
+                        ConstantFrame::Exit {
+                            node,
+                            value: ConstLattice::Overdefined,
+                            cacheable: true,
+                        }
+                    }
+                    Some(CpgNodeKind::Variable { name, .. }) => {
+                        let initializer = cpg.ast_children(node).into_iter().rev().find(|&child| {
+                            !matches!(
+                                cpg.node(child).map(|node| &node.kind),
+                                Some(CpgNodeKind::Identifier { name: child_name, .. }) if child_name == name
+                            )
+                        });
+                        if let Some(initializer) = initializer {
+                            if !push_machine_frame(
+                                &mut frames,
+                                ConstantFrame::Forward { node },
+                                budget,
+                                stats,
+                            ) || !push_machine_frame(
+                                &mut frames,
+                                ConstantFrame::Enter {
+                                    node: initializer,
+                                    depth: depth.saturating_add(1),
+                                },
+                                budget,
+                                stats,
+                            ) {
+                                on_path.clear();
+                                return ConstLattice::Overdefined;
+                            }
+                            continue;
+                        }
+                        ConstantFrame::Exit {
+                            node,
+                            value: ConstLattice::Overdefined,
+                            cacheable: true,
+                        }
+                    }
+                    Some(CpgNodeKind::Return) => {
+                        if let Some(returned) = cpg.ast_children(node).first().copied() {
+                            if !push_machine_frame(
+                                &mut frames,
+                                ConstantFrame::Forward { node },
+                                budget,
+                                stats,
+                            ) || !push_machine_frame(
+                                &mut frames,
+                                ConstantFrame::Enter {
+                                    node: returned,
+                                    depth: depth.saturating_add(1),
+                                },
+                                budget,
+                                stats,
+                            ) {
+                                on_path.clear();
+                                return ConstLattice::Overdefined;
+                            }
+                            continue;
+                        }
+                        ConstantFrame::Exit {
+                            node,
+                            value: ConstLattice::Overdefined,
+                            cacheable: true,
+                        }
+                    }
+                    Some(CpgNodeKind::Parameter { .. }) | None | Some(_) => ConstantFrame::Exit {
+                        node,
+                        value: ConstLattice::Overdefined,
+                        cacheable: true,
+                    },
+                };
+                if !push_machine_frame(&mut frames, frame, budget, stats) {
+                    on_path.clear();
+                    return ConstLattice::Overdefined;
+                }
+            }
+            ConstantFrame::JoinNext {
+                node,
+                depth,
+                definitions,
+                next,
+                value,
+            } => {
+                if let Some(&definition) = definitions.get(next) {
+                    if !push_machine_frame(
+                        &mut frames,
+                        ConstantFrame::JoinCombine {
+                            node,
+                            depth,
+                            definitions,
+                            next: next + 1,
+                            value,
+                        },
+                        budget,
+                        stats,
+                    ) || !push_machine_frame(
+                        &mut frames,
+                        ConstantFrame::Enter {
+                            node: definition,
+                            depth: depth.saturating_add(1),
+                        },
+                        budget,
+                        stats,
+                    ) {
+                        on_path.clear();
+                        return ConstLattice::Overdefined;
+                    }
+                } else if !push_machine_frame(
+                    &mut frames,
+                    ConstantFrame::Exit {
+                        node,
+                        value,
+                        cacheable: false,
+                    },
+                    budget,
+                    stats,
+                ) {
+                    on_path.clear();
+                    return ConstLattice::Overdefined;
+                }
+            }
+            ConstantFrame::JoinCombine {
+                node,
+                depth,
+                definitions,
+                next,
+                mut value,
+            } => {
+                let child = values.pop().unwrap_or(ConstLattice::Overdefined);
+                DataflowLattice::join(&mut value, &child);
+                if !push_machine_frame(
+                    &mut frames,
+                    ConstantFrame::JoinNext {
+                        node,
+                        depth,
+                        definitions,
+                        next,
+                        value,
+                    },
+                    budget,
+                    stats,
+                ) {
+                    on_path.clear();
+                    return ConstLattice::Overdefined;
+                }
+            }
+            ConstantFrame::BinaryLeft {
+                node,
+                depth,
+                operator,
+                right,
+            } => {
+                let left = values.pop().unwrap_or(ConstLattice::Overdefined);
+                if !push_machine_frame(
+                    &mut frames,
+                    ConstantFrame::BinaryRight {
+                        node,
+                        operator,
+                        left,
+                    },
+                    budget,
+                    stats,
+                ) || !push_machine_frame(
+                    &mut frames,
+                    ConstantFrame::Enter {
+                        node: right,
+                        depth: depth.saturating_add(1),
+                    },
+                    budget,
+                    stats,
+                ) {
+                    on_path.clear();
+                    return ConstLattice::Overdefined;
+                }
+            }
+            ConstantFrame::BinaryRight {
+                node,
+                operator,
+                left,
+            } => {
+                let right = values.pop().unwrap_or(ConstLattice::Overdefined);
+                if !push_machine_frame(
+                    &mut frames,
+                    ConstantFrame::Exit {
+                        node,
+                        value: fold_binary(&operator, &left, &right),
+                        cacheable: false,
+                    },
+                    budget,
+                    stats,
+                ) {
+                    on_path.clear();
+                    return ConstLattice::Overdefined;
+                }
+            }
+            ConstantFrame::Unary { node, operator } => {
+                let operand = values.pop().unwrap_or(ConstLattice::Overdefined);
+                if !push_machine_frame(
+                    &mut frames,
+                    ConstantFrame::Exit {
+                        node,
+                        value: fold_unary(&operator, &operand),
+                        cacheable: false,
+                    },
+                    budget,
+                    stats,
+                ) {
+                    on_path.clear();
+                    return ConstLattice::Overdefined;
+                }
+            }
+            ConstantFrame::Forward { node } => {
+                let value = values.pop().unwrap_or(ConstLattice::Overdefined);
+                if !push_machine_frame(
+                    &mut frames,
+                    ConstantFrame::Exit {
+                        node,
+                        value,
+                        cacheable: false,
+                    },
+                    budget,
+                    stats,
+                ) {
+                    on_path.clear();
+                    return ConstLattice::Overdefined;
+                }
+            }
+            ConstantFrame::Exit {
+                node,
+                value,
+                cacheable,
+            } => {
+                if cache_enabled && cacheable && terminal_cache.try_reserve(1).is_ok() {
+                    terminal_cache.insert(node, value.clone());
+                }
+                on_path.remove(&node);
+                if !push_machine_value(&mut values, value, budget) {
+                    return ConstLattice::Overdefined;
+                }
+            }
+        }
     }
-    let value =
-        match cpg.node(node).map(|node| &node.kind) {
-            Some(CpgNodeKind::Literal { kind }) => literal_value(kind),
-            Some(CpgNodeKind::Call { .. }) => match (ctx.resolve)(node) {
-                CalleeRef::Resolved(callee) => ctx
-                    .summaries
-                    .get(&callee)
-                    .map_or(ConstLattice::Overdefined, const_lattice),
-                CalleeRef::External(_) | CalleeRef::Unresolved(_) => ConstLattice::Overdefined,
-            },
-            Some(CpgNodeKind::Identifier { .. }) => {
-                let mut definitions = cpg.reaching_definitions(node);
-                if let Some(CpgNodeKind::Identifier {
-                    definition: Some(definition),
-                    ..
-                }) = cpg.node(node).map(|node| &node.kind)
-                {
-                    definitions.push(*definition);
-                }
-                definitions.sort_unstable();
-                definitions.dedup();
-                if definitions.is_empty() {
-                    ConstLattice::Overdefined
-                } else {
-                    let mut result = ConstLattice::Unknown;
-                    for definition in definitions {
-                        let definition_value = evaluate_constant(
-                            cpg,
-                            definition,
-                            ctx,
-                            depth.saturating_add(1),
-                            on_path,
-                            budget,
-                        );
-                        DataflowLattice::join(&mut result, &definition_value);
-                    }
-                    result
-                }
-            }
-            Some(CpgNodeKind::BinaryOp { operator }) => {
-                let children = cpg.ast_children(node);
-                match children.as_slice() {
-                    [left, right, ..] => {
-                        let left = evaluate_constant(
-                            cpg,
-                            *left,
-                            ctx,
-                            depth.saturating_add(1),
-                            on_path,
-                            budget,
-                        );
-                        let right = evaluate_constant(
-                            cpg,
-                            *right,
-                            ctx,
-                            depth.saturating_add(1),
-                            on_path,
-                            budget,
-                        );
-                        fold_binary(operator, &left, &right)
-                    }
-                    _ => ConstLattice::Overdefined,
-                }
-            }
-            Some(CpgNodeKind::UnaryOp { operator }) => cpg
-                .ast_children(node)
-                .first()
-                .copied()
-                .map_or(ConstLattice::Overdefined, |operand| {
-                    let operand = evaluate_constant(
-                        cpg,
-                        operand,
-                        ctx,
-                        depth.saturating_add(1),
-                        on_path,
-                        budget,
-                    );
-                    fold_unary(operator, &operand)
-                }),
-            Some(CpgNodeKind::Assignment { .. }) => cpg
-                .ast_children(node)
-                .get(1)
-                .copied()
-                .map_or(ConstLattice::Overdefined, |rhs| {
-                    evaluate_constant(cpg, rhs, ctx, depth.saturating_add(1), on_path, budget)
-                }),
-            Some(CpgNodeKind::Variable { name, .. }) => cpg
-                .ast_children(node)
-                .into_iter()
-                .rev()
-                .find(|&child| {
-                    !matches!(
-                        cpg.node(child).map(|node| &node.kind),
-                        Some(CpgNodeKind::Identifier { name: child_name, .. }) if child_name == name
-                    )
-                })
-                .map_or(ConstLattice::Overdefined, |initializer| {
-                    evaluate_constant(
-                        cpg,
-                        initializer,
-                        ctx,
-                        depth.saturating_add(1),
-                        on_path,
-                        budget,
-                    )
-                }),
-            Some(CpgNodeKind::Return) => cpg.ast_children(node).first().copied().map_or(
-                ConstLattice::Overdefined,
-                |returned| {
-                    evaluate_constant(cpg, returned, ctx, depth.saturating_add(1), on_path, budget)
-                },
-            ),
-            Some(CpgNodeKind::Parameter { .. }) => ConstLattice::Overdefined,
-            _ => ConstLattice::Overdefined,
-        };
-    on_path.remove(&node);
-    value
+    values.pop().unwrap_or(ConstLattice::Overdefined)
 }
 
 fn const_lattice(summary: &EffectSummary) -> ConstLattice {

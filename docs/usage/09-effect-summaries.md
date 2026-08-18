@@ -96,10 +96,18 @@ fn service_caps() -> IfdsCaps {
 }
 ```
 
-For this domain, `max_call_depth` and `max_worklist_steps` also bound local
-constant/dependence walks. A local breach widens the parameter mask and return
-constant, sets the function summary's `capped` bit, and adds the function to
-`domain_capped_functions`.
+For this domain, `max_call_depth` is the maximum logical AST/def-use path and
+`max_worklist_steps` is the maximum charged node entries across local
+constant/dependence evaluation. The evaluators use typed heap continuation
+frames, so neither setting configures or consumes a proportional native thread
+stack. Raise `max_call_depth` when deeper represented evidence is in policy;
+do not tune the process stack to change analysis semantics.
+
+A local breach widens the parameter mask and return constant, sets the function
+summary's `capped` bit, and adds the function to
+`domain_capped_functions`. Failure to grow input-dependent machine state takes
+the same fail-closed path. An active dependency cycle widens and caps; an
+active constant cycle becomes overdefined without inventing a cap event.
 
 Raising a cap cannot invalidate an already complete deterministic result. A
 lower capped result may contain useful positive effects, but missing effects
@@ -143,6 +151,9 @@ fn resolve_before_effects(cpg: &mut CodePropertyGraph) {
   rejects stale decompositions.
 - Do not infer globals from identifier spelling. Run the DFG/reference and
   call-resolution passes that create typed evidence.
+- Do not treat `max_call_depth` as protection against native recursion. The
+  effect evaluators are already stack-safe; the setting controls admitted
+  logical evidence depth and the precision/completeness result.
 - Do not mutate or sort returned maps into hash iteration order when stable
   serialization matters.
 

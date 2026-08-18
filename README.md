@@ -65,7 +65,8 @@ PDG). A query can therefore mix syntax, control flow, and data flow freely.
   points, and explicit external/unresolved/capped evidence.
 - **Interprocedural effect summaries** — feature-free global, parameter, and
   field read/write places; transitive purity; parameter-to-return flow; and
-  checked constant returns over the same bounded call-SCC schedule.
+  checked constant returns over the same bounded call-SCC schedule, with
+  source-depth state held by explicit heap continuation machines.
 - **Advisory taint and maybe-null analysis** — feature-free, data-driven source,
   sink, sanitizer, external-model, and dereference findings with deterministic
   interprocedural witnesses and explicit completeness evidence.

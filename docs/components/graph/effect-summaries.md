@@ -12,6 +12,8 @@ language syntax strings, query a database, or add a parallel graph.
 
 ![Effect-summary flow](../../diagrams/effect-summary-composition.svg)
 
+![Typed local evaluators keep source-depth continuation state on the heap.](../../diagrams/effect-evaluation-machines.svg)
+
 ## 1. Vocabulary
 
 - A **place** is storage whose observation matters outside one local scalar
@@ -25,6 +27,10 @@ language syntax strings, query a database, or add a parallel graph.
 - **Overdefined** means available paths disagree or an operation cannot be
   folded safely. **Bottom** means no return evidence has arrived yet. They are
   deliberately distinct.
+- A **continuation frame** is a typed heap value describing the work that must
+  resume after one child evaluation. A **local evaluation machine** is the
+  frame stack, value stack, active-path set, terminal cache, and traversal
+  budget considered together.
 
 ## 2. Public API
 
@@ -111,8 +117,8 @@ EFFECT-SUMMARY(function, current summaries, resolver, caps)
     end for
 
     for each represented return expression
-        trace parameter dependence through AST, def-use, and callee masks
-        fold scalar constants through literals, definitions, and callees
+        run PARAMETER-DEPENDENCIES with typed heap continuation frames
+        run EVALUATE-CONSTANT with typed heap continuation frames
         meet all return constants in the three-level constant lattice
     end for
 
@@ -127,6 +133,73 @@ EFFECT-SUMMARY(function, current summaries, resolver, caps)
 The generic solver visits acyclic callees once and recursive strongly
 connected components (SCCs) to a bounded fixed point. Therefore callers see
 stable callee facts without a second whole-program pass.
+
+The two local machines are deliberately separate: their continuation algebras
+and conservative cycle results differ. In literate pseudocode, parameter flow
+is:
+
+```text
+PARAMETER-DEPENDENCIES(root)
+    frames := [Enter(root, depth=0)]
+    values := []
+    active := {}
+
+    while frames is not empty
+        Enter(node, depth):
+            charge the logical depth/work budget
+            if node is active, return every parameter bit and mark capped
+            add node to active
+            if node directly denotes a formal, start with its bit
+            choose ordered children:
+                call -> arguments selected by the callee return mask
+                other -> AST children followed by reaching definitions
+            schedule Visit(node, children, next=0, accumulated_mask)
+
+        Visit(node, children, next, mask):
+            if one child remains, schedule Combine then Enter(child)
+            otherwise schedule Exit(node, mask)
+
+        Combine(...):
+            OR the child result into the mask and resume Visit
+
+        Exit(node, mask):
+            remove node from active and return mask to the parent
+```
+
+Constant folding uses the same enter/exit discipline but gives each suspended
+operation its own frame:
+
+```text
+EVALUATE-CONSTANT(root)
+    frames := [Enter(root, depth=0)]
+    values := []
+    active := {}
+
+    while frames is not empty
+        Enter(node, depth):
+            charge the logical depth/work budget
+            if node is active, return Overdefined
+            literal/call/missing -> schedule terminal Exit
+            identifier -> schedule JoinNext over sorted unique definitions
+            binary -> schedule BinaryLeft, then Enter(left)
+            unary -> schedule Unary, then Enter(operand)
+            assignment/variable/return -> schedule Forward, then Enter(value)
+
+        JoinNext / JoinCombine:
+            evaluate definitions in order and join in the constant lattice
+        BinaryLeft / BinaryRight:
+            retain the left value, evaluate right, then use checked SCCP fold
+        Unary / Forward:
+            fold or forward the returned child value
+        Exit(node, value):
+            remove node from active and return value to the parent
+```
+
+Only terminal results are cached. Every cache hit still performs `Enter` and
+charges one step, so cached and uncached executions have identical cap and work
+semantics. Required machine-owned frame, value, and active-path growth is
+fallible; failure widens and sets visible cap evidence. The cache is an
+optimization, so failure to reserve a cache entry simply omits that entry.
 
 ## 5. Lattice semantics
 
@@ -163,11 +236,16 @@ This delayed remapping is what makes summaries reusable and compositional.
   `BTreeMap`/`BTreeSet`;
 - the exact current call-graph SCC decomposition is validated before analysis;
 - recursive rounds and shared scheduler work use `IfdsCaps`;
-- expression/dependence walks use `max_call_depth`, `max_worklist_steps`, and
-  cycle guards;
+- expression/dependence machines use `max_call_depth` as logical path depth,
+  `max_worklist_steps` as node-entry work, and active-path cycle guards;
+- input depth grows bounded heap frame state, never the native call stack;
+- exact-cap acceptance and one-smaller rejection are part of the tested API
+  behavior, independent of thread-stack size;
 - a domain-local limit sets `EffectSummary::capped`, rolls up through
   `EffectAnalysis::domain_capped_functions`, widens dependencies, and prevents
   `is_complete()` from succeeding;
+- required machine-state allocation failure follows the same fail-closed
+  widening path, while an unavailable optional cache remains semantically inert;
 - the source CPG is never mutated.
 
 An incomplete may-summary can still prove a positive effect. It cannot justify
@@ -176,15 +254,19 @@ the negative claim “this function never writes that place.”
 ## 8. Complexity
 
 Let $`F`$ be functions, $`C`$ call sites, $`A`$ inspected AST/def-use evidence,
-and $`I`$ recursive rounds. Ordered-set operations add logarithmic factors.
-The bounded worst-case work is
+$`I`$ recursive rounds, $`D`$ the maximum admitted local path depth, and $`B`$
+the maximum ordered child frontier. Ordered-set operations add logarithmic
+factors. The bounded worst-case work is
 
 ```math
 O\!\left(I(A+C)\log P\right),
 ```
 
 where $`P`$ is the number of distinct places retained. Acyclic components have
-$`I=1`$. The configured work and depth caps provide operational ceilings.
+$`I=1`$. A local machine retains $`O(D+B)`$ heap continuation/value/path state
+and $`O(A)`$ terminal cache state in the worst case. Its native call depth is
+$`O(1)`$. The configured work and logical-depth caps provide operational
+ceilings.
 
 ## 9. See also
 
@@ -202,3 +284,6 @@ $`I=1`$. The configured work and depth caps provide operational ceilings.
 2. Wegman, M. N., Zadeck, F. K. (1991). *Constant Propagation with Conditional
    Branches.* ACM TOPLAS 13(2), 181–210. DOI:
    [10.1145/103135.103136](https://doi.org/10.1145/103135.103136).
+3. Reynolds, J. C. (1972). *Definitional Interpreters for Higher-Order
+   Programming Languages.* DOI:
+   [10.1145/800194.805852](https://doi.org/10.1145/800194.805852).
