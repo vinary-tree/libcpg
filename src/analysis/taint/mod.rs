@@ -821,7 +821,8 @@ fn call_result_tokens(
             }
         }
         CalleeRef::External(_) | CalleeRef::Unresolved(_) => {
-            let argument_tokens = argument_tokens(cpg, tokens, &arguments, 1_000);
+            let passthrough_inputs = opaque_call_inputs(cpg, call, &arguments);
+            let argument_tokens = argument_tokens(cpg, tokens, &passthrough_inputs, 1_000);
             let external = catalog.external_match(&path);
             let model = external
                 .as_ref()
@@ -850,6 +851,40 @@ fn call_result_tokens(
         }
     }
     output
+}
+
+/// Returns values that may influence an opaque call's result.
+///
+/// Positional arguments are always included. An unresolved/external method
+/// call also receives its expression receiver: wrappers such as
+/// `source().unwrap()` commonly return a value derived from that receiver even
+/// though it is not represented inside the grammar's argument list. The walk
+/// is shallow, ordered, and restricted to the typed callee subtree.
+fn opaque_call_inputs(cpg: &CodePropertyGraph, call: NodeId, arguments: &[NodeId]) -> Vec<NodeId> {
+    let mut inputs = Vec::with_capacity(arguments.len().saturating_add(1));
+    let is_method = cpg.node(call).is_some_and(|node| {
+        matches!(
+            node.kind,
+            CpgNodeKind::Call {
+                is_method: true,
+                ..
+            }
+        )
+    });
+    if is_method {
+        let mut call_children = cpg.ast_children(call);
+        call_children.sort_unstable_by_key(|&node| source_key(cpg, node));
+        if let Some(callee) = call_children.first().copied() {
+            let mut callee_children = cpg.ast_children(callee);
+            callee_children.sort_unstable_by_key(|&node| source_key(cpg, node));
+            if let Some(receiver) = callee_children.first().copied() {
+                inputs.push(receiver);
+            }
+        }
+    }
+    inputs.extend(arguments.iter().copied());
+    inputs.dedup();
+    inputs
 }
 
 fn summarize_call_sinks(
@@ -992,18 +1027,41 @@ fn argument_tokens(
 
 fn tokens_for_value(cpg: &CodePropertyGraph, tokens: &TokenEnv, value: NodeId) -> TokenSet {
     let mut result = tokens.get(&value).cloned().unwrap_or_default();
-    let mut descendants = cpg.ast_descendants(value);
-    descendants.sort_unstable();
-    for descendant in descendants {
-        if cpg
-            .node(descendant)
-            .is_some_and(|node| matches!(node.kind, CpgNodeKind::Function { .. }))
-        {
+    if cpg
+        .node(value)
+        .is_some_and(|node| matches!(node.kind, CpgNodeKind::Call { .. }))
+    {
+        return result;
+    }
+
+    let mut children = cpg.ast_children(value);
+    children.sort_unstable_by_key(|&node| source_key(cpg, node));
+    children.reverse();
+    let mut stack = children;
+    let mut visited = BTreeSet::new();
+    while let Some(descendant) = stack.pop() {
+        if !visited.insert(descendant) {
+            continue;
+        }
+        let Some(node) = cpg.node(descendant) else {
+            continue;
+        };
+        if matches!(node.kind, CpgNodeKind::Function { .. }) {
             continue;
         }
         if let Some(found) = tokens.get(&descendant) {
             join_witness_map(&mut result, found);
         }
+        // A nested call's result has already been computed by
+        // `call_result_tokens`; descending into its arguments would bypass a
+        // sanitizer or a resolved procedure summary.
+        if matches!(node.kind, CpgNodeKind::Call { .. }) {
+            continue;
+        }
+        let mut nested = cpg.ast_children(descendant);
+        nested.sort_unstable_by_key(|&node| source_key(cpg, node));
+        nested.reverse();
+        stack.extend(nested);
     }
     result
 }

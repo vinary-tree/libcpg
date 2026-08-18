@@ -218,6 +218,71 @@ fn scenario_05_external_passthrough_preserves_taint() {
 }
 
 #[test]
+fn opaque_method_passthrough_preserves_receiver_taint() {
+    let mut cpg = CodePropertyGraph::new(Language::Rust);
+    let function = function(&mut cpg, "entry");
+    let wrapper = child(
+        &mut cpg,
+        function,
+        CpgNodeKind::Call {
+            target: None,
+            is_method: true,
+        },
+    );
+    let member = child(
+        &mut cpg,
+        wrapper,
+        CpgNodeKind::MemberAccess {
+            member: "unwrap".into(),
+        },
+    );
+    let source = call(&mut cpg, member, "std::env::var", None);
+    child(
+        &mut cpg,
+        member,
+        CpgNodeKind::Identifier {
+            name: "unwrap".into(),
+            definition: None,
+        },
+    );
+    let sink = call(&mut cpg, function, "os.system", None);
+    argument(&mut cpg, sink, "wrapped", Some(wrapper));
+
+    let analysis = builtin(&cpg);
+    let flow = analysis
+        .flows
+        .iter()
+        .find(|flow| flow.source == source && flow.sink == sink)
+        .expect("opaque method result retains receiver taint");
+    assert!(flow.witness.contains(&wrapper));
+    assert!(flow.confidence <= 0.5);
+}
+
+#[test]
+fn resolved_constant_return_does_not_leak_argument_taint() {
+    let mut cpg = CodePropertyGraph::new(Language::Rust);
+    let caller = function(&mut cpg, "caller");
+    let helper = function(&mut cpg, "constant");
+    parameter(&mut cpg, helper, "ignored");
+    return_value(
+        &mut cpg,
+        helper,
+        CpgNodeKind::Literal {
+            kind: LiteralKind::String("fixed".into()),
+        },
+        None,
+    );
+
+    let source = call(&mut cpg, caller, "std::env::var", None);
+    let helper_call = call(&mut cpg, caller, "constant", Some(helper));
+    argument(&mut cpg, helper_call, "tainted", Some(source));
+    let sink = call(&mut cpg, caller, "os.system", None);
+    argument(&mut cpg, sink, "constant", Some(helper_call));
+
+    assert!(builtin(&cpg).flows.is_empty());
+}
+
+#[test]
 fn scenario_06_external_sink_model_reports_flow() {
     let mut catalog = TaintCatalog::builtin_generic();
     catalog.externals.insert(

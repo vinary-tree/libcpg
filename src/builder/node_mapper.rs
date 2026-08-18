@@ -312,6 +312,9 @@ impl NodeMapper {
             "field_expression" => CpgNodeKind::MemberAccess {
                 member: self.extract_child_text(node, "field", source),
             },
+            "scoped_identifier" | "scoped_type_identifier" => CpgNodeKind::MemberAccess {
+                member: self.extract_child_text(node, "name", source),
+            },
             "index_expression" => CpgNodeKind::IndexAccess,
             "identifier" if self.is_rust_for_binding(node) => CpgNodeKind::Variable {
                 name: Arc::from(self.node_text(node, source)),
@@ -2914,6 +2917,7 @@ pub enum E { A, B }
 pub trait T { fn m(&self); }
 mod inner { }
 type Alias = i32;
+type ScopedAlias = std::vec::Vec<i32>;
 
 impl T for S {
     fn m(&self) { }
@@ -3009,6 +3013,8 @@ fn g() -> Result<i32, ()> { Ok(1) }
             "compound_assignment_expr" => CpgNodeKind::Assignment { .. },
             "call_expression" => CpgNodeKind::Call { .. },
             "field_expression" => CpgNodeKind::MemberAccess { .. },
+            "scoped_identifier" => CpgNodeKind::MemberAccess { .. },
+            "scoped_type_identifier" => CpgNodeKind::MemberAccess { .. },
             "index_expression" => CpgNodeKind::IndexAccess,
             "identifier" => CpgNodeKind::Identifier { .. },
             "type_identifier" => CpgNodeKind::Identifier { .. },
@@ -3070,6 +3076,14 @@ fn g() -> Result<i32, ()> { Ok(1) }
             call_flags.contains(&false),
             "`g()` is a free call; flags were {call_flags:?}"
         );
+        assert!(p.iter().any(|(kind, mapped)| {
+            kind == "scoped_identifier"
+                && matches!(mapped, CpgNodeKind::MemberAccess { member } if member.as_ref() == "new")
+        }));
+        assert!(p.iter().any(|(kind, mapped)| {
+            kind == "scoped_type_identifier"
+                && matches!(mapped, CpgNodeKind::MemberAccess { member } if member.as_ref() == "Vec")
+        }));
 
         // ---- integer literals are parsed in every radix the language spells ----
         let ints: Vec<i64> = p

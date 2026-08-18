@@ -4,6 +4,8 @@ use libcpg::{
     DfgEdgeKind, IfdsCaps, Language, LiteralKind, MethodSignature, NodeId, NullOriginKind, Pattern,
     SourceRange, TaintCatalog, Visibility,
 };
+#[cfg(feature = "lang-rust")]
+use libcpg::{resolve_calls, CpgBuilder, CpgBuilderConfig, ResolveConfig, TreeSitterCpgBuilder};
 
 fn function_kind(name: &str) -> CpgNodeKind {
     CpgNodeKind::Function {
@@ -123,6 +125,35 @@ fn public_taint_api_classifies_typed_member_paths_and_preserves_shape() {
         report.flows
     );
     assert_eq!((cpg.node_count(), cpg.edge_count()), shape);
+}
+
+#[test]
+#[cfg(feature = "lang-rust")]
+fn tree_sitter_rust_cpg_supports_direct_builtin_taint_flow() {
+    let source = r#"
+fn entry() {
+    let input = std::env::var("CMD").unwrap();
+    std::process::Command::new(input);
+}
+"#;
+    let mut cpg = TreeSitterCpgBuilder::with_config(CpgBuilderConfig {
+        resolve_imports: true,
+        ..CpgBuilderConfig::default()
+    })
+    .build(source, Language::Rust)
+    .expect("Rust CPG");
+    let resolution = resolve_calls(&mut cpg, &ResolveConfig::default());
+    let report = analyze_taint_report(
+        &cpg,
+        &resolution,
+        &TaintCatalog::builtin_generic(),
+        &IfdsCaps::default(),
+    );
+
+    assert!(report.is_complete());
+    assert!(report.flows.iter().any(|flow| {
+        flow.source_class.as_ref() == "env" && flow.sink_class.as_ref() == "command"
+    }));
 }
 
 #[test]
