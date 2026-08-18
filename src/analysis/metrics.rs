@@ -123,6 +123,72 @@ pub struct ClassMetrics {
     pub lcom: LcomSuite,
 }
 
+/// Stack-safe hierarchy depth and direct-child count for one node.
+///
+/// A strongly connected set of cyclic parent relations is treated as one
+/// hierarchy level. Every member of that component therefore receives the
+/// same depth, measured as the longest path from a root component in the SCC
+/// condensation DAG. `direct_children` counts distinct input children before
+/// condensation, excluding self-relations.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+pub struct HierarchyMetrics {
+    /// Stable node identifier.
+    pub node: NodeId,
+    /// Longest root-to-node depth after cyclic components are condensed.
+    pub depth: u32,
+    /// Number of distinct nodes that directly name this node as a parent.
+    pub direct_children: u32,
+}
+
+/// Computes deterministic metrics for an arbitrary child-to-parent hierarchy.
+///
+/// `nodes` defines the complete hierarchy domain. Relations whose child or
+/// parent is outside that domain are ignored, while duplicate relations are
+/// collapsed. Results contain every distinct domain node in ascending
+/// [`NodeId`] order. Self-relations and larger cycles are condensed by libcpg's
+/// iterative SCC engine, so hierarchy depth never consumes the native call
+/// stack and remains finite for malformed cyclic input.
+pub fn hierarchy_metrics(
+    nodes: &[NodeId],
+    child_to_parent: &[(NodeId, NodeId)],
+) -> Vec<HierarchyMetrics> {
+    let nodes: Vec<_> = nodes
+        .iter()
+        .copied()
+        .collect::<BTreeSet<_>>()
+        .into_iter()
+        .collect();
+    if nodes.is_empty() {
+        return Vec::new();
+    }
+
+    let domain: BTreeSet<_> = nodes.iter().copied().collect();
+    let relations: Vec<_> = child_to_parent
+        .iter()
+        .copied()
+        .filter(|(child, parent)| domain.contains(child) && domain.contains(parent))
+        .collect::<BTreeSet<_>>()
+        .into_iter()
+        .collect();
+    let depths = inheritance_depths(&nodes, &relations);
+    let mut children = BTreeMap::<NodeId, BTreeSet<NodeId>>::new();
+    for &(child, parent) in &relations {
+        if child != parent {
+            children.entry(parent).or_default().insert(child);
+        }
+    }
+
+    nodes
+        .into_iter()
+        .map(|node| HierarchyMetrics {
+            node,
+            depth: depths.get(&node).copied().unwrap_or(0),
+            direct_children: u32_len(children.get(&node).map_or(0, BTreeSet::len)),
+        })
+        .collect()
+}
+
 /// Halstead's distinct and total operator/operand counts and derived values.
 #[derive(Debug, Clone, Copy, PartialEq)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
@@ -314,7 +380,10 @@ pub fn ck_metrics(cpg: &CodePropertyGraph, options: &CkOptions) -> Vec<ClassMetr
     }
 
     let inheritance = inheritance_edges(cpg, &all_nominals, options.include_implements);
-    let depths = inheritance_depths(&all_nominals, &inheritance);
+    let hierarchy: BTreeMap<_, _> = hierarchy_metrics(&all_nominals, &inheritance)
+        .into_iter()
+        .map(|metrics| (metrics.node, metrics))
+        .collect();
     classes
         .into_iter()
         .map(|class| {
@@ -324,14 +393,9 @@ pub fn ck_metrics(cpg: &CodePropertyGraph, options: &CkOptions) -> Vec<ClassMetr
                 sum.saturating_add(function_metrics_unchecked(cpg, method).cyclomatic_complexity)
             });
 
-            let noc = u32_len(
-                inheritance
-                    .iter()
-                    .filter(|(_, parent)| *parent == class)
-                    .map(|(child, _)| *child)
-                    .collect::<BTreeSet<_>>()
-                    .len(),
-            );
+            let hierarchy = hierarchy
+                .get(&class)
+                .expect("every selected class belongs to the nominal hierarchy domain");
 
             let mut response = method_set.clone();
             let mut coupled = BTreeSet::new();
@@ -374,8 +438,8 @@ pub fn ck_metrics(cpg: &CodePropertyGraph, options: &CkOptions) -> Vec<ClassMetr
             ClassMetrics {
                 class,
                 wmc,
-                dit: depths.get(&class).copied().unwrap_or(0),
-                noc,
+                dit: hierarchy.depth,
+                noc: hierarchy.direct_children,
                 cbo: u32_len(coupled.len()),
                 rfc: u32_len(response.len()),
                 lcom: lcom_suite(graph),
@@ -1664,6 +1728,74 @@ mod tests {
     }
 
     #[test]
+    fn hierarchy_metrics_cover_branching_depth_children_and_external_edges() {
+        let nodes = (0..=4).map(NodeId::new).collect::<Vec<_>>();
+        let metrics = hierarchy_metrics(
+            &nodes,
+            &[
+                (NodeId::new(1), NodeId::new(0)),
+                (NodeId::new(2), NodeId::new(0)),
+                (NodeId::new(3), NodeId::new(1)),
+                (NodeId::new(3), NodeId::new(2)),
+                (NodeId::new(4), NodeId::new(3)),
+                (NodeId::new(4), NodeId::new(99)),
+            ],
+        );
+
+        assert_eq!(
+            metrics,
+            vec![
+                HierarchyMetrics {
+                    node: NodeId::new(0),
+                    depth: 0,
+                    direct_children: 2,
+                },
+                HierarchyMetrics {
+                    node: NodeId::new(1),
+                    depth: 1,
+                    direct_children: 1,
+                },
+                HierarchyMetrics {
+                    node: NodeId::new(2),
+                    depth: 1,
+                    direct_children: 1,
+                },
+                HierarchyMetrics {
+                    node: NodeId::new(3),
+                    depth: 2,
+                    direct_children: 1,
+                },
+                HierarchyMetrics {
+                    node: NodeId::new(4),
+                    depth: 3,
+                    direct_children: 0,
+                },
+            ]
+        );
+    }
+
+    #[test]
+    fn hierarchy_metrics_are_stack_safe_on_a_deep_chain() {
+        const NODE_COUNT: u32 = 50_000;
+        std::thread::Builder::new()
+            .name("hierarchy-small-stack".into())
+            .stack_size(64 * 1024)
+            .spawn(|| {
+                let nodes = (0..NODE_COUNT).map(NodeId::new).collect::<Vec<_>>();
+                let relations = (1..NODE_COUNT)
+                    .map(|child| (NodeId::new(child), NodeId::new(child - 1)))
+                    .collect::<Vec<_>>();
+                let metrics = hierarchy_metrics(&nodes, &relations);
+                assert_eq!(metrics.len(), NODE_COUNT as usize);
+                assert_eq!(metrics[0].depth, 0);
+                assert_eq!(metrics.last().expect("last node").depth, NODE_COUNT - 1);
+            })
+            .expect("spawn constrained-stack hierarchy test")
+            .join()
+            .expect("hierarchy analysis must not overflow the native stack");
+    }
+
+    #[test]
     fn class_selection_options_cover_structs_enums_and_implements() {
         let mut cpg = CodePropertyGraph::new(Language::Rust);
         cpg.add_node_with_id(node(
@@ -1784,6 +1916,33 @@ mod tests {
     }
 
     proptest! {
+        #[test]
+        fn hierarchy_metrics_are_permutation_invariant_and_bounded(
+            node_count in 1u32..40,
+            raw_relations in prop::collection::vec((0u32..80, 0u32..80), 0..160),
+        ) {
+            let nodes = (0..node_count).map(NodeId::new).collect::<Vec<_>>();
+            let relations = raw_relations
+                .into_iter()
+                .map(|(child, parent)| {
+                    (NodeId::new(child % node_count), NodeId::new(parent % node_count))
+                })
+                .collect::<Vec<_>>();
+            let mut permuted = relations.clone();
+            permuted.reverse();
+            permuted.extend(relations.iter().copied());
+
+            let first = hierarchy_metrics(&nodes, &relations);
+            let second = hierarchy_metrics(&nodes, &permuted);
+            prop_assert_eq!(&first, &second);
+            prop_assert_eq!(first.len(), node_count as usize);
+            for (position, metrics) in first.iter().enumerate() {
+                prop_assert_eq!(metrics.node, NodeId::new(position as u32));
+                prop_assert!(metrics.depth < node_count);
+                prop_assert!(metrics.direct_children < node_count);
+            }
+        }
+
         #[test]
         fn ck_and_lcom_are_deterministic_under_insertion_order(
             method_count in 1usize..6,

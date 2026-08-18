@@ -125,8 +125,9 @@ pub use loops::{loop_forest, LoopExitEdge, LoopForest, NaturalLoop};
 pub use martin::{martin_metrics, sdp_violations, MartinMetrics, ModuleAssignment, SdpViolation};
 
 pub use metrics::{
-    ck_metrics, function_metrics, method_field_graph, CkOptions, ClassMetrics, FunctionMetrics,
-    HalsteadMetrics, LcomSuite, MethodCall, MethodFieldAccess, MethodFieldGraph,
+    ck_metrics, function_metrics, hierarchy_metrics, method_field_graph, CkOptions, ClassMetrics,
+    FunctionMetrics, HalsteadMetrics, HierarchyMetrics, LcomSuite, MethodCall, MethodFieldAccess,
+    MethodFieldGraph,
 };
 
 pub use motifs::{
