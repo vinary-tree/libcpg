@@ -1,18 +1,18 @@
 # Serialization
 
-libcpg can persist and reload a [`CodePropertyGraph`](../GLOSSARY.md#code-property-graph-cpg) through [serde](https://serde.rs). The outer format remains caller-selected, with one deliberate inner representation for recursively nested metadata:
+libcpg can persist and reload a [`CodePropertyGraph`](../GLOSSARY.md#code-property-graph-cpg) through [serde](https://serde.rs). The outer format remains caller-selected, with deliberate inner representations for logically recursive values:
 
 > Graph serialization is **Serde-based**. Most graph types derive
-> `Serialize`/`Deserialize`; `PropertyValue` implements the traits explicitly
-> and embeds its flat, bounded, versioned CPV1 bytes. There is no whole-graph
+> `Serialize`/`Deserialize`; `PropertyValue` and `ExprKey` implement the traits
+> explicitly and embed flat, bounded, versioned CPV1 and CEK1 bytes. There is no whole-graph
 > `export`/`import` function or prescribed outer format. You choose JSON,
 > bincode, MessagePack, CBOR, or another Serde backend.
 
-The CPV1 exception is load-bearing: the former recursive property enum made
-clone, formatting, serialization, deserialization, and destruction consume
-native stack in proportion to logical depth. This guide shows the two graph
-round-trip patterns, the property migration, the ordering rule for
-reconstruction, and one field you must know is skipped.
+The CPV1 and CEK1 exceptions are load-bearing: the former recursive property
+and expression types made lifecycle and persistence consume native stack in
+proportion to logical depth. This guide shows the two graph round-trip
+patterns, both migrations, the ordering rule for reconstruction, and one field
+you must know is skipped.
 
 ---
 
@@ -28,6 +28,9 @@ serde_json = "1"
 ```
 
 The `serde` feature expands to `["dep:serde", "petgraph/serde-1"]` — it pulls in serde itself and turns on serde support in `petgraph`, so the underlying `DiGraph` (and therefore the whole `CodePropertyGraph`) becomes serialisable. Supported graph types include `CodePropertyGraph`, `CpgNode`, `CpgEdge`, `PropertyValue`, all the kind enums (`CpgNodeKind`, `CpgEdgeKind`, `CfgEdgeKind`, `DfgEdgeKind`, `MsgKind`, `LockKind`, and `LockMode`), `NodeId`/`EdgeId`, `SourceRange`, `Language`, and `CpgStats`.
+
+Analysis result types include `ExprKey` and `ExprFacts`; their expression roots
+serialize through CEK1 rather than a recursive Serde visitor.
 
 `CpgNode.message_kind` and `CpgNode.lock_kind` are optional typed concurrency
 metadata. Both fields deserialize with a `None` default, so snapshots produced
@@ -154,6 +157,47 @@ keys must be strings. Parser-built and mapper-built property maps are normally
 empty. If you populate the map and the selected key variant cannot be a JSON
 object key, use a format with arbitrary map keys or store a string-keyed
 snapshot. This limitation belongs to JSON's object model, not CPV1.
+
+---
+
+## Expression keys: shared arenas and CEK1
+
+Construct keys with the fallible API and observe them through borrowed views:
+
+```rust
+use libcpg::{ExprKey, ExprOperand, ExprOperandRef};
+
+let nested = ExprKey::try_new("-", vec![ExprOperand::Variable("x".into())])?;
+let key = ExprKey::try_new(
+    "+",
+    vec![ExprOperand::Expression(nested), ExprOperand::Integer(1)],
+)?;
+
+assert_eq!(key.operator(), "+");
+assert!(matches!(
+    key.operands().get(0),
+    Some(ExprOperandRef::Expression(_))
+));
+
+let json = serde_json::to_vec(&key)?;
+let decoded: ExprKey = serde_json::from_slice(&json)?;
+assert_eq!(decoded, key);
+# Ok::<(), Box<dyn std::error::Error>>(())
+```
+
+`expression_facts` shares one physical postorder arena across every root in its
+`ExprUniverse`; this prevents quadratic ownership on nested syntax. A
+standalone serialized key uses canonical CEK1 bytes. If a shared child appears
+twice, CEK1 emits two tree occurrences so one byte string has one physical
+interpretation. Node, operand, string-byte, encoded-byte, and work limits are
+independent. `ExprKey::decode_with_limits` and
+`expression_facts_with_limits` expose caller-selected policies.
+
+The source migrations are intentional: use `ExprKey::try_new` instead of a
+struct literal, `ExprOperand::Expression(key)` instead of a boxed key, and
+`operator()`/`operands()` instead of public recursive fields. Failed CEK1
+decoding is final; do not retry the retired recursive Serde shape. See
+[ADR-0041](../design/0041-shared-flat-expression-facts.md).
 
 ---
 

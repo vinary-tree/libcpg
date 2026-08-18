@@ -1,13 +1,18 @@
 //! Deterministic dense fact universes shared by data-flow analyses.
 
 use std::{
-    collections::{BTreeMap, BTreeSet},
+    cmp::Reverse,
+    collections::{BTreeMap, BTreeSet, BinaryHeap},
     sync::Arc,
 };
 
 use crate::{CodePropertyGraph, CpgNodeKind, DefinitionKind, LiteralKind, NodeId, UseKind};
 
 use super::super::function_scope_nodes;
+use super::{
+    expr_key::{ExprArenaBuilder, ExprBuildOperand},
+    ExprKey, ExprKeyError, ExprKeyLimit, ExprKeyLimits,
+};
 
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
@@ -27,8 +32,7 @@ impl<T: Ord> FactUniverse<T> {
     /// Panics if $`2^{32}`$ or more distinct facts are supplied.
     pub fn new(values: impl IntoIterator<Item = T>) -> Self {
         let mut values: Vec<_> = values.into_iter().collect();
-        values.sort_unstable();
-        values.dedup();
+        heap_sort_dedup(&mut values);
         let _ = u32::try_from(values.len()).expect("fact universe exceeds the u32 id domain");
         Self { values }
     }
@@ -73,6 +77,111 @@ impl<T: Ord> FactUniverse<T> {
 impl<T: Ord> FromIterator<T> for FactUniverse<T> {
     fn from_iter<I: IntoIterator<Item = T>>(iter: I) -> Self {
         Self::new(iter)
+    }
+}
+
+pub(super) fn heap_sort_dedup<T: Ord>(values: &mut Vec<T>) {
+    let mut heap = BinaryHeap::with_capacity(values.len());
+    for value in std::mem::take(values) {
+        heap.push(Reverse(value));
+    }
+    values.reserve(heap.len());
+    while let Some(Reverse(value)) = heap.pop() {
+        if values.last().is_none_or(|previous| previous != &value) {
+            values.push(value);
+        }
+    }
+}
+
+/// Canonical structural-expression universe backed by one shared arena.
+///
+/// Dense identifiers follow deterministic structural-class creation order in
+/// the postorder arena. Equivalent occurrences share one value without
+/// recursively comparing or copying their logical subtrees.
+#[derive(Clone)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+pub struct ExprUniverse {
+    values: Vec<ExprKey>,
+    #[cfg_attr(feature = "serde", serde(skip))]
+    class_ids: BTreeMap<u64, u32>,
+}
+
+impl std::fmt::Debug for ExprUniverse {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        formatter
+            .debug_struct("ExprUniverse")
+            .field("values", &self.values)
+            .finish()
+    }
+}
+
+impl PartialEq for ExprUniverse {
+    fn eq(&self, other: &Self) -> bool {
+        self.values == other.values
+    }
+}
+
+impl Eq for ExprUniverse {}
+
+impl ExprUniverse {
+    fn try_new(values: impl IntoIterator<Item = ExprKey>) -> Result<Self, ExprKeyError> {
+        let mut by_class = BTreeMap::new();
+        for value in values {
+            by_class.entry(value.class_id()).or_insert(value);
+        }
+        let values: Vec<_> = by_class.into_values().collect();
+        let mut class_ids = BTreeMap::new();
+        for (index, value) in values.iter().enumerate() {
+            let id = u32::try_from(index).map_err(|_| ExprKeyError::ArithmeticOverflow {
+                context: "expression-universe dense identifier",
+            })?;
+            class_ids.insert(value.class_id(), id);
+        }
+        Ok(Self { values, class_ids })
+    }
+
+    /// Returns the number of distinct structural expressions.
+    pub fn len(&self) -> usize {
+        self.values.len()
+    }
+
+    /// Returns whether the expression universe is empty.
+    pub fn is_empty(&self) -> bool {
+        self.values.is_empty()
+    }
+
+    /// Returns the expression with dense identifier `id`.
+    pub fn get(&self, id: u32) -> Option<&ExprKey> {
+        self.values.get(id as usize)
+    }
+
+    /// Returns the dense identifier of a structural expression.
+    pub fn id_of(&self, expression: &ExprKey) -> Option<u32> {
+        if !self.class_ids.is_empty()
+            && self
+                .values
+                .first()
+                .is_some_and(|value| value.shares_arena_with(expression))
+        {
+            return self.class_ids.get(&expression.class_id()).copied();
+        }
+        self.values
+            .iter()
+            .position(|candidate| candidate == expression)
+            .and_then(|index| u32::try_from(index).ok())
+    }
+
+    /// Iterates expressions in dense-id order.
+    pub fn iter(&self) -> impl Iterator<Item = (u32, &ExprKey)> {
+        self.values
+            .iter()
+            .enumerate()
+            .map(|(index, value)| (index as u32, value))
+    }
+
+    /// Returns expressions in dense-id order.
+    pub fn as_slice(&self) -> &[ExprKey] {
+        &self.values
     }
 }
 
@@ -123,8 +232,7 @@ impl VarFacts {
 /// and a plain `=` target are not uses. Nested functions are excluded.
 pub fn variable_facts(cpg: &CodePropertyGraph, function: NodeId) -> VarFacts {
     let scope = function_scope_nodes(cpg, function);
-    let mut nodes: Vec<_> = scope.iter().copied().collect();
-    nodes.sort_unstable();
+    let nodes = super::super::scc::sorted_nodes(scope.iter().copied());
 
     let mut raw_definitions = Vec::new();
     let mut raw_uses = Vec::new();
@@ -193,10 +301,7 @@ pub fn variable_facts(cpg: &CodePropertyGraph, function: NodeId) -> VarFacts {
                 .push(VariableDefinition { variable, kind });
         }
     }
-    for at_node in definitions.values_mut() {
-        at_node.sort_unstable_by_key(|definition| definition.variable);
-        at_node.dedup();
-    }
+    debug_assert!(definitions.values().all(|at_node| at_node.len() == 1));
 
     let mut uses: BTreeMap<NodeId, Vec<u32>> = BTreeMap::new();
     for (node, name, _) in raw_uses {
@@ -204,10 +309,7 @@ pub fn variable_facts(cpg: &CodePropertyGraph, function: NodeId) -> VarFacts {
             uses.entry(node).or_default().push(variable);
         }
     }
-    for at_node in uses.values_mut() {
-        at_node.sort_unstable();
-        at_node.dedup();
-    }
+    debug_assert!(uses.values().all(|at_node| at_node.len() == 1));
 
     VarFacts {
         universe,
@@ -236,52 +338,12 @@ fn assignment_target_name(cpg: &CodePropertyGraph, assignment: NodeId) -> Option
     }
 }
 
-/// One canonical expression operand.
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
-#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
-pub enum ExprOperand {
-    /// Variable read by name.
-    Variable(Arc<str>),
-    /// Signed integer literal.
-    Integer(i64),
-    /// IEEE-754 floating literal represented by exact bits.
-    Float(u64),
-    /// Boolean literal.
-    Bool(bool),
-    /// String literal.
-    String(Arc<str>),
-    /// Character literal.
-    Char(char),
-    /// Null/nil literal.
-    Null,
-    /// Array/list literal.
-    Array,
-    /// Object/map literal.
-    Object,
-    /// Regular-expression literal.
-    Regex(Arc<str>),
-    /// Nested unary or binary expression.
-    Expression(Box<ExprKey>),
-    /// Unsupported operand retained by identity to avoid an unsound match.
-    Opaque(NodeId),
-}
-
-/// Structural key for one unary or binary expression.
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
-#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
-pub struct ExprKey {
-    /// Operator spelling.
-    pub operator: Arc<str>,
-    /// Ordered structural operands.
-    pub operands: Vec<ExprOperand>,
-}
-
 /// Canonical expression occurrences and variable dependencies.
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct ExprFacts {
-    /// Sorted structural expression universe.
-    pub universe: FactUniverse<ExprKey>,
+    /// Deduplicated structural roots in one shared flat arena.
+    pub universe: ExprUniverse,
     /// Sorted variable universe referenced by expressions.
     pub variables: FactUniverse<Arc<str>>,
     /// Expression ids evaluated at each CPG node.
@@ -318,33 +380,69 @@ impl ExprFacts {
 /// literal values, and nested expression keys participate. Unsupported operand
 /// nodes remain identity-qualified, conservatively preventing false CSE/PRE
 /// equivalence.
-pub fn expression_facts(cpg: &CodePropertyGraph, function: NodeId) -> ExprFacts {
+///
+/// # Errors
+///
+/// Returns [`ExprKeyError`] if default node, operand, string-byte,
+/// encoded-byte, or work limits are exceeded, checked arithmetic overflows, or
+/// a required arena/worklist reservation fails. The function never returns a
+/// partial fact universe.
+pub fn expression_facts(
+    cpg: &CodePropertyGraph,
+    function: NodeId,
+) -> Result<ExprFacts, ExprKeyError> {
+    expression_facts_with_limits(cpg, function, ExprKeyLimits::default())
+}
+
+/// Re-derives expression facts with explicit arena and logical-key limits.
+///
+/// Any exceeded cap fails the entire derivation. No partial universe is
+/// returned because omitting an expression could make a Must analysis report
+/// an unsound negative claim.
+///
+/// # Errors
+///
+/// Returns [`ExprKeyError`] for a named limit, checked arithmetic, or fallible
+/// allocation failure while building the shared postorder arena.
+pub fn expression_facts_with_limits(
+    cpg: &CodePropertyGraph,
+    function: NodeId,
+    limits: ExprKeyLimits,
+) -> Result<ExprFacts, ExprKeyError> {
     let scope = function_scope_nodes(cpg, function);
-    let mut nodes: Vec<_> = scope.iter().copied().collect();
-    nodes.sort_unstable();
+    let nodes = super::super::scc::sorted_nodes(scope.iter().copied());
+    let expression_nodes: Vec<_> = nodes
+        .iter()
+        .copied()
+        .filter(|&node| {
+            matches!(
+                cpg.node(node).map(|node| &node.kind),
+                Some(CpgNodeKind::BinaryOp { .. } | CpgNodeKind::UnaryOp { .. })
+            )
+        })
+        .collect();
+
+    let BuiltExpressionArena {
+        arena,
+        roots,
+        variable_names,
+    } = build_expression_arena(cpg, &expression_nodes, limits)?;
     let mut raw = Vec::new();
     let mut all_variables = BTreeSet::new();
 
-    for node in nodes {
-        let Some(kind) = cpg.node(node).map(|node| &node.kind) else {
-            continue;
-        };
-        if !matches!(
-            kind,
-            CpgNodeKind::BinaryOp { .. } | CpgNodeKind::UnaryOp { .. }
-        ) {
-            continue;
-        }
-        let mut on_path = BTreeSet::new();
-        if let Some(key) = expression_key(cpg, node, &mut on_path) {
-            let mut variables = BTreeSet::new();
-            collect_operand_variables(&key, &mut variables);
-            all_variables.extend(variables.iter().cloned());
-            raw.push((node, key, variables));
-        }
+    raw.try_reserve(expression_nodes.len())
+        .map_err(|error| ExprKeyError::AllocationFailed {
+            context: "expression-fact occurrences",
+            message: error.to_string(),
+        })?;
+    for node in expression_nodes {
+        let root = roots[&node];
+        let variables = variable_names[root as usize].clone();
+        all_variables.extend(variables.iter().cloned());
+        raw.push((node, ExprKey::from_shared(arena.clone(), root), variables));
     }
 
-    let universe = FactUniverse::new(raw.iter().map(|(_, key, _)| key.clone()));
+    let universe = ExprUniverse::try_new(raw.iter().map(|(_, key, _)| key.clone()))?;
     let variables = FactUniverse::new(all_variables);
     let mut generated: BTreeMap<NodeId, Vec<u32>> = BTreeMap::new();
     let mut occurrences = vec![Vec::new(); universe.len()];
@@ -357,14 +455,10 @@ pub fn expression_facts(cpg: &CodePropertyGraph, function: NodeId) -> ExprFacts 
         occurrences[expression as usize].push(node);
         operand_names[expression as usize].extend(names);
     }
-    for expressions in generated.values_mut() {
-        expressions.sort_unstable();
-        expressions.dedup();
-    }
-    for nodes in &mut occurrences {
-        nodes.sort_unstable();
-        nodes.dedup();
-    }
+    debug_assert!(generated.values().all(|expressions| expressions.len() == 1));
+    debug_assert!(occurrences
+        .iter()
+        .all(|nodes| nodes.windows(2).all(|pair| pair[0] < pair[1])));
     let operand_variables = operand_names
         .into_iter()
         .map(|names| {
@@ -375,77 +469,198 @@ pub fn expression_facts(cpg: &CodePropertyGraph, function: NodeId) -> ExprFacts 
         })
         .collect();
 
-    ExprFacts {
+    Ok(ExprFacts {
         universe,
         variables,
         generated,
         occurrences,
         operand_variables,
-    }
+    })
 }
 
-fn expression_key(
+struct BuiltExpressionArena {
+    arena: Arc<super::expr_key::ExprArena>,
+    roots: BTreeMap<NodeId, u64>,
+    variable_names: Vec<BTreeSet<Arc<str>>>,
+}
+
+fn build_expression_arena(
     cpg: &CodePropertyGraph,
-    node: NodeId,
-    on_path: &mut BTreeSet<NodeId>,
-) -> Option<ExprKey> {
-    if !on_path.insert(node) {
-        return None;
+    expression_nodes: &[NodeId],
+    limits: ExprKeyLimits,
+) -> Result<BuiltExpressionArena, ExprKeyError> {
+    struct Frame {
+        node: NodeId,
+        operator: Arc<str>,
+        children: Vec<NodeId>,
+        next: usize,
+        operands: Vec<ExprBuildOperand>,
+        variables: BTreeSet<Arc<str>>,
     }
-    let operator = match cpg.node(node).map(|node| &node.kind) {
-        Some(CpgNodeKind::BinaryOp { operator } | CpgNodeKind::UnaryOp { operator }) => {
-            operator.clone()
-        }
-        _ => {
-            on_path.remove(&node);
-            return None;
-        }
-    };
-    let operands = cpg
-        .ast_children(node)
-        .into_iter()
-        .map(|child| expression_operand(cpg, child, on_path))
-        .collect();
-    on_path.remove(&node);
-    Some(ExprKey { operator, operands })
-}
 
-fn expression_operand(
-    cpg: &CodePropertyGraph,
-    node: NodeId,
-    on_path: &mut BTreeSet<NodeId>,
-) -> ExprOperand {
-    match cpg.node(node).map(|node| &node.kind) {
-        Some(CpgNodeKind::Identifier { name, .. }) => ExprOperand::Variable(name.clone()),
-        Some(CpgNodeKind::Literal { kind }) => match kind {
-            LiteralKind::Integer(value) => ExprOperand::Integer(*value),
-            LiteralKind::Float(value) => ExprOperand::Float(value.to_bits()),
-            LiteralKind::String(value) => ExprOperand::String(value.clone()),
-            LiteralKind::Char(value) => ExprOperand::Char(*value),
-            LiteralKind::Bool(value) => ExprOperand::Bool(*value),
-            LiteralKind::Null => ExprOperand::Null,
-            LiteralKind::Array => ExprOperand::Array,
-            LiteralKind::Object => ExprOperand::Object,
-            LiteralKind::Regex(value) => ExprOperand::Regex(value.clone()),
-        },
-        Some(CpgNodeKind::BinaryOp { .. } | CpgNodeKind::UnaryOp { .. }) => {
-            expression_key(cpg, node, on_path)
-                .map(|key| ExprOperand::Expression(Box::new(key)))
-                .unwrap_or(ExprOperand::Opaque(node))
-        }
-        _ => ExprOperand::Opaque(node),
-    }
-}
-
-fn collect_operand_variables(key: &ExprKey, variables: &mut BTreeSet<Arc<str>>) {
-    for operand in &key.operands {
-        match operand {
-            ExprOperand::Variable(name) => {
-                variables.insert(name.clone());
+    fn frame(cpg: &CodePropertyGraph, node: NodeId) -> Result<Frame, ExprKeyError> {
+        let operator = match cpg.node(node).map(|node| &node.kind) {
+            Some(CpgNodeKind::BinaryOp { operator } | CpgNodeKind::UnaryOp { operator }) => {
+                operator.clone()
             }
-            ExprOperand::Expression(nested) => collect_operand_variables(nested, variables),
-            _ => {}
+            _ => {
+                return Err(ExprKeyError::ArithmeticOverflow {
+                    context: "expression frame requires an operator node",
+                })
+            }
+        };
+        let children = cpg.ast_children(node);
+        let mut operands = Vec::new();
+        operands
+            .try_reserve(children.len())
+            .map_err(|error| ExprKeyError::AllocationFailed {
+                context: "expression extraction frame",
+                message: error.to_string(),
+            })?;
+        Ok(Frame {
+            node,
+            operator,
+            children,
+            next: 0,
+            operands,
+            variables: BTreeSet::new(),
+        })
+    }
+
+    fn limit(dimension: ExprKeyLimit, actual: usize, maximum: usize) -> Result<(), ExprKeyError> {
+        if actual > maximum {
+            Err(ExprKeyError::LimitExceeded {
+                limit: dimension,
+                actual,
+                maximum,
+            })
+        } else {
+            Ok(())
         }
+    }
+
+    let mut builder = ExprArenaBuilder::new(limits);
+    let mut roots = BTreeMap::new();
+    let mut variables_by_node: Vec<BTreeSet<Arc<str>>> = Vec::new();
+    let mut active = BTreeSet::new();
+    let mut work = Vec::new();
+    let mut scheduled_nodes = 0usize;
+    let mut scheduled_operands = 0usize;
+
+    for &root in expression_nodes {
+        if roots.contains_key(&root) {
+            continue;
+        }
+        scheduled_nodes =
+            scheduled_nodes
+                .checked_add(1)
+                .ok_or(ExprKeyError::ArithmeticOverflow {
+                    context: "scheduled expression nodes",
+                })?;
+        limit(ExprKeyLimit::Nodes, scheduled_nodes, limits.max_nodes)?;
+        let root_frame = frame(cpg, root)?;
+        scheduled_operands = scheduled_operands
+            .checked_add(root_frame.children.len())
+            .ok_or(ExprKeyError::ArithmeticOverflow {
+                context: "scheduled expression operands",
+            })?;
+        limit(
+            ExprKeyLimit::Operands,
+            scheduled_operands,
+            limits.max_operands,
+        )?;
+        active.insert(root);
+        work.push(root_frame);
+
+        while let Some(current) = work.last_mut() {
+            if let Some(&child) = current.children.get(current.next) {
+                current.next += 1;
+                match cpg.node(child).map(|node| &node.kind) {
+                    Some(CpgNodeKind::Identifier { name, .. }) => {
+                        current.variables.insert(name.clone());
+                        current
+                            .operands
+                            .push(ExprBuildOperand::Variable(name.clone()));
+                    }
+                    Some(CpgNodeKind::Literal { kind }) => {
+                        current.operands.push(literal_operand(kind));
+                    }
+                    Some(CpgNodeKind::BinaryOp { .. } | CpgNodeKind::UnaryOp { .. }) => {
+                        if active.contains(&child) {
+                            current.operands.push(ExprBuildOperand::Opaque(child));
+                        } else if let Some(&child_root) = roots.get(&child) {
+                            current
+                                .variables
+                                .extend(variable_names_for(&variables_by_node, child_root));
+                            current
+                                .operands
+                                .push(ExprBuildOperand::Expression(child_root));
+                        } else {
+                            scheduled_nodes = scheduled_nodes.checked_add(1).ok_or(
+                                ExprKeyError::ArithmeticOverflow {
+                                    context: "scheduled expression nodes",
+                                },
+                            )?;
+                            limit(ExprKeyLimit::Nodes, scheduled_nodes, limits.max_nodes)?;
+                            let child_frame = frame(cpg, child)?;
+                            scheduled_operands = scheduled_operands
+                                .checked_add(child_frame.children.len())
+                                .ok_or(ExprKeyError::ArithmeticOverflow {
+                                    context: "scheduled expression operands",
+                                })?;
+                            limit(
+                                ExprKeyLimit::Operands,
+                                scheduled_operands,
+                                limits.max_operands,
+                            )?;
+                            active.insert(child);
+                            work.push(child_frame);
+                        }
+                    }
+                    _ => current.operands.push(ExprBuildOperand::Opaque(child)),
+                }
+                continue;
+            }
+
+            let completed = work.pop().expect("one active expression frame");
+            active.remove(&completed.node);
+            let variables = completed.variables;
+            let node = builder.push(completed.operator, completed.operands)?;
+            debug_assert_eq!(node as usize, variables_by_node.len());
+            variables_by_node.push(variables.clone());
+            roots.insert(completed.node, node);
+            if let Some(parent) = work.last_mut() {
+                parent.variables.extend(variables);
+                parent.operands.push(ExprBuildOperand::Expression(node));
+            }
+        }
+    }
+
+    Ok(BuiltExpressionArena {
+        arena: builder.finish(),
+        roots,
+        variable_names: variables_by_node,
+    })
+}
+
+fn variable_names_for(
+    variables_by_node: &[BTreeSet<Arc<str>>],
+    node: u64,
+) -> impl Iterator<Item = Arc<str>> + '_ {
+    variables_by_node[node as usize].iter().cloned()
+}
+
+fn literal_operand(kind: &LiteralKind) -> ExprBuildOperand {
+    match kind {
+        LiteralKind::Integer(value) => ExprBuildOperand::Integer(*value),
+        LiteralKind::Float(value) => ExprBuildOperand::Float(value.to_bits()),
+        LiteralKind::String(value) => ExprBuildOperand::String(value.clone()),
+        LiteralKind::Char(value) => ExprBuildOperand::Char(*value),
+        LiteralKind::Bool(value) => ExprBuildOperand::Bool(*value),
+        LiteralKind::Null => ExprBuildOperand::Null,
+        LiteralKind::Array => ExprBuildOperand::Array,
+        LiteralKind::Object => ExprBuildOperand::Object,
+        LiteralKind::Regex(value) => ExprBuildOperand::Regex(value.clone()),
     }
 }
 
@@ -453,7 +668,8 @@ fn collect_operand_variables(key: &ExprKey, variables: &mut BTreeSet<Arc<str>>) 
 mod tests {
     use super::*;
     use crate::{
-        CpgEdgeKind, CpgNode, Language, MethodSignature, ScopeId, SourceRange, Visibility,
+        CpgEdgeKind, CpgNode, ExprOperandRef, Language, MethodSignature, ScopeId, SourceRange,
+        Visibility,
     };
     use proptest::prelude::*;
 
@@ -670,7 +886,7 @@ mod tests {
             connect_ast(&mut cpg, expression, literal);
         }
 
-        let facts = expression_facts(&cpg, function);
+        let facts = expression_facts(&cpg, function).expect("expression facts");
         assert_eq!(facts.universe.len(), 2);
         assert_eq!(
             facts.generated_at(NodeId::new(10)),
@@ -719,6 +935,14 @@ mod tests {
     #[test]
     fn expression_operands_cover_literals_nested_cycles_and_opaque_nodes() {
         let mut cpg = CodePropertyGraph::new(Language::Rust);
+        let function = cpg.add_node_with_id(node(100, function()));
+        let root = cpg.add_node_with_id(node(
+            101,
+            CpgNodeKind::BinaryOp {
+                operator: "all".into(),
+            },
+        ));
+        connect_ast(&mut cpg, function, root);
         let literal_kinds = [
             LiteralKind::Integer(-2),
             LiteralKind::Float(1.25),
@@ -730,15 +954,10 @@ mod tests {
             LiteralKind::Object,
             LiteralKind::Regex("a+".into()),
         ];
-        let mut operands = Vec::new();
         for (index, kind) in literal_kinds.into_iter().enumerate() {
             let id = cpg.add_node_with_id(node(index as u32, CpgNodeKind::Literal { kind }));
-            operands.push(expression_operand(&cpg, id, &mut BTreeSet::new()));
+            connect_ast(&mut cpg, root, id);
         }
-        assert_eq!(operands[0], ExprOperand::Integer(-2));
-        assert_eq!(operands[1], ExprOperand::Float(1.25f64.to_bits()));
-        assert_eq!(operands[5], ExprOperand::Null);
-        assert_eq!(operands[8], ExprOperand::Regex("a+".into()));
 
         let nested = cpg.add_node_with_id(node(
             20,
@@ -747,24 +966,135 @@ mod tests {
             },
         ));
         connect_ast(&mut cpg, nested, NodeId::new(0));
-        assert!(matches!(
-            expression_operand(&cpg, nested, &mut BTreeSet::new()),
-            ExprOperand::Expression(_)
-        ));
+        connect_ast(&mut cpg, root, nested);
 
         let opaque = cpg.add_node_with_id(node(21, CpgNodeKind::Return));
-        assert_eq!(
-            expression_operand(&cpg, opaque, &mut BTreeSet::new()),
-            ExprOperand::Opaque(opaque)
-        );
-        assert!(expression_key(&cpg, opaque, &mut BTreeSet::new()).is_none());
+        connect_ast(&mut cpg, root, opaque);
 
         cpg.connect(nested, nested, CpgEdgeKind::AstChild);
-        let mut on_path = BTreeSet::from([nested]);
-        assert_eq!(
-            expression_operand(&cpg, nested, &mut on_path),
-            ExprOperand::Opaque(nested)
-        );
+        let facts = expression_facts(&cpg, function).expect("iterative expression facts");
+        let root_id = facts.generated_at(root)[0];
+        let root_key = facts.universe.get(root_id).expect("root key");
+        let operands: Vec<_> = root_key.operands().iter().collect();
+        assert_eq!(operands[0], ExprOperandRef::Integer(-2));
+        assert_eq!(operands[1], ExprOperandRef::Float(1.25f64.to_bits()));
+        assert_eq!(operands[5], ExprOperandRef::Null);
+        assert_eq!(operands[8], ExprOperandRef::Regex("a+"));
+        let ExprOperandRef::Expression(nested_key) = operands[9] else {
+            panic!("nested operator remains structural");
+        };
+        assert!(nested_key
+            .operands()
+            .iter()
+            .any(|operand| operand == ExprOperandRef::Opaque(nested)));
+        assert_eq!(operands[10], ExprOperandRef::Opaque(opaque));
+    }
+
+    #[test]
+    fn shared_subexpressions_reuse_arena_ids_but_encode_as_canonical_trees() {
+        let mut cpg = CodePropertyGraph::new(Language::Rust);
+        let function = cpg.add_node_with_id(node(0, function()));
+        let root = cpg.add_node_with_id(node(
+            1,
+            CpgNodeKind::BinaryOp {
+                operator: "+".into(),
+            },
+        ));
+        let shared = cpg.add_node_with_id(node(
+            2,
+            CpgNodeKind::UnaryOp {
+                operator: "-".into(),
+            },
+        ));
+        let variable = cpg.add_node_with_id(node(
+            3,
+            CpgNodeKind::Identifier {
+                name: "x".into(),
+                definition: None,
+            },
+        ));
+        connect_ast(&mut cpg, function, root);
+        connect_ast(&mut cpg, root, shared);
+        cpg.connect(root, shared, CpgEdgeKind::AstChild);
+        connect_ast(&mut cpg, shared, variable);
+
+        let facts = expression_facts(&cpg, function).expect("shared expression facts");
+        let key = facts
+            .universe
+            .get(facts.generated_at(root)[0])
+            .expect("root key");
+        let operands: Vec<_> = key.operands().iter().collect();
+        let (ExprOperandRef::Expression(left), ExprOperandRef::Expression(right)) =
+            (operands[0], operands[1])
+        else {
+            panic!("both operands are shared expressions");
+        };
+        assert_eq!(left, right);
+        assert_eq!(key.metrics().nodes, 3);
+        let decoded = ExprKey::decode(&key.encode().expect("canonical shared encode"))
+            .expect("canonical shared decode");
+        assert_eq!(decoded, *key);
+        assert_eq!(decoded.metrics().nodes, 3);
+    }
+
+    #[test]
+    fn expression_fact_caps_fail_the_whole_derivation_monotonically() {
+        let mut cpg = CodePropertyGraph::new(Language::Rust);
+        let function = cpg.add_node_with_id(node(0, function()));
+        let expression = cpg.add_node_with_id(node(
+            1,
+            CpgNodeKind::BinaryOp {
+                operator: "+".into(),
+            },
+        ));
+        let variable = cpg.add_node_with_id(node(
+            2,
+            CpgNodeKind::Identifier {
+                name: "variable".into(),
+                definition: None,
+            },
+        ));
+        let literal = cpg.add_node_with_id(node(
+            3,
+            CpgNodeKind::Literal {
+                kind: LiteralKind::Integer(1),
+            },
+        ));
+        connect_ast(&mut cpg, function, expression);
+        connect_ast(&mut cpg, expression, variable);
+        connect_ast(&mut cpg, expression, literal);
+        let facts = expression_facts(&cpg, function).expect("uncapped facts");
+        let metrics = facts.universe.get(0).expect("one key").metrics();
+
+        let cases = [
+            (ExprKeyLimit::Nodes, metrics.nodes),
+            (ExprKeyLimit::Operands, metrics.operands),
+            (ExprKeyLimit::StringBytes, metrics.string_bytes),
+            (ExprKeyLimit::EncodedBytes, metrics.encoded_bytes),
+            (ExprKeyLimit::Work, metrics.work),
+        ];
+        for (dimension, exact) in cases {
+            let mut limits = ExprKeyLimits::UNBOUNDED;
+            match dimension {
+                ExprKeyLimit::Nodes => limits.max_nodes = exact,
+                ExprKeyLimit::Operands => limits.max_operands = exact,
+                ExprKeyLimit::StringBytes => limits.max_string_bytes = exact,
+                ExprKeyLimit::EncodedBytes => limits.max_encoded_bytes = exact,
+                ExprKeyLimit::Work => limits.max_work = exact,
+            }
+            assert!(expression_facts_with_limits(&cpg, function, limits).is_ok());
+            match dimension {
+                ExprKeyLimit::Nodes => limits.max_nodes -= 1,
+                ExprKeyLimit::Operands => limits.max_operands -= 1,
+                ExprKeyLimit::StringBytes => limits.max_string_bytes -= 1,
+                ExprKeyLimit::EncodedBytes => limits.max_encoded_bytes -= 1,
+                ExprKeyLimit::Work => limits.max_work -= 1,
+            }
+            assert!(matches!(
+                expression_facts_with_limits(&cpg, function, limits),
+                Err(ExprKeyError::LimitExceeded { limit, .. }) if limit == dimension
+            ));
+        }
     }
 
     #[cfg(feature = "serde")]
@@ -775,5 +1105,30 @@ mod tests {
         let decoded: FactUniverse<Arc<str>> =
             serde_json::from_str(&json).expect("deserialize universe");
         assert_eq!(decoded, universe);
+
+        let mut cpg = CodePropertyGraph::new(Language::Rust);
+        let function = cpg.add_node_with_id(node(0, function()));
+        let expression = cpg.add_node_with_id(node(
+            1,
+            CpgNodeKind::UnaryOp {
+                operator: "-".into(),
+            },
+        ));
+        let variable = cpg.add_node_with_id(node(
+            2,
+            CpgNodeKind::Identifier {
+                name: "x".into(),
+                definition: None,
+            },
+        ));
+        connect_ast(&mut cpg, function, expression);
+        connect_ast(&mut cpg, expression, variable);
+        let facts = expression_facts(&cpg, function).expect("expression facts");
+        let json = serde_json::to_vec(&facts).expect("serialize expression facts");
+        let decoded: ExprFacts =
+            serde_json::from_slice(&json).expect("deserialize expression facts");
+        assert_eq!(decoded, facts);
+        let original_key = facts.universe.get(0).expect("original key");
+        assert_eq!(decoded.universe.id_of(original_key), Some(0));
     }
 }

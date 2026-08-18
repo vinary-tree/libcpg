@@ -79,12 +79,14 @@ pub use condensation::{
 pub use cycles::{simple_cycles, CycleOptions, CycleSet, MAX_CYCLE_LENGTH, MAX_SIMPLE_CYCLES};
 
 pub use dataflow::{
-    available_expressions, dead_stores, expression_facts, liveness, sccp, solve, value_ranges,
-    variable_facts, very_busy_expressions, AvailableExpressions, BitSetDomain, Bound, Confluence,
-    ConstLattice, ConstValue, DataflowAnalysis, DataflowSolution, DeadStore, DeadStoreReport,
-    Direction, ExprFacts, ExprKey, ExprOperand, FactUniverse, Interval, IntervalEnv,
-    IntervalReport, Lattice, LivenessResult, MustBits, SccpResult, SolverConfig, VarFacts,
-    VariableDefinition, VeryBusyExpressions,
+    available_expressions, dead_stores, expression_facts, expression_facts_with_limits, liveness,
+    sccp, solve, value_ranges, variable_facts, very_busy_expressions, AvailableExpressions,
+    BitSetDomain, Bound, Confluence, ConstLattice, ConstValue, DataflowAnalysis, DataflowSolution,
+    DeadStore, DeadStoreReport, Direction, ExprFacts, ExprKey, ExprKeyError, ExprKeyLimit,
+    ExprKeyLimits, ExprKeyMetrics, ExprKeyRef, ExprOperand, ExprOperandRef, ExprOperands,
+    ExprOperandsIter, ExprUniverse, FactUniverse, Interval, IntervalEnv, IntervalReport, Lattice,
+    LivenessResult, MustBits, SccpResult, SolverConfig, VarFacts, VariableDefinition,
+    VeryBusyExpressions,
 };
 
 pub use projection::{
@@ -220,6 +222,9 @@ pub enum AnalysisError {
         /// Human-readable description of the violated contract.
         reason: &'static str,
     },
+    /// Stack-safe expression-fact construction or persistence failed.
+    #[error(transparent)]
+    ExpressionKey(#[from] dataflow::ExprKeyError),
     /// Projection construction failed before the analysis could run.
     #[error(transparent)]
     Projection(#[from] ProjectionError),

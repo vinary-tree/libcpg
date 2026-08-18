@@ -1,0 +1,72 @@
+@startuml
+!include _libcpg-theme.iuml
+title Stack-safe expression facts: shared arena, structural classes, CEK1
+
+skinparam backgroundColor #FCFCFC
+skinparam component {
+  BorderColor #495057
+}
+skinparam note {
+  BackgroundColor #F1F3F5
+  BorderColor #495057
+}
+
+component "function CPG\nunary · binary · ordered AST" as CPG #DBE4FF
+component "explicit extraction PDA\nenter · child · assemble frames" as PDA #FFF3BF
+component "node tape N\npostorder operator records" as NODES #C3FAE8
+component "operand tape O\nscalars · Expression(node id)" as OPERANDS #D3F9D8
+component "exact class interner\noperator + typed operand classes" as CLASS #E5DBFF
+component "ExprUniverse\nstable dense fact ids" as UNIVERSE #D0EBFF
+component "borrowed logical views\nExprKeyRef · ExprOperands" as VIEW #E5DBFF
+component "explicit lifecycle machines\ncmp · hash · debug · drop" as LIFE #FFF3BF
+component "canonical CEK1 tree\nversioned nodes + operands" as CEK #C5F6FA
+component "bounded decoder / Serde\nbyte cursor · strict validation" as DECODE #FFD8A8
+component "typed rejection\nnode · operand · string · byte · work" as ERROR #FFE3E3
+
+CPG --> PDA : sorted roots and source-order children
+PDA --> NODES : append completed operator
+PDA --> OPERANDS : append scalar / prior child id
+NODES --> CLASS
+OPERANDS --> CLASS
+CLASS --> UNIVERSE : deduplicate exact structure
+NODES --> VIEW
+OPERANDS --> VIEW
+VIEW --> LIFE : explicit heap events/cursors
+VIEW --> CEK : expand one logical root
+CEK --> DECODE : serialize_bytes
+DECODE --> NODES : canonical standalone arena
+DECODE --> OPERANDS : checked partitioned tape
+PDA --> ERROR : cap/allocation failure
+DECODE --> ERROR : malformed/cap failure
+
+note bottom of PDA
+  Active child edge -> Opaque(NodeId).
+  Completed child -> reuse stable arena id.
+  No source-depth native recursion.
+end note
+
+note bottom of CLASS
+  Class equality compares complete typed descriptors.
+  It is collision-free and arena-local.
+  Public cross-arena ordering remains structural.
+end note
+
+note bottom of CEK
+  Shared DAG storage is permitted in facts.
+  CEK1 expands sharing to one canonical tree:
+  child < parent, contiguous subtrees, one parent.
+end note
+
+legend bottom
+|= Colour |= Meaning |
+|<#DBE4FF>| source CPG |
+|<#FFF3BF>| explicit pushdown/lifecycle machines |
+|<#C3FAE8>| flat operator ownership |
+|<#D3F9D8>| flat ordered operands |
+|<#E5DBFF>| structural identity and logical views |
+|<#D0EBFF>| dense analysis universe |
+|<#C5F6FA>| canonical persistence |
+|<#FFD8A8>| bounded decoding |
+|<#FFE3E3>| typed rejection |
+endlegend
+@enduml

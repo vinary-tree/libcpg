@@ -343,7 +343,7 @@ pub fn available_expressions(
     cpg: &CodePropertyGraph,
     function: NodeId,
 ) -> Result<AvailableExpressions, AnalysisError> {
-    let facts = expression_facts(cpg, function);
+    let facts = expression_facts(cpg, function)?;
     let (cfg, transfer, solution) = solve_available(cpg, function, &facts)?;
     let node_inputs = forward_node_inputs(&cfg, &transfer, &solution);
     let projection = cfg_projection(cpg, function)?;
@@ -379,8 +379,7 @@ pub fn available_expressions(
             }
         }
     }
-    redundant.sort_unstable();
-    redundant.dedup();
+    super::facts::heap_sort_dedup(&mut redundant);
 
     Ok(AvailableExpressions {
         function,
@@ -400,7 +399,7 @@ pub fn very_busy_expressions(
     cpg: &CodePropertyGraph,
     function: NodeId,
 ) -> Result<VeryBusyExpressions, AnalysisError> {
-    let facts = expression_facts(cpg, function);
+    let facts = expression_facts(cpg, function)?;
     let (cfg, transfer, solution) = solve_very_busy(cpg, function, &facts)?;
     let node_outputs = backward_node_outputs(&cfg, &transfer, &solution);
     let projection = cfg_projection(cpg, function)?;
@@ -438,8 +437,7 @@ pub fn very_busy_expressions(
             ));
         }
     }
-    hoistable.sort_unstable();
-    hoistable.dedup();
+    super::facts::heap_sort_dedup(&mut hoistable);
 
     Ok(VeryBusyExpressions {
         function,
@@ -495,10 +493,11 @@ mod tests {
     }
 
     fn expression_key() -> ExprKey {
-        ExprKey {
-            operator: "+".into(),
-            operands: vec![ExprOperand::Variable("x".into()), ExprOperand::Integer(1)],
-        }
+        ExprKey::try_new(
+            "+",
+            vec![ExprOperand::Variable("x".into()), ExprOperand::Integer(1)],
+        )
+        .expect("shallow expression key")
     }
 
     fn add_expression(cpg: &mut CodePropertyGraph, expression: NodeId, child_base: u32) {

@@ -91,6 +91,7 @@ Grouped by subject. Each row: the source (its `.svg` sibling is embedded by the 
 | `mhp-par-operands.puml` | component/relation flow | typed parallel block → direct operand subtrees → execution sites → canonical bounded symmetric pairs | components/graph/mhp-analysis, theory/31, design/0038, scientific/33, security/06, usage/14 |
 | `session-duality.puml` | component/decision flow | resolved Rholang events → ordered endpoint traces → conformant, nonconformant, or inconclusive binary duality evidence | components/graph/session-analysis, theory/32, design/0039, scientific/34, security/07, usage/15 |
 | `property-value-flat-arena.puml` | component/storage/codec flow | logical properties → postorder node and edge tapes → explicit lifecycle machines → bounded CPV1/Serde persistence | components/graph/nodes, design/0040, scientific/35, usage/05, security/01 |
+| `expression-key-flat-arena.puml` | component/storage/identity/codec flow | CPG expressions → explicit postorder extraction → shared node/operand arena → exact structural classes → bounded CEK1/Serde persistence | components/graph/dataflow-framework, components/graph/expression-analysis, design/0041, scientific/36, usage/05, security/01 |
 
 ### Control flow, data flow, dependence
 | Source | Type | Depicts | Embedded by |

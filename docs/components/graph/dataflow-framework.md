@@ -190,13 +190,22 @@ an analysis must derive every state from one fact universe.
 - `uses`: identifier reads, excluding declaration/parameter binders and the
   target of plain `=` while retaining compound-assignment target reads.
 
-`expression_facts(cpg, function)` returns `ExprFacts`. Unary and binary
-expressions receive structural `ExprKey` values from the operator and ordered
-operands. Variables, exact literal values, and nested expression keys compare
-structurally. Unsupported operands retain their `NodeId` as `Opaque`, preventing
-an unsound equivalence. `generated_at`, `occurrences`, `variables_of`, and
+`expression_facts(cpg, function)` returns `Result<ExprFacts, ExprKeyError>`.
+Unary and binary expressions receive structural `ExprKey` roots in one shared
+postorder node/operand arena. Variables, exact literal values, ordered nested
+keys, and arena-local exact structural classes determine identity. Unsupported
+operands retain their `NodeId` as `Opaque`, preventing an unsound equivalence.
+`ExprUniverse` assigns stable dense ids without copying or repeatedly comparing
+deep subtrees. `generated_at`, `occurrences`, `variables_of`, and
 `killed_by_var` support available-expression and partial-redundancy analyses.
+`expression_facts_with_limits` exposes independent node, operand, string-byte,
+encoded-byte, and work policies; any failure aborts the whole fact derivation.
 Both fact builders exclude nested function scopes and leave the CPG unchanged.
+
+![Expression facts use an explicit extraction machine, one shared flat arena, exact structural classes, and a bounded CEK1 persistence boundary.](../../diagrams/expression-key-flat-arena.svg)
+
+*Figure — expression-fact ownership and lifecycle. Source:
+[`expression-key-flat-arena.puml`](../../diagrams/expression-key-flat-arena.puml).*
 
 ## Node-level states
 

@@ -84,8 +84,9 @@ alternatives is folklore, and a decision without its costs is marketing.
 | [0038 — Typed AST MHP](0038-typed-ast-mhp.md) | Derive bounded canonical may-happen-in-parallel pairs from direct operand subtrees of typed parallel blocks, independent of parser wrapper shape. | Accepted |
 | [0039 — Advisory session sketches](0039-advisory-session-sketches.md) | Group definition-resolved Rholang actions into deterministic endpoint traces and classify binary linear duality without guessing through missing evidence. | Accepted |
 | [0040 — Flat property-value arena](0040-flat-property-value-arena.md) | Own logical property trees as canonical postorder node and edge tapes, with explicit lifecycle machines and a bounded versioned CPV1 persistence boundary. | Accepted |
+| [0041 — Shared flat expression facts](0041-shared-flat-expression-facts.md) | Represent expression roots in one shared postorder arena, deduplicate exact structural classes, and persist standalone keys through bounded canonical CEK1 bytes. | Accepted |
 
-These forty are not independent. ADR-0001 fixes the substrate that all analyses
+These forty-one are not independent. ADR-0001 fixes the substrate that all analyses
 write onto; ADR-0002 and ADR-0005 together explain how a language reaches that
 substrate and what you must switch on to get there; ADR-0003 and ADR-0004 are
 two analyses *over* the substrate (one always-on, one feature-gated) that each
@@ -185,7 +186,10 @@ events to infer shallow endpoint traces, distinguishes proven incompatibility
 from incomplete evidence, and remains out of graph. ADR-0040 repairs a lifecycle
 property of ADR-0001's metadata side-table: logical property recursion is
 projected from flat ownership, and only that recursive field crosses a versioned
-canonical inner codec.
+canonical inner codec. ADR-0041 applies the same pushdown discipline to
+data-flow facts but selects a shared directed acyclic arena, rather than one
+strict tree, so all nested expression occurrences remain linear in physical
+syntax size while exact structural classes preserve fact identity.
 
 ![Module architecture of libcpg, showing the graph core and the analysis modules layered over it](../diagrams/module-architecture.svg)
 
@@ -197,7 +201,7 @@ canonical inner codec.
   (`0001`…). Numbers are never reused; a reversed decision is marked
   *Superseded* and a new record supersedes it, so history stays legible.
 - **Status lifecycle.** `Proposed → Accepted → (Superseded by NNNN | Deprecated)`.
-  All thirty-nine current records are **Accepted** and reflect the shipped `v0.1.1`
+  All forty-one current records are **Accepted** and reflect the shipped `v0.1.1`
   code.
 - **Grounding.** Every claim here is traceable to source: the
   [`Cargo.toml`](../engineering/01-build-and-features.md) feature block, the

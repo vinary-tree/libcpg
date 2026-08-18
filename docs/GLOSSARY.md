@@ -962,6 +962,31 @@ configured share of outgoing dependencies points toward modules with greater
 Findings remain advisory and carry stable nodes plus numerical evidence. See
 [`theory/21-advisory-architectural-smells.md`](theory/21-advisory-architectural-smells.md).
 
+### Pushdown automaton (PDA) / explicit continuation machine
+
+A **pushdown automaton** (PDA) is a finite-control machine augmented by a stack.
+In libcpg's stack-safety engineering, the term also names an equivalent
+implementation technique: replace mutually recursive calls with a closed enum
+of continuation/frame states stored in a heap `Vec`, then dispatch those states
+in a loop. The logical stack remains, but source depth no longer determines
+native call depth. Frames must retain every value that a suspended recursive
+call would need after its child returns; omitting such state changes semantics.
+Property-value and expression-key formatting, validation, persistence, and CPG
+extraction use this technique. See [ADR-0040](design/0040-flat-property-value-arena.md)
+and [ADR-0041](design/0041-shared-flat-expression-facts.md), grounded in
+Reynolds's defunctionalization lineage [[47]](#references).
+
+### Structural expression arena / CEK1
+
+A **structural expression arena** is the shared postorder node and ordered
+operand storage behind `ExprKey` and `ExprUniverse`. Nested operands store a
+preceding stable node id; exact bottom-up structural classes deduplicate equal
+roots without relying on hash collision assumptions. **CEK1** is the canonical
+version-1 byte representation of one logical expression tree. In-memory arena
+sharing is expanded at this boundary so every accepted byte string has one
+strict tree interpretation. See
+[ADR-0041](design/0041-shared-flat-expression-facts.md).
+
 ---
 
 ## References
@@ -1012,3 +1037,4 @@ Findings remain advisory and carry stable nodes plus numerical evidence. See
 44. Kobayashi, N. (2006). *A New Type System for Deadlock-Free Processes.* CONCUR 2006, LNCS 4137, 233–247. DOI: [10.1007/11817949_16](https://doi.org/10.1007/11817949_16).
 45. Naumovich, G., Avrunin, G. S. (1998). *A Conservative Data Flow Algorithm for Detecting All Pairs of Statements That May Happen in Parallel.* Proceedings of the 6th ACM SIGSOFT International Symposium on Foundations of Software Engineering, 24–34. DOI: [10.1145/288195.288213](https://doi.org/10.1145/288195.288213).
 46. Honda, K., Vasconcelos, V. T., Kubo, M. (1998). *Language Primitives and Type Discipline for Structured Communication-Based Programming.* ESOP 1998. DOI: [10.1007/BFb0053567](https://doi.org/10.1007/BFb0053567).
+47. Reynolds, J. C. (1972). *Definitional Interpreters for Higher-Order Programming Languages.* DOI: [10.1145/800194.805852](https://doi.org/10.1145/800194.805852).

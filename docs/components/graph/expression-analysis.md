@@ -19,18 +19,30 @@ Source: [`diagrams/expression-analysis.puml`](../../diagrams/expression-analysis
 
 ## 1. Structural expression facts
 
-Fix the finite universe $`E`$ of unary and binary [`ExprKey`](dataflow-framework.md#built-in-domains-and-fact-universes)s
+Fix the finite `ExprUniverse` $`E`$ of unary and binary [`ExprKey`](dataflow-framework.md#built-in-domains-and-fact-universes)s
 in one function. A key preserves:
 
 - operator spelling and operand order;
 - variable names and exact literal values, including floating-point bits;
-- recursively nested unary/binary keys; and
+- nested unary/binary roots in one shared flat postorder arena; and
 - an identity-qualified `Opaque(NodeId)` for an unsupported operand.
 
 Opaque identity is deliberately conservative: two unsupported constructs are
 not called equivalent merely because their node kinds resemble one another.
 Nested functions are separate scopes. Only occurrences in the selected
 function's reachable [`BlockCfg`](basic-block-cfg.md) receive output states.
+
+`ExprKey` has no recursive owned field. A node stores an operator plus a
+checked range in an ordered operand tape; a nested operand stores the id of a
+previously completed node. Exact bottom-up structural classes deduplicate equal
+roots without a finite digest. Extraction, comparison, hashing, formatting,
+Serde, and destruction use explicit heap state. See
+[ADR-0041](../../design/0041-shared-flat-expression-facts.md).
+
+![CPG operators enter an explicit postorder machine, share one expression arena, and cross canonical CEK1 persistence.](../../diagrams/expression-key-flat-arena.svg)
+
+*Figure — shared expression facts and their persistence boundary. Source:
+[`expression-key-flat-arena.puml`](../../diagrams/expression-key-flat-arena.puml).*
 
 For node $`n`$, define:
 
@@ -150,11 +162,15 @@ for (expression, placement) in busy.hoistable {
 | `busy_out` | every reachable block-CFG node mapped to keys anticipable immediately after it |
 | `hoistable` | sorted, deduplicated `(ExprKey, nearest_common_dominator)` PRE evidence |
 
-All expression vectors follow canonical `FactUniverse<ExprKey>` order.
+All expression vectors follow canonical `ExprUniverse` dense-id order.
 Unknown node ids and non-function selectors return
 `AnalysisError::{UnknownNode, NotAFunction}`. Bodyless functions produce one
 empty state for the function entry. Unreachable AST islands and nested-function
 nodes are absent.
+
+Expression construction and persistence failures return
+`AnalysisError::ExpressionKey`. No available/very-busy result is produced from
+partial facts.
 
 With the optional `serde` feature, both report types and their structural keys
 round-trip through Serde.
@@ -192,7 +208,7 @@ hostile or structurally malformed inputs.
 
 ## 6. Determinism and complexity
 
-Sorted fact universes, deterministic block traversal, `BTreeMap` states, and
+Deterministic structural-class universes, block traversal, `BTreeMap` states, and
 sorted candidate vectors make reports independent of CPG node and CFG-edge
 insertion order.
 

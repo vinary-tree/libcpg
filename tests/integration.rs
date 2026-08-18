@@ -407,7 +407,7 @@ mod rust_pipeline {
         let cpg = build();
         let function = cpg.functions().next().expect("function").id;
         let variables = variable_facts(&cpg, function);
-        let expressions = expression_facts(&cpg, function);
+        let expressions = expression_facts(&cpg, function).expect("expression facts");
 
         assert!(variables.universe.id_of(&"x".into()).is_some());
         assert!(variables.universe.id_of(&"y".into()).is_some());
@@ -644,10 +644,13 @@ mod rust_pipeline {
 }
 
 mod expression_dataflow_analysis {
+    use std::thread;
+
     use libcpg::{
-        available_expressions, very_busy_expressions, AvailableExpressions, CfgEdgeKind,
-        CodePropertyGraph, CpgEdgeKind, CpgNode, CpgNodeKind, ExprKey, ExprOperand, Language,
-        LiteralKind, MethodSignature, NodeId, SourceRange, VeryBusyExpressions, Visibility,
+        available_expressions, expression_facts, very_busy_expressions, AvailableExpressions,
+        CfgEdgeKind, CodePropertyGraph, CpgEdgeKind, CpgNode, CpgNodeKind, ExprKey, ExprOperand,
+        Language, LiteralKind, MethodSignature, NodeId, SourceRange, VeryBusyExpressions,
+        Visibility,
     };
 
     fn node(id: u32, kind: CpgNodeKind) -> CpgNode {
@@ -720,14 +723,78 @@ mod expression_dataflow_analysis {
             available_expressions(&cpg, function).expect("availability");
         let busy: VeryBusyExpressions =
             very_busy_expressions(&cpg, function).expect("anticipability");
-        let key = ExprKey {
-            operator: "+".into(),
-            operands: vec![ExprOperand::Variable("x".into()), ExprOperand::Integer(1)],
-        };
+        let key = ExprKey::try_new(
+            "+",
+            vec![ExprOperand::Variable("x".into()), ExprOperand::Integer(1)],
+        )
+        .expect("shallow expression key");
         assert!(available.available_in[&second].contains(&key));
         assert_eq!(available.redundant, vec![(first, second)]);
         assert!(busy.busy_out[&first].contains(&key));
         assert_eq!(busy.hoistable, vec![(key, first)]);
+    }
+
+    #[test]
+    fn public_expression_facts_build_depth_100_000_on_a_small_stack() {
+        thread::Builder::new()
+            .name("public-expression-facts-small-stack".into())
+            .stack_size(256 * 1024)
+            .spawn(|| {
+                let mut cpg = CodePropertyGraph::new(Language::Rust);
+                let function = cpg.add_node_with_id(node(
+                    0,
+                    CpgNodeKind::Function {
+                        signature: MethodSignature {
+                            name: "deep".into(),
+                            params: Default::default(),
+                            return_type: None,
+                            is_static: false,
+                            is_async: false,
+                            visibility: Visibility::Private,
+                        },
+                    },
+                ));
+                let mut parent = function;
+                let mut outer = None;
+                for depth in 0..100_000u32 {
+                    let expression = cpg.add_node_with_id(node(
+                        depth + 1,
+                        CpgNodeKind::UnaryOp {
+                            operator: "-".into(),
+                        },
+                    ));
+                    outer.get_or_insert(expression);
+                    child(&mut cpg, parent, expression);
+                    parent = expression;
+                }
+                let variable = cpg.add_node_with_id(node(
+                    100_001,
+                    CpgNodeKind::Identifier {
+                        name: "x".into(),
+                        definition: None,
+                    },
+                ));
+                child(&mut cpg, parent, variable);
+
+                let facts = expression_facts(&cpg, function).expect("deep public facts");
+                assert_eq!(facts.universe.len(), 100_000);
+                let outer = outer.expect("outer expression");
+                let key = facts
+                    .universe
+                    .get(facts.generated_at(outer)[0])
+                    .expect("outer key");
+                assert_eq!(key.metrics().nodes, 100_000);
+                let x = facts.variables.id_of(&"x".into()).expect("x variable");
+                assert!(facts.killed_by_var(facts.generated_at(outer)[0], x));
+                let cloned = facts.clone();
+                assert_eq!(cloned, facts);
+                drop(cloned);
+                drop(facts);
+                drop(cpg);
+            })
+            .expect("spawn public small-stack thread")
+            .join()
+            .expect("public deep expression facts");
     }
 }
 

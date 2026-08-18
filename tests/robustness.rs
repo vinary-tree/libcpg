@@ -522,7 +522,7 @@ fn exercise_every_analysis(cpg: &CodePropertyGraph, func: NodeId) {
         }
     }
     let variables = libcpg::variable_facts(&work, func);
-    let expressions = libcpg::expression_facts(&work, func);
+    let expressions = libcpg::expression_facts(&work, func).expect("expression facts remain total");
     assert!(variables.universe.len() <= work.node_count());
     assert!(expressions.universe.len() <= work.node_count());
     let solution = libcpg::solve(

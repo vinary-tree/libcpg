@@ -927,8 +927,18 @@ evidence from canonical `ExprKey` facts:
 
 | API | Signature | Result |
 |---|---|---|
+| `expression_facts` | `fn(&CodePropertyGraph, NodeId) -> Result<ExprFacts, ExprKeyError>` | one shared flat `ExprUniverse`, generated occurrences, and operand-variable dependencies |
+| `expression_facts_with_limits` | `fn(&CodePropertyGraph, NodeId, ExprKeyLimits) -> Result<ExprFacts, ExprKeyError>` | the same facts with caller-selected node, operand, string-byte, encoded-byte, and work limits |
 | `available_expressions` | `fn(&CodePropertyGraph, NodeId) -> Result<AvailableExpressions, AnalysisError>` | `available_in` structural keys for every reachable node plus dominating `redundant` CSE pairs. |
 | `very_busy_expressions` | `fn(&CodePropertyGraph, NodeId) -> Result<VeryBusyExpressions, AnalysisError>` | `busy_out` structural keys for every reachable node plus dominance-backed `hoistable` PRE placements. |
+
+`ExprKey::try_new` constructs a flat key; `operator()` and `operands()` expose
+borrowed logical views. `ExprOperand::Expression` contains another flat key
+handle, not a recursive box. `ExprKeyLimits`, `ExprKeyMetrics`, and
+`ExprKeyError` make construction and canonical CEK1 persistence explicit.
+`ExprUniverse` assigns stable dense fact ids with exact bottom-up structural
+classes and shares one arena across occurrences. See
+[ADR-0041](../design/0041-shared-flat-expression-facts.md).
 
 Forward availability intersects predecessor outputs; backward anticipability
 intersects successor inputs. Defining any operand kills its expression. Reports

@@ -20,6 +20,7 @@ Source: [`diagrams/resource-bounds.puml`](../diagrams/resource-bounds.puml).*
 | --- | --- | --- | --- |
 | `CpgBuilderConfig::max_file_size` | 10 MB | `build` only (not `build_from_tree`) | `build` returns `Error::Construction` before parsing |
 | `PropertyValueLimits::{max_nodes,max_edges,max_string_bytes,max_encoded_bytes,max_work}` | `1_000_000`, `1_000_000`, 64 MiB, 256 MiB, `4_000_000` | CPV1 encode/decode/Serde and explicit validation | returns a typed error naming the exceeded dimension before accepting the value; canonical shape validation rejects cycles, sharing, forward references, nonpartitioned edge ranges, invalid tags/UTF-8, and trailing bytes |
+| `ExprKeyLimits::{max_nodes,max_operands,max_string_bytes,max_encoded_bytes,max_work}` | `1_000_000`, `4_000_000`, 64 MiB, 256 MiB, `5_000_000` | expression-fact extraction, CEK1 encode/decode/Serde, explicit validation | aborts the complete fact derivation or key operation with `ExprKeyError`; canonical standalone validation rejects empty/multiple roots, cycles, forward references, nonpartitioned ranges, noncontiguous postorder, duplicate parents, invalid tags/scalars/UTF-8, and trailing bytes |
 | Program-composition admission | caller-selected file/node/edge/path-byte limits | `merge_programs`; `build_import_graph` | finite and non-recursive, but intentionally has no independent cap; reject an oversized aggregate before composition |
 | `ResolveConfig::max_scope_depth` | `128` | scope and callee-name walks | traversal stops at the configured depth or the first repeated node |
 | `ResolveConfig::max_candidates_per_name` | `64` | lexical/global symbol buckets | full ambiguity count is preserved, but excess candidate IDs are not retained |
@@ -125,6 +126,17 @@ the former visitor after a CPV1 failure. Such a fallback would reintroduce the
 stack-exhaustion path and make malformed-input disposition format-dependent.
 See [ADR-0040](../design/0040-flat-property-value-arena.md) and
 [validation 35](../scientific/35-property-value-validation.md).
+
+Expression facts use a related but distinct boundary. In memory, all roots in
+one derivation share a postorder directed acyclic arena and exact structural
+class table. Logical metrics count a shared child once per operand occurrence,
+so compact physical sharing cannot evade encoded-byte or work policy. A
+standalone `ExprKey` serializes as canonical `CEK1`, where sharing is expanded
+and every non-root node has exactly one parent. `expression_facts_with_limits`
+returns no partial universe on failure: omitting a generated expression could
+make available/very-busy Must analysis claim an unsound absence. See
+[ADR-0041](../design/0041-shared-flat-expression-facts.md) and [validation
+36](../scientific/36-expression-fact-arena-validation.md).
 
 ## Program composition: aggregate admission and evidence safety
 

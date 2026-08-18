@@ -4,6 +4,7 @@
 //! feature-free, read-only, direction-polymorphic, and deterministic under CPG
 //! insertion-order permutations.
 
+mod expr_key;
 mod expressions;
 mod facts;
 mod intervals;
@@ -19,12 +20,16 @@ use crate::CodePropertyGraph;
 
 use super::{AnalysisError, BlockCfg, BlockEdge, BlockId, LoopForest};
 
+pub use expr_key::{
+    ExprKey, ExprKeyError, ExprKeyLimit, ExprKeyLimits, ExprKeyMetrics, ExprKeyRef, ExprOperand,
+    ExprOperandRef, ExprOperands, ExprOperandsIter,
+};
 pub use expressions::{
     available_expressions, very_busy_expressions, AvailableExpressions, VeryBusyExpressions,
 };
 pub use facts::{
-    expression_facts, variable_facts, ExprFacts, ExprKey, ExprOperand, FactUniverse, VarFacts,
-    VariableDefinition,
+    expression_facts, expression_facts_with_limits, variable_facts, ExprFacts, ExprUniverse,
+    FactUniverse, VarFacts, VariableDefinition,
 };
 pub use intervals::{value_ranges, Bound, Interval, IntervalEnv, IntervalReport};
 pub use liveness::{dead_stores, liveness, DeadStore, DeadStoreReport, LivenessResult};
