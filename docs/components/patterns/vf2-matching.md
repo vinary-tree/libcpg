@@ -63,11 +63,14 @@ pub struct Vf2State<'a> {
 }
 ```
 
-The `order` stack is the correctness lynchpin. Each `push_mapping` records a frame — the
-mapped pair, whether each node was already in its terminal set, and exactly which terminal
-entries the push *newly inserted*. The matching `pop_mapping` pops that frame and reverses
-precisely those edits. This is what the regression test
-`test_multi_embedding_backtracking` in `src/pattern/vf2.rs` guards (see
+Two independent heap stacks serve different purposes. `Vf2State::order` is the **undo
+log**: each `push_mapping` records the mapped pair, whether each node was already in its
+terminal set, and exactly which terminal entries the push *newly inserted*. The matching
+`pop_mapping` reverses precisely those edits. `Vf2Matcher::vf2_search` owns a separate
+`Vec<Vf2SearchFrame>` whose candidate vectors and cursors are the defunctionalized
+continuations of the depth-first search. Consequently, pattern depth consumes heap memory,
+not native call-stack frames. The undo-log regression
+`test_multi_embedding_backtracking` in `src/pattern/vf2.rs` guards this invariant (see
 [the diamond example](#the-diamond-a-backtracking-litmus-test)).
 
 ![VF2 state machine: an empty mapping expands by pushing feasible candidate pairs, reports a match when the mapping is complete, and pops frames on backtrack.](../../diagrams/vf2-state-machine.svg)
@@ -76,31 +79,42 @@ precisely those edits. This is what the regression test
 
 ### The search, as literate pseudocode
 
-The recursion mirrors `Vf2Matcher::vf2_search` line for line:
+Each `Frame(candidates, cursor, owns_mapping)` remembers one suspended candidate loop.
+The root frame owns no mapping; every child frame owns the mapping that led to it and
+therefore performs exactly one `pop_mapping` when exhausted.
 
 ```text
 search(state, matches):
-  1. if a match cap is set and matches is full:          # honour with_max_matches
-        return
-  2. if state.is_complete():                             # every pattern node mapped
-        matches.push(state.to_pattern_match())           # record this embedding
-        return
-  3. candidates ← state.candidate_pairs()                # fringe-first candidate pairs
-  4. for each (p, t) in candidates:
-       5. if is_feasible(state, p, t):                   # kind + incident-edge checks
-            6. state.push_mapping(p, t)                  # extend M, grow terminal sets
-            7. search(state, matches)                    # recurse deeper
-            8. state.pop_mapping()                       # exact undo of step 6
-            9. if the cap is now full: return
+  1. search_stack ← [Frame(candidate_pairs(state), cursor = 0, owns = false)]
+  2. while search_stack is not empty:
+       3. if a positive match cap is full: break
+       4. frame ← search_stack.last
+       5. if frame.cursor = length(frame.candidates):
+            exhausted ← search_stack.pop
+            if exhausted.owns: state.pop_mapping()       # exact undo
+            continue
+       6. (p, t) ← frame.candidates[frame.cursor]
+          frame.cursor ← frame.cursor + 1             # suspend after this pair
+       7. if not is_feasible(state, p, t): continue
+       8. state.push_mapping(p, t)
+       9. if state.is_complete():
+            matches.push(state.to_pattern_match())
+            state.pop_mapping()                          # leaf has no child frame
+          else:
+            search_stack.push(Frame(candidate_pairs(state), 0, owns = true))
+ 10. for each remaining frame from deepest to root:
+       if frame.owns: state.pop_mapping()                # cap-safe unwind
 ```
 
-**Candidate generation** (`candidate_pairs`, step 3). If both terminal sets are non-empty,
-VF2 picks one pattern-terminal node and pairs it with *every* target-terminal node —
-staying on the connected fringe. Only if the fringe is empty (a disconnected pattern, or
-the very first node) does it fall back to pairing an arbitrary unmapped pattern node with
-every unused target node.
+**Candidate generation** (`candidate_pairs`, steps 1 and 9). If both terminal sets are
+non-empty, VF2 picks the smallest pattern-terminal `NodeId` and pairs it with every target
+terminal node in ascending `NodeId` order—staying on the connected fringe. Only if the
+fringe is empty (a disconnected pattern, or the very first node) does it fall back to the
+smallest unmapped pattern node and all unused targets in ascending order. This canonical
+order makes the emitted sequence, representative `root`, and every positive-cap prefix
+independent of hash-table and graph insertion order.
 
-**Feasibility** (`is_feasible`, step 5). A pair $`(p, t)`$ survives when:
+**Feasibility** (`is_feasible`, step 7). A pair $`(p, t)`$ survives when:
 
 - `p` and `t` have compatible kinds (strict or relaxed — see below); and
 - for every pattern edge $`p \to q`$ whose head `q` is *already mapped* to some $`t_q`$,
@@ -117,8 +131,15 @@ the number of nodes, the search is $`O(N!\,N)`$ in the pathological dense case (
 ordering of an all-to-all mapping). Terminal-set ordering and feasibility pruning collapse
 this dramatically on real CPGs, where the practical cost tracks the number of *partial*
 mappings that survive pruning rather than the factorial bound. Two levers keep it bounded:
-cap the result count with `with_max_matches`, and raise strictness to shrink the candidate
-set.
+cap the **result count** with `with_max_matches`, and raise strictness to shrink the
+candidate set. A result cap stops after the requested embedding has been found; it cannot
+bound a no-match search. Untrusted-input services must also admit bounded graph sizes or
+enforce an outer deadline.
+
+For a pattern of $`P`$ nodes and a target of $`T`$ nodes, the mapping, terminal sets, and
+undo log use $`O(P+T)`$ memory. Live search frames retain candidate vectors whose
+conservative worst-case total is $`O(PT)`$; a uniquely constrained path uses $`O(P)`$.
+Native call-stack use is $`O(1)`$ with respect to graph depth.
 
 ## Using `Vf2Matcher`
 
@@ -141,8 +162,8 @@ The `SubgraphMatcher` trait provides three more entry points on top of `find_mat
 | Method | Returns | Meaning |
 | :----- | :------ | :------ |
 | `find_matches(&pattern, &target)` | `Vec<PatternMatch>` | every embedding (respecting `max_matches`) |
-| `find_matches_limited(&pattern, &target, limit)` | `Vec<PatternMatch>` | at most `limit`, truncating the full result |
-| `contains_pattern(&pattern, &target)` | `bool` | is there at least one embedding? |
+| `find_matches_limited(&pattern, &target, limit)` | `Vec<PatternMatch>` | at most `limit`; VF2 stops as soon as that canonical prefix is complete |
+| `contains_pattern(&pattern, &target)` | `bool` | is there at least one embedding? VF2 stops at the first positive result |
 | `algorithm_name()` | `&str` | `"VF2"` |
 
 ```rust

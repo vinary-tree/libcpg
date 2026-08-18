@@ -260,15 +260,20 @@ interpretation.
 
 ## Pattern matching: VF2
 
-[VF2](../GLOSSARY.md#vf2) subgraph isomorphism is worst-case super-exponential —
-$`O(N!\,N)`$ — so on adversarial graphs the search space is the concern. Two
-controls bound it:
+[VF2](../GLOSSARY.md#vf2) subgraph isomorphism is worst-case super-exponential—
+$`O(N!\,N)`$—so on adversarial graphs the search space is the concern. Its typed
+heap-frame driver makes search depth independent of the native call stack, but stack
+safety is not a time or heap-work budget. Three controls constrain exposure:
 
-- **`with_max_matches(n)`** stops the state-space search after `n` matches (`0`
-  means unlimited, the default). Set it to a small number — or `1` for a pure
-  existence check — to guarantee early termination.
+- **`with_max_matches(n)`** stops after emitting `n` matches (`0` means unlimited,
+  the default). Set it to a small number—or `1` for an existence query—to avoid
+  enumerating further embeddings after a positive result. It does **not** bound a
+  difficult branch before the next match or a no-match search.
 - **`with_strict_kinds(true)` / `with_strict_edges(true)`** tighten the feasibility
   test so infeasible branches are pruned sooner, shrinking the search.
+- **Graph admission and deadlines** supply the actual hostile-input work boundary.
+  Bound pattern and target node/edge counts before matching, and enforce an outer
+  deadline when latency must be guaranteed.
 
 ```rust
 // requires: no features (pattern module is always compiled)
@@ -283,8 +288,8 @@ let matches = matcher.find_matches(&pattern, &target);
 
 Note that the [Gang-of-Four detector](../GLOSSARY.md#gang-of-four-gof) uses a
 *relaxed* matcher by design (category-level kind/edge matching); when you run it on
-untrusted input, bound the surrounding work instead — cap the number of patterns
-searched and the size of the CPG (via `max_file_size`).
+untrusted input, bound the surrounding work instead—cap the number of patterns
+searched and the size of the CPG (via `max_file_size`), and apply a request deadline.
 
 ### Function clone search
 

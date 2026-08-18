@@ -54,7 +54,7 @@ semantics and hard ceilings are in the
 
 ## VF2 subgraph isomorphism (feature-free)
 
-[VF2](../GLOSSARY.md#vf2) (Cordella, Foggia, Sansone & Vento [[1]](#references)) finds **all** occurrences of a small *pattern* graph inside a larger *target* graph. `Vf2Matcher` implements it as a depth-first state-space search with feasibility pruning and exact backtracking. The `find_matches` method comes from the `SubgraphMatcher` trait, so bring that trait into scope.
+[VF2](../GLOSSARY.md#vf2) (Cordella, Foggia, Sansone & Vento [[1]](#references)) finds **all** occurrences of a small *pattern* graph inside a larger *target* graph. `Vf2Matcher` implements it as a depth-first state-space search with feasibility pruning and exact backtracking. Typed heap frames retain candidate loops and cursors, so pattern depth does not consume native call-stack frames. Candidate `NodeId`s are sorted, making result order deterministic across graph insertion orders. The `find_matches` method comes from the `SubgraphMatcher` trait, so bring that trait into scope.
 
 The example below is the library's own backtracking regression, distilled: a 3-node directed **path** pattern `p0 → p1 → p2` matched against a **diamond** target `t0 → {t1, t2} → t3`. There are exactly **two** embeddings — one through `t1`, one through `t2` — and finding the second requires the search to backtrack out of the first without losing `p0 → t0`.
 
@@ -106,7 +106,7 @@ let matcher = Vf2Matcher::new()
 
 - **Relaxed (default).** Two nodes match if they fall in the same broad category (declaration / expression / statement) or share a kind tag; two edges match if they are in the same overlay (AST/CFG/DFG/call). This maximises recall and is what the GoF detector uses.
 - **Strict.** Node-kind tags and edge kinds must be identical. Use this for exact structural search.
-- **`with_max_matches`** bounds the search — indispensable on large targets where an unbounded VF2 can be expensive (worst case $`O(N!\,N)`$, though pruning makes it practical in code graphs). It is a `usize`; `0` means unlimited.
+- **`with_max_matches`** bounds emitted results—indispensable when a target has many embeddings. It is a `usize`; `0` means unlimited, while a positive value returns a canonical prefix. The cap stops only after that many matches have been found; a difficult no-match query can still explore the full worst-case $`O(N!\,N)`$ state space. For untrusted inputs, combine it with a graph-size admission bound or an outer deadline.
 
 ### Inspecting a `PatternMatch`
 

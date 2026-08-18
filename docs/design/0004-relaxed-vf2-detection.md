@@ -170,8 +170,11 @@ because they are easy to conflate:
   caller who needs that distinction should set `strict_kinds = true`.
 - **Worst-case cost.** VF2 is $`O(N!\,N)`$ in the worst case (subgraph
   isomorphism is [NP-complete](../GLOSSARY.md#isomorphism--subgraph-isomorphism));
-  pruning makes it practical, and `with_max_matches` bounds the search when a
-  program contains many embeddings.
+  pruning makes it practical, and `with_max_matches` bounds emitted results when a
+  program contains many embeddings. It does not bound a no-match search, so hostile
+  inputs still require graph admission limits or an outer deadline. Typed heap search
+  frames make input depth independent of the native stack, and sorted `NodeId`
+  candidates make every positive-cap prefix deterministic.
 
 ## Alternatives considered
 
@@ -206,7 +209,7 @@ because they are easy to conflate:
 
 ![The VF2 state machine: candidate pair generation, feasibility pruning, and backtracking](../diagrams/vf2-state-machine.svg)
 
-*Figure — the VF2 search: extend the partial mapping with a feasible candidate pair (category-level under relaxation), recurse, and restore mapping and terminal sets exactly on backtrack. Source: [`diagrams/vf2-state-machine.puml`](../diagrams/vf2-state-machine.puml).*
+*Figure — the VF2 search: advance a heap-frame cursor, extend the partial mapping with a feasible candidate pair (category-level under relaxation), push a child frame, and restore mapping and terminal sets exactly when that frame is exhausted. Source: [`diagrams/vf2-state-machine.puml`](../diagrams/vf2-state-machine.puml).*
 
 ## Related decisions and further reading
 

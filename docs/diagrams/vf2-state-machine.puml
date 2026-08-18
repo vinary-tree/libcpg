@@ -1,22 +1,48 @@
 @startuml
 !include _libcpg-theme.iuml
 title VF2 subgraph-isomorphism search (Cordella et al. 2004)
-[*] --> Empty : initial state
-state Empty #F1F3F5 : mapping = {}
-Empty --> Candidate : select (n, m)\nfrom terminal sets
-state Candidate #FFF3BF : trial pair (n, m)
-Candidate --> Extended : is_feasible(n, m)\nkinds + edges consistent
-Candidate --> Backtrack : infeasible
-state Extended #D3F9D8 : push_mapping(n, m)
-Extended --> Complete : |mapping| = |pattern|
-Extended --> Candidate : recurse / extend
-state Backtrack #FFE3E3 : pop_mapping
-Backtrack --> Candidate : restore exact prior state
-state Complete #C3FAE8 : record embedding
-Complete --> [*]
-note bottom of Backtrack
-  Pop-order fix (P7b): an explicit push-order
-  stack of frames restores the mapping AND the
-  terminal sets exactly on backtrack.
+[*] --> RootFrame : empty mapping
+state RootFrame #D0EBFF : push root search frame\nowns_mapping = false
+RootFrame --> Advance : canonical candidate pairs
+
+state Advance #FFF3BF : inspect top frame\nadvance suspended cursor
+Advance --> LimitUnwind : positive result cap is full
+Advance --> Exhausted : cursor reached candidate count
+Advance --> Feasibility : next candidate pair
+
+state Feasibility #FFE8CC : kind and incident-edge checks
+Feasibility --> Advance : infeasible / resume same frame
+Feasibility --> Extended : feasible / push_mapping
+
+state Extended #D3F9D8 : mapping and terminal sets extended\nundo frame recorded
+Extended --> Emit : mapping covers pattern
+Extended --> ChildFrame : mapping incomplete
+
+state ChildFrame #E5DBFF : push child search frame\nowns_mapping = true
+ChildFrame --> Advance : canonical child candidates
+
+state Emit #C3FAE8 : snapshot complete embedding
+Emit --> Advance : pop_mapping / resume parent
+
+state Exhausted #FFE3E3 : pop exhausted search frame
+Exhausted --> Advance : child owned mapping\npop_mapping / resume parent
+Exhausted --> Done : root owned no mapping
+
+state LimitUnwind #FFD8A8 : pop every live child frame\nand its owned mapping
+LimitUnwind --> Done : caller-visible state restored
+
+state Done #D8F5A2 : canonical result prefix\nempty mapping and stacks
+Done --> [*]
+
+note bottom of ChildFrame
+  Search stack: candidate vectors and cursors are
+  heap-resident continuations. Pattern depth does
+  not consume native call-stack frames.
+end note
+
+note bottom of Exhausted
+  Undo stack: each mapping frame restores both the
+  mapping and terminal sets exactly once. It is
+  separate from the search continuation stack.
 end note
 @enduml

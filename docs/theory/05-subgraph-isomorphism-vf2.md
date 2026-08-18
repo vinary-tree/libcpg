@@ -31,7 +31,7 @@ The decision problem "does $`P`$ embed into $`G`$?" is **NP‑complete** in gene
 
 ## 2. VF2 as a state‑space search
 
-VF2 (Cordella, Foggia, Sansone, Vento [[1]](#references)) frames matching as a depth‑first walk over **partial mappings**. A state $`s`$ holds a partial injection $`\mu_s`$ covering some pattern nodes; the search grows $`\mu_s`$ one pair $`(p, t)`$ at a time, checks that the extension stays consistent (a *feasibility* test), recurses, and **backtracks** by undoing the extension when a branch is exhausted. A state whose mapping covers *all* of $`V_P`$ is a complete match and is emitted.
+VF2 (Cordella, Foggia, Sansone, Vento [[1]](#references)) frames matching as a depth‑first walk over **partial mappings**. A state $`s`$ holds a partial injection $`\mu_s`$ covering some pattern nodes; the search grows $`\mu_s`$ one pair $`(p, t)`$ at a time, checks that the extension stays consistent (a *feasibility* test), and **backtracks** by undoing the extension when a branch is exhausted. `libcpg` realizes that depth-first control flow as typed heap frames rather than recursive calls. A state whose mapping covers *all* of $`V_P`$ is a complete match and is emitted.
 
 `libcpg`'s state is the `Vf2State` struct. Its fields correspond one‑to‑one with the classical VF2 state description:
 
@@ -50,51 +50,70 @@ pub struct Vf2State<'a> {
 ```
 
 The `order` stack is `libcpg`'s correctness backbone; Section 5 explains why it must exist.
+It is distinct from `Vf2Matcher`'s private `Vec<Vf2SearchFrame>`: `order` restores state,
+whereas each search frame stores a candidate vector, a suspended cursor, and whether the
+frame owns one mapping. Defunctionalizing the recursive continuation this way makes native
+call-stack consumption independent of $`|V_P|`$.
 
-![VF2 state machine: initialise, generate candidate pairs from the terminal fringe, test feasibility, push a mapping and recurse, or backtrack via the push‑order stack, emitting a match when the mapping is complete.](../diagrams/vf2-state-machine.svg)
+![VF2 state machine: initialise a root search frame, advance its candidate cursor, test feasibility, push a mapping and child frame, or exhaust and undo the child, emitting a match when the mapping is complete.](../diagrams/vf2-state-machine.svg)
 
-*Figure — the VF2 control loop as a state machine: candidate generation → feasibility → push/recurse → pop, with completion emitting a `PatternMatch`. Source: [`diagrams/vf2-state-machine.puml`](../diagrams/vf2-state-machine.puml).*
+*Figure — the VF2 control loop as a heap state machine: candidate generation → feasibility → push child frame → pop-and-restore, with completion emitting a `PatternMatch`. Source: [`diagrams/vf2-state-machine.puml`](../diagrams/vf2-state-machine.puml).*
 
 ### 2.1 Terminal sets: search the fringe first
 
 The single most important pruning idea is to **grow the mapping along edges** rather than jumping to arbitrary nodes. The [terminal sets](../GLOSSARY.md#terminal-set-vf2) `pattern_terminal` and `target_terminal` are the "fringes": pattern (resp. target) nodes that are *adjacent to an already‑mapped node but not yet mapped themselves*. Candidate generation prefers them:
 
-- if both fringes are non‑empty, pick one pattern fringe node $`p`$ and pair it with **every** target fringe node $`t`$;
-- otherwise (the mapping is empty, or a connected component has been fully consumed), fall back to any unmapped pattern node paired with every unused target node.
+- if both fringes are non‑empty, pick the smallest pattern-fringe `NodeId` $`p`$ and pair it with every target-fringe node $`t`$ in ascending `NodeId` order;
+- otherwise (the mapping is empty, or a connected component has been fully consumed), fall back to the smallest unmapped pattern `NodeId`, paired with every unused target in ascending order.
 
 Preferring the fringe keeps the partial mapping **connected**, which means each new pair is immediately constrained by edges to already‑mapped nodes — so infeasible pairs are rejected early instead of deep in the tree.
+Sorting also defines a canonical depth-first sequence: graph insertion and hash-table order
+cannot change the result order, the representative match root, or the prefix selected by a
+positive result cap.
 
 ---
 
 ## 3. The matching algorithm in literate form
 
-The recursion is small enough to read whole. In `libcpg` it is `Vf2Matcher::vf2_search`; here it is as literate pseudocode.
+`Vf2Matcher::vf2_search` is an iterative pushdown machine. A
+`Frame(candidates, cursor, owns_mapping)` is the defunctionalized continuation of one
+depth-first candidate loop: `cursor` is where that loop resumes, and `owns_mapping` says
+whether exhausting the frame must undo one extension.
 
 ```text
 Algorithm VF2‑Match(P, G, max_matches):
   s       ← empty state over (P, G)         # μ = ∅, both fringes empty
   results ← [ ]
-  Search(s, results)
-  return results
+  frames  ← [Frame(CandidatePairs(s), cursor = 0, owns_mapping = false)]
 
-procedure Search(s, results):
-  ❶ if max_matches > 0 and |results| >= max_matches: return     # honour the bound
-  ❷ if s.unmapped_pattern = ∅:                                  # μ covers all of V_P
-        results.append( snapshot(s.mapping) as PatternMatch )    # a complete embedding
-        return
-  ❸ for (p, t) in CandidatePairs(s):        # fringe pairs first, else unmapped × unused
-        if Feasible(s, p, t):               # Section 4
-            Push(s, p, t)                    # extend μ; record an undo frame
-            Search(s, results)               # recurse one level deeper
-            Pop(s)                           # EXACT inverse of Push (Section 5)
-            if max_matches > 0 and |results| >= max_matches: return
+  while frames is not empty:
+    ❶ if max_matches > 0 and |results| >= max_matches: break
+    ❷ f ← frames.last
+    ❸ if f.cursor = |f.candidates|:
+          exhausted ← frames.pop
+          if exhausted.owns_mapping: Pop(s)              # exact inverse of Push
+          continue
+    ❹ (p, t) ← f.candidates[f.cursor]
+       f.cursor ← f.cursor + 1                            # suspended resume point
+    ❺ if not Feasible(s, p, t): continue                  # Section 4
+    ❻ Push(s, p, t)                                       # extend μ; log exact undo
+    ❼ if s.unmapped_pattern = ∅:
+          results.append(snapshot(s.mapping) as PatternMatch)
+          Pop(s)                                          # leaf owns no child frame
+       else:
+          frames.push(Frame(CandidatePairs(s), 0, true))
+
+  for f in reverse(frames):                               # cap-safe unwind
+    if f.owns_mapping: Pop(s)
+  return results
 ```
 
 Three properties are worth stating explicitly, because the correctness of *every* pattern query depends on them:
 
-1. **Completeness.** With `max_matches = 0` the loop at ❸ tries every feasible candidate for the chosen pattern node, so `Search` enumerates **every** embedding — not just the first. (`with_max_matches(k)` for $`k>0`$ stops after $`k`$.)
-2. **Soundness.** A mapping is emitted at ❷ only after each incremental `Push` passed `Feasible`, so the accumulated injection satisfies the edge‑ and kind‑constraints of Section 1 by construction.
-3. **No graph copying.** The search mutates one shared state and undoes each step; it never clones $`P`$ or $`G`$. Memory stays $`O(|V_P| + |V_G|)`$ — VF2's headline advantage over Ullmann‑style matchers.
+1. **Completeness.** With `max_matches = 0`, cursor advancement at ❹ tries every feasible candidate for the chosen pattern node, so the machine enumerates **every** embedding—not just the first. `with_max_matches(k)` for $`k>0`$ returns the first $`k`$ embeddings in canonical order.
+2. **Soundness.** A mapping is emitted at ❼ only after each incremental `Push` passed `Feasible`, so the accumulated injection satisfies the edge- and kind-constraints of Section 1 by construction.
+3. **Exact restoration.** Normal frame exhaustion and positive-cap unwinding both perform exactly one `Pop` for every live child frame, so the caller-visible state is empty after matching.
+4. **No graph copying or native recursion.** The search mutates one shared state and undoes each step; it never clones $`P`$ or $`G`$ and never allocates one native call frame per pattern node. Mapping and terminal storage remain $`O(|V_P|+|V_G|)`$; live candidate vectors add a conservative $`O(|V_P||V_G|)`$ heap bound, while a uniquely constrained path uses $`O(|V_P|)`$ search-frame memory.
 
 The public surface that drives this is deliberately tiny:
 
@@ -211,14 +230,17 @@ This bound is unavoidable in the worst case — subgraph isomorphism is NP‑com
 - **Sparsity.** CPGs are near‑linear in their edges; a node's neighbourhood is small, so the edge‑consistency rule rejects most candidates immediately.
 - **Connected growth.** Terminal‑set ordering keeps the partial mapping connected, so after the first pair each new candidate is pinned by an edge to something already mapped — collapsing the branching factor.
 
-Reported behaviour (from `libcpg`'s own doc‑comments and the VF2 literature [[1]](#references)) is roughly $`O(N^2 M)`$ in the typical case, where $`M`$ is the target size, and closer to $`O(N)`$ when strong labels prune early. Two knobs trade completeness for latency:
+Reported behaviour (from `libcpg`'s own doc‑comments and the VF2 literature [[1]](#references)) is roughly $`O(N^2 M)`$ in the typical case, where $`M`$ is the target size, and closer to $`O(N)`$ when strong labels prune early. Two knobs reduce work after preserving their documented semantics:
 
 | Knob | Effect |
 |---|---|
-| `with_max_matches(k)`, $`k>0`$ | stop after $`k`$ embeddings — e.g. $`k = 1`$ for a Boolean "does it occur?" query |
+| `with_max_matches(k)`, $`k>0`$ | stop after the first $`k`$ canonical embeddings—e.g. $`k = 1`$ for a Boolean "does it occur?" query; no positive result means the full search may still run |
 | `with_strict_kinds(true)` / `with_strict_edges(true)` | fewer compatible pairs ⇒ smaller tree (higher precision, lower recall) |
 
-Memory is $`O(N + M)`$ throughout: the mapping tables, the two fringes, and the undo stack, all over shared references.
+The mapping tables, two fringes, and undo log use $`O(N+M)`$ memory over shared graph
+references. The explicit search stack retains candidate vectors for its live depth, giving
+a conservative $`O(NM)`$ heap bound and $`O(N)`$ heap use on a uniquely constrained path.
+Native call-stack use is $`O(1)`$ with respect to $`N`$.
 
 ---
 

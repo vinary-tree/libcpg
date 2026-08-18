@@ -41,7 +41,11 @@ impl Vf2Matcher {
         self
     }
 
-    /// Sets maximum number of matches to find.
+    /// Sets the maximum number of matches to emit.
+    ///
+    /// Zero means unlimited. A positive value returns a deterministic prefix
+    /// and stops after that many embeddings have been found; it does not bound
+    /// the work needed to find the next embedding or prove that none exists.
     pub fn with_max_matches(mut self, max: usize) -> Self {
         self.max_matches = max;
         self
@@ -162,45 +166,89 @@ impl SubgraphMatcher for Vf2Matcher {
         matches
     }
 
+    fn find_matches_limited(
+        &self,
+        pattern: &CodePropertyGraph,
+        target: &CodePropertyGraph,
+        limit: usize,
+    ) -> Vec<PatternMatch> {
+        if limit == 0 {
+            return Vec::new();
+        }
+
+        let mut limited = self.clone();
+        limited.max_matches = match self.max_matches {
+            0 => limit,
+            configured => configured.min(limit),
+        };
+        limited.find_matches(pattern, target)
+    }
+
+    fn contains_pattern(&self, pattern: &CodePropertyGraph, target: &CodePropertyGraph) -> bool {
+        !self.find_matches_limited(pattern, target, 1).is_empty()
+    }
+
     fn algorithm_name(&self) -> &str {
         "VF2"
     }
 }
 
 impl Vf2Matcher {
-    /// Recursive VF2 search.
+    /// Stack-safe depth-first VF2 search.
+    ///
+    /// Each [`Vf2SearchFrame`] is the defunctionalized continuation of one
+    /// recursive search activation: its candidate vector is the loop-local
+    /// value and `next_candidate` is the suspended loop cursor. A non-root
+    /// frame owns exactly one mapping, which is undone when that frame is
+    /// exhausted. Complete mappings are emitted and undone immediately.
     fn vf2_search(&self, state: &mut Vf2State, matches: &mut Vec<PatternMatch>) {
-        // Check if we've reached the match limit
         if self.max_matches > 0 && matches.len() >= self.max_matches {
             return;
         }
-
-        // Check if we have a complete match
         if state.is_complete() {
-            let pm = state.to_pattern_match();
-            matches.push(pm);
+            matches.push(state.to_pattern_match());
             return;
         }
 
-        // Get candidate pairs
-        let candidates = state.candidate_pairs();
+        let mut search = vec![Vf2SearchFrame::root(state.candidate_pairs())];
+        while !search.is_empty() {
+            if self.max_matches > 0 && matches.len() >= self.max_matches {
+                break;
+            }
 
-        for (pattern_node, target_node) in candidates {
-            // Check feasibility
-            if self.is_feasible(state, pattern_node, target_node) {
-                // Add mapping
-                state.push_mapping(pattern_node, target_node);
+            let candidate = {
+                let frame = search.last_mut().expect("search stack is non-empty");
+                let candidate = frame.candidates.get(frame.next_candidate).copied();
+                frame.next_candidate += usize::from(candidate.is_some());
+                candidate
+            };
 
-                // Recurse
-                self.vf2_search(state, matches);
-
-                // Backtrack
-                state.pop_mapping();
-
-                // Check match limit again
-                if self.max_matches > 0 && matches.len() >= self.max_matches {
-                    return;
+            let Some((pattern_node, target_node)) = candidate else {
+                let frame = search.pop().expect("search stack is non-empty");
+                if frame.owns_mapping {
+                    state.pop_mapping();
                 }
+                continue;
+            };
+
+            if !self.is_feasible(state, pattern_node, target_node) {
+                continue;
+            }
+
+            state.push_mapping(pattern_node, target_node);
+            if state.is_complete() {
+                matches.push(state.to_pattern_match());
+                state.pop_mapping();
+            } else {
+                search.push(Vf2SearchFrame::child(state.candidate_pairs()));
+            }
+        }
+
+        // A match cap can stop the search with live child frames. Restore the
+        // caller-owned state exactly as recursive returns would have done.
+        for frame in search.into_iter().rev() {
+            if frame.owns_mapping {
+                state.pop_mapping();
             }
         }
     }
@@ -281,6 +329,32 @@ impl Vf2Matcher {
     }
 }
 
+/// One suspended candidate loop in the iterative VF2 depth-first search.
+#[derive(Debug)]
+struct Vf2SearchFrame {
+    candidates: Vec<(NodeId, NodeId)>,
+    next_candidate: usize,
+    owns_mapping: bool,
+}
+
+impl Vf2SearchFrame {
+    fn root(candidates: Vec<(NodeId, NodeId)>) -> Self {
+        Self {
+            candidates,
+            next_candidate: 0,
+            owns_mapping: false,
+        }
+    }
+
+    fn child(candidates: Vec<(NodeId, NodeId)>) -> Self {
+        Self {
+            candidates,
+            next_candidate: 0,
+            owns_mapping: true,
+        }
+    }
+}
+
 /// A record of exactly what a single [`Vf2State::push_mapping`] changed, so the
 /// matching [`Vf2State::pop_mapping`] can undo it precisely.
 ///
@@ -358,36 +432,27 @@ impl<'a> Vf2State<'a> {
 
     /// Returns candidate pairs for the next mapping.
     pub fn candidate_pairs(&self) -> Vec<(NodeId, NodeId)> {
-        let mut pairs = Vec::new();
+        let mut pattern_candidates = Vec::new();
+        let mut target_candidates = Vec::new();
 
         // If there are nodes in terminal sets, prefer those
         if !self.pattern_terminal.is_empty() && !self.target_terminal.is_empty() {
-            // Pick the first terminal pattern node
-            let p_node = *self
-                .pattern_terminal
-                .iter()
-                .next()
-                .expect("terminal not empty");
-
-            // Pair with all terminal target nodes
-            for &t_node in &self.target_terminal {
-                pairs.push((p_node, t_node));
-            }
+            pattern_candidates.extend(self.pattern_terminal.iter().copied());
+            target_candidates.extend(self.target_terminal.iter().copied());
         } else if !self.unmapped_pattern.is_empty() {
-            // Fall back to any unmapped pattern node
-            let p_node = *self
-                .unmapped_pattern
-                .iter()
-                .next()
-                .expect("unmapped not empty");
-
-            // Pair with all unused target nodes
-            for &t_node in &self.unused_target {
-                pairs.push((p_node, t_node));
-            }
+            pattern_candidates.extend(self.unmapped_pattern.iter().copied());
+            target_candidates.extend(self.unused_target.iter().copied());
         }
 
-        pairs
+        pattern_candidates.sort_unstable();
+        target_candidates.sort_unstable();
+        let Some(pattern_node) = pattern_candidates.first().copied() else {
+            return Vec::new();
+        };
+        target_candidates
+            .into_iter()
+            .map(|target_node| (pattern_node, target_node))
+            .collect()
     }
 
     /// Adds a mapping and records an internal undo frame so the change can be
@@ -484,9 +549,9 @@ impl<'a> Vf2State<'a> {
     pub fn to_pattern_match(&self) -> PatternMatch {
         let root = self
             .mapping
-            .values()
-            .next()
-            .copied()
+            .iter()
+            .min_by_key(|(pattern, _)| *pattern)
+            .map(|(_, target)| *target)
             .unwrap_or(NodeId::new(0));
 
         let mut pm = PatternMatch::new("VF2Match", root, 1.0);
@@ -890,6 +955,49 @@ mod proptests {
     use crate::testutil::*;
     use proptest::prelude::*;
 
+    /// Bounded recursive reference equations retained only for shallow
+    /// differential tests. Generated patterns contain at most three nodes, so
+    /// this oracle cannot make test-stack usage depend on hostile input.
+    fn recursive_search(
+        matcher: &Vf2Matcher,
+        state: &mut Vf2State<'_>,
+        matches: &mut Vec<PatternMatch>,
+    ) {
+        if matcher.max_matches > 0 && matches.len() >= matcher.max_matches {
+            return;
+        }
+        if state.is_complete() {
+            matches.push(state.to_pattern_match());
+            return;
+        }
+        for (pattern_node, target_node) in state.candidate_pairs() {
+            if matcher.is_feasible(state, pattern_node, target_node) {
+                state.push_mapping(pattern_node, target_node);
+                recursive_search(matcher, state, matches);
+                state.pop_mapping();
+                if matcher.max_matches > 0 && matches.len() >= matcher.max_matches {
+                    return;
+                }
+            }
+        }
+    }
+
+    fn recursive_matches(
+        matcher: &Vf2Matcher,
+        pattern: &CodePropertyGraph,
+        target: &CodePropertyGraph,
+    ) -> Vec<PatternMatch> {
+        if pattern.node_count() == 0 || target.node_count() < pattern.node_count() {
+            return Vec::new();
+        }
+        let mut state = Vf2State::new(pattern, target);
+        let mut matches = Vec::new();
+        recursive_search(matcher, &mut state, &mut matches);
+        assert!(state.mapping.is_empty());
+        assert!(state.order.is_empty());
+        matches
+    }
+
     /// The induced subgraph of `g` over its first `k` node ids (1..=k, clamped).
     /// Preserves original ids and every edge whose endpoints are both retained.
     fn small_pattern(g: &CodePropertyGraph, k: usize) -> CodePropertyGraph {
@@ -913,6 +1021,38 @@ mod proptests {
                 v
             })
             .collect()
+    }
+
+    fn embedding_sequence(matches: &[PatternMatch]) -> Vec<Vec<(u32, u32)>> {
+        matches
+            .iter()
+            .map(|m| {
+                let mut mapping: Vec<_> = m
+                    .node_mapping
+                    .iter()
+                    .map(|(pattern, target)| (pattern.as_u32(), target.as_u32()))
+                    .collect();
+                mapping.sort_unstable();
+                mapping
+            })
+            .collect()
+    }
+
+    fn reverse_insertion(graph: &CodePropertyGraph) -> CodePropertyGraph {
+        let mut reversed = CodePropertyGraph::new(graph.language());
+        let mut nodes: Vec<_> = graph.nodes().cloned().collect();
+        nodes.reverse();
+        for node in nodes {
+            reversed.add_node_with_id(node);
+        }
+        let mut edges: Vec<_> = graph.edges().cloned().collect();
+        edges.reverse();
+        for edge in edges {
+            reversed
+                .add_edge_with_id(edge)
+                .expect("reversed edge endpoints exist");
+        }
+        reversed
     }
 
     /// Checks the three structural VF2 invariants for a single returned match
@@ -975,6 +1115,100 @@ mod proptests {
                     check_match_invariants(&matcher, &pattern, &g, m)?;
                 }
             }
+        }
+
+        /// The iterative driver is the exact defunctionalization of the former
+        /// recursive search equations, including enumeration order and cap
+        /// short-circuit position.
+        #[test]
+        fn prop_iterative_search_matches_bounded_recursive_oracle(
+            g in arb_cpg_raw(),
+            k in 1usize..=3,
+            cap in 0usize..=8,
+            strict_kinds in any::<bool>(),
+            strict_edges in any::<bool>(),
+        ) {
+            let pattern = small_pattern(&g, k);
+            let matcher = Vf2Matcher::new()
+                .with_strict_kinds(strict_kinds)
+                .with_strict_edges(strict_edges)
+                .with_max_matches(cap);
+            let expected = recursive_matches(&matcher, &pattern, &g);
+            let actual = matcher.find_matches(&pattern, &g);
+            prop_assert_eq!(embedding_sequence(&actual), embedding_sequence(&expected));
+        }
+
+        /// Hash-table insertion order cannot change the canonical DFS or which
+        /// prefix a public match cap selects.
+        #[test]
+        fn prop_search_is_deterministic_under_graph_insertion_permutation(
+            g in arb_cpg_raw(),
+            k in 1usize..=3,
+            cap in 1usize..=8,
+        ) {
+            let pattern = small_pattern(&g, k);
+            let reversed = reverse_insertion(&g);
+            let matcher = Vf2Matcher::new()
+                .with_strict_kinds(true)
+                .with_strict_edges(true)
+                .with_max_matches(cap);
+            let first = matcher.find_matches(&pattern, &g);
+            let second = matcher.find_matches(&pattern, &reversed);
+            let repeat = matcher.find_matches(&pattern, &g);
+            prop_assert_eq!(embedding_sequence(&first), embedding_sequence(&second));
+            prop_assert_eq!(embedding_sequence(&first), embedding_sequence(&repeat));
+        }
+
+        /// Increasing a positive cap retains the entire prior canonical prefix.
+        #[test]
+        fn prop_match_cap_is_prefix_monotone(
+            g in arb_cpg_raw(),
+            k in 1usize..=2,
+            lower in 1usize..=6,
+            extra in 0usize..=6,
+        ) {
+            let pattern = small_pattern(&g, k);
+            let lower_matches = Vf2Matcher::new()
+                .with_max_matches(lower)
+                .find_matches(&pattern, &g);
+            let upper_matches = Vf2Matcher::new()
+                .with_max_matches(lower + extra)
+                .find_matches(&pattern, &g);
+            let lower_sequence = embedding_sequence(&lower_matches);
+            let upper_sequence = embedding_sequence(&upper_matches);
+            prop_assert_eq!(
+                lower_sequence.as_slice(),
+                &upper_sequence[..lower_sequence.len()]
+            );
+        }
+
+        /// The public convenience performs the bounded search itself rather
+        /// than enumerating all embeddings and truncating afterward.
+        #[test]
+        fn prop_find_matches_limited_equals_effective_configured_cap(
+            g in arb_cpg_raw(),
+            k in 1usize..=3,
+            configured_cap in 0usize..=8,
+            requested_limit in 0usize..=8,
+        ) {
+            let pattern = small_pattern(&g, k);
+            let matcher = Vf2Matcher::new().with_max_matches(configured_cap);
+            let limited = matcher.find_matches_limited(&pattern, &g, requested_limit);
+            let effective_cap = if requested_limit == 0 {
+                0
+            } else if configured_cap == 0 {
+                requested_limit
+            } else {
+                configured_cap.min(requested_limit)
+            };
+            let expected = if effective_cap == 0 {
+                Vec::new()
+            } else {
+                Vf2Matcher::new()
+                    .with_max_matches(effective_cap)
+                    .find_matches(&pattern, &g)
+            };
+            prop_assert_eq!(embedding_sequence(&limited), embedding_sequence(&expected));
         }
 
         /// The relaxed matcher's embedding set is a superset of the strict
