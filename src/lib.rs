@@ -114,7 +114,9 @@ pub(crate) mod testutil;
 pub use graph::{
     CfgEdgeKind, CodePropertyGraph, CpgEdge, CpgEdgeKind, CpgNode, CpgNodeKind, CpgStats,
     DfgEdgeKind, EdgeId, Language, LiteralKind, LockKind, LockMode, MethodSignature, MsgKind,
-    NodeId, Paradigm, PropertyKey, PropertyValue, ScopeId, SourceRange, TypeInfo, Visibility,
+    NodeId, Paradigm, PropertyKey, PropertyList, PropertyListIter, PropertyValue,
+    PropertyValueError, PropertyValueKind, PropertyValueLimit, PropertyValueLimits,
+    PropertyValueMetrics, PropertyValueRef, ScopeId, SourceRange, TypeInfo, Visibility,
 };
 
 pub use analysis::{

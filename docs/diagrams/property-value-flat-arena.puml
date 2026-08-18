@@ -1,0 +1,68 @@
+@startuml
+!include _libcpg-theme.iuml
+title Stack-safe PropertyValue: logical tree, flat ownership, bounded persistence
+
+skinparam backgroundColor #FCFCFC
+skinparam component {
+  BorderColor #495057
+}
+skinparam note {
+  BackgroundColor #F1F3F5
+  BorderColor #495057
+}
+
+component "caller API\nInt · String · List · Null" as API #DBE4FF
+component "node tape N\npostorder scalar/list records" as NODES #C3FAE8
+component "edge tape E\nordered child-root indices" as EDGES #D3F9D8
+component "borrowed logical view\nPropertyValueKind\nPropertyList cursor" as VIEW #E5DBFF
+component "explicit machines\nequality · debug · validation" as PDA #FFF3BF
+component "CPV1 encoder\nmagic · count · tagged nodes" as ENCODE #C5F6FA
+component "bounded CPV1 decoder\nbyte cursor · bottom-up arena" as DECODE #FFD8A8
+component "Serde carrier\nserialize_bytes / bounded visitor" as SERDE #FCC2D7
+component "typed rejection\nnode · edge · string · byte · work" as ERROR #FFE3E3
+
+API --> NODES : constructors append nodes
+API --> EDGES : lists append child roots
+NODES --> VIEW
+EDGES --> VIEW
+VIEW --> PDA : counted cursor frames
+NODES --> ENCODE
+EDGES --> ENCODE
+ENCODE --> SERDE : canonical CPV1 bytes
+SERDE --> DECODE
+DECODE --> NODES : validated postorder
+DECODE --> EDGES : validated ranges/order
+PDA --> ERROR : invariant/cap failure
+DECODE --> ERROR : malformed/cap failure
+
+note bottom of NODES
+  Every child node precedes its parent.
+  A non-null root is the final node.
+  Standalone Null is the empty canonical arena.
+end note
+
+note bottom of EDGES
+  Each List stores one checked range in E.
+  Ranges partition E in node order.
+  Every non-root node has exactly one parent.
+end note
+
+note bottom of PDA
+  Native call depth is constant in logical depth.
+  Counted list cursors retain O(depth) live obligations,
+  while N and E retain O(nodes + edges) owned data.
+end note
+
+legend bottom
+|= Colour |= Meaning |
+|<#DBE4FF>| source-compatible construction API |
+|<#C3FAE8>| flat node ownership |
+|<#D3F9D8>| flat ordered-edge ownership |
+|<#E5DBFF>| logical borrowed projection |
+|<#FFF3BF>| explicit pushdown/cursor machines |
+|<#C5F6FA>| canonical encoder |
+|<#FFD8A8>| bounded decoder |
+|<#FCC2D7>| format-neutral Serde carrier |
+|<#FFE3E3>| explicit rejection |
+endlegend
+@enduml

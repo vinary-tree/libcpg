@@ -168,7 +168,15 @@ The graph is a mutable owned value, not a frozen artifact:
 
 - Construction mutates it (`add_node`, `connect`); the `CfgExtractor`, `DfgExtractor`, and `PdgBuilder` mutate it in place; `CodePropertyGraph` implements `Clone`.
 - Ids are stable across mutation: adding nodes/edges never renumbers existing ones, so a `NodeId` captured before an extractor runs is still valid after.
-- With `--features serde`, every graph type derives `Serialize`/`Deserialize` (petgraph's `serde-1` feature serializes the `DiGraph`). There is no bespoke format and no export/import function; round-trip through the caller's own `serde_json`, then rebuild indices via `add_node_with_id`/`add_edge_with_id`. See [`../usage/05-serialization.md`](../usage/05-serialization.md).
+- With `--features serde`, graph containers and nonrecursive graph types derive
+  `Serialize`/`Deserialize` (petgraph's `serde-1` feature serializes the
+  `DiGraph`). The caller still chooses JSON, bincode, CBOR, or another outer
+  format. The one exception is logical recursion inside `PropertyValue`, which
+  Serde embeds as bounded, versioned CPV1 bytes over a flat arena. libcpg has no
+  whole-graph export/import format; portable snapshots still rebuild indices
+  via `add_node_with_id`/`add_edge_with_id`. See
+  [`../usage/05-serialization.md`](../usage/05-serialization.md) and
+  [ADR-0040](../design/0040-flat-property-value-arena.md).
 
 ## Where to go next
 

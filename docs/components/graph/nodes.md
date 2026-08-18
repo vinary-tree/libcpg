@@ -383,28 +383,46 @@ A `u32` newtype tagging lexical scopes, carried by `Block` and `Variable` nodes.
 ### Properties: `PropertyKey` / `PropertyValue`
 
 Beyond the typed fields above, a node can hold ad-hoc metadata in its
-`properties` map. Keys are a small enum with a `Custom` escape hatch, and values
-are a tagged union (note the integer/boolean variants are `Int` / `Uint` /
-`Bool`, not `Integer` / `Boolean`):
+`properties` map. Keys are a small enum with a `Custom` escape hatch. Values
+have seven logical forms but flat physical ownership, so logical list depth
+does not become Rust call-stack depth:
 
 ```rust
 pub enum PropertyKey { Name, Type, Scope, Visibility, Mutable, Static, Async, Custom(Arc<str>) }
 
-pub enum PropertyValue { String(Arc<str>), Int(i64), Uint(u64), Bool(bool), Float(f64), List(Vec<PropertyValue>), Null }
+let value = PropertyValue::List(vec![
+    PropertyValue::String("role".into()),
+    PropertyValue::Int(7),
+    PropertyValue::Null,
+]);
 ```
 
-`PropertyValue` offers `as_str() -> Option<&str>`, `as_int() -> Option<i64>`,
-and `as_bool() -> Option<bool>` for convenient extraction:
+The historical constructor spellings remain. Scalar accessors and the borrowed
+`PropertyValueKind`/`PropertyList` views replace recursive enum pattern matching:
 
 ```rust
-use libcpg::PropertyKey;
+use libcpg::{PropertyKey, PropertyValueKind};
 
 if let Some(v) = node.properties.get(&PropertyKey::Name) {
     if let Some(name) = v.as_str() {
         println!("name property: {name}");
     }
 }
+
+if let PropertyValueKind::List(children) = value.kind() {
+    for child in children {
+        if let Some(integer) = child.as_int() {
+            println!("integer property: {integer}");
+        }
+    }
+}
 ```
+
+The node tape is postorder; a separate edge tape retains list order through
+checked ranges. Clone and drop are flat vector lifecycle operations, while
+equality, debug, validation, CPV1 encoding/decoding, and Serde use explicit
+cursor machines. See [ADR-0040](../../design/0040-flat-property-value-arena.md)
+and [validation 35](../../scientific/35-property-value-validation.md).
 
 ## Where to go next
 

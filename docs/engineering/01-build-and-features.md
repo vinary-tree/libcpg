@@ -63,7 +63,7 @@ working build and [`usage/01-building-cpgs.md`](../usage/01-building-cpgs.md) fo
 | `gnn` | `ndarray`, `rand` | the `gnn` module: `CpgGnn`, `NodeEmbedding`, message passing | See [`components/gnn/overview.md`](../components/gnn/overview.md). |
 | `design-patterns` | `serde_yaml`, `toml_edit` | the `patterns` module: `GofPatternDetector`, [DPML](../GLOSSARY.md#dpml-design-pattern-markup-language), classification | YAML/TOML deps are for loading DPML templates. |
 | `algorithm-detection` | *(none)* | the `algorithms` module: `DefaultAlgorithmDetector`, complexity heuristics | Empty dep list — a pure `cfg` toggle. |
-| `serde` | `dep:serde`, `petgraph/serde-1` | `Serialize`/`Deserialize` derives on the graph types | Derive-based; no bespoke on-disk format. See [`usage/05-serialization.md`](../usage/05-serialization.md). |
+| `serde` | `dep:serde`, `petgraph/serde-1` | `Serialize`/`Deserialize` on graph types | Caller-selected outer format; recursive `PropertyValue` embeds bounded CPV1 bytes. See [`usage/05-serialization.md`](../usage/05-serialization.md). |
 | `ml-linfa` | `linfa`, `linfa-trees` | the ML back end for `PatternClassifier` | **Excluded from `full`** (pulls a large ML stack). |
 | `ml-rules` | *(none)* | the rule-based back end for `PatternClassifier` | The lightweight classifier path; included in `full`. |
 | `gpu` | `wgpu`, `pollster` | *(reserved)* | **No GPU code is wired yet** — the flag reserves the dependency surface only. Excluded from `full`. |

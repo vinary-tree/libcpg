@@ -7,6 +7,7 @@ mod cpg;
 mod edge;
 mod language;
 mod node;
+mod property_value;
 
 #[cfg(feature = "serde")]
 pub(crate) mod serde_util;
@@ -16,5 +17,9 @@ pub use edge::{CfgEdgeKind, CpgEdge, CpgEdgeKind, DfgEdgeKind, EdgeId};
 pub use language::{Language, Paradigm};
 pub use node::{
     CpgNode, CpgNodeKind, LiteralKind, LockKind, LockMode, MethodSignature, MsgKind, NodeId,
-    PropertyKey, PropertyValue, ScopeId, SourceRange, TypeInfo, Visibility,
+    PropertyKey, ScopeId, SourceRange, TypeInfo, Visibility,
+};
+pub use property_value::{
+    PropertyList, PropertyListIter, PropertyValue, PropertyValueError, PropertyValueKind,
+    PropertyValueLimit, PropertyValueLimits, PropertyValueMetrics, PropertyValueRef,
 };

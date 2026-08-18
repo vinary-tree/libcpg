@@ -19,6 +19,7 @@ Source: [`diagrams/resource-bounds.puml`](../diagrams/resource-bounds.puml).*
 | Bound | Default | Enforced in | Effect when exceeded |
 | --- | --- | --- | --- |
 | `CpgBuilderConfig::max_file_size` | 10 MB | `build` only (not `build_from_tree`) | `build` returns `Error::Construction` before parsing |
+| `PropertyValueLimits::{max_nodes,max_edges,max_string_bytes,max_encoded_bytes,max_work}` | `1_000_000`, `1_000_000`, 64 MiB, 256 MiB, `4_000_000` | CPV1 encode/decode/Serde and explicit validation | returns a typed error naming the exceeded dimension before accepting the value; canonical shape validation rejects cycles, sharing, forward references, nonpartitioned edge ranges, invalid tags/UTF-8, and trailing bytes |
 | Program-composition admission | caller-selected file/node/edge/path-byte limits | `merge_programs`; `build_import_graph` | finite and non-recursive, but intentionally has no independent cap; reject an oversized aggregate before composition |
 | `ResolveConfig::max_scope_depth` | `128` | scope and callee-name walks | traversal stops at the configured depth or the first repeated node |
 | `ResolveConfig::max_candidates_per_name` | `64` | lexical/global symbol buckets | full ambiguity count is preserved, but excess candidate IDs are not retained |
@@ -92,6 +93,38 @@ apply the `max_file_size` check** — the caller already parsed the source and o
 the tree. If your Mode-B input is untrusted, you must bound it yourself before
 parsing (next section). This is a deliberate design property, not an oversight; see
 [`design/0002-mode-b-build-from-tree.md`](../design/0002-mode-b-build-from-tree.md).
+
+## Recursive metadata: flat ownership and CPV1 limits
+
+`PropertyValue` lists are logically recursive but physically stored in one
+postorder node tape and one ordered edge tape. Clone and destruction therefore
+release flat vectors; equality, formatting, validation, and persistence use
+explicit cursor machines. Increasing logical depth does not increase native
+call depth. Public depth-100,000 tests exercise the complete lifecycle on a
+256 KiB stack.
+
+At an untrusted persistence boundary, use `PropertyValue::decode_with_limits`
+or validate with a caller-selected `PropertyValueLimits`. The five dimensions
+are independent: a service can admit many tiny nodes while tightly limiting
+aggregate strings, or admit wide lists while bounding total work. All size
+arithmetic is checked, input slices are bounds-checked before payload copying,
+and arena reservations are fallible. The decoder also requires:
+
+1. the `CPV1` version prefix and closed tag alphabet;
+2. UTF-8 strings and boolean bytes in `{0,1}`;
+3. every child index to precede its parent;
+4. strictly increasing child roots and exactly one parent per non-root node;
+5. list ranges to partition the edge tape in canonical node order;
+6. the final node to be the one root, with standalone null represented only by
+   the empty arena; and
+7. no trailing bytes.
+
+Serde embeds the same CPV1 bytes and uses default limits. Version the owning
+snapshot or cache: old unversioned recursive properties are not retried through
+the former visitor after a CPV1 failure. Such a fallback would reintroduce the
+stack-exhaustion path and make malformed-input disposition format-dependent.
+See [ADR-0040](../design/0040-flat-property-value-arena.md) and
+[validation 35](../scientific/35-property-value-validation.md).
 
 ## Program composition: aggregate admission and evidence safety
 

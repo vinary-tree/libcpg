@@ -76,15 +76,22 @@ grammar, not code execution.
 
 ### Boundary 2 — untrusted serialized graphs
 
-With the `serde` feature, the graph types derive `Serialize`/`Deserialize` (with
-custom helpers for `Arc<str>` fields). There is **no bespoke, validated import
-function** — round-tripping is done with the caller's own `serde_json` (or similar),
-as described in [`usage/05-serialization.md`](../usage/05-serialization.md).
+With the `serde` feature, graph types support `Serialize`/`Deserialize` (usually
+by derive, with custom helpers for `Arc<str>` fields). There is **no validated
+whole-graph import function** — round-tripping uses the caller's own
+`serde_json` or similar. One recursive field has a stricter inner boundary:
+`PropertyValue` embeds bounded, versioned CPV1 bytes and validates its canonical
+flat node/edge tapes before returning. See
+[`usage/05-serialization.md`](../usage/05-serialization.md) and
+[ADR-0040](../design/0040-flat-property-value-arena.md).
 Deserialization is therefore its own trust boundary: a `CodePropertyGraph`
 reconstructed from bytes is only as trustworthy as those bytes. Treat deserializing
 a graph like deserializing any other complex structure — **load only graphs from
 sources you trust**, because a crafted payload could encode a misleading or
-internally inconsistent graph that later analyses take at face value.
+internally inconsistent graph that later analyses take at face value. CPV1
+protects property lifecycle and property-tree invariants; it does not validate
+the surrounding CPG's node ids, edge endpoints, overlay semantics, or analysis
+evidence.
 
 ## Results are advisory, not authoritative
 

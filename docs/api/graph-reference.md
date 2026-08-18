@@ -1252,9 +1252,15 @@ constructor `ScopeId::new(u32)`.
 
 - `PropertyKey`: `Name`, `Type`, `Scope`, `Visibility`, `Mutable`, `Static`,
   `Async`, `Custom(Arc<str>)`.
-- `PropertyValue`: `String(Arc<str>)`, `Int(i64)`, `Uint(u64)`, `Bool(bool)`,
-  `Float(f64)`, `List(Vec<PropertyValue>)`, `Null`. Accessors `as_str()`,
-  `as_int()`, `as_bool()` return `Option`s.
+- `PropertyValue`: a logical `String`, `Int`, `Uint`, `Bool`, `Float`, `List`,
+  or `Null`, owned as flat postorder node and edge tapes. Historical constructor
+  spellings remain (`PropertyValue::List(vec![...])`); observation uses
+  `kind() -> PropertyValueKind`, `as_list() -> Option<PropertyList>`, or the
+  scalar `as_str`, `as_int`, `as_uint`, `as_bool`, and `as_float` accessors.
+- `PropertyValueLimits`, `PropertyValueMetrics`, and `PropertyValueError` expose
+  independent node, edge, string-byte, encoded-byte, and work accounting.
+  `encode`/`decode` use canonical versioned CPV1 bytes with no logical-depth
+  native recursion. See [ADR-0040](../design/0040-flat-property-value-arena.md).
 
 ---
 

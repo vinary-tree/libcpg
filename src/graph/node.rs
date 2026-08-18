@@ -5,6 +5,8 @@ use smallvec::SmallVec;
 use std::sync::Arc;
 use text_size::TextRange;
 
+use super::property_value::PropertyValue;
+
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
 
@@ -211,52 +213,6 @@ pub enum PropertyKey {
     Async,
     /// Custom property key.
     Custom(#[cfg_attr(feature = "serde", serde(with = "arc_str"))] Arc<str>),
-}
-
-/// Property value for node metadata.
-#[derive(Debug, Clone, PartialEq)]
-#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
-pub enum PropertyValue {
-    /// String value.
-    String(#[cfg_attr(feature = "serde", serde(with = "arc_str"))] Arc<str>),
-    /// Integer value.
-    Int(i64),
-    /// Unsigned integer value.
-    Uint(u64),
-    /// Boolean value.
-    Bool(bool),
-    /// Float value.
-    Float(f64),
-    /// List of values.
-    List(Vec<PropertyValue>),
-    /// Null/absent value.
-    Null,
-}
-
-impl PropertyValue {
-    /// Returns the value as a string reference if it is a string.
-    pub fn as_str(&self) -> Option<&str> {
-        match self {
-            Self::String(s) => Some(s),
-            _ => None,
-        }
-    }
-
-    /// Returns the value as an integer if it is an integer.
-    pub fn as_int(&self) -> Option<i64> {
-        match self {
-            Self::Int(i) => Some(*i),
-            _ => None,
-        }
-    }
-
-    /// Returns the value as a boolean if it is a boolean.
-    pub fn as_bool(&self) -> Option<bool> {
-        match self {
-            Self::Bool(b) => Some(*b),
-            _ => None,
-        }
-    }
 }
 
 /// Type information for a node.

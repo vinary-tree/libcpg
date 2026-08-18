@@ -1,10 +1,18 @@
 # Serialization
 
-libcpg can persist and reload a [`CodePropertyGraph`](../GLOSSARY.md#code-property-graph-cpg) through [serde](https://serde.rs). The design is deliberately minimal and worth stating precisely, because it shapes how you use it:
+libcpg can persist and reload a [`CodePropertyGraph`](../GLOSSARY.md#code-property-graph-cpg) through [serde](https://serde.rs). The outer format remains caller-selected, with one deliberate inner representation for recursively nested metadata:
 
-> Serialisation is **derive-based**. libcpg puts `#[derive(Serialize, Deserialize)]` on its graph types (behind the `serde` feature) and stops there. There is **no bespoke `export`/`import` function** and **no on-disk format specification**. You choose the format — JSON, bincode, MessagePack, anything with a serde backend — and drive it with your own crate (e.g. `serde_json`).
+> Graph serialization is **Serde-based**. Most graph types derive
+> `Serialize`/`Deserialize`; `PropertyValue` implements the traits explicitly
+> and embeds its flat, bounded, versioned CPV1 bytes. There is no whole-graph
+> `export`/`import` function or prescribed outer format. You choose JSON,
+> bincode, MessagePack, CBOR, or another Serde backend.
 
-That keeps the library format-agnostic and the surface tiny. This guide shows the two round-trip patterns, the ordering rule for reconstruction, and one field you must know is skipped.
+The CPV1 exception is load-bearing: the former recursive property enum made
+clone, formatting, serialization, deserialization, and destruction consume
+native stack in proportion to logical depth. This guide shows the two graph
+round-trip patterns, the property migration, the ordering rule for
+reconstruction, and one field you must know is skipped.
 
 ---
 
@@ -19,7 +27,7 @@ serde = { version = "1", features = ["derive"] } # only needed for the portable 
 serde_json = "1"
 ```
 
-The `serde` feature expands to `["dep:serde", "petgraph/serde-1"]` — it pulls in serde itself and turns on serde support in `petgraph`, so the underlying `DiGraph` (and therefore the whole `CodePropertyGraph`) becomes serialisable. The graph types that gain `Serialize`/`Deserialize` include `CodePropertyGraph`, `CpgNode`, `CpgEdge`, all the kind enums (`CpgNodeKind`, `CpgEdgeKind`, `CfgEdgeKind`, `DfgEdgeKind`, `MsgKind`, `LockKind`, and `LockMode`), `NodeId`/`EdgeId`, `SourceRange`, `Language`, and `CpgStats`.
+The `serde` feature expands to `["dep:serde", "petgraph/serde-1"]` — it pulls in serde itself and turns on serde support in `petgraph`, so the underlying `DiGraph` (and therefore the whole `CodePropertyGraph`) becomes serialisable. Supported graph types include `CodePropertyGraph`, `CpgNode`, `CpgEdge`, `PropertyValue`, all the kind enums (`CpgNodeKind`, `CpgEdgeKind`, `CfgEdgeKind`, `DfgEdgeKind`, `MsgKind`, `LockKind`, and `LockMode`), `NodeId`/`EdgeId`, `SourceRange`, `Language`, and `CpgStats`.
 
 `CpgNode.message_kind` and `CpgNode.lock_kind` are optional typed concurrency
 metadata. Both fields deserialize with a `None` default, so snapshots produced
@@ -107,9 +115,45 @@ A snapshot like this also gives you a natural place to store your own metadata (
 
 ---
 
-## Caveat: JSON and node properties
+## Node properties: flat values, CPV1, and JSON keys
 
-`CpgNode` has a `properties: FxHashMap<PropertyKey, PropertyValue>` field where `PropertyKey` is an enum. For **parser-built and mapper-built graphs this map is always empty**, so it serialises to `{}` and JSON round-trips cleanly (as Pattern A demonstrates). If you populate `properties` yourself with the `PropertyKey::Custom(..)` variant, be aware that JSON object keys must be strings; a non-string map key will fail `serde_json`. For graphs with rich `properties`, prefer a format that supports arbitrary map keys (bincode, MessagePack, CBOR) or move the data into a string-keyed container. This is a property of JSON, not of libcpg.
+`CpgNode` has a `properties: FxHashMap<PropertyKey, PropertyValue>` field.
+`PropertyValue` has logical string, signed, unsigned, boolean, float, list, and
+null forms, but owns lists as flat postorder node and edge tapes. Constructors
+retain their earlier spellings:
+
+```rust
+use libcpg::{PropertyValue, PropertyValueKind};
+
+let value = PropertyValue::List(vec![
+    PropertyValue::String("role".into()),
+    PropertyValue::Int(7),
+    PropertyValue::Null,
+]);
+
+if let PropertyValueKind::List(children) = value.kind() {
+    assert_eq!(children.get(1).and_then(|child| child.as_int()), Some(7));
+}
+```
+
+Recursive enum patterns such as `PropertyValue::List(children)` are the one
+source migration: use `kind()` or `as_list()`. When Serde is enabled, the value
+serializes as canonical CPV1 bytes. The inner format validates node/edge tree
+shape and independent node, edge, string-byte, encoded-byte, and work limits;
+it also preserves every floating-point bit pattern. See
+[ADR-0040](../design/0040-flat-property-value-arena.md).
+
+This CPV1 shape is intentionally incompatible with an old unversioned recursive
+Serde property. Version the owning snapshot. For a cache, change its envelope
+or builder signature and rebuild old rows; pgmcp uses cache envelope v2 with a
+`property-cpv1` signature. Do not retry a failed CPV1 decode through the old
+recursive visitor, because that would restore the stack-exhaustion path.
+
+There is a separate JSON concern: `PropertyKey` is an enum, while JSON object
+keys must be strings. Parser-built and mapper-built property maps are normally
+empty. If you populate the map and the selected key variant cannot be a JSON
+object key, use a format with arbitrary map keys or store a string-keyed
+snapshot. This limitation belongs to JSON's object model, not CPV1.
 
 ---
 
