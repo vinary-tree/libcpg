@@ -87,6 +87,18 @@ pub struct MethodFieldGraph {
     pub method_calls: Vec<MethodCall>,
 }
 
+impl MethodFieldGraph {
+    /// Computes LCOM1 through LCOM5 from this graph's typed evidence.
+    ///
+    /// LCOM4 is the connected-component count after joining methods that
+    /// either access a common field or have a resolved internal call. The
+    /// implementation uses an iterative disjoint-set forest and therefore
+    /// does not consume the process call stack as the graph grows.
+    pub fn lcom(&self) -> LcomSuite {
+        lcom_suite(self)
+    }
+}
+
 /// The five commonly distinguished LCOM variants.
 #[derive(Debug, Clone, Copy, PartialEq)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
@@ -442,7 +454,7 @@ pub fn ck_metrics(cpg: &CodePropertyGraph, options: &CkOptions) -> Vec<ClassMetr
                 noc: hierarchy.direct_children,
                 cbo: u32_len(coupled.len()),
                 rfc: u32_len(response.len()),
-                lcom: lcom_suite(graph),
+                lcom: graph.lcom(),
             }
         })
         .collect()
@@ -1324,6 +1336,16 @@ mod tests {
                 callee: NodeId::new(40),
             }]
         );
+        assert_eq!(
+            graph.lcom(),
+            LcomSuite {
+                lcom1: 2,
+                lcom2: 1,
+                lcom3: 2,
+                lcom4: 1,
+                lcom5: 0.75,
+            }
+        );
 
         let metrics = ck_metrics(&cpg, &CkOptions::default());
         assert_eq!(
@@ -1954,6 +1976,10 @@ mod tests {
             let first = ck_metrics(&forward, &CkOptions::default());
             let second = ck_metrics(&reverse, &CkOptions::default());
             prop_assert_eq!(&first, &second);
+            prop_assert_eq!(
+                method_field_graph(&forward, NodeId::new(1)).lcom(),
+                method_field_graph(&reverse, NodeId::new(1)).lcom(),
+            );
             let lcom = first[0].lcom;
             prop_assert!(lcom.lcom2 <= lcom.lcom1);
             prop_assert!(lcom.lcom4 <= lcom.lcom3);

@@ -579,7 +579,7 @@ field flow, and common CPG node kinds without reparsing source:
 
 | Function | Signature | Result |
 |---|---|---|
-| `method_field_graph` | `fn(&CodePropertyGraph, NodeId) -> MethodFieldGraph` | Sorted method/field partitions, concrete access witnesses with read/write flags, and resolved internal method calls. |
+| `method_field_graph` | `fn(&CodePropertyGraph, NodeId) -> MethodFieldGraph` | Sorted method/field partitions, concrete access witnesses with read/write flags, and resolved internal method calls; `MethodFieldGraph::lcom()` projects that exact evidence to LCOM1–5. |
 | `ck_metrics` | `fn(&CodePropertyGraph, &CkOptions) -> Vec<ClassMetrics>` | Class-ID-sorted WMC, DIT, NOC, CBO, RFC, and LCOM1–5 rows. |
 | `function_metrics` | `fn(&CodePropertyGraph, NodeId) -> Result<FunctionMetrics, AnalysisError>` | Semantic Halstead, cyclomatic, cognitive, source-span/comment, and maintainability values for one function. |
 

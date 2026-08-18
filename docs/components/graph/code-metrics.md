@@ -36,6 +36,7 @@ fn inspect(cpg: &CodePropertyGraph) -> Result<(), AnalysisError> {
         );
 
         let evidence = method_field_graph(cpg, class.class);
+        assert_eq!(evidence.lcom(), class.lcom);
         for access in evidence.accesses {
             println!(
                 "method {:?} accesses field {:?}: read={} write={}",
