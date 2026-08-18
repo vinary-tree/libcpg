@@ -228,8 +228,9 @@ propagation](../components/graph/sccp-analysis.md).
 The `value_ranges(&cpg, function)` instance propagates sorted integer interval
 environments forward. Typed comparison edges intersect one variable with a
 half-line; loop headers widen after three visits, and two descending sweeps
-recover finite bounds. The immutable `IntervalReport` is keyed by basic-block
-leader. See [interval value-range
+recover finite bounds. Local unary/binary evaluation uses a typed heap
+continuation machine, keeping native call depth constant as AST depth grows.
+The immutable `IntervalReport` is keyed by basic-block leader. See [interval value-range
 analysis](../components/graph/interval-analysis.md).
 
 ### Strongly-connected components (feature-free)

@@ -343,10 +343,13 @@ The built-in [`value_ranges`](../components/graph/interval-analysis.md)
 instance uses a stricter fixed policy: at most 64 visits per block, widening
 after the third visit only at a `LoopForest` header, and exactly two narrowing
 sweeps. Unsupported expressions become top rather than triggering recursive or
-language-specific evaluation. A visited stack cuts malformed AST expression
-cycles, and an empty branch meet remains environment bottom. The report may
-still contain $`O(BV)`$ interval pairs for $`B`$ blocks and $`V`$ variables, so
-source/graph size remains the caller's memory boundary.
+language-specific evaluation. Typed heap continuation frames and an active-path
+set keep native call depth constant and cut malformed AST expression cycles.
+Required machine-state allocation failure becomes top; there is no artificial
+expression-depth cutoff. An empty branch meet remains environment bottom. The
+report may still contain $`O(BV)`$ interval pairs for $`B`$ blocks and $`V`$
+variables, and deep expressions retain linear heap frames, so source/graph size
+remains the caller's memory boundary.
 
 ## SCCP: coupled event bound
 
@@ -857,7 +860,7 @@ correctness**: an analysis may return a meaningless answer, but it must
 | `loop_forest` | the shared visited function scope, iterative dominator/SCC/DFS walks, iterative reverse-body closure, and iterative nesting walk avoid recursion; a 25,000-node natural loop is regression-tested |
 | `unreachable_code` | visited function-scope and dense CFG sets bound discovery; iterative DFS is stack-safe on a 25,000-node reachable/disconnected graph |
 | `block_cfg` / `solve` | iterative CFG traversal and work queues avoid native-stack growth; `solve` also caps extractions per block and ignores inconsistent public loop-header mappings |
-| `value_ranges` | expression visited stack, loop-header-only widening, 64 visits per block, and two bounded narrowing sweeps |
+| `value_ranges` | typed heap expression frames with active-path cycle checks, loop-header-only widening, 64 visits per block, and two bounded narrowing sweeps; a 100,000-level initializer is tested on 256 KiB |
 | `loop_induction` | validates every supplied loop reference; finite invariant rounds, depth-three affine recognition, checked arithmetic, and iterative visited-set AST walks; a 25,000-node region is regression-tested |
 | `build_symbol_table` / `resolve_calls` | visited sets cut parent and callee-subtree cycles; deterministic scope-depth, candidate-retention, and call-count caps bound configured work |
 | `CfgExtractor::process_node` (and every `process_*` handler) | a **path set** on `CfgContext` — a node already on the current recursion path becomes its own exit instead of being re-entered |

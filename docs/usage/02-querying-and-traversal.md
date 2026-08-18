@@ -224,7 +224,10 @@ to the matching half-line. Integer literal assignments and constant `+`/`-`
 shifts remain precise; unsupported right-hand sides become the top interval.
 Loop headers use widening and bounded narrowing, so callers receive a result or
 an explicit iteration error rather than an unbounded computation. Reports are
-immutable evidence, not source rewrites. See the [interval component
+immutable evidence, not source rewrites. Expression depth is held in typed heap
+continuations; no thread-stack tuning or caller-selected depth cutoff is
+required. A malformed cycle or inability to retain required machine state
+becomes the top interval. See the [interval component
 guide](../components/graph/interval-analysis.md) for the complete domain and
 transfer contract.
 

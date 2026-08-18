@@ -17,8 +17,12 @@ second intermediate representation.
 
 ![Block states flow through interval transfers, branch meets, loop-header widening, and narrowing into an immutable report.](../../diagrams/interval-analysis.svg)
 
-*Figure — the end-to-end interval-analysis pipeline. Source:
-[`diagrams/interval-analysis.puml`](../../diagrams/interval-analysis.puml).*
+![Unary and binary expression depth is stored in typed heap continuations.](../../diagrams/interval-expression-machine.svg)
+
+*Figures — the end-to-end interval-analysis pipeline and its expression
+continuation machine. Sources:
+[`diagrams/interval-analysis.puml`](../../diagrams/interval-analysis.puml) and
+[`diagrams/interval-expression-machine.puml`](../../diagrams/interval-expression-machine.puml).*
 
 ## Terms and intuition
 
@@ -36,6 +40,9 @@ second intermediate representation.
   precision without risking nontermination.
 - A **loop header** is the entry node of a natural or conservative irreducible
   loop reported by `loop_forest`. Widening is permitted only there.
+- A **continuation frame** is a heap value that records which operator work
+  resumes after one child interval is available. The **expression machine** is
+  the frame stack, result stack, and active-path set together.
 
 For example, an unconstrained parameter `x` starts at top. On the true edge of
 `x < 5`, the analysis intersects its range with
@@ -153,8 +160,13 @@ division, overloaded arithmetic, floating-point operations, and mixed numeric
 coercions intentionally become top rather than receiving language-dependent or
 potentially unsound semantics.
 
-AST evaluation uses a visited stack. A malformed AST cycle therefore produces
-top instead of recursing indefinitely.
+AST evaluation uses explicit `Enter`, `Unary`, `BinaryLeft`, `BinaryRight`, and
+`Exit` continuation frames. The active-path set contains only entered nodes
+that have not exited. Re-entering one of those nodes makes that occurrence top,
+preserving the conservative malformed-cycle rule without recursive descent.
+Required machine-owned frame, result, and path growth is fallible; failure also
+becomes top. Left is evaluated before right, so the machine preserves the exact
+observable child order of the recursive specification.
 
 ### Conditional edges
 
@@ -207,6 +219,40 @@ The procedure below follows the production control flow and records why each
 phase exists:
 
 ```text
+EVAL_INTERVAL(root, environment):
+    frames := [Enter(root)]
+    values := []
+    active := {}
+
+    while frames is not empty:
+        Enter(node):
+            if node is active: return Top to the parent
+            add node to active
+            literal/identifier/unsupported -> schedule Exit(node, value)
+            unary -> schedule Unary(node, operator), then Enter(operand)
+            binary -> schedule BinaryLeft(node, operator, right), then Enter(left)
+
+        Unary(node, operator):
+            consume operand; schedule Exit with identity, negation, or Top
+
+        BinaryLeft(node, operator, right):
+            consume left; schedule BinaryRight(node, operator, left)
+            then Enter(right)
+
+        BinaryRight(node, operator, left):
+            consume right; apply the checked singleton-shift table
+            schedule Exit(node, interval)
+
+        Exit(node, interval):
+            remove node from active; return interval to the parent
+
+    allocation failure in required machine state -> Top
+```
+
+Every suspended continuation is data in `frames`; the host call stack does not
+grow with represented expression depth. The outer data-flow algorithm is:
+
+```text
 VALUE_RANGES(cpg, function):
     cfg   := block_cfg(cpg, function)          # canonical reachable blocks
     facts := variable_facts(cpg, function)     # stable dense variable ids
@@ -243,11 +289,14 @@ VALUE_RANGES(cpg, function):
 ## Determinism, complexity, and resources
 
 Let $`B`$ be the basic-block count, $`E`$ the block-edge count, $`V`$ the
-variable count, and $`A`$ the total number of transferred CFG nodes. A join or
-widen is $`O(V \log V)`$ with the small sorted environment; one solver visit is
-$`O(V \cdot pred(b) + transfer(b))`$. The hard bound is 64 visits per block,
-followed by exactly two sweeps, so termination does not depend on well-formed
-input. Space is $`O(BV + E + A)`$ for before/after states and existing views.
+variable count, $`A`$ the total number of transferred CFG nodes, and $`D`$ the
+largest evaluated expression depth. A join or widen is $`O(V \log V)`$ with
+the small sorted environment; one solver visit is
+$`O(V \cdot pred(b) + transfer(b))`$. One expression evaluation uses $`O(D)`$
+heap state and $`O(1)`$ native call depth. The hard bound is 64 visits per
+block, followed by exactly two sweeps, so fixed-point termination does not
+depend on well-formed input. Space is $`O(BV + E + A + D)`$ for before/after
+states, existing views, and the current expression machine.
 
 Blocks, edges, variable identifiers, report keys, and report vectors all use
 canonical orders. Property tests rebuild the same graph under reversed node and
@@ -264,6 +313,8 @@ evidence:
   every bounded concrete header observation;
 - interval hull, widening, narrowing, and environment join obey their algebraic
   laws over 96 generated cases per property;
+- 96 generated mixed unary/binary expressions compare the flat machine with a
+  retained shallow recursive specification;
 - solutions with two narrowing sweeps must be below their widened-only
   counterparts at every before/after state;
 - direct and parser-built branch examples check exact true/false half-lines;
@@ -272,6 +323,8 @@ evidence:
   the interval analysis state for the same definition;
 - malformed AST cycles, invalid selectors, graph non-interference, empty paths,
   unsupported calls, and Serde round trips have fixed examples.
+- a public 100,000-level initializer produces the exact branch interval through
+  `value_ranges` on a 256 KiB native thread stack.
 
 See the [scientific validation record](../../scientific/06-interval-analysis-validation.md)
 for the hypotheses and oracle independence argument.
@@ -295,10 +348,12 @@ relational upgrade is an octagon domain; the current edge-transfer boundary
 allows that domain to replace interval meets without changing the solver.
 
 Applications receiving hostile source should enforce parser source-size and
-time limits before analysis. Within the analysis, AST cycle checks, loop-header
-widening, and the 64-visit cap prevent unbounded recursion or fixed-point work.
-The result borrows the CPG immutably, so analysis cannot corrupt source
-evidence.
+time limits before analysis. Within the analysis, active-path cycle checks and
+typed heap frames keep native call depth constant; loop-header widening and the
+64-visit cap bound fixed-point work. The expression machine has no artificial
+depth cutoff: admitted source depth consumes linear heap state and required
+allocation failure safely returns top. The result borrows the CPG immutably, so
+analysis cannot corrupt source evidence.
 
 ## Related documentation
 
@@ -322,3 +377,6 @@ evidence.
 3. Kildall, G. A. (1973). *A Unified Approach to Global Program Optimization.*
    POPL '73. DOI:
    [10.1145/512927.512945](https://doi.org/10.1145/512927.512945)
+4. Reynolds, J. C. (1972). *Definitional Interpreters for Higher-Order
+   Programming Languages.* DOI:
+   [10.1145/800194.805852](https://doi.org/10.1145/800194.805852)

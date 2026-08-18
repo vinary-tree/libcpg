@@ -118,7 +118,8 @@ PDG). A query can therefore mix syntax, control flow, and data flow freely.
   refinement.
 - **Interval value ranges** — forward abstract interpretation with comparison
   refinement, loop-header widening, bounded narrowing, and canonical immutable
-  block-entry reports.
+  block-entry reports; typed heap continuations keep expression depth off the
+  native call stack.
 - **Loop invariants and induction variables** — DFG-backed invariant fixed
   points, unique latch-dominating additive/affine IVs, conservative hoist
   candidates, and counted-trip evidence.

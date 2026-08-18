@@ -6,7 +6,11 @@
 //! Loop-header widening guarantees convergence over the infinite-height
 //! interval domain, and deterministic descending sweeps recover precision.
 
-use std::{cmp::Ordering, collections::BTreeMap, sync::Arc};
+use std::{
+    cmp::Ordering,
+    collections::{BTreeMap, HashSet},
+    sync::Arc,
+};
 
 use smallvec::SmallVec;
 
@@ -381,20 +385,17 @@ impl IntervalAnalysis<'_> {
         match cpg.node(node).map(|node| &node.kind) {
             Some(CpgNodeKind::Variable { name, .. }) => declaration_initializer(cpg, node, name)
                 .map_or_else(Interval::top, |initializer| {
-                    self.eval_expr(cpg, initializer, state, &mut Vec::new())
+                    self.eval_expr(cpg, initializer, state)
                 }),
             Some(CpgNodeKind::Assignment { operator }) => {
                 let children = cpg.ast_children(node);
                 let rhs = children.get(1).copied();
                 if &**operator == "=" {
-                    rhs.map_or_else(Interval::top, |rhs| {
-                        self.eval_expr(cpg, rhs, state, &mut Vec::new())
-                    })
+                    rhs.map_or_else(Interval::top, |rhs| self.eval_expr(cpg, rhs, state))
                 } else {
                     let current = state.get(variable).unwrap_or_else(Interval::top);
-                    let operand = rhs.map_or_else(Interval::top, |rhs| {
-                        self.eval_expr(cpg, rhs, state, &mut Vec::new())
-                    });
+                    let operand =
+                        rhs.map_or_else(Interval::top, |rhs| self.eval_expr(cpg, rhs, state));
                     match (&**operator, singleton_value(operand)) {
                         ("+=", Some(amount)) => current.shift(amount),
                         ("-=", Some(amount)) => current.shift(amount.saturating_neg()),
@@ -407,56 +408,159 @@ impl IntervalAnalysis<'_> {
         }
     }
 
-    fn eval_expr(
-        &self,
-        cpg: &CodePropertyGraph,
-        node: NodeId,
-        state: &IntervalEnv,
-        stack: &mut Vec<NodeId>,
-    ) -> Interval {
-        if stack.contains(&node) {
+    fn eval_expr(&self, cpg: &CodePropertyGraph, root: NodeId, state: &IntervalEnv) -> Interval {
+        let mut frames = Vec::new();
+        let mut values = Vec::new();
+        let mut on_path = HashSet::new();
+        if !push_interval_frame(&mut frames, IntervalExprFrame::Enter(root)) {
             return Interval::top();
         }
-        stack.push(node);
-        let result = match cpg.node(node).map(|node| &node.kind) {
-            Some(CpgNodeKind::Literal {
-                kind: LiteralKind::Integer(value),
-            }) => Interval::singleton(i128::from(*value)),
-            Some(CpgNodeKind::Identifier { name, .. }) => variable_id(self.facts, name)
-                .and_then(|variable| state.get(variable))
-                .unwrap_or_else(Interval::top),
-            Some(CpgNodeKind::UnaryOp { operator }) => cpg
-                .ast_children(node)
-                .first()
-                .copied()
-                .map_or_else(Interval::top, |operand| {
-                    let operand = self.eval_expr(cpg, operand, state, stack);
-                    match &**operator {
+
+        while let Some(frame) = frames.pop() {
+            match frame {
+                IntervalExprFrame::Enter(node) => {
+                    if on_path.contains(&node) {
+                        if !push_interval_value(&mut values, Interval::top()) {
+                            return Interval::top();
+                        }
+                        continue;
+                    }
+                    if on_path.try_reserve(1).is_err() {
+                        return Interval::top();
+                    }
+                    on_path.insert(node);
+                    let next = match cpg.node(node).map(|node| &node.kind) {
+                        Some(CpgNodeKind::Literal {
+                            kind: LiteralKind::Integer(value),
+                        }) => IntervalExprFrame::Exit {
+                            node,
+                            value: Interval::singleton(i128::from(*value)),
+                        },
+                        Some(CpgNodeKind::Identifier { name, .. }) => IntervalExprFrame::Exit {
+                            node,
+                            value: variable_id(self.facts, name)
+                                .and_then(|variable| state.get(variable))
+                                .unwrap_or_else(Interval::top),
+                        },
+                        Some(CpgNodeKind::UnaryOp { operator }) => {
+                            let Some(operand) = cpg.ast_children(node).first().copied() else {
+                                if !push_interval_frame(
+                                    &mut frames,
+                                    IntervalExprFrame::Exit {
+                                        node,
+                                        value: Interval::top(),
+                                    },
+                                ) {
+                                    return Interval::top();
+                                }
+                                continue;
+                            };
+                            if !push_interval_frame(
+                                &mut frames,
+                                IntervalExprFrame::Unary {
+                                    node,
+                                    operator: operator.clone(),
+                                },
+                            ) || !push_interval_frame(
+                                &mut frames,
+                                IntervalExprFrame::Enter(operand),
+                            ) {
+                                return Interval::top();
+                            }
+                            continue;
+                        }
+                        Some(CpgNodeKind::BinaryOp { operator }) => {
+                            let children = cpg.ast_children(node);
+                            let [left, right, ..] = children.as_slice() else {
+                                if !push_interval_frame(
+                                    &mut frames,
+                                    IntervalExprFrame::Exit {
+                                        node,
+                                        value: Interval::top(),
+                                    },
+                                ) {
+                                    return Interval::top();
+                                }
+                                continue;
+                            };
+                            if !push_interval_frame(
+                                &mut frames,
+                                IntervalExprFrame::BinaryLeft {
+                                    node,
+                                    operator: operator.clone(),
+                                    right: *right,
+                                },
+                            ) || !push_interval_frame(
+                                &mut frames,
+                                IntervalExprFrame::Enter(*left),
+                            ) {
+                                return Interval::top();
+                            }
+                            continue;
+                        }
+                        _ => IntervalExprFrame::Exit {
+                            node,
+                            value: Interval::top(),
+                        },
+                    };
+                    if !push_interval_frame(&mut frames, next) {
+                        return Interval::top();
+                    }
+                }
+                IntervalExprFrame::Unary { node, operator } => {
+                    let operand = values.pop().unwrap_or_else(Interval::top);
+                    let value = match &*operator {
                         "+" => operand,
                         "-" => operand.negate(),
                         _ => Interval::top(),
+                    };
+                    if !push_interval_frame(&mut frames, IntervalExprFrame::Exit { node, value }) {
+                        return Interval::top();
                     }
-                }),
-            Some(CpgNodeKind::BinaryOp { operator }) => {
-                let children = cpg.ast_children(node);
-                match children.as_slice() {
-                    [left, right, ..] => {
-                        let left = self.eval_expr(cpg, *left, state, stack);
-                        let right = self.eval_expr(cpg, *right, state, stack);
-                        match (&**operator, singleton_value(right), singleton_value(left)) {
-                            ("+", Some(amount), _) => left.shift(amount),
-                            ("+", _, Some(amount)) => right.shift(amount),
-                            ("-", Some(amount), _) => left.shift(amount.saturating_neg()),
-                            _ => Interval::top(),
-                        }
+                }
+                IntervalExprFrame::BinaryLeft {
+                    node,
+                    operator,
+                    right,
+                } => {
+                    let left = values.pop().unwrap_or_else(Interval::top);
+                    if !push_interval_frame(
+                        &mut frames,
+                        IntervalExprFrame::BinaryRight {
+                            node,
+                            operator,
+                            left,
+                        },
+                    ) || !push_interval_frame(&mut frames, IntervalExprFrame::Enter(right))
+                    {
+                        return Interval::top();
                     }
-                    _ => Interval::top(),
+                }
+                IntervalExprFrame::BinaryRight {
+                    node,
+                    operator,
+                    left,
+                } => {
+                    let right = values.pop().unwrap_or_else(Interval::top);
+                    let value = match (&*operator, singleton_value(right), singleton_value(left)) {
+                        ("+", Some(amount), _) => left.shift(amount),
+                        ("+", _, Some(amount)) => right.shift(amount),
+                        ("-", Some(amount), _) => left.shift(amount.saturating_neg()),
+                        _ => Interval::top(),
+                    };
+                    if !push_interval_frame(&mut frames, IntervalExprFrame::Exit { node, value }) {
+                        return Interval::top();
+                    }
+                }
+                IntervalExprFrame::Exit { node, value } => {
+                    on_path.remove(&node);
+                    if !push_interval_value(&mut values, value) {
+                        return Interval::top();
+                    }
                 }
             }
-            _ => Interval::top(),
-        };
-        stack.pop();
-        result
+        }
+        values.pop().unwrap_or_else(Interval::top)
     }
 
     fn edge_constraint(
@@ -500,6 +604,44 @@ impl IntervalAnalysis<'_> {
         comparison_interval(normalized_operator, constant, truth)
             .map(|interval| (variable, interval))
     }
+}
+
+enum IntervalExprFrame {
+    Enter(NodeId),
+    Unary {
+        node: NodeId,
+        operator: Arc<str>,
+    },
+    BinaryLeft {
+        node: NodeId,
+        operator: Arc<str>,
+        right: NodeId,
+    },
+    BinaryRight {
+        node: NodeId,
+        operator: Arc<str>,
+        left: Interval,
+    },
+    Exit {
+        node: NodeId,
+        value: Interval,
+    },
+}
+
+fn push_interval_frame(frames: &mut Vec<IntervalExprFrame>, frame: IntervalExprFrame) -> bool {
+    if frames.try_reserve(1).is_err() {
+        return false;
+    }
+    frames.push(frame);
+    true
+}
+
+fn push_interval_value(values: &mut Vec<Interval>, value: Interval) -> bool {
+    if values.try_reserve(1).is_err() {
+        return false;
+    }
+    values.push(value);
+    true
 }
 
 impl DataflowAnalysis for IntervalAnalysis<'_> {
@@ -1033,6 +1175,102 @@ mod tests {
         ]
     }
 
+    fn shallow_expression_fixture(steps: &[(u8, i8)]) -> (CodePropertyGraph, NodeId, NodeId) {
+        let mut cpg = CodePropertyGraph::new(Language::Rust);
+        let function = add(&mut cpg, function());
+        let declaration = add(&mut cpg, variable("x"));
+        let binder = add(&mut cpg, identifier("x"));
+        connect_ast(&mut cpg, function, declaration);
+        connect_ast(&mut cpg, declaration, binder);
+
+        let mut root = add(&mut cpg, identifier("x"));
+        for &(shape, amount) in steps {
+            if shape % 5 < 2 {
+                let parent = add(
+                    &mut cpg,
+                    CpgNodeKind::UnaryOp {
+                        operator: if shape % 5 == 0 { "+" } else { "-" }.into(),
+                    },
+                );
+                connect_ast(&mut cpg, parent, root);
+                root = parent;
+                continue;
+            }
+
+            let parent = add(
+                &mut cpg,
+                CpgNodeKind::BinaryOp {
+                    operator: if shape % 5 == 4 { "-" } else { "+" }.into(),
+                },
+            );
+            let scalar = add(&mut cpg, integer(i64::from(amount)));
+            if shape % 5 == 3 {
+                connect_ast(&mut cpg, parent, scalar);
+                connect_ast(&mut cpg, parent, root);
+            } else {
+                connect_ast(&mut cpg, parent, root);
+                connect_ast(&mut cpg, parent, scalar);
+            }
+            root = parent;
+        }
+        let returned = add(&mut cpg, CpgNodeKind::Return);
+        connect_ast(&mut cpg, function, returned);
+        connect_ast(&mut cpg, returned, root);
+        (cpg, function, root)
+    }
+
+    fn recursive_eval_expr(
+        analysis: &IntervalAnalysis<'_>,
+        cpg: &CodePropertyGraph,
+        node: NodeId,
+        state: &IntervalEnv,
+        on_path: &mut Vec<NodeId>,
+    ) -> Interval {
+        if on_path.contains(&node) {
+            return Interval::top();
+        }
+        on_path.push(node);
+        let result = match cpg.node(node).map(|node| &node.kind) {
+            Some(CpgNodeKind::Literal {
+                kind: LiteralKind::Integer(value),
+            }) => Interval::singleton(i128::from(*value)),
+            Some(CpgNodeKind::Identifier { name, .. }) => variable_id(analysis.facts, name)
+                .and_then(|variable| state.get(variable))
+                .unwrap_or_else(Interval::top),
+            Some(CpgNodeKind::UnaryOp { operator }) => cpg
+                .ast_children(node)
+                .first()
+                .copied()
+                .map_or_else(Interval::top, |operand| {
+                    let operand = recursive_eval_expr(analysis, cpg, operand, state, on_path);
+                    match &**operator {
+                        "+" => operand,
+                        "-" => operand.negate(),
+                        _ => Interval::top(),
+                    }
+                }),
+            Some(CpgNodeKind::BinaryOp { operator }) => {
+                let children = cpg.ast_children(node);
+                match children.as_slice() {
+                    [left, right, ..] => {
+                        let left = recursive_eval_expr(analysis, cpg, *left, state, on_path);
+                        let right = recursive_eval_expr(analysis, cpg, *right, state, on_path);
+                        match (&**operator, singleton_value(right), singleton_value(left)) {
+                            ("+", Some(amount), _) => left.shift(amount),
+                            ("+", _, Some(amount)) => right.shift(amount),
+                            ("-", Some(amount), _) => left.shift(amount.saturating_neg()),
+                            _ => Interval::top(),
+                        }
+                    }
+                    _ => Interval::top(),
+                }
+            }
+            _ => Interval::top(),
+        };
+        on_path.pop();
+        result
+    }
+
     #[test]
     fn interval_constructors_and_order_cover_extended_endpoints() {
         assert_eq!(
@@ -1513,7 +1751,7 @@ mod tests {
         let x = variable_id(&facts, "x").expect("x variable");
         let analysis = IntervalAnalysis { facts: &facts };
         let state = IntervalEnv::from_vars([(x, Interval::singleton(10))]);
-        let evaluate = |expression| analysis.eval_expr(&cpg, expression, &state, &mut Vec::new());
+        let evaluate = |expression| analysis.eval_expr(&cpg, expression, &state);
         assert_eq!(evaluate(plus), Interval::singleton(13));
         assert_eq!(evaluate(reverse_plus), Interval::singleton(13));
         assert_eq!(evaluate(subtract), Interval::singleton(7));
@@ -1692,6 +1930,27 @@ mod tests {
 
     proptest! {
         #![proptest_config(ProptestConfig::with_cases(96))]
+
+        #[test]
+        fn flat_expression_machine_matches_the_bounded_recursive_oracle(
+            steps in prop::collection::vec((any::<u8>(), any::<i8>()), 0..32),
+            initial in arb_interval(),
+        ) {
+            let (cpg, function, root) = shallow_expression_fixture(&steps);
+            let facts = variable_facts(&cpg, function);
+            let variable = variable_id(&facts, "x").expect("x variable");
+            let state = IntervalEnv::from_vars([(variable, initial)]);
+            let analysis = IntervalAnalysis { facts: &facts };
+            let actual = analysis.eval_expr(&cpg, root, &state);
+            let expected = recursive_eval_expr(
+                &analysis,
+                &cpg,
+                root,
+                &state,
+                &mut Vec::new(),
+            );
+            prop_assert_eq!(actual, expected);
+        }
 
         #[test]
         fn interval_hull_widen_and_narrow_obey_their_algebra(

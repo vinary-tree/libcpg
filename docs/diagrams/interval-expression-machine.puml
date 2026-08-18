@@ -1,0 +1,71 @@
+@startuml
+!include _libcpg-theme.iuml
+title Stack-safe interval expression evaluation
+
+skinparam backgroundColor #FCFCFC
+skinparam component {
+  BorderColor #495057
+}
+skinparam note {
+  BackgroundColor #F1F3F5
+  BorderColor #495057
+}
+
+component "semantic CPG expression\nliteral · identifier · unary · binary" as CPG #DBE4FF
+component "Enter(node)\nclassify and establish active path" as ENTER #FFF3BF
+component "Unary(node, op)\nsuspended operand transform" as UNARY #C5F6FA
+component "BinaryLeft(node, op, right)\nretain right while evaluating left" as LEFT #E5DBFF
+component "BinaryRight(node, op, left)\nretain left while evaluating right" as RIGHT #D0EBFF
+component "Exit(node, interval)\nremove active node and return value" as EXIT #C3FAE8
+component "heap frame stack\n+ interval value stack" as STACK #D3F9D8
+component "active-path set\nmalformed cycle detection" as PATH #FFE8CC
+component "Top interval\nunsupported · cycle · required allocation failure" as TOP #FFE3E3
+component "exact interval\nidentifier lookup · checked singleton shift" as VALUE #FCC2D7
+
+CPG --> ENTER
+ENTER --> UNARY : unary operand
+ENTER --> LEFT : binary left first
+LEFT --> RIGHT : left interval retained
+UNARY --> EXIT : identity / negate / Top
+RIGHT --> EXIT : + or - singleton shift / Top
+ENTER --> EXIT : literal / identifier / unsupported
+ENTER --> PATH : insert
+EXIT --> PATH : remove
+ENTER --> STACK : push continuations
+LEFT --> STACK
+RIGHT --> STACK
+UNARY --> STACK
+PATH --> TOP : repeated active node
+STACK --> TOP : required reservation fails
+EXIT --> VALUE : exact supported result
+TOP --> EXIT : conservative result
+
+note bottom of STACK
+  All suspended work is explicit heap data.
+  Native call depth stays constant as AST depth grows.
+end note
+
+note bottom of LEFT
+  Source order is observable:
+  left completes before right is entered.
+end note
+
+note bottom of TOP
+  Top loses precision but remains sound.
+  There is no artificial expression-depth cutoff.
+end note
+
+legend bottom
+|= Colour |= Meaning |
+|<#DBE4FF>| represented CPG input |
+|<#FFF3BF>| enter/classification transition |
+|<#C5F6FA>| unary continuation |
+|<#E5DBFF>| left-child continuation |
+|<#D0EBFF>| right-child continuation |
+|<#C3FAE8>| exit/unwind transition |
+|<#D3F9D8>| explicit heap machine state |
+|<#FFE8CC>| active-path cycle state |
+|<#FFE3E3>| conservative Top result |
+|<#FCC2D7>| exact abstract result |
+endlegend
+@enduml

@@ -26,7 +26,7 @@ think to write down.
 | Public-API integration tests | 21 | `tests/integration.rs` |
 | Malformed-input robustness tests | 5 | `tests/robustness.rs` |
 | SCCP public/parser integration tests | 3 | `tests/sccp_integration.rs` |
-| Interval public/parser integration tests | 3 | `tests/intervals_integration.rs` |
+| Interval public/parser integration tests | 4 | `tests/intervals_integration.rs` |
 | Loop-induction public/parser integration tests | 3 | `tests/induction_integration.rs` |
 | Complexity-evidence public/parser integration tests | 3 | `tests/complexity_evidence_integration.rs` |
 | Condensation public/parser integration tests | 2 | `tests/condensation_integration.rs` |
@@ -55,7 +55,7 @@ think to write down.
 | Deadlock-candidate public/parser integration tests | 3 | `tests/deadlock_integration.rs` |
 | MHP public/parser integration tests | 2 | `tests/mhp_integration.rs` |
 | Session-sketch public/parser integration tests | 2 | `tests/session_integration.rs` |
-| **Executable test cases** | **1,084** | measured by the all-features test inventory; excludes three ignored rustdoc examples |
+| **Executable test cases** | **1,086** | measured by the all-features test inventory; excludes three ignored rustdoc examples |
 | `proptest!` blocks (subset of the library/robustness rows) | 74 | exact source-level macro count in `src/` and `tests/` |
 
 The maximal-matrix library count is up from **99** inline tests and **zero**
@@ -359,7 +359,8 @@ parser integration, endpoint filtering, and malformed-graph cases are catalogued
 The new `analysis/dataflow/intervals.rs` module measures **99.46 %** line,
 **99.08 %** region, **100 %** function, and **95.95 %** branch coverage, clearing
 the same thresholds. Its independent concrete interpreters, algebraic laws,
-loop-convergence checks, SCCP cross-check, and parser experiment are catalogued
+loop-convergence checks, SCCP cross-check, parser experiment, 96-case recursive
+expression oracle, and exact 100,000-level 256 KiB public gate are catalogued
 in [`scientific/06-interval-analysis-validation.md`](../scientific/06-interval-analysis-validation.md).
 The new `analysis/metrics.rs` module measures **98.11 %** line,
 **98.00 %** region, **100 %** function, and **80.00 %** branch coverage,

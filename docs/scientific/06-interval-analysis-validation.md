@@ -7,9 +7,11 @@ concrete execution checks soundness, algebraic properties check the domain,
 the generic solver exposes convergence evidence, and a parser-backed example
 checks the complete source-to-report path.
 
+![The interval expression evaluator is tested as a typed heap continuation machine.](../diagrams/interval-expression-machine.svg)
+
 ## Hypotheses
 
-The campaign evaluates seven falsifiable hypotheses:
+The campaign evaluates nine falsifiable hypotheses:
 
 1. **Concrete soundness.** Every value observed by the generated straight-line
    and bounded-loop interpreters belongs to the reported interval.
@@ -24,6 +26,11 @@ The campaign evaluates seven falsifiable hypotheses:
 6. **Determinism.** Stable node identities with reversed node and CFG-edge
    insertion produce identical public reports.
 7. **Non-interference.** Analysis does not change CPG node or edge counts.
+8. **Machine equivalence.** Generated shallow expressions produce exactly the
+   same interval under the flat production machine and a bounded test-only
+   recursive specification.
+9. **Stack independence.** A 100,000-level accepted initializer produces its
+   exact public branch interval on a 256 KiB native thread stack.
 
 ## Concrete mini-interpreter
 
@@ -68,6 +75,24 @@ A \sqcup B = B \sqcup A,
 
 The environment experiment lifts the same laws through sorted variable-id
 maps. This tests the exact `Lattice` implementation consumed by the solver.
+
+### Expression-machine differential oracle
+
+The mixed-expression generator starts from a variable whose interval is chosen
+by `arb_interval`, then applies up to 31 unary identity/negation or binary
+left/right addition/subtraction steps with arbitrary `i8` singletons. A
+test-only recursive evaluator retains the pre-flattening equations and is used
+only at this bounded depth. For expression $`e`$ and environment $`\rho`$, the
+deciding assertion is exact equality:
+
+```math
+EVAL_{machine}(e,\rho) = EVAL_{recursive}(e,\rho).
+```
+
+This oracle distinguishes operand-order, unary-negation, singleton-shift,
+unsupported-to-top, and identifier-lookup changes. It does not share the
+production frame transitions; the separate fixed cycle example checks
+active-path unwinding.
 
 ### Widening and narrowing
 
@@ -132,7 +157,7 @@ self-derived expected value could share.
 Fixed examples cover:
 
 - invalid and non-function selectors with exact `AnalysisError` variants;
-- an AST cycle, which must terminate through the expression visited stack;
+- an AST cycle, which must terminate through the active-path set and return top;
 - a call on an assignment right-hand side, which must become top;
 - empty intersections, which keep the path at environment bottom;
 - duplicate/out-of-order environment pairs, which sort and hull canonically;
@@ -144,6 +169,12 @@ Fixed examples cover:
   the literal on the left;
 - simple, compound, unsupported, incomplete, and cyclic expression shapes; and
 - Serde round trips for every public result/domain layer under `serde`.
+
+The public depth experiment constructs a 100,000-level unary initializer for
+`x = 7`, then branches on `x < 8`. The complete `value_ranges` pipeline runs on
+a 256 KiB stack and must report exactly singleton 7 on the true block while the
+impossible false block remains absent. This anti-vacuity assertion proves the
+deep evaluator executed; success alone would not.
 
 The clean maximal-matrix coverage runs measure the interval module at
 **99.46 % line**, **99.08 % region**, **100 % function**, and **95.95 % branch
@@ -159,6 +190,8 @@ The focused experiments are:
 cargo test --lib analysis::dataflow::intervals
 cargo test --test intervals_integration
 cargo test --test intervals_integration --features lang-rust
+cargo test --test intervals_integration \
+  public_value_ranges_evaluate_depth_100_000_on_a_small_stack -- --exact
 ```
 
 The repository gate additionally runs the feature-free, maximal, all-feature,
@@ -185,3 +218,6 @@ that libcpg currently tracks two-variable constraints.
 2. Miné, A. (2006). *The Octagon Abstract Domain.* Higher-Order and Symbolic
    Computation 19, 31–100. DOI:
    [10.1007/s10990-006-8609-1](https://doi.org/10.1007/s10990-006-8609-1)
+3. Reynolds, J. C. (1972). *Definitional Interpreters for Higher-Order
+   Programming Languages.* DOI:
+   [10.1145/800194.805852](https://doi.org/10.1145/800194.805852)

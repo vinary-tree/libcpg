@@ -1,6 +1,6 @@
 # Diagram catalog
 
-Every figure in the `libcpg` documentation is a **committed source** (`.puml` for PlantUML, `.dot` for Graphviz) rendered to a **committed `.svg`** that the Markdown pages embed. Sources are version-controlled so figures are reproducible and reviewable; SVGs are committed so they render on GitHub (which does not render PlantUML/Graphviz inline). This directory holds all 94 figures plus the shared theme.
+Every figure in the `libcpg` documentation is a **committed source** (`.puml` for PlantUML, `.dot` for Graphviz) rendered to a **committed `.svg`** that the Markdown pages embed. Sources are version-controlled so figures are reproducible and reviewable; SVGs are committed so they render on GitHub (which does not render PlantUML/Graphviz inline). This directory holds all 95 figures plus the shared theme.
 
 ## Conventions
 
@@ -75,6 +75,7 @@ Grouped by subject. Each row: the source (its `.svg` sibling is embedded by the 
 | `dsm-core-periphery.puml` | comparative quadrant view | Median VFI/VFO classes and the distinct largest multi-vertex SCC | components/graph/dsm-analysis, theory/10, design/0015 |
 | `wl-clone-pipeline.puml` | component/algorithm flow | Validated projection → directed-degree seeds → bounded incident refinement → canonical labels → ordered clone classes | components/graph/wl-analysis, theory/11, design/0016 |
 | `interval-analysis.puml` | component/fixed-point flow | Block/variable/loop evidence → interval transfer, branch meet, widening, narrowing, and canonical report | components/graph/interval-analysis |
+| `interval-expression-machine.puml` | continuation-machine flow | semantic expression → typed enter/unary/binary/exit heap frames → exact interval or conservative top | components/graph/interval-analysis, design/0011, scientific/06 |
 | `induction-analysis.puml` | component/evidence flow | Semantic AST/CFG/DFG plus loop/dominance evidence → invariants, hoist candidates, induction variables, and counted bounds | components/graph/induction-analysis |
 | `call-resolution.puml` | activity | Lexical symbols and syntax evidence crossing the guarded topology boundary | components/graph/call-resolution |
 | `program-composition.puml` | component/evidence flow | Per-file identity translation → one program CPG → exact/ambiguous/external import evidence → cross-file resolution | components/graph/program-composition, design/0031, theory/24 |

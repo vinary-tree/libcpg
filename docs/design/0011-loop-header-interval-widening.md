@@ -4,6 +4,8 @@
 
 Accepted.
 
+- **Amended:** 2026-08-18
+
 ## Context
 
 Integer intervals form an infinite-height lattice. A monotone loop such as
@@ -17,6 +19,12 @@ The natural-loop analysis already identifies loop headers, including
 conservative representatives for irreducible cyclic regions. The generic
 solver already provides widening hooks, per-block visit limits, typed edge
 transfers, and bounded narrowing sweeps.
+
+The initial implementation evaluated unary and binary ASTs with direct Rust
+recursion. A malformed-cycle guard prevented infinite recursion but did not
+make a deep acyclic expression stack-safe: represented AST depth still became
+native call depth. The loop solver's 64-visit cap is unrelated to expression
+depth and cannot solve that ownership of continuation state.
 
 ## Decision
 
@@ -37,6 +45,18 @@ and subtraction shifts, simple assignments, and `+=`/`-=`. Refine
 right-hand side to top. Return only immutable, canonically ordered
 `IntervalReport` evidence.
 
+Defunctionalize expression evaluation into a typed heap continuation machine.
+`Enter` establishes active-path state; `Unary`, `BinaryLeft`, and
+`BinaryRight` retain suspended operator work and exact left-before-right order;
+`Exit` removes the node from the active path and returns one interval through a
+value stack. A repeated active node returns top, exactly as the prior cycle
+guard did. Required machine-owned frame, value, and active-path growth is
+fallible; inability to retain required state returns top rather than an
+unsound precise interval. No public depth cap or thread-stack size participates
+in expression semantics.
+
+![Interval expressions are evaluated by a typed heap continuation machine.](../diagrams/interval-expression-machine.svg)
+
 ## Consequences
 
 ### Positive
@@ -51,6 +71,10 @@ right-hand side to top. Return only immutable, canonically ordered
   and leaves a clean replacement point for an octagon domain.
 - `default = []` consumers receive the complete analysis and public domain.
 - Canonical block, variable, and environment orders make reports reproducible.
+- Expression source depth is represented by heap frames while native call depth
+  remains constant.
+- Active cycles and required machine-state allocation failure conservatively
+  return top without changing the public API.
 
 ### Negative
 
@@ -61,6 +85,8 @@ right-hand side to top. Return only immutable, canonically ordered
 - Unsupported integer semantics become top, so the analysis may be imprecise.
 - The fixed visit and narrowing counts are policy choices that trade precision
   for predictable resource use.
+- A deep expression retains one continuation frame per admitted AST level, so
+  heap usage remains linear in logical depth.
 
 ## Alternatives considered
 
@@ -95,6 +121,17 @@ Rejected because inferred facts are analysis evidence, not source facts.
 Out-of-graph reports preserve original graph identity and let callers decide
 how to consume advisory bounds.
 
+### Keep recursive expression evaluation behind the cycle guard
+
+Rejected because an active-path guard proves termination on cycles but says
+nothing about native-stack consumption on a deep acyclic AST.
+
+### Increase the native thread stack or impose an expression-depth cutoff
+
+Rejected because either choice moves or hides the failure boundary and makes
+otherwise identical abstract interpretation depend on process configuration.
+The finite continuation algebra is explicit and preserves all accepted depths.
+
 ## References
 
 1. Cousot, P., Cousot, R. (1977). *Abstract Interpretation: A Unified Lattice
@@ -104,3 +141,6 @@ how to consume advisory bounds.
 2. Miné, A. (2006). *The Octagon Abstract Domain.* Higher-Order and Symbolic
    Computation 19, 31–100. DOI:
    [10.1007/s10990-006-8609-1](https://doi.org/10.1007/s10990-006-8609-1)
+3. Reynolds, J. C. (1972). *Definitional Interpreters for Higher-Order
+   Programming Languages.* DOI:
+   [10.1145/800194.805852](https://doi.org/10.1145/800194.805852)

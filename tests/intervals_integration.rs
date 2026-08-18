@@ -2,7 +2,8 @@
 
 use libcpg::{
     value_ranges, Bound, CfgEdgeKind, CodePropertyGraph, CpgEdgeKind, CpgNode, CpgNodeKind,
-    Interval, IntervalEnv, Language, LiteralKind, MethodSignature, NodeId, SourceRange, Visibility,
+    Interval, IntervalEnv, Language, LiteralKind, MethodSignature, NodeId, ScopeId, SourceRange,
+    Visibility,
 };
 
 fn node(id: u32, kind: CpgNodeKind) -> CpgNode {
@@ -117,6 +118,119 @@ fn public_interval_domain_exposes_canonical_lattice_operations() {
     let environment = IntervalEnv::from_vars([(3, right), (1, left)]);
     assert_eq!(environment.vars[0], (1, left));
     assert_eq!(environment.get(3), Some(right));
+}
+
+#[test]
+fn public_value_ranges_evaluate_depth_100_000_on_a_small_stack() {
+    const DEPTH: u32 = 100_000;
+    std::thread::Builder::new()
+        .name("interval-expression-depth-100k".into())
+        .stack_size(256 * 1024)
+        .spawn(|| {
+            let mut cpg = CodePropertyGraph::new(Language::Rust);
+            let function = cpg.add_node_with_id(node(
+                0,
+                CpgNodeKind::Function {
+                    signature: MethodSignature {
+                        name: "deep_interval".into(),
+                        params: Default::default(),
+                        return_type: None,
+                        is_static: false,
+                        is_async: false,
+                        visibility: Visibility::Private,
+                    },
+                },
+            ));
+            let declaration = cpg.add_node_with_id(node(
+                1,
+                CpgNodeKind::Variable {
+                    name: "x".into(),
+                    var_type: None,
+                    scope: ScopeId::GLOBAL,
+                    is_mutable: false,
+                },
+            ));
+            let binder = cpg.add_node_with_id(node(
+                2,
+                CpgNodeKind::Identifier {
+                    name: "x".into(),
+                    definition: Some(declaration),
+                },
+            ));
+            let mut root = cpg.add_node_with_id(node(
+                3,
+                CpgNodeKind::Literal {
+                    kind: LiteralKind::Integer(7),
+                },
+            ));
+            for level in 0..DEPTH {
+                let parent = cpg.add_node_with_id(node(
+                    4 + level,
+                    CpgNodeKind::UnaryOp {
+                        operator: "+".into(),
+                    },
+                ));
+                connect_ast(&mut cpg, parent, root);
+                root = parent;
+            }
+
+            let comparison_id = DEPTH + 4;
+            let comparison = cpg.add_node_with_id(node(
+                comparison_id,
+                CpgNodeKind::BinaryOp {
+                    operator: "<".into(),
+                },
+            ));
+            let use_site = cpg.add_node_with_id(node(
+                comparison_id + 1,
+                CpgNodeKind::Identifier {
+                    name: "x".into(),
+                    definition: Some(declaration),
+                },
+            ));
+            let eight = cpg.add_node_with_id(node(
+                comparison_id + 2,
+                CpgNodeKind::Literal {
+                    kind: LiteralKind::Integer(8),
+                },
+            ));
+            let true_return = cpg.add_node_with_id(node(comparison_id + 3, CpgNodeKind::Return));
+            let false_return = cpg.add_node_with_id(node(comparison_id + 4, CpgNodeKind::Return));
+
+            for child in [declaration, comparison, true_return, false_return] {
+                connect_ast(&mut cpg, function, child);
+            }
+            connect_ast(&mut cpg, declaration, binder);
+            connect_ast(&mut cpg, declaration, root);
+            connect_ast(&mut cpg, comparison, use_site);
+            connect_ast(&mut cpg, comparison, eight);
+            connect_cfg(&mut cpg, function, declaration, CfgEdgeKind::Sequential);
+            connect_cfg(&mut cpg, declaration, comparison, CfgEdgeKind::Sequential);
+            connect_cfg(
+                &mut cpg,
+                comparison,
+                true_return,
+                CfgEdgeKind::ConditionalTrue,
+            );
+            connect_cfg(
+                &mut cpg,
+                comparison,
+                false_return,
+                CfgEdgeKind::ConditionalFalse,
+            );
+
+            let graph_size = (cpg.node_count(), cpg.edge_count());
+            let report = value_ranges(&cpg, function).expect("deep public interval analysis");
+            assert_eq!(
+                report.interval_at(true_return, "x"),
+                Some(Interval::singleton(7))
+            );
+            assert_eq!(report.interval_at(false_return, "x"), None);
+            assert_eq!((cpg.node_count(), cpg.edge_count()), graph_size);
+        })
+        .expect("spawn 256 KiB interval-analysis thread")
+        .join()
+        .expect("deep interval analysis must not overflow the native stack");
 }
 
 #[cfg(feature = "lang-rust")]

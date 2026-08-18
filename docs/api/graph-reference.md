@@ -991,6 +991,9 @@ narrowing, subset, and membership operations. `IntervalEnv` is a sorted
 pointwise `Lattice` over stable variable ids. The built-in analysis refines
 integer comparison edges, widens only at `LoopForest` headers after three
 visits, performs two bounded narrowing sweeps, and enforces a 64-visit cap.
+Unary/binary expressions use typed heap continuation frames, so accepted AST
+depth does not grow the native call stack; cycles or required machine-state
+allocation failure conservatively become top.
 
 See [Interval value-range
 analysis](../components/graph/interval-analysis.md) for the domain equations,
