@@ -87,8 +87,9 @@ alternatives is folklore, and a decision without its costs is marketing.
 | [0041 — Shared flat expression facts](0041-shared-flat-expression-facts.md) | Represent expression roots in one shared postorder arena, deduplicate exact structural classes, and persist standalone keys through bounded canonical CEK1 bytes. | Accepted |
 | [0042 — Stack-safe CFG extraction](0042-stack-safe-cfg-extraction.md) | Defunctionalize the complete recursive CFG-handler component into typed heap continuations while preserving its exact edge stream, context lifetime, and malformed-path semantics. | Accepted |
 | [0043 — Deterministic typestate analysis](0043-deterministic-typestate-analysis.md) | Validate caller-defined finite-state properties, propagate allocation-site object/state facts over typed CPG evidence, and expose forbidden transitions with bounded canonical witnesses. | Accepted |
+| [0044 — Evidence-composed bug detectors](0044-evidence-composed-bug-detectors.md) | Project leak and uninitialized-use evidence from shared facts, normalize typed handler entry, and propagate finite exception summaries through call SCCs without parsing or graph mutation. | Accepted |
 
-These forty-three are not independent. ADR-0001 fixes the substrate that all analyses
+These forty-four are not independent. ADR-0001 fixes the substrate that all analyses
 write onto; ADR-0002 and ADR-0005 together explain how a language reaches that
 substrate and what you must switch on to get there; ADR-0003 and ADR-0004 are
 two analyses *over* the substrate (one always-on, one feature-gated) that each
@@ -200,6 +201,10 @@ ADR-0043 composes typed call, DFG/reference, canonical CFG, and shared cap
 evidence into a feature-free finite typestate may-analysis. It retains
 allocation-site identity and graph-depth state in ordered heap structures and
 keeps all policy-dependent facts out of graph.
+ADR-0044 consumes ADR-0043's terminal evidence, ADR-0003's reaching-definition
+relations, ADR-0032's bounded SCC summary solver, and ADR-0042's reserved
+exception topology. It keeps syntax normalization in the frontend and composes
+three advisory detector families from shared evidence.
 
 ![Module architecture of libcpg, showing the graph core and the analysis modules layered over it](../diagrams/module-architecture.svg)
 

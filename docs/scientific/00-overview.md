@@ -50,12 +50,13 @@ Two properties of the suite make this rigorous rather than merely suggestive:
 
 ## 3. The evidence base
 
-The all-features Cargo inventory contains **1,047 library tests** and **108
-integration/robustness tests**, for **1,155 executable cases**. The integration
+The all-features Cargo inventory contains **1,071 library tests** and **112
+integration/robustness tests**, for **1,183 executable cases**. The integration
 inventory includes public and parser-backed gates for graph construction,
 optimization, architecture, concurrency, summaries, slicing, persistence, and
-typestate, including the new three-case hand/parser/depth-100,000 typestate
-target. These cases combine fixed examples, differential oracles, and 77 exact
+typestate plus resource/definition/exception bug detectors, including the
+aggregate, Rust, Java dual-build, and depth-100,000 detector target. These cases
+combine fixed examples, differential oracles, and 80 exact
 source-level `proptest!` blocks. The feature-free matrix remains
 independently runnable and exercises the exact graph/data-flow substrate
 without compiling any grammar. Nineteen active Criterion targets supplement
@@ -108,6 +109,7 @@ Because `default = []`, many tests are **feature-gated**. The end-to-end reachin
 | [36 — Shared expression-fact arena validation](36-expression-fact-arena-validation.md) | Shared-arena structural equivalence, exact class identity, CEK1 canonical bytes, typed caps, malformed rejection, linear physical ownership, and constant native call depth | operand/sharing/cycle examples, generated comparison/hash/round-trip property, adversarial bytes, 100,000-level key and public fact-universe gates | feature-free / `serde` |
 | [37 — Stack-safe CFG extraction validation](37-cfg-extraction-machine-validation.md) | Exact former-equation preservation, handler/config completeness, active-path malformed semantics, insertion-order determinism, idempotency, and constant native call depth | comprehensive frozen oracle; five 192-case campaigns; cycle/share/config examples; public parser-built depth-100,000/256 KiB gate | feature-free / `lang-rust` parser case |
 | [38 — Typestate validation](38-typestate-validation.md) | Finite property validation, allocation/alias identity, exact forbidden transitions, may-joins, canonical witnesses, deterministic insertion order, explicit cap monotonicity, and constant native call depth | fourteen examples/properties plus serde; three 256-case campaigns; public hand/parser/depth-100,000 integration | feature-free / `serde` / `lang-rust` |
+| [39 — Bug-detector validation](39-bug-detector-validation.md) | Non-accepting leak terminals, empty scoped reaching definitions, finite exception summaries, lexical handler dispatch, root uncaught witnesses, dead catches, typed incompleteness, and constant native call depth | 21 feature-free plus three serde tests; three independent generated oracles; public aggregate/Rust/Java/depth-100,000 integration | feature-free / `serde` / `lang-rust` / `lang-java` |
 
 ## 5. What is proven, and what is advisory
 

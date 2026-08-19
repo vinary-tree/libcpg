@@ -1,0 +1,70 @@
+@startuml
+!include _libcpg-theme.iuml
+title Bounded interprocedural exception flow and handler dispatch
+
+skinparam backgroundColor #FCFCFC
+skinparam component {
+  BorderColor #495057
+}
+skinparam note {
+  BackgroundColor #F1F3F5
+  BorderColor #495057
+}
+
+component "reserved Throw nodes\ntyped value evidence" as THROW #DBE4FF
+component "unique represented calls" as CALL #C3FAE8
+component "call_graph_sccs\ncaller-to-callee condensation" as SCC #C3FAE8
+component "ExceptionSummary\n<latex>E_f \subseteq \mathcal{T}</latex>" as SET #FFF3BF
+component "callee-first singleton\nor bounded SCC Kleene rounds\n<latex>E_f^{k+1}=E_f^k \cup F_f(E^k)</latex>" as FIX #E5DBFF
+component "nearest lexical Try layer\nsource-ordered Catch clauses" as LAYERS #D3F9D8
+component "exact / inherited type match\nor untyped catch-all" as MATCH #E9ECEF
+component "reached_catches\naccepted type sets" as REACHED #D3F9D8
+component "root SCC escaping type\nUncaughtException + witness" as UNCAUGHT #FFE3E3
+component "unreached handler\nDeadCatch" as DEAD #FFE3E3
+component "caps and issues\nqualified report" as QUAL #FCC2D7
+
+THROW --> SET : direct type origins
+CALL --> SCC
+SCC --> FIX : stable component order
+SET --> FIX
+CALL --> FIX : join callee summaries
+FIX --> SET : monotone finite union
+SET --> LAYERS : direct + propagated origins
+LAYERS --> MATCH
+MATCH --> REACHED : first accepting catch
+MATCH --> SET : no handler; type escapes
+SET --> UNCAUGHT : source call component
+LAYERS --> DEAD : no reached entry
+FIX --> QUAL : function / fact / work / SCC caps
+THROW --> QUAL : unknown nominal type
+CALL --> QUAL : ambiguous target
+LAYERS --> QUAL : missing typed Catch edge
+UNCAUGHT --> QUAL : missing origin witness
+
+note bottom of FIX
+  Mutual recursion is a finite SCC fixed point.
+  No call path is expanded on the native stack.
+end note
+
+note bottom of MATCH
+  Inheritance closure uses an ordered heap worklist
+  and terminates even when represented type edges cycle.
+end note
+
+note bottom of UNCAUGHT
+  The canonical witness is the shortest stable sequence
+  of entry, call, callee, and direct-throw node identifiers.
+end note
+
+legend bottom
+|= Colour |= Meaning |
+|<#DBE4FF>| typed throw evidence |
+|<#C3FAE8>| represented call topology |
+|<#FFF3BF>| finite exception-type lattice |
+|<#E5DBFF>| bounded recursive summary fixed point |
+|<#D3F9D8>| lexical handler flow |
+|<#E9ECEF>| nominal type matching |
+|<#FFE3E3>| advisory finding |
+|<#FCC2D7>| incomplete-result evidence |
+endlegend
+@enduml

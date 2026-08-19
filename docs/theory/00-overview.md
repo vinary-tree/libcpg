@@ -272,6 +272,10 @@ development, or jump to the layer you need:
     Caller-defined property automata, allocation-site identity, typed object
     flow, and CFG may-facts define deterministic advisory forbidden-transition
     evidence with explicit completeness bounds.
+34. **[34 — Advisory resource, definition, and exception analysis](34-advisory-bug-detection.md).**
+    Non-accepting typestate terminals, empty scoped reaching definitions,
+    finite exception-type summaries, lexical handler dispatch, uncaught root
+    propagation, and dead-handler evidence.
 
 The later chapters define deterministic projection structure, architecture
 metrics, inspectable evidence, and their interpretation limits.

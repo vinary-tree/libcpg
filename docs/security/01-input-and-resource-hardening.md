@@ -28,6 +28,9 @@ Source: [`diagrams/resource-bounds.puml`](../diagrams/resource-bounds.puml).*
 | `IfdsCaps::{max_functions,max_facts_per_node,max_worklist_steps,max_scc_iters,max_call_depth}` | `100_000`, `4_096`, `1_000_000`, `64`, `128` | `solve_summaries`; default callee resolver | returns ordered partial evidence, never a false completeness claim; fact overflow stops before solving and recursive overflow stops before callers |
 | Effect-domain local machines | inherit `IfdsCaps::{max_call_depth,max_worklist_steps}` | `analyze_effects`; return-dependency and constant evaluation | typed heap frames keep native depth constant; active-path cycles terminate; logical depth/work or allocation exhaustion widens conservatively, records the function as capped, and prevents a false completeness claim |
 | Taint/nullflow traversal and retention bounds | inherit `IfdsCaps` | `analyze_taint_report`; `analyze_null_flows_report` | typed call-path/value walks terminate by depth and visited sets; parameter masks visibly truncate after 64 positions; solver fact/work/SCC caps and domain-local cap evidence prevent false absence claims |
+| Typestate and resource-leak bounds | inherit `IfdsCaps::{max_functions,max_facts_per_node,max_worklist_steps,max_call_depth}` | `analyze_typestate`; `analyze_resource_leaks` | ordered object/value-flow and CFG fact worklists stop visibly; invalid policies, missing events/placement, and absent leak accepting states prevent false completeness |
+| Exception-flow bounds | inherit `IfdsCaps::{max_functions,max_facts_per_node,max_worklist_steps,max_scc_iters}` | `analyze_exception_flow` | finite exception-type summaries stop visibly at solver caps; unknown types, ambiguous calls, malformed catch entry, and missing witnesses prevent false completeness; call depth is inapplicable because SCC summaries replace path expansion |
+| Uninitialized-use traversal guards | always on | `analyze_uninitialized_uses` | finite function/use/definition scans and cycle-safe heap traversals; results describe only the represented binding and reaching-definition relation |
 | `Vf2Matcher::max_matches` | `0` (unlimited) | `pattern::Vf2Matcher` | search short-circuits once the match count is reached |
 | `Vf2Matcher` strict toggles | `strict_kinds`/`strict_edges` off | `pattern::Vf2Matcher` | tighter feasibility test prunes branches earlier |
 | Clone pair / PDG / VF2 budgets | `100_000` pairs, `300` PDG nodes, `10_000` VF2 calls | `pattern::detect_clones` | returns `AnalysisError::BudgetExceeded` before omitting a required comparison; hard maxima are `100_000`, `300`, and `100_000` |
@@ -257,6 +260,28 @@ making an absence claim; the vector conveniences retain positive evidence but
 cannot represent an empty capped result. The separate [taint security
 boundary](02-taint-analysis.md) covers policy provenance and witness
 interpretation.
+
+### Typestate and advisory bug-detector evidence
+
+[`analyze_typestate`](../components/graph/typestate-analysis.md) charges
+function admission, object/state fact retention, worklist steps, and typed
+callee-path depth. Resource-leak projection cannot restore omitted typestate
+evidence, so it retains that complete report and additionally rejects a policy
+with no accepting terminal state.
+
+[`analyze_exception_flow`](../components/graph/bug-detectors.md) uses the shared
+finite summary solver. Function, fact, work, and recursive-SCC round caps apply;
+`max_call_depth` does not, because the domain never expands a recursive call
+path. Ordered heap searches handle inheritance closure and canonical witnesses.
+Unknown throw types, ambiguous call targets, absent typed handler entry, and an
+unreconstructible origin become explicit issues.
+
+Uninitialized-use analysis has no truncation mode. It scans the finite
+represented function scopes, binder-aware uses, and reaching-definition
+relations with cycle-safe graph primitives. Its completeness is therefore
+about that normalized relation, not behavior omitted by a frontend. The
+[bug-detector security boundary](09-bug-detectors.md) covers policy provenance,
+false-positive/negative modes, and safe finding interpretation.
 
 ## Pattern matching: VF2
 

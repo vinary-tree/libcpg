@@ -1,0 +1,77 @@
+@startuml
+!include _libcpg-theme.iuml
+title Evidence-composed advisory bug detectors
+
+skinparam backgroundColor #FCFCFC
+skinparam component {
+  BorderColor #495057
+}
+skinparam note {
+  BackgroundColor #F1F3F5
+  BorderColor #495057
+}
+
+component "CodePropertyGraph\ntyped AST · CFG · DFG\ncalls · types · inheritance" as CPG #DBE4FF
+component "caller PropertyFsm\nallocation · release · accepting" as POLICY #FFE8CC
+component "finite typestate\nterminal object / exit / state / witness" as TYPESTATE #C3FAE8
+component "resource-leak projection\n<latex>q \notin A</latex> at semantic exit" as LEAK #FFF3BF
+component "shared variable facts\nbinder-aware executable uses" as FACTS #C3FAE8
+component "scoped reaching definitions\n<latex>R(u) \cap S_f = \varnothing</latex>" as UNINIT #FFF3BF
+component "call-graph SCC summaries\nfinite escaping exception types" as SUMMARY #E5DBFF
+component "lexical handler dispatch\nCatch edge · nominal subtype" as DISPATCH #D3F9D8
+component "ResourceLeakAnalysis" as LR #FFE3E3
+component "UninitializedUseAnalysis" as UR #FFE3E3
+component "ExceptionFlowAnalysis\nuncaught · reached/dead catch" as ER #FFE3E3
+component "qualification boundary\ncaps · issues · is_complete()" as QUAL #FCC2D7
+
+POLICY --> TYPESTATE
+CPG --> TYPESTATE : allocation / event / flow / CFG
+TYPESTATE --> LEAK
+LEAK --> LR
+
+CPG --> FACTS : identifiers / bindings / scope
+CPG --> UNINIT : represented definitions
+FACTS --> UNINIT
+UNINIT --> UR
+
+CPG --> SUMMARY : direct throws / unique calls
+SUMMARY --> DISPATCH : propagated types
+CPG --> DISPATCH : Try / Catch / type hierarchy
+DISPATCH --> SUMMARY : caught types removed
+SUMMARY --> ER : root escaping types
+DISPATCH --> ER : reached and dead catches
+
+TYPESTATE --> QUAL : typestate caps / issues
+LEAK --> QUAL : accepting-policy issue
+SUMMARY --> QUAL : solver caps / issues
+DISPATCH --> QUAL : type / call / Catch-edge issues
+QUAL --> LR
+QUAL --> ER
+
+note bottom of CPG
+  Frontends are the only syntax-normalization boundary.
+  Detectors neither parse source text nor mutate topology.
+end note
+
+note bottom of FACTS
+  Declaration signatures and unbound callee names
+  are syntax, not executable variable reads.
+end note
+
+note bottom of QUAL
+  Positive candidates remain reviewable under qualification.
+  Absence claims require the complete report surface.
+end note
+
+legend bottom
+|= Colour |= Meaning |
+|<#DBE4FF>| normalized program evidence |
+|<#FFE8CC>| caller-owned resource policy |
+|<#C3FAE8>| shared reusable analysis facts |
+|<#FFF3BF>| detector-specific decision |
+|<#E5DBFF>| recursive-safe exception summary fixed point |
+|<#D3F9D8>| lexical handler selection |
+|<#FFE3E3>| advisory candidate report |
+|<#FCC2D7>| completeness qualification |
+endlegend
+@enduml

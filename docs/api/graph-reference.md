@@ -447,6 +447,31 @@ the [component guide](../components/graph/typestate-analysis.md), [usage
 guide](../usage/16-typestate-analysis.md), [theory](../theory/33-finite-state-typestate-properties.md),
 and [security boundary](../security/08-typestate-analysis.md).
 
+### Advisory bug detectors
+
+The feature-free bug-detector APIs compose existing typestate, variable-fact,
+reaching-definition, call-SCC, type, inheritance, and reserved exception
+evidence. Every report is read-only and deterministic.
+
+| Item | Contract |
+|---|---|
+| `analyze_resource_leaks` | `fn(&CodePropertyGraph, &PropertyFsm, &IfdsCaps) -> ResourceLeakAnalysis`; projects non-accepting typestate terminals while retaining the complete typestate report. |
+| `resource_leaks` | Positive-only leak projection; inspect `ResourceLeakAnalysis::is_complete()` before an absence claim. |
+| `analyze_uninitialized_uses` | `fn(&CodePropertyGraph) -> UninitializedUseAnalysis`; reports binder-aware executable uses with no in-scope reaching definition. |
+| `uninitialized_uses` | Positive-only use projection. |
+| `analyze_exception_flow` | `fn(&CodePropertyGraph, &IfdsCaps) -> ExceptionFlowAnalysis`; returns finite escaping-type summaries, uncaught root propagation, reached/dead catches, work, caps, and issues. |
+| `uncaught_exceptions` / `dead_catches` | Positive-only exception finding projections. |
+| `ResourceLeak` | Allocation object, semantic exit, non-accepting state, canonical witness, and cap qualifier. |
+| `UninitializedUse` | Function, executable use site, canonical variable name, and out-of-scope definitions. |
+| `UncaughtException` | Root entry, escaping origin/type, canonical call/throw witness, and cap qualifier. |
+| `DeadCatch` | Function, catch node, accepted types or catch-all marker, and cap qualifier. |
+
+Unknown types, ambiguous calls, missing typed catch-entry edges, missing
+witnesses, and shared-solver failures prevent exception completeness. See the
+[component guide](../components/graph/bug-detectors.md), [usage
+guide](../usage/17-advisory-bug-detectors.md), [theory](../theory/34-advisory-bug-detection.md),
+and [security boundary](../security/09-bug-detectors.md).
+
 ### Deterministic graph projections
 
 `GraphProjection` is the feature-free, payload-free compressed-sparse-row view

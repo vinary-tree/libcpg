@@ -653,6 +653,37 @@ CFG. Results are advisory and require a complete report for negative claims.
 See [Theory 33](theory/33-finite-state-typestate-properties.md), Strom–Yemini
 [[48]](#references), and Fink et al. [[49]](#references).
 
+### Resource leak
+
+A **resource leak** candidate is an allocation-site object that reaches a
+represented semantic function exit in a non-accepting typestate. It is distinct
+from a forbidden transition: a path can perform only legal operations yet omit
+the release required by terminal policy. libcpg retains the allocation, exit,
+state, and canonical typestate witness [[50]](#references). See [Theory
+34](theory/34-advisory-bug-detection.md).
+
+### Uninitialized use / Scoped reaching definition
+
+An **uninitialized use** candidate is a binder-aware executable variable read
+whose represented reaching-definition set contains no definition in the same
+function scope. A **scoped reaching definition** is a reaching definition that
+belongs to that scope; definitions from other functions are retained as
+diagnostic evidence but do not initialize the local use. Declaration-signature
+and unbound callee identifiers are syntax rather than reads. See [Theory
+34](theory/34-advisory-bug-detection.md) and Reps–Horwitz–Sagiv
+[[41a]](#references).
+
+### Exception summary / Uncaught exception / Dead catch
+
+An **exception summary** is the finite ordered set of nominal exception types
+that may escape one represented function after lexical handler dispatch. An
+**uncaught exception** candidate is a summary type escaping a function in a
+source component of the call condensation graph, with a canonical call/throw
+witness. A **dead catch** candidate is a represented catch clause to which no
+direct or propagated exception type is dispatched. These are advisory static
+relations, not runtime feasibility or impact verdicts [[51]](#references). See
+[Theory 34](theory/34-advisory-bug-detection.md).
+
 ### Message passing (GNN)
 
 One round of GNN computation: every node updates its vector from its neighbours' vectors. `libcpg` uses mean aggregation with a ReLU nonlinearity over AST, CFG, and DFG neighbourhoods:
@@ -1054,3 +1085,5 @@ strict tree interpretation. See
 47. Reynolds, J. C. (1972). *Definitional Interpreters for Higher-Order Programming Languages.* DOI: [10.1145/800194.805852](https://doi.org/10.1145/800194.805852).
 48. Strom, R. E., Yemini, S. (1986). *Typestate: A Programming Language Concept for Enhancing Software Reliability.* DOI: [10.1109/TSE.1986.6312929](https://doi.org/10.1109/TSE.1986.6312929).
 49. Fink, S. J., Yahav, E., Dor, N., Ramalingam, G., Geay, E. (2008). *Effective Typestate Verification in the Presence of Aliasing.* DOI: [10.1145/1348250.1348255](https://doi.org/10.1145/1348250.1348255).
+50. Shadab, N., Gharat, P., Ernst, M. D., Kellogg, M., Lahiri, S. K., Lal, A., Sridharan, M. (2025). *Lightweight and Modular Resource Leak Checking (Extended Version).* DOI: [10.1007/s10009-025-00804-2](https://doi.org/10.1007/s10009-025-00804-2).
+51. Sinha, S., Harrold, M. J. (2000). *Analysis and Testing of Programs with Exception Handling Constructs.* DOI: [10.1109/32.877846](https://doi.org/10.1109/32.877846).

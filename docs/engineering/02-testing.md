@@ -22,7 +22,7 @@ think to write down.
 
 | Kind | Count | Where |
 | --- | ---: | --- |
-| Maximal-matrix library tests | 984 | inline `#[cfg(test)] mod …` next to the code; includes examples and properties |
+| Maximal-matrix library tests | 1,071 | inline `#[cfg(test)] mod …` next to the code; includes examples and properties |
 | Public-API integration tests | 21 | `tests/integration.rs` |
 | Malformed-input robustness tests | 5 | `tests/robustness.rs` |
 | SCCP public/parser integration tests | 3 | `tests/sccp_integration.rs` |
@@ -56,8 +56,9 @@ think to write down.
 | MHP public/parser integration tests | 2 | `tests/mhp_integration.rs` |
 | Session-sketch public/parser integration tests | 2 | `tests/session_integration.rs` |
 | Typestate public/parser/stack integration tests | 3 | `tests/typestate_integration.rs` |
-| **Executable test cases** | **1,155** | measured by the all-features test inventory: 1,047 library and 108 integration/robustness tests; excludes ignored rustdoc examples |
-| `proptest!` blocks (subset of the library/robustness rows) | 77 | exact source-level macro count in `src/` and `tests/` |
+| Bug-detector public/parser/stack integration tests | 4 | `tests/bug_detectors_integration.rs` |
+| **Executable test cases** | **1,183** | measured by the all-features test inventory: 1,071 library and 112 integration/robustness tests; excludes three rustdoc examples |
+| `proptest!` blocks (subset of the library/robustness rows) | 80 | exact source-level macro count in `src/` and `tests/` |
 
 The maximal-matrix library count is up from **99** inline tests and **zero**
 property tests before this work.
@@ -75,10 +76,10 @@ on the features enabled:
 
 | Command | Lib tests | Notes |
 | --- | ---: | --- |
-| `cargo test` | 693 | `default = []`: the feature-free surface, including typestate, only |
-| `cargo test --features "full rholang metta"` | 1,047 | the maximal matrix, including the Mode-B mappers, session sketches, typestate, and evidence-aware complexity |
+| `cargo test` | 714 | `default = []`: the feature-free surface, including typestate and bug detectors, only |
+| `cargo test --features "full rholang metta"` | 1,071 | the maximal matrix, including the Mode-B mappers, session sketches, typestate, bug detectors, and evidence-aware complexity |
 
-The feature-free 693 exercise the graph model, deterministic multi-file merge
+The feature-free 714 exercise the graph model, deterministic multi-file merge
 and import linkage, exact dominator/post-dominator,
 natural-loop, monotone data-flow, IFDS/IDE procedure summaries,
 interprocedural effect/constant, taint, and maybe-null summaries, variable-liveness/dead-store,
@@ -90,6 +91,7 @@ structural-clone and Type-1 through Type-4 function-clone detection, centrality,
 spectral-connectivity classification, bounded simple cycles, directed motifs,
 bipartite GED, typed channel/deadlock evidence, may-happen-in-parallel relations,
 finite-state typestate properties,
+resource-leak, uninitialized-use, uncaught-exception, and dead-catch detection,
 the CFG/DFG/PDG extractors, VF2, and similarity by building CPGs
 **by hand** — no grammar required. This is what
 the [`arb_well_formed_cpg`](#the-generators) generator exists for.
@@ -167,6 +169,7 @@ The invariants fall into complementary families.
 | **Graph projections** | CSR nodes and adjacency are sorted; parallel-edge weights merge deterministically; transpose is an involution; all overlay constructors equal direct typed-edge traversal and do not mutate the CPG |
 | **Session-protocol sketches** | a 128-case exact-dual generator preserves complete sketches under reversed node/edge insertion and keeps all evidence in graph; examples cover every concrete mismatch, explicit uncertainty, literal/named/definition-backed payload types, nested/cyclic AST boundaries, real Rholang normalization, serde, and graph non-mutation |
 | **Typestate analysis** | three 256-case properties compare against an independent sequence oracle, reverse CFG/DFG insertion, and check cap monotonicity; examples cover policy invariants, legal/forbidden protocols, joins, aliases, call evidence, applicable caps, serde, parser-built Rust, graph immutability, and CFG depth 100,000 on 256 KiB |
+| **Advisory bug detectors** | independent generated oracles check non-accepting leak terminals, empty scoped reaching-definition sets, and 256 exception-call chains; examples cover semantic exits, declaration/callee syntax exclusion, direct/interprocedural and subtype/catch-all dispatch, dead catches, every applicable cap/issue, serde, graph immutability, Rust/Java dual build modes, and 100,000 AST levels on 256 KiB |
 | **Function CFG scope** | the reachable CFG view is invariant under node, edge, and recorded-exit insertion permutations; call edges never enter the view; dense entry/exit identifiers map back to the same stable nodes |
 | **CFG extraction machine** | one comprehensive fixture covers every typed continuation and all eight config combinations; three 192-case campaigns require exact edge-id/order/kind/label and entry/exit equality with the bounded former-recursive equations on well-formed and arbitrarily corrupted ASTs, plus exact invariance under reversed non-AST insertion; examples cover cycles, sharing, terminators, nested loop/try state, idempotency, and degenerate forms; a public parser-built depth-100,000 CFG completes on 256 KiB |
 | **Dominance** | CHK immediate dominators equal `petgraph::algo::dominators::simple_fast` under edge permutations; post-dominators and control edges equal the former PDG oracle; `PdgBuilder` emits exactly `PostDominatorTree::control_dependence_edges`; a 25,000-node path is stack-safe |

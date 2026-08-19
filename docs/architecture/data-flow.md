@@ -557,6 +557,27 @@ See the [component guide](../components/graph/typestate-analysis.md), [Theory
 33](../theory/33-finite-state-typestate-properties.md), and [Usage
 16](../usage/16-typestate-analysis.md).
 
+### Evidence-composed bug detectors (feature-free)
+
+`analysis::bugs` fans normalized evidence into three read-only paths. Resource
+leaks project non-accepting `TypestateTerminal` values. Uninitialized uses reuse
+the shared binder-aware variable facts and function-scoped reaching
+definitions. Exception flow reuses the call-graph SCC summary solver, reserved
+`Throw`/`Catch` nodes, typed `Catch` CFG entry, nominal type/inheritance
+evidence, and lexical AST handler nesting.
+
+No detector constructs a private parser or parallel graph. Ordered heap
+worklists retain source/graph depth off the native stack, and each report keeps
+the caps or structural issues needed to qualify an empty result.
+
+![Shared CPG evidence composes into three advisory detector reports](../diagrams/bug-detector-pipeline.svg)
+
+![Finite exception summaries feed lexical handler dispatch and canonical findings](../diagrams/exception-flow-summary.svg)
+
+See the [component guide](../components/graph/bug-detectors.md), [Theory
+34](../theory/34-advisory-bug-detection.md), and [Usage
+17](../usage/17-advisory-bug-detectors.md).
+
 ### Pattern detection
 
 Two layers, at two feature levels:

@@ -61,6 +61,9 @@
 //!   pairs from typed parallel operand subtrees under an explicit output cap
 //! - **Session Protocol Sketches** (`rholang`): Compare ordered per-channel
 //!   endpoint actions for advisory binary direction and payload-type duality
+//! - **Advisory Bug Detectors**: Project resource leaks and uninitialized uses,
+//!   propagate bounded exception summaries, and report uncaught root flow and
+//!   dead catches with explicit completeness evidence
 //! - **Pattern Detection**: Detect design patterns using subgraph isomorphism (VF2/VF3)
 //! - **Algorithm Analysis**: Extract algorithm signatures and estimate complexity
 //! - **GNN Support**: Graph neural network message passing for semantic embeddings

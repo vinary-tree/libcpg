@@ -87,6 +87,9 @@ PDG). A query can therefore mix syntax, control flow, and data flow freely.
 - **Finite-state typestate analysis** — feature-free allocation-site object
   identities, typed event/alias evidence, deterministic CFG may-facts,
   canonical forbidden-transition witnesses, and explicit completeness bounds.
+- **Advisory bug detectors** — feature-free resource-leak projection,
+  binder-aware uninitialized-use evidence, bounded interprocedural exception
+  summaries, uncaught root witnesses, and dead-catch findings.
 - **Projection centrality** — deterministic PageRank variants, vertex/edge
   betweenness, eigenvector, Katz, closeness, harmonic, HITS, and Burt
   structural-hole scores with explicit iteration and traversal budgets.
@@ -207,7 +210,7 @@ Comprehensive documentation lives under [`docs/`](docs/README.md):
 - **[API reference](docs/api/graph-reference.md)** — graph/program/projection/block-CFG/SCC/condensation/layering/architectural-smell/DSM/Martin/code-metric/reflexion/centrality/community/cohesion/reachability, builder, and pattern/algorithm/GNN reference.
 - **[Components](docs/README.md#components)** — graph projections, basic blocks, dominators, SCC/condensation/layering/architectural-smell/DSM/Martin/code-metric/reflexion/centrality/community/cohesion analytics, reachability, builders, patterns, algorithms, and GNN internals.
 - **[Usage guides](docs/usage/00-getting-started.md)** — task-oriented how-tos.
-- **[Engineering](docs/engineering/00-overview.md)** · **[Scientific validation](docs/scientific/00-overview.md)** · **[Security](docs/security/00-threat-model.md)** · **[Taint-analysis usage](docs/usage/10-taint-and-nullflow.md)**.
+- **[Engineering](docs/engineering/00-overview.md)** · **[Scientific validation](docs/scientific/00-overview.md)** · **[Security](docs/security/00-threat-model.md)** · **[Taint-analysis usage](docs/usage/10-taint-and-nullflow.md)** · **[Bug-detector usage](docs/usage/17-advisory-bug-detectors.md)**.
 - **[Glossary](docs/GLOSSARY.md)** and the **[diagram catalog](docs/diagrams/README.md)**.
 
 ## License

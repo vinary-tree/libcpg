@@ -50,6 +50,7 @@ analytics](../GLOSSARY.md#condensation-graph--condensation-metrics),
 [Martin package metrics](../GLOSSARY.md#martin-package-metrics),
 [interprocedural effect summaries](../GLOSSARY.md#effect-summary--place--purity),
 [advisory taint and maybe-null summaries](../GLOSSARY.md#taint-catalog--taint-witness), pure
+[resource-leak, uninitialized-use, and exception-flow detectors](../GLOSSARY.md#exception-summary--uncaught-exception--dead-catch),
 [architectural-smell analysis](../GLOSSARY.md#architectural-smell),
 [reflexion-model conformance](../GLOSSARY.md#reflexion-model),
 [WL structural-clone analysis](../GLOSSARY.md#weisfeilerleman-wl-refinement),
@@ -87,8 +88,8 @@ directly from that relationship, and both are visible in `Cargo.toml`:
 | Page | What it covers |
 | --- | --- |
 | [01 — Build and features](01-build-and-features.md) | The full feature matrix: 16 `lang-*` grammars, the language groups, the analysis features, the Mode-B toggles, `serde`, the reserved `gpu` flag, and the `full` umbrella; the pgmcp grammar-pin table; how to enable a language. |
-| [02 — Testing](02-testing.md) | The example-based and `proptest` suite plus the general, robustness, SCCP, interval, loop-induction, complexity-evidence, condensation, layering, architectural-smell, DSM, Martin, reflexion, WL, centrality, community, cohesion, spectral, cycle, motif, GED, function-clone, program-composition, IFDS/IDE, effect-summary, taint, and maybe-null public-API suites; the `arb_*` generators; how to run each feature subset; measured coverage; the defects the suite found; and the active Criterion benchmark substrate. |
-| [03 — Performance](03-performance.md) | The data-structure rationale, asymptotic costs, nineteen active oracle-guarded Criterion targets, controlled-measurement protocol, and explicit remaining benchmark gaps. |
+| [02 — Testing](02-testing.md) | The example-based and `proptest` suite plus the general, robustness, SCCP, interval, loop-induction, complexity-evidence, condensation, layering, architectural-smell, DSM, Martin, reflexion, WL, centrality, community, cohesion, spectral, cycle, motif, GED, function-clone, program-composition, IFDS/IDE, effect-summary, taint, maybe-null, typestate, and bug-detector public-API suites; the `arb_*` generators; how to run each feature subset; measured coverage; the defects the suite found; and the active Criterion benchmark substrate. |
+| [03 — Performance](03-performance.md) | The data-structure rationale, asymptotic costs including typestate and bug detectors, nineteen active oracle-guarded Criterion targets, controlled-measurement protocol, and explicit remaining benchmark gaps. |
 | [04 — Contributing](04-contributing.md) | Step-by-step recipes: add a language mapper, add a Gang-of-Four template, add a similarity metric; plus the coding conventions the crate follows. |
 
 ## Map of the security pillar
@@ -98,6 +99,13 @@ directly from that relationship, and both are visible in `Cargo.toml`:
 | [`security/00` — Threat model](../security/00-threat-model.md) | Assets, attackers, and the two trust boundaries (untrusted source bytes; untrusted serialized graphs); why tree-sitter parsing executes no analyzed code; why detection results are advisory. |
 | [`security/01` — Input and resource hardening](../security/01-input-and-resource-hardening.md) | The concrete bounds — `max_file_size`, DFG structural passes, IFDS/IDE functions/facts/work/recursion/depth, effect-summary traversal widening, condensation/layering and DSM/WL/centrality/community limits, Martin/architectural-smell evidence validation, reflexion path-policy admission, k-truss/min-cut/attack ceilings, VF2 `max_matches`, and slice `max_nodes` — with recommended caps for hostile input and where caller-side parser timeouts belong. |
 | [`security/02` — Taint-analysis boundary](../security/02-taint-analysis.md) | Why catalog policy is caller-owned, why findings are advisory, how confidence and witnesses should be interpreted, and why capped empty results cannot support absence claims. |
+| [`security/03` — Interprocedural-slicing boundary](../security/03-system-dependence-slicing.md) | Summary-edge trust, context/depth caps, graph mutation, and safe interpretation of bounded slices. |
+| [`security/04` — Channel-topology boundary](../security/04-channel-topology.md) | Typed message evidence, channel identity, linear-consumption candidates, and false-positive/negative limits. |
+| [`security/05` — Deadlock-analysis boundary](../security/05-deadlock-analysis.md) | Communication and lock-order candidate evidence, SCC witnesses, resource identity, and review requirements. |
+| [`security/06` — MHP-analysis boundary](../security/06-mhp-analysis.md) | Structural may-happen-in-parallel pairs, output caps, and the distinction from races or runtime overlap. |
+| [`security/07` — Session-analysis boundary](../security/07-session-analysis.md) | Shallow endpoint duality, missing evidence, and limits of binary linear protocol sketches. |
+| [`security/08` — Typestate-analysis boundary](../security/08-typestate-analysis.md) | Caller property trust, allocation abstraction, capped may-facts, terminal policy, and advisory witnesses. |
+| [`security/09` — Bug-detector boundary](../security/09-bug-detectors.md) | Resource, definition, and exception evidence; incomplete-result controls; stack/resource safety; and impact review. |
 
 ## Honest project status
 

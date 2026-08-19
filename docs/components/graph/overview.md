@@ -420,6 +420,9 @@ So the safe pattern is: build (single-threaded, `&mut`), then analyse
 - [Deterministic typestate analysis](typestate-analysis.md) — feature-free
   finite-state properties, allocation-site object flow, CFG may-facts,
   canonical witnesses, and explicit incomplete-result evidence.
+- [Advisory bug detectors](bug-detectors.md) — feature-free resource-leak and
+  uninitialized-use projections plus bounded interprocedural uncaught-exception
+  and dead-catch evidence over the same normalized graph.
 - [`api/graph-reference.md`](../../api/graph-reference.md) — the precise,
   method-by-method API reference for `CodePropertyGraph`.
 - [`theory/01-code-property-graphs.md`](../../theory/01-code-property-graphs.md)
