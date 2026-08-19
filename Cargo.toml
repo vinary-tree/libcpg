@@ -263,6 +263,10 @@ name = "clones"
 harness = false
 
 [[bench]]
+name = "advisory_bugs"
+harness = false
+
+[[bench]]
 name = "program_merge"
 harness = false
 
