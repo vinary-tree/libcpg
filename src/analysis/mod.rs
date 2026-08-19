@@ -33,6 +33,7 @@ mod sdg;
 mod smells;
 mod spectral;
 mod taint;
+mod typestate;
 pub(crate) mod wl;
 
 use crate::NodeId;
@@ -171,6 +172,11 @@ pub use taint::{
     NullAnalysis, NullFlow, NullFlowKey, NullOriginKind, NullSummary, ParamSinkKey, Pattern,
     ReturnSourceKey, SinkClass, SourceClass, TaintAnalysis, TaintCatalog, TaintFact, TaintFlow,
     TaintSummary, TaintWitness,
+};
+
+pub use typestate::{
+    analyze_typestate, check_typestate, PropertyEvent, PropertyFsm, PropertyFsmIssue,
+    PropertyState, TypestateAnalysis, TypestateCapEvent, TypestateIssue, TypestateViolation,
 };
 
 pub use wl::{structural_clone_classes, wl_labels, MAX_WL_ITERATIONS};
