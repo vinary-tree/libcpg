@@ -177,6 +177,15 @@ so `build` returns `Error::UnsupportedLanguage`; enable a `lang-*` feature (as
 above) or use the feature-free `build_from_tree` path. See
 [`docs/usage/00-getting-started.md`](docs/usage/00-getting-started.md).
 
+The feature-free population anomaly example exercises both exact oracles:
+
+```sh
+cargo run --example population_anomalies --no-default-features
+```
+
+See the [I6/I7 usage guide](docs/usage/18-population-anomaly-detectors.md) for
+catalog policy, peer scopes, exact thresholds, reports, and completeness.
+
 ## Features
 
 `default = []` — nothing is enabled by default. Opt in to exactly what you need.

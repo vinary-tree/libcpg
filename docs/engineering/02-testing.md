@@ -526,10 +526,13 @@ dependencies and are not part of the `full` feature set.
 
 | Surface | State |
 | --- | --- |
-| `examples/` directory | present but **empty** — no runnable `cargo run --example …` programs. |
 | Doctests | none run — every code fence in a doc comment is marked `ignore` / `rust,ignore`, so `cargo test --doc` executes nothing. Feature-gating individual doctests in a `default = []` crate is awkward; the snippets are instead validated by the documentation snippet-check harness. |
 | Benchmarks | Nineteen active Criterion targets cover SCC paths/rings/clusters, condensation paths/independent chains with and without CG layering, graph-arena paths, bounded VF2 paths, liveness chains/diamond ladders/nested loops, counted-loop induction regions, DSM paths/rings, WL rings/stars, centrality paths/rings/clusters, Louvain rings of cliques, disconnected-community refinement, cohesion lattices/clique chains/weighted seams/star attacks, spectral stars/complete-bipartite/disconnected-star families, bounded cycles over acyclic paths/disjoint triangles/dense digraphs, motif censuses over paths/bidirected cliques/out-stars, GED over identical/relabelled/retyped graphs, function clones over equality/insertion/reordering corpora, program merge/import linkage, IFDS/IDE summaries, and taint summaries over path/ring/clustered call graphs, plus—under `algorithm-detection`—complexity evidence on the counted-loop fixtures. Each active group asserts a deterministic oracle before timing. See [performance](03-performance.md). |
 | `ml-linfa`, `gpu` | not exercised: optional heavy dependencies outside the `full` feature set. |
+
+The feature-free [`population_anomalies`](../../examples/population_anomalies.rs)
+example is compiled by the verification matrix and can be executed with
+`cargo run --example population_anomalies --no-default-features`.
 
 ## Related pages
 

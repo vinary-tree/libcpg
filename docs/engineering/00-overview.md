@@ -118,7 +118,7 @@ maturity than exists. The most consequential items:
 | Aspect | Reality | Detailed in |
 | --- | --- | --- |
 | Default build | `default = []`; `build` fails without a `lang-*` feature | [01](01-build-and-features.md) |
-| `examples/` directory | present but **empty** — no runnable examples (`tests/` now holds the integration and robustness suites) | [02](02-testing.md) |
+| `examples/` directory | contains the feature-free runnable `population_anomalies` I6/I7 exact-oracle example; `tests/` holds the integration and robustness suites | [02](02-testing.md), [Usage 18](../usage/18-population-anomaly-detectors.md) |
 | Benchmarks | nineteen oracle-guarded Criterion targets are active; thirty-one operation groups are feature-free and the thirty-second, complexity evidence, is `algorithm-detection`-gated; effect summaries, DFG/PDG construction, whole-corpus analysis, and GNN propagation remain broader gaps | [02](02-testing.md), [03](03-performance.md) |
 | `rayon`, `ahash`, `string_cache`, `regex` | declared in `Cargo.toml` but **not yet wired** into `src/` (`proptest` is now used throughout the test suite) | [02](02-testing.md), [03](03-performance.md) |
 | `gpu` feature | **reserved** — enables `wgpu`/`pollster` but no GPU code is written | [01](01-build-and-features.md) |

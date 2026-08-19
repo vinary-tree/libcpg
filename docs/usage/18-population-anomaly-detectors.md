@@ -6,6 +6,13 @@ report, and use source ranges associated with reported node identifiers when
 presenting evidence. Neither analyzer parses source strings or mutates the
 graph.
 
+A complete feature-free runnable version of both exact fixtures is available as
+[`examples/population_anomalies.rs`](../../examples/population_anomalies.rs):
+
+```sh
+cargo run --example population_anomalies --no-default-features
+```
+
 ![Typed evidence, exact beliefs, and review findings](../diagrams/population-anomaly-pipeline.svg)
 
 ## 1. Configure sensitive APIs and find missing checks
