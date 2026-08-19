@@ -2,7 +2,9 @@
 set -euo pipefail
 
 repository_root=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
-log_root=$(mktemp -d /tmp/libcpg-verify.XXXXXX)
+verification_root="$repository_root/target/verification"
+mkdir -p "$verification_root"
+log_root=$(mktemp -d "$verification_root/run.XXXXXX")
 trap 'rm -rf "$log_root"' EXIT
 cd "$repository_root"
 

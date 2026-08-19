@@ -127,7 +127,8 @@ cargo cov-text             # stable line/region summary
 cargo cov                  # stable HTML report
 cargo +nightly cov-branch  # nightly branch summary
 
-# The complete local verification gate (logs are captured and cleaned).
+# The complete local verification gate.
+# Logs are captured below target/verification and cleaned.
 ./scripts/verify.sh
 ```
 
