@@ -5,7 +5,11 @@
 //! source depth and graph depth never consume native call-stack depth.
 
 mod leaks;
+mod uninit;
 
 pub use leaks::{
     analyze_resource_leaks, resource_leaks, ResourceLeak, ResourceLeakAnalysis, ResourceLeakIssue,
+};
+pub use uninit::{
+    analyze_uninitialized_uses, uninitialized_uses, UninitializedUse, UninitializedUseAnalysis,
 };

@@ -42,7 +42,9 @@ use crate::NodeId;
 pub use basic_blocks::{block_cfg, BasicBlock, BlockCfg, BlockEdge, BlockId};
 
 pub use bugs::{
-    analyze_resource_leaks, resource_leaks, ResourceLeak, ResourceLeakAnalysis, ResourceLeakIssue,
+    analyze_resource_leaks, analyze_uninitialized_uses, resource_leaks, uninitialized_uses,
+    ResourceLeak, ResourceLeakAnalysis, ResourceLeakIssue, UninitializedUse,
+    UninitializedUseAnalysis,
 };
 
 pub use centrality::{
