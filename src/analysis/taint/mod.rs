@@ -26,40 +26,6 @@ use super::{
     SummaryDomain,
 };
 
-#[cfg(feature = "serde")]
-pub(super) mod ordered_map {
-    use std::collections::BTreeMap;
-
-    use serde::{Deserialize, Deserializer, Serialize, Serializer};
-
-    pub fn serialize<K, V, S>(map: &BTreeMap<K, V>, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        K: Ord + Serialize,
-        V: Serialize,
-        S: Serializer,
-    {
-        map.iter().collect::<Vec<_>>().serialize(serializer)
-    }
-
-    pub fn deserialize<'de, K, V, D>(deserializer: D) -> Result<BTreeMap<K, V>, D::Error>
-    where
-        K: Ord + Deserialize<'de>,
-        V: Deserialize<'de>,
-        D: Deserializer<'de>,
-    {
-        let entries = Vec::<(K, V)>::deserialize(deserializer)?;
-        let mut map = BTreeMap::new();
-        for (key, value) in entries {
-            if map.insert(key, value).is_some() {
-                return Err(serde::de::Error::custom(
-                    "duplicate key in ordered taint evidence",
-                ));
-            }
-        }
-        Ok(map)
-    }
-}
-
 pub use catalog::{
     CatalogClassification, CatalogMatch, CatalogRule, ExternalModel, Pattern, TaintCatalog,
 };
@@ -197,15 +163,15 @@ pub struct TaintSummary {
     /// Source classes that may reach the return value.
     pub return_sources: BTreeSet<SourceClass>,
     /// Canonical witnesses for formal-parameter-to-sink summary edges.
-    #[cfg_attr(feature = "serde", serde(with = "ordered_map"))]
+    #[cfg_attr(feature = "serde", serde(with = "super::serde_util::ordered_map"))]
     pub param_sink_sites: BTreeMap<ParamSinkKey, TaintWitness>,
     /// Canonical witnesses for formal-parameter-to-return summary edges.
     pub param_return_sites: BTreeMap<u16, TaintWitness>,
     /// Canonical witnesses for concrete source-to-return summary edges.
-    #[cfg_attr(feature = "serde", serde(with = "ordered_map"))]
+    #[cfg_attr(feature = "serde", serde(with = "super::serde_util::ordered_map"))]
     pub return_source_sites: BTreeMap<ReturnSourceKey, TaintWitness>,
     /// Concrete source-to-sink findings discovered in this procedure or callees.
-    #[cfg_attr(feature = "serde", serde(with = "ordered_map"))]
+    #[cfg_attr(feature = "serde", serde(with = "super::serde_util::ordered_map"))]
     pub ambient_flows: BTreeMap<AmbientFlowKey, TaintWitness>,
     /// Whether more parameters existed than the fixed-width return mask can encode.
     pub param_mask_truncated: bool,

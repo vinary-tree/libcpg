@@ -25,38 +25,6 @@ pub type PropertyState = Arc<str>;
 /// Stable name of one finite property event.
 pub type PropertyEvent = Arc<str>;
 
-#[cfg(feature = "serde")]
-mod ordered_map {
-    use std::collections::BTreeMap;
-
-    use serde::{Deserialize, Deserializer, Serialize, Serializer};
-
-    pub fn serialize<K, V, S>(map: &BTreeMap<K, V>, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        K: Ord + Serialize,
-        V: Serialize,
-        S: Serializer,
-    {
-        map.iter().collect::<Vec<_>>().serialize(serializer)
-    }
-
-    pub fn deserialize<'de, K, V, D>(deserializer: D) -> Result<BTreeMap<K, V>, D::Error>
-    where
-        K: Ord + Deserialize<'de>,
-        V: Deserialize<'de>,
-        D: Deserializer<'de>,
-    {
-        let entries = Vec::<(K, V)>::deserialize(deserializer)?;
-        let mut map = BTreeMap::new();
-        for (key, value) in entries {
-            if map.insert(key, value).is_some() {
-                return Err(serde::de::Error::custom("duplicate ordered-map key"));
-            }
-        }
-        Ok(map)
-    }
-}
-
 /// A deterministic finite-state property automaton.
 ///
 /// `allocations[event] = state` declares that a call classified as `event`
@@ -73,14 +41,14 @@ pub struct PropertyFsm {
     /// Closed event vocabulary.
     pub alphabet: BTreeSet<PropertyEvent>,
     /// Deterministic ordinary transition relation.
-    #[cfg_attr(feature = "serde", serde(with = "ordered_map"))]
+    #[cfg_attr(feature = "serde", serde(with = "super::serde_util::ordered_map"))]
     pub transitions: BTreeMap<(PropertyState, PropertyEvent), PropertyState>,
     /// States that represent acceptable object state at a function exit.
     pub accepting: BTreeSet<PropertyState>,
     /// Absorbing state entered by every forbidden transition.
     pub error: PropertyState,
     /// Allocation event to post-allocation state.
-    #[cfg_attr(feature = "serde", serde(with = "ordered_map"))]
+    #[cfg_attr(feature = "serde", serde(with = "super::serde_util::ordered_map"))]
     pub allocations: BTreeMap<PropertyEvent, PropertyState>,
 }
 

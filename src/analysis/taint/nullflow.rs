@@ -73,13 +73,22 @@ pub struct NullSummary {
     /// Whether any represented execution may return null.
     pub returns_maybe_null: bool,
     /// Canonical parameter-to-dereference witnesses keyed by `(parameter, sink)`.
-    #[cfg_attr(feature = "serde", serde(with = "super::ordered_map"))]
+    #[cfg_attr(
+        feature = "serde",
+        serde(with = "crate::analysis::serde_util::ordered_map")
+    )]
     pub param_deref_sites: BTreeMap<(u16, NodeId), TaintWitness>,
     /// Canonical parameter or concrete-origin witnesses reaching a return value.
-    #[cfg_attr(feature = "serde", serde(with = "super::ordered_map"))]
+    #[cfg_attr(
+        feature = "serde",
+        serde(with = "crate::analysis::serde_util::ordered_map")
+    )]
     pub return_sites: BTreeMap<MaybeNull, TaintWitness>,
     /// Concrete maybe-null-to-dereference candidate flows.
-    #[cfg_attr(feature = "serde", serde(with = "super::ordered_map"))]
+    #[cfg_attr(
+        feature = "serde",
+        serde(with = "crate::analysis::serde_util::ordered_map")
+    )]
     pub flows: BTreeMap<NullFlowKey, TaintWitness>,
     /// Whether more parameters existed than the fixed-width return mask can encode.
     pub param_mask_truncated: bool,

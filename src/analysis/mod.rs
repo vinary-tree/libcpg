@@ -31,6 +31,8 @@ mod reflexion;
 mod resolve;
 mod scc;
 mod sdg;
+#[cfg(feature = "serde")]
+pub(crate) mod serde_util;
 mod smells;
 mod spectral;
 mod taint;
@@ -42,10 +44,16 @@ use crate::NodeId;
 pub use basic_blocks::{block_cfg, BasicBlock, BlockCfg, BlockEdge, BlockId};
 
 pub use bugs::{
-    analyze_exception_flow, analyze_resource_leaks, analyze_uninitialized_uses, dead_catches,
-    resource_leaks, uncaught_exceptions, uninitialized_uses, DeadCatch, ExceptionFlowAnalysis,
-    ExceptionFlowIssue, ExceptionSummary, ExceptionType, ResourceLeak, ResourceLeakAnalysis,
-    ResourceLeakIssue, UncaughtException, UninitializedUse, UninitializedUseAnalysis,
+    analyze_deviant_behavior, analyze_exception_flow, analyze_missing_checks,
+    analyze_resource_leaks, analyze_uninitialized_uses, dead_catches, deviant_behaviors,
+    missing_checks, resource_leaks, uncaught_exceptions, uninitialized_uses, ApiIdentity,
+    CallOrderBelief, CheckFingerprint, CheckFingerprintNode, CheckNodeKind, DeadCatch,
+    DeviantBehavior, DeviantBehaviorAnalysis, DeviantBehaviorConfig, DeviantBehaviorIssue,
+    DeviantBehaviorKind, ExceptionFlowAnalysis, ExceptionFlowIssue, ExceptionSummary,
+    ExceptionType, MissingCheck, MissingCheckAnalysis, MissingCheckConfig, MissingCheckIssue,
+    PeerScope, PopulationFraction, PopulationThreshold, ResourceLeak, ResourceLeakAnalysis,
+    ResourceLeakIssue, ReturnCheckBelief, UncaughtException, UninitializedUse,
+    UninitializedUseAnalysis,
 };
 
 pub use centrality::{
