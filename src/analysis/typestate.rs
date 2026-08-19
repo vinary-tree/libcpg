@@ -398,6 +398,27 @@ pub struct TypestateViolation {
     pub capped: bool,
 }
 
+/// One possible object state at one concrete function exit.
+///
+/// Unlike [`TypestateAnalysis::terminal_states`], this evidence retains the
+/// exit program point and one canonical allocation-to-exit witness. Consumers
+/// such as resource-leak checkers can therefore report the path on which a
+/// required terminal transition is absent without re-running CFG traversal.
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+pub struct TypestateTerminal {
+    /// Abstract object identity: the allocation call site.
+    pub object: NodeId,
+    /// Exit-like CFG program point reached by the object.
+    pub exit: NodeId,
+    /// Object state after all events at `exit` have been applied.
+    pub state: PropertyState,
+    /// Allocation/event/CFG evidence in canonical execution order.
+    pub witness: Vec<NodeId>,
+    /// Whether a resource boundary made the overall report partial.
+    pub capped: bool,
+}
+
 /// Typestate findings, terminal states, and completeness evidence.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
@@ -406,6 +427,8 @@ pub struct TypestateAnalysis {
     pub violations: Vec<TypestateViolation>,
     /// Possible post-transfer states at function exits, keyed by allocation site.
     pub terminal_states: BTreeMap<NodeId, BTreeSet<PropertyState>>,
+    /// Exit-specific terminal evidence in canonical object/exit/state order.
+    pub terminals: Vec<TypestateTerminal>,
     /// Functions containing at least one analyzed allocation, in stable order.
     pub processed_functions: Vec<NodeId>,
     /// Allocation sites admitted by the analysis.
@@ -542,9 +565,14 @@ pub fn analyze_typestate(
         }
     }
     analysis.violations = violations.into_values().collect();
+    analysis.terminals.sort();
+    analysis.terminals.dedup();
     if analysis.capped {
         for violation in &mut analysis.violations {
             violation.capped = true;
+        }
+        for terminal in &mut analysis.terminals {
+            terminal.capped = true;
         }
     }
     analysis
@@ -841,6 +869,13 @@ fn analyze_function(
                 .entry(out_fact.object)
                 .or_default()
                 .insert(Arc::clone(&out_fact.state));
+            analysis.terminals.push(TypestateTerminal {
+                object: out_fact.object,
+                exit: item.key.node,
+                state: Arc::clone(&out_fact.state),
+                witness: reconstruct_witness(&traces, &item.key, &local_sites),
+                capped: false,
+            });
         }
         for successor in successors {
             if !admit_fact(

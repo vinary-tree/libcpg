@@ -5,6 +5,7 @@
 //! numerical approximations. They are available with `default = []`.
 
 mod basic_blocks;
+pub mod bugs;
 mod centrality;
 pub(crate) mod cfg_scope;
 mod cohesion;
@@ -39,6 +40,10 @@ pub(crate) mod wl;
 use crate::NodeId;
 
 pub use basic_blocks::{block_cfg, BasicBlock, BlockCfg, BlockEdge, BlockId};
+
+pub use bugs::{
+    analyze_resource_leaks, resource_leaks, ResourceLeak, ResourceLeakAnalysis, ResourceLeakIssue,
+};
 
 pub use centrality::{
     accumulate_for_sources, betweenness_centrality, burt_constraint, closeness_centrality,
@@ -176,7 +181,8 @@ pub use taint::{
 
 pub use typestate::{
     analyze_typestate, check_typestate, PropertyEvent, PropertyFsm, PropertyFsmIssue,
-    PropertyState, TypestateAnalysis, TypestateCapEvent, TypestateIssue, TypestateViolation,
+    PropertyState, TypestateAnalysis, TypestateCapEvent, TypestateIssue, TypestateTerminal,
+    TypestateViolation,
 };
 
 pub use wl::{structural_clone_classes, wl_labels, MAX_WL_ITERATIONS};
