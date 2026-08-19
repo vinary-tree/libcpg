@@ -45,17 +45,21 @@ pub use basic_blocks::{block_cfg, BasicBlock, BlockCfg, BlockEdge, BlockId};
 
 pub use bugs::{
     analyze_deviant_behavior, analyze_exception_flow, analyze_inconsistent_clones,
-    analyze_missing_checks, analyze_resource_leaks, analyze_uninitialized_uses, dead_catches,
-    deviant_behaviors, inconsistent_clone_bugs, missing_checks, resource_leaks,
-    uncaught_exceptions, uninitialized_uses, ApiIdentity, CallOrderBelief, CheckFingerprint,
+    analyze_infeasible_paths, analyze_missing_checks, analyze_resource_leaks,
+    analyze_uninitialized_uses, dead_catches, deviant_behaviors, inconsistent_clone_bugs,
+    infeasible_paths, missing_checks, resource_leaks, uncaught_exceptions, uninitialized_uses,
+    AnalyzedCondition, ApiIdentity, BranchOutcome, CallOrderBelief, CheckFingerprint,
     CheckFingerprintNode, CheckNodeKind, CloneBugAnalysis, CloneBugConfig, CloneBugIssue,
     CloneGuardValue, ClonePairEvidence, DeadCatch, DeviantBehavior, DeviantBehaviorAnalysis,
     DeviantBehaviorConfig, DeviantBehaviorIssue, DeviantBehaviorKind, ExceptionFlowAnalysis,
-    ExceptionFlowIssue, ExceptionSummary, ExceptionType, InconsistentCloneBug,
-    InconsistentCloneKind, MissingCheck, MissingCheckAnalysis, MissingCheckConfig,
+    ExceptionFlowIssue, ExceptionSummary, ExceptionType, FeasibilityProofSource,
+    InconsistentCloneBug, InconsistentCloneKind, InfeasiblePathAnalysis, InfeasiblePathConfig,
+    InfeasiblePathFinding, InfeasiblePathIssue, InfeasiblePathKind, IntervalContradiction,
+    IntervalPredicateEvidence, MissingCheck, MissingCheckAnalysis, MissingCheckConfig,
     MissingCheckIssue, PeerScope, PopulationFraction, PopulationThreshold, RenameDirection,
     ResourceLeak, ResourceLeakAnalysis, ResourceLeakIssue, ReturnCheckBelief, UncaughtException,
     UninitializedUse, UninitializedUseAnalysis, MAX_CLONE_ALIGNMENT_CELLS, MAX_CLONE_BUG_AST_NODES,
+    MAX_CONDITION_NODES, MAX_CONDITION_STATES, MAX_CONDITION_STEPS,
 };
 
 pub use centrality::{

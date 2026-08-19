@@ -8,6 +8,7 @@ mod clone_bugs;
 mod deviant;
 mod evidence;
 mod exceptions;
+mod infeasible;
 mod leaks;
 mod missing_check;
 mod uninit;
@@ -27,6 +28,12 @@ pub use evidence::{ApiIdentity, PopulationFraction, PopulationThreshold};
 pub use exceptions::{
     analyze_exception_flow, dead_catches, uncaught_exceptions, DeadCatch, ExceptionFlowAnalysis,
     ExceptionFlowIssue, ExceptionSummary, ExceptionType, UncaughtException,
+};
+pub use infeasible::{
+    analyze_infeasible_paths, infeasible_paths, AnalyzedCondition, BranchOutcome,
+    FeasibilityProofSource, InfeasiblePathAnalysis, InfeasiblePathConfig, InfeasiblePathFinding,
+    InfeasiblePathIssue, InfeasiblePathKind, IntervalContradiction, IntervalPredicateEvidence,
+    MAX_CONDITION_NODES, MAX_CONDITION_STATES, MAX_CONDITION_STEPS,
 };
 pub use leaks::{
     analyze_resource_leaks, resource_leaks, ResourceLeak, ResourceLeakAnalysis, ResourceLeakIssue,

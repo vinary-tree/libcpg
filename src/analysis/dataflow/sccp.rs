@@ -17,6 +17,7 @@ use crate::{
     CfgEdgeKind, CodePropertyGraph, CpgEdgeKind, CpgNodeKind, DfgEdgeKind, LiteralKind, NodeId,
 };
 
+use super::conditions::guard_expression;
 use super::Lattice;
 use crate::analysis::{
     cfg_projection,
@@ -156,7 +157,7 @@ pub fn sccp(cpg: &CodePropertyGraph, function: NodeId) -> Result<SccpResult, Ana
     let mut guard_consumers: BTreeMap<NodeId, Vec<NodeId>> = BTreeMap::new();
     for (&source, edges) in &outgoing {
         if edges.iter().any(|(_, _, kind)| kind.is_conditional()) {
-            if let Some(cell) = guard_cell(cpg, source, &cells, &scope) {
+            if let Some(cell) = guard_expression(cpg, source).filter(|cell| cells.contains(cell)) {
                 guard_cells.insert(source, cell);
                 guard_consumers.entry(cell).or_default().push(source);
             }
@@ -385,51 +386,6 @@ fn def_use_maps(
         values.dedup();
     }
     (predecessors, successors, count)
-}
-
-fn first_value_descendant(
-    cpg: &CodePropertyGraph,
-    source: NodeId,
-    cells: &BTreeSet<NodeId>,
-    scope: &FxHashSet<NodeId>,
-) -> Option<NodeId> {
-    let mut seen = FxHashSet::default();
-    let mut work = cpg.ast_children(source);
-    work.reverse();
-    while let Some(node) = work.pop() {
-        if !scope.contains(&node) || !seen.insert(node) {
-            continue;
-        }
-        if cells.contains(&node) {
-            return Some(node);
-        }
-        let mut children = cpg.ast_children(node);
-        children.reverse();
-        work.extend(children);
-    }
-    None
-}
-
-fn guard_cell(
-    cpg: &CodePropertyGraph,
-    source: NodeId,
-    cells: &BTreeSet<NodeId>,
-    scope: &FxHashSet<NodeId>,
-) -> Option<NodeId> {
-    if cells.contains(&source) {
-        return Some(source);
-    }
-    // Canonical CFG construction puts the condition expression itself at the
-    // source of boolean edges. Retain compatibility with wrapper-shaped If and
-    // While overlays, whose first semantic descendant is contractually the
-    // condition, but do not guess for For/Match/Switch headers: their first
-    // value descendant need not be a boolean guard.
-    matches!(
-        cpg.node(source).map(|node| &node.kind),
-        Some(CpgNodeKind::If | CpgNodeKind::While)
-    )
-    .then(|| first_value_descendant(cpg, source, cells, scope))
-    .flatten()
 }
 
 fn mark_node_executable(

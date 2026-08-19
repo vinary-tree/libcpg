@@ -16,6 +16,7 @@ use smallvec::SmallVec;
 
 use crate::{CfgEdgeKind, CodePropertyGraph, CpgNodeKind, LiteralKind, NodeId};
 
+use super::conditions::guard_expression;
 use super::{
     solve, variable_facts, Confluence, DataflowAnalysis, DataflowSolution, Direction, Lattice,
     SolverConfig, VarFacts,
@@ -357,6 +358,18 @@ impl IntervalReport {
                 .ok()
                 .map(|index| entries[index].1)
         })
+    }
+}
+
+/// Named interval environments immediately before reachable CFG nodes.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct NodeIntervalReport {
+    pub(crate) before_node: BTreeMap<NodeId, Vec<(Arc<str>, Interval)>>,
+}
+
+impl NodeIntervalReport {
+    pub(crate) fn intervals_before(&self, node: NodeId) -> Option<&[(Arc<str>, Interval)]> {
+        self.before_node.get(&node).map(Vec::as_slice)
     }
 }
 
@@ -737,6 +750,41 @@ pub fn value_ranges(
     })
 }
 
+/// Computes named interval states immediately before every reachable CFG node.
+///
+/// This crate-internal view replays the same transfer function used by
+/// [`value_ranges`] over the already-solved block inputs. It exists for
+/// analyses that need guard-local rather than block-entry evidence.
+pub(crate) fn node_value_ranges(
+    cpg: &CodePropertyGraph,
+    function: NodeId,
+) -> Result<NodeIntervalReport, AnalysisError> {
+    let (cfg, facts, solution) = solve_function(cpg, function)?;
+    let analysis = IntervalAnalysis { facts: &facts };
+    let mut before_node = BTreeMap::new();
+    for block in &cfg.blocks {
+        let mut state = solution.before[block.id.0 as usize].clone();
+        if state.is_bottom() {
+            continue;
+        }
+        for &node in &block.nodes {
+            before_node.insert(node, named_intervals(&facts, &state));
+            analysis.transfer_node(cpg, node, &mut state);
+        }
+    }
+    Ok(NodeIntervalReport { before_node })
+}
+
+fn named_intervals(facts: &VarFacts, state: &IntervalEnv) -> Vec<(Arc<str>, Interval)> {
+    state
+        .vars
+        .iter()
+        .filter_map(|&(variable, interval)| {
+            facts.name(variable).map(|name| (name.clone(), interval))
+        })
+        .collect()
+}
+
 fn solve_function(
     cpg: &CodePropertyGraph,
     function: NodeId,
@@ -792,45 +840,41 @@ fn declaration_initializer(
 }
 
 fn condition_expression(cpg: &CodePropertyGraph, source: NodeId) -> Option<NodeId> {
-    if matches!(
-        cpg.node(source).map(|node| &node.kind),
-        Some(CpgNodeKind::BinaryOp { .. })
-    ) {
-        return Some(source);
-    }
-    let root = cpg.ast_children(source).first().copied()?;
-    let mut pending = vec![root];
-    let mut seen = Vec::new();
-    while let Some(node) = pending.pop() {
-        if seen.contains(&node) {
-            continue;
-        }
-        seen.push(node);
-        if matches!(
-            cpg.node(node).map(|node| &node.kind),
-            Some(CpgNodeKind::BinaryOp { operator })
-                if matches!(&**operator, "<" | "<=" | ">" | ">=")
-        ) {
-            return Some(node);
-        }
-        let mut children = cpg.ast_children(node);
-        children.reverse();
-        pending.extend(children);
-    }
-    None
+    let condition = guard_expression(cpg, source)?;
+    matches!(
+        cpg.node(condition).map(|node| &node.kind),
+        Some(CpgNodeKind::BinaryOp { operator })
+            if matches!(&**operator, "<" | "<=" | ">" | ">=")
+    )
+    .then_some(condition)
 }
 
-fn reverse_comparison(operator: &str) -> Option<&'static str> {
+pub(crate) fn reverse_comparison(operator: &str) -> Option<&'static str> {
     match operator {
         "<" => Some(">"),
         "<=" => Some(">="),
         ">" => Some("<"),
         ">=" => Some("<="),
+        "==" => Some("=="),
+        "!=" => Some("!="),
         _ => None,
     }
 }
 
 fn comparison_interval(operator: &str, constant: i128, truth: bool) -> Option<Interval> {
+    let regions = comparison_regions(operator, constant, truth)?;
+    (regions.len() == 1).then(|| regions[0])
+}
+
+/// Returns the disjoint integer regions satisfying one normalized comparison.
+///
+/// `Some([])` means the predicate is impossible over signed integers, while
+/// `None` means the operator is outside the supported comparison vocabulary.
+pub(crate) fn comparison_regions(
+    operator: &str,
+    constant: i128,
+    truth: bool,
+) -> Option<Vec<Interval>> {
     let successor = constant
         .checked_add(1)
         .map(Bound::Finite)
@@ -839,26 +883,21 @@ fn comparison_interval(operator: &str, constant: i128, truth: bool) -> Option<In
         .checked_sub(1)
         .map(Bound::Finite)
         .unwrap_or(Bound::NegInf);
-    let interval = match (operator, truth) {
-        ("<", true) | (">=", false) => Interval {
-            lo: Bound::NegInf,
-            hi: predecessor,
-        },
-        ("<", false) | (">=", true) => Interval {
-            lo: Bound::Finite(constant),
-            hi: Bound::PosInf,
-        },
-        ("<=", true) | (">", false) => Interval {
-            lo: Bound::NegInf,
-            hi: Bound::Finite(constant),
-        },
-        ("<=", false) | (">", true) => Interval {
-            lo: successor,
-            hi: Bound::PosInf,
-        },
+    let one = |lo, hi| Interval::new(lo, hi).into_iter().collect::<Vec<_>>();
+    let regions = match (operator, truth) {
+        ("<", true) | (">=", false) => one(Bound::NegInf, predecessor),
+        ("<", false) | (">=", true) => one(Bound::Finite(constant), Bound::PosInf),
+        ("<=", true) | (">", false) => one(Bound::NegInf, Bound::Finite(constant)),
+        ("<=", false) | (">", true) => one(successor, Bound::PosInf),
+        ("==", true) | ("!=", false) => vec![Interval::singleton(constant)],
+        ("==", false) | ("!=", true) => {
+            let mut regions = one(Bound::NegInf, predecessor);
+            regions.extend(one(successor, Bound::PosInf));
+            regions
+        }
         _ => return None,
     };
-    Interval::new(interval.lo, interval.hi)
+    Some(regions)
 }
 
 impl PartialOrd for Interval {
@@ -1550,14 +1589,33 @@ mod tests {
                 Some(upper)
             );
         }
-        assert_eq!(comparison_interval("==", 5, true), None);
+        assert_eq!(
+            comparison_interval("==", 5, true),
+            Some(Interval::singleton(5))
+        );
+        assert_eq!(comparison_interval("==", 5, false), None);
         assert_eq!(comparison_interval("<", i128::MIN, true), None);
         assert_eq!(comparison_interval(">", i128::MAX, true), None);
+        assert_eq!(
+            comparison_regions("==", 5, true),
+            Some(vec![Interval::singleton(5)])
+        );
+        assert_eq!(
+            comparison_regions("!=", 5, false),
+            Some(vec![Interval::singleton(5)])
+        );
+        assert_eq!(comparison_regions("==", 5, false), Some(vec![lower, upper]));
+        assert_eq!(comparison_regions("!=", 5, true), Some(vec![lower, upper]));
+        assert_eq!(comparison_regions("<", i128::MIN, true), Some(vec![]));
+        assert_eq!(comparison_regions(">", i128::MAX, true), Some(vec![]));
+        assert_eq!(comparison_regions("?", 5, true), None);
         assert_eq!(reverse_comparison("<"), Some(">"));
         assert_eq!(reverse_comparison("<="), Some(">="));
         assert_eq!(reverse_comparison(">"), Some("<"));
         assert_eq!(reverse_comparison(">="), Some("<="));
-        assert_eq!(reverse_comparison("=="), None);
+        assert_eq!(reverse_comparison("=="), Some("=="));
+        assert_eq!(reverse_comparison("!="), Some("!="));
+        assert_eq!(reverse_comparison("?"), None);
         assert_eq!(singleton_value(Interval::top()), None);
 
         let mut cpg = CodePropertyGraph::new(Language::Rust);
@@ -1583,7 +1641,20 @@ mod tests {
         );
         connect_ast(&mut cpg, wrapper, nested);
         connect_ast(&mut cpg, nested, comparison);
-        assert_eq!(condition_expression(&cpg, wrapper), Some(comparison));
+        assert_eq!(condition_expression(&cpg, wrapper), None);
+
+        let if_wrapper = add(&mut cpg, CpgNodeKind::If);
+        connect_ast(&mut cpg, if_wrapper, comparison);
+        assert_eq!(condition_expression(&cpg, if_wrapper), Some(comparison));
+
+        let compound = add(
+            &mut cpg,
+            CpgNodeKind::BinaryOp {
+                operator: "&&".into(),
+            },
+        );
+        connect_ast(&mut cpg, compound, comparison);
+        assert_eq!(condition_expression(&cpg, compound), None);
 
         let cycle = add(
             &mut cpg,
