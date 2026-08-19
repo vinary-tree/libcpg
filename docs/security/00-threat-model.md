@@ -127,6 +127,10 @@ security guarantees:
   node/edge evidence and documented formulae. WMC, CBO, RFC, LCOM, Halstead,
   cognitive complexity, and maintainability index do not prove a defect,
   business responsibility, comprehension cost, or future maintenance effort.
+- [Population anomaly findings](../GLOSSARY.md#missing-check-analysis--check-fingerprint)
+  have exact support for the represented peers, but a dominant convention can
+  be wrong or poisoned and a rare behavior can be correct. They prioritize
+  review; they do not establish a vulnerability or clean population.
 
 Use these to *prioritise* human attention, not to *gate* a security decision on
 their own. Exact structural analyses are exact with respect to their input
@@ -158,6 +162,7 @@ and its build pipeline.
 | Explosive pattern search | VF2 `max_matches` cap + strict toggles | [hardening §VF2](01-input-and-resource-hardening.md#pattern-matching-vf2) |
 | Non-terminating data flow | Structural AST sweep, two loop passes, and a malformed-cycle path guard | [hardening §DFG](01-input-and-resource-hardening.md#data-flow-structural-sweep-bounds) |
 | Oversized or untrusted taint policy; capped negative claim | caller admission for catalog rule/string counts, literal path matching, shared/domain caps, and report-level completeness checks | [taint-analysis boundary](02-taint-analysis.md) |
+| Poisoned or oversized missing-check/deviant population | caller-owned catalog/peer policy, exact rational support, traversal caps, excluded incomplete samples, report-level completeness, and heap worklists | [population-anomaly boundary](10-population-anomaly-detectors.md) |
 | Unbounded slice | `backward_slice` / `forward_slice` `max_nodes` cap | [hardening §slicing](01-input-and-resource-hardening.md#slicing-max_nodes) |
 | Expensive or divergent centrality | hard iteration ceiling, explicit traversal budgets, finite-option validation, and complete projection validation | [hardening §centrality](01-input-and-resource-hardening.md#centrality-iteration-ceilings-traversal-budgets-and-safe-numerics) |
 | Adversarial community search or weights | 50-pass/10-level ceilings plus complete CSR, resolution, weight, and overflow validation | [hardening §community detection](01-input-and-resource-hardening.md#community-detection-pass-level-and-numeric-bounds) |
@@ -172,7 +177,7 @@ and its build pipeline.
 | Forged or oversized smell evidence bundle | complete projection/options/metric/assignment validation, exact SCC recomputation, fail-closed empty result; caller-side projection cap | [hardening §architectural smells](01-input-and-resource-hardening.md#architectural-smells-validated-bundle-and-ingress-cap) |
 | Oversized or misleading code-metric evidence | finite iterative graph traversals, inheritance-SCC condensation, stable ordered sets, defined arithmetic edge cases; caller-side CPG cap and retained resolver policy | [hardening §code metrics](01-input-and-resource-hardening.md#code-metrics-finite-evidence-and-ingress-cap) |
 | Untrusted serialized graph | Deserialize only trusted bytes | [`usage/05-serialization.md`](../usage/05-serialization.md) |
-| Over-trusting heuristics, taint/nullflow findings, rankings, partitions, edit bounds, architecture/code metrics, cut/robustness evidence, bounded cycle prefixes, or motif frequencies | Treat taint/nullflow, pattern/algorithm/GNN, GED, Martin, CK/LCOM/function metrics, reflexion, layering, smells, centrality, community, cohesion, spectral, truncated-cycle, and motif output as advisory | this page |
+| Over-trusting heuristics, taint/nullflow/population findings, rankings, partitions, edit bounds, architecture/code metrics, cut/robustness evidence, bounded cycle prefixes, or motif frequencies | Treat taint/nullflow, missing-check/deviant, pattern/algorithm/GNN, GED, Martin, CK/LCOM/function metrics, reflexion, layering, smells, centrality, community, cohesion, spectral, truncated-cycle, and motif output as advisory | this page |
 
 ## References
 

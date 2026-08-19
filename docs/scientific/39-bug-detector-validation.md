@@ -5,6 +5,9 @@ detectors: resource leaks, uninitialized variable uses, uncaught exceptions,
 and dead catches. It validates deterministic consequences of represented CPG
 evidence, not runtime path feasibility or exploitability.
 
+Population-based missing-check and deviant-behavior evidence has its own
+[validation ledger](40-population-anomaly-validation.md).
+
 ## 1. Hypotheses
 
 | ID | Hypothesis | Falsifying observation |

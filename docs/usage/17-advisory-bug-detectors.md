@@ -4,6 +4,9 @@ All three detector families are feature-free. Build or supply a CPG, keep the
 qualified report, and inspect convenience projections only for positive
 searches. The analyzers do not parse source strings and never mutate the graph.
 
+For missing-check, call-order, and return-check populations, use the separate
+[population anomaly guide](18-population-anomaly-detectors.md).
+
 ![Three detector paths and their completeness boundaries](../diagrams/bug-detector-pipeline.svg)
 
 ## 1. Define a resource policy and find leaks

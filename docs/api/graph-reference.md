@@ -472,6 +472,32 @@ witnesses, and shared-solver failures prevent exception completeness. See the
 guide](../usage/17-advisory-bug-detectors.md), [theory](../theory/34-advisory-bug-detection.md),
 and [security boundary](../security/09-bug-detectors.md).
 
+### Population anomaly detectors
+
+The feature-free population APIs compose caller-owned taint policy, typed API
+identity, PDG checks, CFG reachability, and forward DFG/PDG value evidence.
+They are deterministic, read-only, stack-safe over represented depth, and exact
+at rational support boundaries.
+
+| Item | Contract |
+|---|---|
+| `analyze_missing_checks` | `fn(&CodePropertyGraph, &MissingCheckConfig) -> Result<MissingCheckAnalysis, AnalysisError>`; returns qualified I6 findings, admitted sites, and typed issues. |
+| `missing_checks` | Positive-only `Vec<MissingCheck>` projection; inspect the report before an absence claim. |
+| `MissingCheckConfig` | Taint catalog/classes, exact support, minimum population, peer scope, and fingerprint/callee bounds. |
+| `PeerScope` | `WholeProgram` or `CallGraph { max_distance }` over owner functions. |
+| `CheckFingerprint` | Flat postorder semantic check tape; local spellings are abstracted while behavior-bearing payloads remain exact. |
+| `analyze_deviant_behavior` | `fn(&CodePropertyGraph, &DeviantBehaviorConfig) -> Result<DeviantBehaviorAnalysis, AnalysisError>`; returns I7 order/return beliefs, deviations, sites, and issues. |
+| `deviant_behaviors` | Positive-only `Vec<DeviantBehavior>` projection. |
+| `CallOrderBelief` | Exact support for a later CFG-reachable API after a predecessor API. |
+| `ReturnCheckBelief` | Exact support for call-result value evidence reaching a represented guard. |
+| `ApiIdentity` | Sorted represented target set or typed named external path. |
+| `PopulationFraction` / `PopulationThreshold` | Exact observed and required support; `ratio()` is presentation-only. |
+
+Incomplete occurrences do not vote and remain visible as issues. See the
+[component guide](../components/graph/population-anomaly-detectors.md), [usage
+guide](../usage/18-population-anomaly-detectors.md), [theory](../theory/35-population-anomaly-inference.md),
+and [security boundary](../security/10-population-anomaly-detectors.md).
+
 ### Deterministic graph projections
 
 `GraphProjection` is the feature-free, payload-free compressed-sparse-row view

@@ -196,7 +196,7 @@ same graph. Errors are the crate's own [`libcpg::Error`](../api/graph-reference.
 
 ## 6. Map of the theory pillar
 
-This overview sits above thirty-two formal chapters. Read them in order for a ground-up
+This overview sits above thirty-five formal chapters. Read them in order for a ground-up
 development, or jump to the layer you need:
 
 1. **[01 — Code Property Graphs](01-code-property-graphs.md).** The formal model:
@@ -276,6 +276,10 @@ development, or jump to the layer you need:
     Non-accepting typestate terminals, empty scoped reaching definitions,
     finite exception-type summaries, lexical handler dispatch, uncaught root
     propagation, and dead-handler evidence.
+35. **[35 — Exact population anomaly inference](35-population-anomaly-inference.md).**
+    Taint-selected sensitive calls, normalized checks, call/value reachability,
+    and exact peer fractions define qualified missing-check and deviant-behavior
+    evidence.
 
 The later chapters define deterministic projection structure, architecture
 metrics, inspectable evidence, and their interpretation limits.

@@ -1,0 +1,90 @@
+@startuml
+!include _libcpg-theme.iuml
+title Population anomaly detectors — evidence composition and qualification
+
+skinparam backgroundColor #FCFCFC
+skinparam component {
+  BorderColor #495057
+}
+skinparam note {
+  BackgroundColor #F1F3F5
+  BorderColor #495057
+}
+
+component "CodePropertyGraph\ntyped AST · CFG · DFG · PDG · calls" as CPG #DBE4FF
+component "caller TaintCatalog\nsensitive sink classes" as CATALOG #FFE8CC
+component "stable ApiIdentity\nresolved target set or typed path" as API #C3FAE8
+
+package "I6 — missing check" #F8F9FA {
+  component "PDG control predecessors\nof sensitive use sites" as GUARDS #E5DBFF
+  component "flat postorder CheckFingerprint\nidentifiers abstracted\noperators · literals · APIs retained" as FP #FFF3BF
+  component "whole-program or undirected\ncall-graph radius population" as PEERS #C3FAE8
+  component "exact support test\n<latex>sd \geq np</latex>" as I6RULE #D3F9D8
+  component "MissingCheck\nsite · expected_checks\npeer_support · witnesses" as MISSING #FFE3E3
+}
+
+package "I7 — deviant behavior" #F8F9FA {
+  component "CFG reachability\nB occurrence reaches later A" as ORDER #D3F9D8
+  component "forward DFG / PDG evidence\nreturn reaches a guard" as RETURN #FFF3BF
+  component "population beliefs\nCallOrderBelief\nReturnCheckBelief" as BELIEF #E5DBFF
+  component "DeviantBehavior\nmissing A after B\nor unchecked return" as DEVIANT #FFE3E3
+}
+
+component "typed issues and explicit caps\ncomplete evidence only enters a population" as QUAL #FCC2D7
+component "immutable ordered reports\npositive-only convenience projections" as REPORT #FFE8CC
+
+CPG --> API : typed callee evidence
+CATALOG --> API : classify sensitive sinks
+CPG --> GUARDS : ControlDependence
+API --> GUARDS : selected I6 sites
+GUARDS --> FP : iterative AST machine
+CPG --> PEERS : call_graph_projection
+API --> PEERS : same API identity
+FP --> I6RULE : per-site check sets
+PEERS --> I6RULE : comparable population
+I6RULE --> MISSING : absent supported check
+
+API --> ORDER : all identified calls
+CPG --> ORDER : intraprocedural CFG
+API --> RETURN : all identified calls
+CPG --> RETURN : forward value evidence
+ORDER --> BELIEF : support by predecessor API
+RETURN --> BELIEF : support by API
+BELIEF --> DEVIANT : violating occurrence
+
+API --> QUAL : missing / capped callee path
+FP --> QUAL : cycle / missing node / node cap
+ORDER --> QUAL : absent CFG / node cap
+RETURN --> QUAL : evidence node cap
+QUAL --> REPORT
+MISSING --> REPORT
+DEVIANT --> REPORT
+
+note bottom of I6RULE
+  For observed support n/p and configured threshold s/d,
+  decisions use integer cross multiplication, never floating point.
+end note
+
+note bottom of FP
+  The tape owns no recursive children.
+  Traversal, comparison, serialization, and destruction
+  keep native call depth constant.
+end note
+
+note bottom of QUAL
+  A capped or malformed occurrence is excluded from inference.
+  Empty convenience vectors are not absence proofs.
+end note
+
+legend bottom
+|= Colour |= Meaning |
+|<#DBE4FF>| normalized CPG evidence |
+|<#FFE8CC>| caller policy or public report boundary |
+|<#C3FAE8>| API/call-neighborhood evidence |
+|<#E5DBFF>| PDG or inferred belief evidence |
+|<#FFF3BF>| normalized check or value evidence |
+|<#D3F9D8>| CFG/relation decision |
+|<#FFE3E3>| advisory finding |
+|<#FCC2D7>| incomplete-result qualification |
+endlegend
+@enduml

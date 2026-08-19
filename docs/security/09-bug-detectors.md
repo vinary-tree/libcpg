@@ -6,6 +6,10 @@ service, or unsafe cleanup. libcpg reports static candidates, not vulnerability
 verdicts. Security policy must distinguish positive evidence, incomplete
 evidence, and runtime impact.
 
+Missing-check and deviant-behavior populations have a separate
+[security boundary](10-population-anomaly-detectors.md), including population
+poisoning and peer-policy trust.
+
 ![Untrusted graph evidence, bounded analysis, and qualified detector reports](../diagrams/bug-detector-pipeline.svg)
 
 ## 1. Assets and actors

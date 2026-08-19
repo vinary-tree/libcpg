@@ -88,8 +88,9 @@ alternatives is folklore, and a decision without its costs is marketing.
 | [0042 — Stack-safe CFG extraction](0042-stack-safe-cfg-extraction.md) | Defunctionalize the complete recursive CFG-handler component into typed heap continuations while preserving its exact edge stream, context lifetime, and malformed-path semantics. | Accepted |
 | [0043 — Deterministic typestate analysis](0043-deterministic-typestate-analysis.md) | Validate caller-defined finite-state properties, propagate allocation-site object/state facts over typed CPG evidence, and expose forbidden transitions with bounded canonical witnesses. | Accepted |
 | [0044 — Evidence-composed bug detectors](0044-evidence-composed-bug-detectors.md) | Project leak and uninitialized-use evidence from shared facts, normalize typed handler entry, and propagate finite exception summaries through call SCCs without parsing or graph mutation. | Accepted |
+| [0045 — Exact population anomaly detectors](0045-exact-population-anomaly-detectors.md) | Infer missing checks and deviant call behavior from canonical CPG evidence, exact peer fractions, and explicit incomplete-result semantics. | Accepted |
 
-These forty-four are not independent. ADR-0001 fixes the substrate that all analyses
+These forty-five are not independent. ADR-0001 fixes the substrate that all analyses
 write onto; ADR-0002 and ADR-0005 together explain how a language reaches that
 substrate and what you must switch on to get there; ADR-0003 and ADR-0004 are
 two analyses *over* the substrate (one always-on, one feature-gated) that each
@@ -205,6 +206,10 @@ ADR-0044 consumes ADR-0043's terminal evidence, ADR-0003's reaching-definition
 relations, ADR-0032's bounded SCC summary solver, and ADR-0042's reserved
 exception topology. It keeps syntax normalization in the frontend and composes
 three advisory detector families from shared evidence.
+ADR-0045 reuses ADR-0034's caller-owned taint catalog and dependence evidence,
+ADR-0006's call identity, and deterministic call/CFG projections. It makes
+population support an exact rational relation, normalizes checks into flat
+postorder tapes, and qualifies every excluded occurrence.
 
 ![Module architecture of libcpg, showing the graph core and the analysis modules layered over it](../diagrams/module-architecture.svg)
 
@@ -216,7 +221,7 @@ three advisory detector families from shared evidence.
   (`0001`…). Numbers are never reused; a reversed decision is marked
   *Superseded* and a new record supersedes it, so history stays legible.
 - **Status lifecycle.** `Proposed → Accepted → (Superseded by NNNN | Deprecated)`.
-  All forty-three current records are **Accepted** and reflect the shipped `v0.1.1`
+  All forty-five current records are **Accepted** and reflect the shipped `v0.1.1`
   code.
 - **Grounding.** Every claim here is traceable to source: the
   [`Cargo.toml`](../engineering/01-build-and-features.md) feature block, the

@@ -1,0 +1,63 @@
+@startuml
+!include _libcpg-theme.iuml
+title Exact population support — the two executable oracles
+
+skinparam backgroundColor #FCFCFC
+skinparam component {
+  BorderColor #495057
+}
+skinparam note {
+  BackgroundColor #F1F3F5
+  BorderColor #495057
+}
+
+rectangle "I6: one sensitive API population" as I6 #DBE4FF {
+  component "site 1\ncheck C present" as C1 #D3F9D8
+  component "site 2\ncheck C present" as C2 #D3F9D8
+  component "site 3\ncheck C present" as C3 #D3F9D8
+  component "site 4\ncheck C present" as C4 #D3F9D8
+  component "site 5\ncheck C absent" as C5 #FFE3E3
+}
+
+component "support(C) = 4 / 5\nthreshold = 4 / 5\n<latex>4\cdot5 \geq 4\cdot5</latex>" as F45 #FFF3BF
+component "MissingCheck(site 5)\nexpected_checks = [C]\npeer_support[C] = 4/5" as MISSING #FCC2D7
+
+C1 --> F45
+C2 --> F45
+C3 --> F45
+C4 --> F45
+C5 --> F45 : denominator includes deviation
+F45 --> MISSING
+
+rectangle "I7: one return-producing API population" as I7 #C3FAE8 {
+  component "9 calls\nreturn reaches guard" as R9 #D3F9D8
+  component "1 call\nno guard reached" as R1 #FFE3E3
+}
+
+component "support(checked) = 9 / 10\nthreshold = 9 / 10\n<latex>9\cdot10 \geq 9\cdot10</latex>" as F910 #FFF3BF
+component "ReturnCheckBelief(9/10)\nDeviantBehavior(unchecked site)" as DEVIANT #FCC2D7
+
+R9 --> F910
+R1 --> F910 : denominator includes deviation
+F910 --> DEVIANT
+
+note bottom of F45
+  PopulationFraction stores the two integers.
+  ratio() exists only for presentation.
+end note
+
+note bottom of F910
+  Deterministic ordered sets deduplicate evidence per site,
+  so repeated edges cannot inflate support.
+end note
+
+legend bottom
+|= Colour |= Meaning |
+|<#DBE4FF>| missing-check population |
+|<#C3FAE8>| return-check population |
+|<#D3F9D8>| supporting behavior |
+|<#FFE3E3>| deviating occurrence |
+|<#FFF3BF>| exact rational decision |
+|<#FCC2D7>| advisory report evidence |
+endlegend
+@enduml

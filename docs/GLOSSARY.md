@@ -1007,6 +1007,41 @@ configured share of outgoing dependencies points toward modules with greater
 Findings remain advisory and carry stable nodes plus numerical evidence. See
 [`theory/21-advisory-architectural-smells.md`](theory/21-advisory-architectural-smells.md).
 
+### API identity / Peer population / Support fraction
+
+An **API identity** is libcpg's canonical identity for one called interface: a
+complete sorted represented target set when resolution evidence exists, or a
+typed named callee path for an external/unresolved target. A **peer population**
+is a finite set of complete same-identity call occurrences selected globally or
+by owner-function call-graph distance. Its exact **support fraction** is the
+integer pair $`n/p`$, where $`n`$ peers carry a behavior and $`p`$ includes
+every comparable occurrence, including the deviation. Thresholds are decided
+by integer cross multiplication, never floating-point rounding. See
+[`theory/35-population-anomaly-inference.md`](theory/35-population-anomaly-inference.md).
+
+### Missing-check analysis / Check fingerprint
+
+**Missing-check analysis** compares checks controlling a security-sensitive API
+site with checks used by its peer population, following the comparative
+condition lineage of Chucky and CRIX [[52]](#references), [[53]](#references).
+A **check fingerprint** is libcpg's flat postorder semantic tape for one guard.
+It abstracts local identifier/declaration spelling while retaining operators,
+literals, members, called APIs, nominal types, imports, attributes, macros, and
+opaque frontend kinds. A supported fingerprint absent from a site is advisory
+evidence, not proof of a defect. See
+[`components/graph/population-anomaly-detectors.md`](components/graph/population-anomaly-detectors.md).
+
+### Implicit belief / Deviant behavior / Return-check belief
+
+An **implicit belief** is a high-support represented convention inferred from a
+program population, following Engler et al. [[54]](#references). **Deviant
+behavior** is a call occurrence that lacks an inferred later reachable API or
+an inferred return-value check. A **return-check belief** is supported when a
+configured fraction of one API's call results reaches a represented guard over
+forward DFG/PDG value evidence. These relations are exact for the modeled graph
+and policy but remain advisory about semantic correctness or security impact.
+See [`theory/35-population-anomaly-inference.md`](theory/35-population-anomaly-inference.md).
+
 ### Pushdown automaton (PDA) / explicit continuation machine
 
 A **pushdown automaton** (PDA) is a finite-control machine augmented by a stack.
@@ -1087,3 +1122,6 @@ strict tree interpretation. See
 49. Fink, S. J., Yahav, E., Dor, N., Ramalingam, G., Geay, E. (2008). *Effective Typestate Verification in the Presence of Aliasing.* DOI: [10.1145/1348250.1348255](https://doi.org/10.1145/1348250.1348255).
 50. Shadab, N., Gharat, P., Ernst, M. D., Kellogg, M., Lahiri, S. K., Lal, A., Sridharan, M. (2025). *Lightweight and Modular Resource Leak Checking (Extended Version).* DOI: [10.1007/s10009-025-00804-2](https://doi.org/10.1007/s10009-025-00804-2).
 51. Sinha, S., Harrold, M. J. (2000). *Analysis and Testing of Programs with Exception Handling Constructs.* DOI: [10.1109/32.877846](https://doi.org/10.1109/32.877846).
+52. Yamaguchi, F., Wressnegger, C., Gascon, H., Rieck, K. (2013). *Chucky: Exposing Missing Checks in Source Code for Vulnerability Discovery.* DOI: [10.1145/2508859.2516665](https://doi.org/10.1145/2508859.2516665).
+53. Lu, K., Pakki, A., Wu, Q. (2019). *Detecting Missing-Check Bugs via Semantic- and Context-Aware Criticalness and Constraints Inferences.* [USENIX Security 2019](https://www.usenix.org/conference/usenixsecurity19/presentation/lu) (no DOI assigned in the proceedings record).
+54. Engler, D., Chen, D. Y., Hallem, S., Chou, A., Chelf, B. (2001). *Bugs as Deviant Behavior: A General Approach to Inferring Errors in Systems Code.* DOI: [10.1145/502034.502041](https://doi.org/10.1145/502034.502041).

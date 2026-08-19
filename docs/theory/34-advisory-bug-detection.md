@@ -1,7 +1,9 @@
 # Theory 34 — Advisory resource, definition, and exception analysis
 
-This chapter gives the common mathematical model for libcpg's feature-free bug
-detectors. A **candidate** is a reproducible consequence of represented Code
+This chapter gives the common mathematical model for libcpg's resource,
+definition, and exception detector families. [Theory 35](35-population-anomaly-inference.md)
+defines the separate population-based missing-check and deviant-behavior
+families. A **candidate** is a reproducible consequence of represented Code
 Property Graph (CPG) evidence. It is advisory: it neither proves runtime
 feasibility nor assigns security impact. A report supports a negative claim
 only under its documented completeness predicate.

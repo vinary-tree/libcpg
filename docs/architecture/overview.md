@@ -78,6 +78,10 @@ evidence-bounded call resolution before DFG). There is no
 
 `default = []`: with no Cargo features, `build(source, language)` fails for **every** language (the [parser registry](../GLOSSARY.md#tree-sitter) is empty), and only the feature-free surface works — hand-built CPGs, `build_from_tree`, the CFG/DFG/PDG extractors, deterministic CSR projections, id-preserving basic-block CFGs, the monotone data-flow solver and fact domains, bounded IFDS/IDE procedure-summary solving, compositional constant/effect summaries, advisory taint and maybe-null summaries, finite typestate and resource-leak analysis, binder-aware uninitialized-use detection, bounded exception-flow/uncaught/dead-catch reports, SDG summary-edge construction and context-sensitive two-pass slicing, typed channel-event extraction and advisory topology/linearity reports, variable liveness/dead-store reports, available/very-busy expression evidence, sparse conditional constant propagation with reachability refinement, interval value ranges, loop invariants/induction evidence, exact dominator/post-dominator, natural-loop, reachability/dead-branch, CFG/call-graph SCC, condensation-DAG and architectural-layering, DSM visibility/core–periphery, Martin package-metric, CK/LCOM and function code-metric, advisory architectural-smell, pure path reflexion-model, WL structural-clone, projection-centrality, multi-level community, cohesion/robustness, spectral-connectivity, bounded simple-cycle, directed-motif, graph-edit-bound, and Type-1 through Type-4 function-clone analyses, VF2 matching, and slicing. Optional analyses live behind features: `gnn`, `design-patterns`, `algorithm-detection`, `serde`, `ml-linfa`/`ml-rules`, and the Mode-B toggles `rholang`/`metta`. The `algorithm-detection` consumer reuses the feature-free CFG/loop/induction providers for evidence-aware complexity; it adds no grammar. The umbrella `full = [gnn, design-patterns, algorithm-detection, serde, ml-rules, lang-all]` (it excludes `rholang`, `metta`, `gpu`, and `ml-linfa`). The rationale — compile time, dependency surface, and duplicate-symbol avoidance — is captured in [`../design/0005-feature-flag-taxonomy.md`](../design/0005-feature-flag-taxonomy.md).
 
+The always-on analysis surface also includes exact missing-check, call-order,
+and return-check population reports. These compose existing catalog,
+call-resolution, CFG, DFG, and PDG evidence without adding a grammar feature.
+
 ### 5. Thread-safety, honestly
 
 The public types are built for concurrency but do **not** silently parallelize:
@@ -103,6 +107,10 @@ libcpg is a small set of modules; four are always compiled, the rest are feature
 | `patterns` | `design-patterns` | [Gang-of-Four](../GLOSSARY.md#gang-of-four-gof) detection: `GofPatternDetector`, the 23 `GofPattern` templates, [DPML](../GLOSSARY.md#dpml-design-pattern-markup-language), classification, and `PatternMetrics`. |
 | `algorithms` | `algorithm-detection` | Algorithm-family heuristics and evidence-aware complexity: `DefaultAlgorithmDetector`, `ControlFlowAnalyzer`, `ComplexityAnalyzer`; validated CFG/loop/DFG evidence with exact AST fallback. |
 | `gnn` | `gnn` | [Graph neural network](../GLOSSARY.md#graph-neural-network-gnn) message passing: `CpgGnn`, `GraphNeuralNetwork`, node/subgraph [embeddings](../GLOSSARY.md#embedding). |
+
+Within the always-on `analysis` row, population anomaly inference is provided
+by `analysis::bugs::{missing_check,deviant}` and exposes exact support plus
+typed completeness evidence through the crate root.
 
 ### `pattern` versus `patterns` — do not conflate
 

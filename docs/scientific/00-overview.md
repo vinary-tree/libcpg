@@ -50,13 +50,14 @@ Two properties of the suite make this rigorous rather than merely suggestive:
 
 ## 3. The evidence base
 
-The all-features Cargo inventory contains **1,071 library tests** and **112
-integration/robustness tests**, for **1,183 executable cases**. The integration
+The all-features Cargo inventory contains **1,090 library tests** and **114
+integration/robustness tests**, for **1,204 executable cases**. The integration
 inventory includes public and parser-backed gates for graph construction,
 optimization, architecture, concurrency, summaries, slicing, persistence, and
-typestate plus resource/definition/exception bug detectors, including the
-aggregate, Rust, Java dual-build, and depth-100,000 detector target. These cases
-combine fixed examples, differential oracles, and 80 exact
+typestate plus resource/definition/exception and population bug detectors,
+including aggregate, Rust, Java dual-build, exact 4/5 and 9/10, and
+depth-100,000 detector targets. These cases combine fixed examples,
+differential oracles, and 82 exact
 source-level `proptest!` blocks. The feature-free matrix remains
 independently runnable and exercises the exact graph/data-flow substrate
 without compiling any grammar. Nineteen active Criterion targets supplement
@@ -110,6 +111,7 @@ Because `default = []`, many tests are **feature-gated**. The end-to-end reachin
 | [37 — Stack-safe CFG extraction validation](37-cfg-extraction-machine-validation.md) | Exact former-equation preservation, handler/config completeness, active-path malformed semantics, insertion-order determinism, idempotency, and constant native call depth | comprehensive frozen oracle; five 192-case campaigns; cycle/share/config examples; public parser-built depth-100,000/256 KiB gate | feature-free / `lang-rust` parser case |
 | [38 — Typestate validation](38-typestate-validation.md) | Finite property validation, allocation/alias identity, exact forbidden transitions, may-joins, canonical witnesses, deterministic insertion order, explicit cap monotonicity, and constant native call depth | fourteen examples/properties plus serde; three 256-case campaigns; public hand/parser/depth-100,000 integration | feature-free / `serde` / `lang-rust` |
 | [39 — Bug-detector validation](39-bug-detector-validation.md) | Non-accepting leak terminals, empty scoped reaching definitions, finite exception summaries, lexical handler dispatch, root uncaught witnesses, dead catches, typed incompleteness, and constant native call depth | 21 feature-free plus three serde tests; three independent generated oracles; public aggregate/Rust/Java/depth-100,000 integration | feature-free / `serde` / `lang-rust` / `lang-java` |
+| [40 — Population-anomaly validation](40-population-anomaly-validation.md) | Exact missing-check, call-order, and return-check support; semantic fingerprints; peer scopes; typed incompleteness; determinism; and constant native call depth | exact 4/5 and 9/10 examples, two generated population oracles, public aggregate/Rust/depth-100,000 integration, serde regressions | feature-free / `serde` / `lang-rust` |
 
 ## 5. What is proven, and what is advisory
 
@@ -185,6 +187,10 @@ Scientific honesty requires separating the two:
   evidence; dynamic endpoint instances, operational reductions, recursive or
   multiparty protocols, progress, and deadlock freedom remain advisory or out of
   scope.
+  Missing-check and deviant-behavior fractions and findings are exact for their
+  represented catalog, identity, peer, CFG, DFG, and PDG evidence; a dominant
+  convention is not a specification, and semantic correctness, population
+  integrity, path feasibility, and security impact remain advisory.
 - **Empirically bounded.** Performance results apply only to a target's named
   fixture, size, and controlled environment. DFG/PDG
   construction, whole-corpus analysis, and GNN propagation remain measurement gaps; no result

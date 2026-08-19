@@ -51,6 +51,7 @@ analytics](../GLOSSARY.md#condensation-graph--condensation-metrics),
 [interprocedural effect summaries](../GLOSSARY.md#effect-summary--place--purity),
 [advisory taint and maybe-null summaries](../GLOSSARY.md#taint-catalog--taint-witness), pure
 [resource-leak, uninitialized-use, and exception-flow detectors](../GLOSSARY.md#exception-summary--uncaught-exception--dead-catch),
+[missing-check and deviant-behavior population detectors](../GLOSSARY.md#missing-check-analysis--check-fingerprint),
 [architectural-smell analysis](../GLOSSARY.md#architectural-smell),
 [reflexion-model conformance](../GLOSSARY.md#reflexion-model),
 [WL structural-clone analysis](../GLOSSARY.md#weisfeilerleman-wl-refinement),
@@ -88,8 +89,8 @@ directly from that relationship, and both are visible in `Cargo.toml`:
 | Page | What it covers |
 | --- | --- |
 | [01 — Build and features](01-build-and-features.md) | The full feature matrix: 16 `lang-*` grammars, the language groups, the analysis features, the Mode-B toggles, `serde`, the reserved `gpu` flag, and the `full` umbrella; the pgmcp grammar-pin table; how to enable a language. |
-| [02 — Testing](02-testing.md) | The example-based and `proptest` suite plus the general, robustness, SCCP, interval, loop-induction, complexity-evidence, condensation, layering, architectural-smell, DSM, Martin, reflexion, WL, centrality, community, cohesion, spectral, cycle, motif, GED, function-clone, program-composition, IFDS/IDE, effect-summary, taint, maybe-null, typestate, and bug-detector public-API suites; the `arb_*` generators; how to run each feature subset; measured coverage; the defects the suite found; and the active Criterion benchmark substrate. |
-| [03 — Performance](03-performance.md) | The data-structure rationale, asymptotic costs including typestate and bug detectors, nineteen active oracle-guarded Criterion targets, controlled-measurement protocol, and explicit remaining benchmark gaps. |
+| [02 — Testing](02-testing.md) | The example-based and `proptest` suite plus the general, robustness, SCCP, interval, loop-induction, complexity-evidence, condensation, layering, architectural-smell, DSM, Martin, reflexion, WL, centrality, community, cohesion, spectral, cycle, motif, GED, function-clone, program-composition, IFDS/IDE, effect-summary, taint, maybe-null, typestate, bug-detector, and population-anomaly public-API suites; the `arb_*` generators; how to run each feature subset; measured coverage; the defects the suite found; and the active Criterion benchmark substrate. |
+| [03 — Performance](03-performance.md) | The data-structure rationale, asymptotic costs including typestate, bug detectors, and population anomaly inference, nineteen active oracle-guarded Criterion targets, controlled-measurement protocol, and explicit remaining benchmark gaps. |
 | [04 — Contributing](04-contributing.md) | Step-by-step recipes: add a language mapper, add a Gang-of-Four template, add a similarity metric; plus the coding conventions the crate follows. |
 
 ## Map of the security pillar
@@ -106,6 +107,7 @@ directly from that relationship, and both are visible in `Cargo.toml`:
 | [`security/07` — Session-analysis boundary](../security/07-session-analysis.md) | Shallow endpoint duality, missing evidence, and limits of binary linear protocol sketches. |
 | [`security/08` — Typestate-analysis boundary](../security/08-typestate-analysis.md) | Caller property trust, allocation abstraction, capped may-facts, terminal policy, and advisory witnesses. |
 | [`security/09` — Bug-detector boundary](../security/09-bug-detectors.md) | Resource, definition, and exception evidence; incomplete-result controls; stack/resource safety; and impact review. |
+| [`security/10` — Population-anomaly boundary](../security/10-population-anomaly-detectors.md) | Catalog and peer trust, exact support, population poisoning, incomplete-result controls, stack/resource safety, and impact review. |
 
 ## Honest project status
 

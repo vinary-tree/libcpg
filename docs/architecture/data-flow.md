@@ -578,6 +578,27 @@ See the [component guide](../components/graph/bug-detectors.md), [Theory
 34](../theory/34-advisory-bug-detection.md), and [Usage
 17](../usage/17-advisory-bug-detectors.md).
 
+### Exact population anomaly detectors (feature-free)
+
+`analyze_missing_checks` selects sensitive calls through the caller's taint
+catalog, identifies APIs through represented targets or typed callee paths,
+normalizes PDG control checks into flat semantic tapes, and compares same-API
+peers globally or within a bounded call-graph neighborhood.
+`analyze_deviant_behavior` uses intraprocedural CFG reachability and forward
+DFG/PDG value evidence to infer later-call and return-check beliefs.
+
+Both paths store observed and required support as integer fractions. Threshold
+decisions use widened cross multiplication, so the 4/5 and 9/10 oracles have no
+floating-point boundary. Incomplete sites are excluded from inference and
+retained as typed issues. AST, call-neighborhood, CFG, and value traversals use
+heap worklists or flat postorder tapes; the graph remains unchanged.
+
+![Typed graph evidence becomes exact peer beliefs and advisory deviations](../diagrams/population-anomaly-pipeline.svg)
+
+See the [component guide](../components/graph/population-anomaly-detectors.md),
+[Theory 35](../theory/35-population-anomaly-inference.md), and [Usage
+18](../usage/18-population-anomaly-detectors.md).
+
 ### Pattern detection
 
 Two layers, at two feature levels:

@@ -423,6 +423,9 @@ So the safe pattern is: build (single-threaded, `&mut`), then analyse
 - [Advisory bug detectors](bug-detectors.md) — feature-free resource-leak and
   uninitialized-use projections plus bounded interprocedural uncaught-exception
   and dead-catch evidence over the same normalized graph.
+- [Population anomaly detectors](population-anomaly-detectors.md) — feature-free
+  missing-check, call-order, and return-check population beliefs with exact
+  support and explicit incomplete-result evidence.
 - [`api/graph-reference.md`](../../api/graph-reference.md) — the precise,
   method-by-method API reference for `CodePropertyGraph`.
 - [`theory/01-code-property-graphs.md`](../../theory/01-code-property-graphs.md)

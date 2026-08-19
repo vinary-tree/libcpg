@@ -8,6 +8,10 @@ the detector composition and report surfaces. Language parsing belongs to the
 frontend; typestate transfer, variable facts, reaching definitions, call SCCs,
 and bounded summary scheduling remain in their shared analysis components.
 
+This page covers those evidence-composed detector families. The same module's
+missing-check and deviant-behavior surfaces are specified separately in the
+[population anomaly component](population-anomaly-detectors.md).
+
 ![Inputs, shared analyses, findings, and completeness evidence](../../diagrams/bug-detector-pipeline.svg)
 
 ## Feature boundary

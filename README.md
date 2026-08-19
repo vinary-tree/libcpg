@@ -90,6 +90,9 @@ PDG). A query can therefore mix syntax, control flow, and data flow freely.
 - **Advisory bug detectors** — feature-free resource-leak projection,
   binder-aware uninitialized-use evidence, bounded interprocedural exception
   summaries, uncaught root witnesses, and dead-catch findings.
+- **Population anomaly detectors** — feature-free taint-selected missing-check
+  inference plus call-order and return-check beliefs with exact rational support,
+  canonical evidence, and explicit incomplete-result qualification.
 - **Projection centrality** — deterministic PageRank variants, vertex/edge
   betweenness, eigenvector, Katz, closeness, harmonic, HITS, and Burt
   structural-hole scores with explicit iteration and traversal budgets.

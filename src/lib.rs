@@ -64,6 +64,9 @@
 //! - **Advisory Bug Detectors**: Project resource leaks and uninitialized uses,
 //!   propagate bounded exception summaries, and report uncaught root flow and
 //!   dead catches with explicit completeness evidence
+//! - **Population Anomaly Detectors**: Infer taint-selected missing checks,
+//!   call-order conventions, and return-check conventions from exact peer
+//!   fractions with qualified advisory evidence
 //! - **Pattern Detection**: Detect design patterns using subgraph isomorphism (VF2/VF3)
 //! - **Algorithm Analysis**: Extract algorithm signatures and estimate complexity
 //! - **GNN Support**: Graph neural network message passing for semantic embeddings
