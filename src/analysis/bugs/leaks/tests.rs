@@ -153,6 +153,41 @@ fn release_on_every_exit_path_is_clean_and_read_only() {
 }
 
 #[test]
+fn recorded_function_exits_exclude_expression_evaluation_side_sinks() {
+    let mut fixture = fixture(false, false);
+    let function = fixture
+        .cpg
+        .functions()
+        .next()
+        .expect("fixture function exists")
+        .id;
+    let side_sink = add(
+        &mut fixture.cpg,
+        40,
+        CpgNodeKind::Identifier {
+            name: "argument".into(),
+            definition: None,
+        },
+    );
+    ast(&mut fixture.cpg, function, side_sink);
+    fixture
+        .cpg
+        .connect(
+            fixture.open,
+            side_sink,
+            CpgEdgeKind::ControlFlow(CfgEdgeKind::Sequential),
+        )
+        .expect("side-evaluation CFG endpoints exist");
+
+    let report = analyze_resource_leaks(&fixture.cpg, &resource_fsm(), &IfdsCaps::default());
+
+    assert!(report.is_complete(), "{report:#?}");
+    assert!(report.leaks.is_empty(), "{report:#?}");
+    assert_eq!(report.typestate.terminals.len(), 1, "{report:#?}");
+    assert_eq!(report.typestate.terminals[0].exit, fixture.exit);
+}
+
+#[test]
 fn missing_release_on_one_branch_reports_its_non_accepting_exit_witness() {
     let fixture = fixture(true, false);
 

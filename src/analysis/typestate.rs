@@ -760,11 +760,31 @@ fn analyze_function(
     }
 
     analysis.processed_functions.push(function);
-    let exit_like: BTreeSet<_> = view
-        .exit_like
+    let recorded_exits: BTreeSet<_> = cpg.cfg_exits().iter().copied().collect();
+    let mut exit_like: BTreeSet<_> = view
+        .projection
+        .nodes
         .iter()
-        .map(|&dense| view.projection.node_id(dense))
+        .copied()
+        .filter(|node| {
+            recorded_exits.contains(node)
+                || matches!(
+                    cpg.node(*node).map(|node| &node.kind),
+                    Some(CpgNodeKind::Return | CpgNodeKind::Throw)
+                )
+        })
         .collect();
+    // Legacy hand-built CFG fixtures may not register exits. Preserve their
+    // established structural-sink semantics only when no builder-recorded or
+    // explicit terminal exists. Parser-built expression-evaluation side nodes
+    // are therefore never mistaken for function exits.
+    if exit_like.is_empty() {
+        exit_like.extend(
+            view.exit_like
+                .iter()
+                .map(|&dense| view.projection.node_id(dense)),
+        );
+    }
     let mut facts = BTreeMap::<NodeId, BTreeSet<FactKey>>::new();
     let mut traces = BTreeMap::<TraceKey, TraceStep>::new();
     let mut queue = BTreeSet::<QueueItem>::new();
@@ -863,7 +883,7 @@ fn analyze_function(
             .iter()
             .map(|&successor| view.projection.node_id(successor))
             .collect();
-        if exit_like.contains(&item.key.node) || successors.is_empty() {
+        if exit_like.contains(&item.key.node) {
             analysis
                 .terminal_states
                 .entry(out_fact.object)

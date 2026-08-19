@@ -61,10 +61,10 @@ pub fn analyze_uninitialized_uses(cpg: &CodePropertyGraph) -> UninitializedUseAn
 
     for &function in &functions {
         let scope: BTreeSet<_> = function_scope_nodes(cpg, function).into_iter().collect();
-        let callee_symbols = unbound_callee_symbols(cpg, &scope);
+        let non_values = non_value_identifiers(cpg, function, &scope);
         let facts = variable_facts(cpg, function);
         for (&use_site, variables) in &facts.uses {
-            if callee_symbols.contains(&use_site) {
+            if non_values.contains(&use_site) {
                 continue;
             }
             let mut in_scope = false;
@@ -103,8 +103,36 @@ pub fn uninitialized_uses(cpg: &CodePropertyGraph) -> Vec<UninitializedUse> {
     analyze_uninitialized_uses(cpg).uses
 }
 
-fn unbound_callee_symbols(cpg: &CodePropertyGraph, scope: &BTreeSet<NodeId>) -> BTreeSet<NodeId> {
+fn non_value_identifiers(
+    cpg: &CodePropertyGraph,
+    function: NodeId,
+    scope: &BTreeSet<NodeId>,
+) -> BTreeSet<NodeId> {
     let mut symbols = BTreeSet::new();
+
+    // Tree-sitter retains declaration names and type syntax in the AST. Every
+    // unbound identifier before the function body belongs to the signature,
+    // not to the executable variable-use relation. Bound identifiers remain
+    // eligible so default-value expressions referring to variables are not
+    // silently discarded.
+    let function_children = cpg.ast_children(function);
+    if let Some(body_index) = function_children.iter().position(|&child| {
+        cpg.node(child)
+            .is_some_and(|node| matches!(node.kind, CpgNodeKind::Block { .. }))
+    }) {
+        for &child in &function_children[..body_index] {
+            for node in std::iter::once(child).chain(cpg.ast_descendants(child)) {
+                if cpg
+                    .node(node)
+                    .is_some_and(|node| matches!(node.kind, CpgNodeKind::Identifier { .. }))
+                    && !has_variable_binding(cpg, node)
+                {
+                    symbols.insert(node);
+                }
+            }
+        }
+    }
+
     for &call in scope {
         if !cpg
             .node(call)

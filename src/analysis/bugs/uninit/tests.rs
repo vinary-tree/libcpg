@@ -129,6 +129,32 @@ fn unbound_function_names_are_syntax_but_bound_callbacks_are_variable_uses() {
 }
 
 #[test]
+fn unbound_signature_identifiers_are_not_executable_variable_reads() {
+    let mut cpg = CodePropertyGraph::new(Language::Unknown);
+    let function = add(&mut cpg, 1, function_kind("entry"));
+    let declaration_name = add(&mut cpg, 2, identifier("entry", None));
+    let return_type = add(&mut cpg, 3, identifier("Result", None));
+    let body = add(
+        &mut cpg,
+        4,
+        CpgNodeKind::Block {
+            scope: ScopeId::GLOBAL,
+        },
+    );
+    let value = add(&mut cpg, 5, identifier("value", None));
+    for child in [declaration_name, return_type, body] {
+        ast(&mut cpg, function, child);
+    }
+    ast(&mut cpg, body, value);
+
+    let report = analyze_uninitialized_uses(&cpg);
+
+    assert_eq!(report.uses.len(), 1, "{report:#?}");
+    assert_eq!(report.uses[0].use_site, value);
+    assert_eq!(report.uses[0].variable.as_ref(), "value");
+}
+
+#[test]
 fn definitions_from_another_function_do_not_initialize_the_local_use() {
     let mut cpg = CodePropertyGraph::new(Language::Unknown);
     let first = add(&mut cpg, 1, function_kind("first"));

@@ -780,11 +780,13 @@ impl NodeMapper {
             "lambda_expression" => CpgNodeKind::Lambda {
                 captures: SmallVec::new(),
             },
-            "formal_parameter" | "spread_parameter" => CpgNodeKind::Parameter {
-                name: self.extract_child_text(node, "name", source),
-                param_type: None,
-                is_variadic: ts_kind == "spread_parameter",
-            },
+            "formal_parameter" | "spread_parameter" | "catch_formal_parameter" => {
+                CpgNodeKind::Parameter {
+                    name: self.extract_child_text(node, "name", source),
+                    param_type: self.extract_java_parameter_type(node, source),
+                    is_variadic: ts_kind == "spread_parameter",
+                }
+            }
             "block" => CpgNodeKind::Block {
                 scope: ScopeId::GLOBAL,
             },
@@ -2072,6 +2074,28 @@ impl NodeMapper {
     fn extract_type_from_node(&self, node: &tree_sitter::Node, source: &str) -> Option<TypeInfo> {
         node.child_by_field_name("type")
             .map(|t| TypeInfo::new(self.node_text(&t, source)))
+    }
+
+    /// Extracts the declared type of a Java ordinary, variadic, or catch parameter.
+    ///
+    /// The Java grammar exposes ordinary parameter types through the `type`
+    /// field, but a `catch_formal_parameter` owns an unfielded `catch_type`
+    /// child so it can represent union catches. Normalizing both grammar shapes
+    /// here keeps exception analyses independent of source text and grammar
+    /// details.
+    fn extract_java_parameter_type(
+        &self,
+        node: &tree_sitter::Node,
+        source: &str,
+    ) -> Option<TypeInfo> {
+        self.extract_type_from_node(node, source).or_else(|| {
+            let mut cursor = node.walk();
+            let catch_type = node
+                .named_children(&mut cursor)
+                .find(|child| child.kind() == "catch_type")
+                .map(|catch_type| TypeInfo::new(self.node_text(&catch_type, source)));
+            catch_type
+        })
     }
 
     fn parse_integer(&self, node: &tree_sitter::Node, source: &str) -> LiteralKind {
@@ -3627,6 +3651,7 @@ enum E { A }
             "lambda_expression" => CpgNodeKind::Lambda { .. },
             "formal_parameter" => CpgNodeKind::Parameter { is_variadic: false, .. },
             "spread_parameter" => CpgNodeKind::Parameter { is_variadic: true, .. },
+            "catch_formal_parameter" => CpgNodeKind::Parameter { is_variadic: false, .. },
             "block" => CpgNodeKind::Block { .. },
             "local_variable_declaration" => CpgNodeKind::Variable { .. },
             "variable_declarator" => CpgNodeKind::Variable { .. },
@@ -3689,6 +3714,23 @@ enum E { A }
                 assert!(signature.return_type.is_some(), "`int` return type");
             }
             other => panic!("expected Function, got {other:?}"),
+        }
+        let catch_parameter = p
+            .iter()
+            .find(|(kind, _)| kind == "catch_formal_parameter")
+            .map(|(_, mapped)| mapped)
+            .expect("a catch_formal_parameter");
+        match catch_parameter {
+            CpgNodeKind::Parameter {
+                name, param_type, ..
+            } => {
+                assert_eq!(name.as_ref(), "e");
+                assert_eq!(
+                    param_type.as_ref().map(|type_info| type_info.name.as_ref()),
+                    Some("Exception")
+                );
+            }
+            other => panic!("expected typed catch Parameter, got {other:?}"),
         }
         // A field with no access modifier is package-private.
         let pkg_private = p.iter().any(|(k, v)| {
