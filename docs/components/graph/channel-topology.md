@@ -26,7 +26,7 @@ All items compile with `default = []`; their serde derives compile only with
 ## Construction seam
 
 `NodeMapper::message_kind` is called alongside `map_kind` during
-`TreeSitterCpgBuilder::convert_node`. This orthogonal field avoids changing a
+`TreeSitterCpgBuilder::build_ast`. This orthogonal field avoids changing a
 node's established structural meaning. For example, a Rholang `send` remains a
 `Call`, `choice` remains `Match`, and `par` remains `Block`, while each also
 carries the appropriate `MsgKind`.

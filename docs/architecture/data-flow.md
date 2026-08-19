@@ -36,7 +36,8 @@ fn demo() -> libcpg::Result<()> {
 
 ### Stage 1 — AST construction
 
-`build_from_tree` recursively walks the tree-sitter tree (`convert_node`). For each retained node it:
+`build_from_tree` walks the tree-sitter tree with the explicit preorder work
+stack in `build_ast`. For each retained node it:
 
 1. asks the `NodeMapper` whether to keep the node (`should_include_node`, which drops punctuation, comments unless configured, and language-specific wrappers/tokens);
 2. maps the grammar's node-kind string to a `CpgNodeKind` (`map_kind`) and,
@@ -60,7 +61,14 @@ let cfg = CfgExtractorConfig { include_fallthrough: true, include_exceptions: tr
 CfgExtractor::with_config(cfg).extract(&mut cpg);
 ```
 
-For each function it takes the **last AST child as the body**, connects the function to that body with a `Sequential` edge, then structurally walks the body, dispatching per `CpgNodeKind` to a handler (`process_block`, `process_if`, `process_while`, `process_for`, `process_loop`, `process_match`, `process_return`, `process_break`, `process_continue`, `process_try`, `process_throw`, and — when `include_call_edges` — `process_call`). A `CfgContext` carries the enclosing loop/try stacks so `break`/`continue`/`throw` target the right place.
+For each function it takes the **last AST child as the body**, connects the
+function to that body with a `Sequential` edge, then evaluates the body with a
+typed heap pushdown machine. `Enter`/`Leave` frames own active-path lifecycle;
+construct-specific continuations own source-order child scheduling and exact
+edge emission; a value stack carries completed exit sets. `CfgContext` carries
+the enclosing loop/try stacks so `break`/`continue`/`throw` target the right
+place. The complete former handler recursion component was defunctionalized
+together, so valid or malformed AST depth does not consume native call frames.
 
 The 14 `CfgEdgeKind` variants — the real vocabulary, replacing the invented `BranchTrue`/`BranchFalse`:
 

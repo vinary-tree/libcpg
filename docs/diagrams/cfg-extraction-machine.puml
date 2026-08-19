@@ -1,0 +1,62 @@
+@startuml
+!include _libcpg-theme.iuml
+title Typed heap pushdown machine for CFG extraction
+
+skinparam backgroundColor #FFFFFF
+skinparam shadowing false
+skinparam roundcorner 12
+skinparam defaultFontName "DejaVu Sans"
+skinparam ArrowColor #495057
+skinparam ArrowThickness 1.4
+skinparam activity {
+  BackgroundColor #E7F5FF
+  BorderColor #1971C2
+  FontColor #212529
+  DiamondBackgroundColor #FFF3BF
+  DiamondBorderColor #F08C00
+  StartColor #2F9E44
+  EndColor #2F9E44
+}
+
+start
+:Public `extract_function_cfg`\nselects the final AST child as body; <<#D3F9D8>>
+:Push `Enter(body)` onto\n`frames: Vec<CfgFrame>`; <<#D0EBFF>>
+
+while (`frames` nonempty?) is (yes)
+  :Pop one typed frame; <<#D0EBFF>>
+  if (Frame role?) then (`Enter(node)`)
+    if (`node` already in `on_path`?) then (cycle)
+      :Push `{node}` onto\n`values: Vec<CfgExits>`; <<#FFE8CC>>
+    else (fresh)
+      :Insert `node` in active path; <<#E5DBFF>>
+      :Push `Leave(node)`; <<#E5DBFF>>
+      :Emit node-local edges with\n`connect_unique`; <<#D3F9D8>>
+      :Push kind-specific continuation,\nthen `Enter(first child)`; <<#D0EBFF>>
+    endif
+  elseif (`Continuation(state)`)
+    :Pop the completed child exit set; <<#FFE8CC>>
+    :Emit the former equation's next\nedges in exact source order; <<#D3F9D8>>
+    :Update lexical loop / try context; <<#E5DBFF>>
+    if (Another child required?) then (yes)
+      :Push updated continuation,\nthen `Enter(next child)`; <<#D0EBFF>>
+    else (no)
+      :Push exactly one completed\nconstruct exit set; <<#FFE8CC>>
+    endif
+  else (`Leave(node)`)
+    :Remove `node` from active path; <<#E5DBFF>>
+  endif
+endwhile (no)
+
+:Require exactly one exit set; <<#FFF3BF>>
+:Register every returned node\nas a deduplicated CFG exit; <<#D3F9D8>>
+stop
+
+legend right
+  |= Color |= Ownership |
+  |<#D0EBFF>| typed continuation frames |
+  |<#FFE8CC>| exit-value stack |
+  |<#E5DBFF>| active / loop / try context |
+  |<#D3F9D8>| graph mutation boundary |
+  |<#FFF3BF>| checked conservation boundary |
+endlegend
+@enduml

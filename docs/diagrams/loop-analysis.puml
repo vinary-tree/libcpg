@@ -14,7 +14,7 @@ rectangle "whole-SCC irreducible region" as REGION #FFC9C9
 rectangle "strict body containment\nsmallest enclosing parent" as NEST #E5DBFF
 rectangle "LoopForest\nloops · membership · roots" as FOREST #D0BFFF
 
-rectangle "CfgExtractor::process_block" as BUILDER #F1F3F5
+rectangle "CfgFrame::BlockAfterChild" as BUILDER #F1F3F5
 rectangle "scope decision\ncontinuation leaves AST loop?" as LEAVES #FFF3BF
 rectangle "Sequential" as SEQUENTIAL #DBE4FF
 rectangle "LoopExit\nsame edge count" as LOOP_EXIT #D3F9D8

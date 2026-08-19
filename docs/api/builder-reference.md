@@ -200,8 +200,9 @@ parse.
 
 ### AST conversion
 
-Both modes convert tree-sitter nodes recursively. For each retained node the
-builder: maps its kind via [`NodeMapper::map_kind`](#nodemapper); records a
+Both modes convert tree-sitter nodes with an explicit preorder frame machine.
+For each retained node the builder: maps its kind via
+[`NodeMapper::map_kind`](#nodemapper); records a
 `SourceRange` from byte offsets; adds the node; wires an `AstChild` edge from the
 parent **and** sets the child's `parent` pointer (ancestor-based analyses read
 the pointer, not the edge); and marks every `Function` node as a CFG entry.
@@ -287,11 +288,13 @@ pub struct CfgExtractorConfig {
 | `extract_function_cfg` | `fn extract_function_cfg(&self, cpg: &mut CodePropertyGraph, function: NodeId)` | Build CFG for one function. |
 
 `extract_function_cfg` marks the function as a CFG entry, connects it to its body
-(the **last** AST child), and recursively processes control constructs — `If`,
+(the **last** AST child), and runs a typed heap continuation machine over control constructs — `If`,
 `While`, `For`, `Loop`, `Match`, `Return`, `Break`, `Continue`, `Try`, `Throw`,
 and (when `include_call_edges`) `Call` — emitting the 14 [`CfgEdgeKind`](graph-reference.md#cfgedgekind)
-variants; a loop/`try` context stack routes `break`/`continue`/`throw` edges. It
-is idempotent.
+variants; a loop/`try` context stack routes `break`/`continue`/`throw` edges. Its
+native call depth is independent of AST depth, active-path `Enter`/`Leave`
+state cuts malformed cycles without suppressing shared DAG paths, and every
+emission uses `connect_unique`, so it is idempotent.
 
 ```rust
 // requires: no features (feature-free over a hand-built or Mode-B graph)

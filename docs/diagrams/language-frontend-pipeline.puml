@@ -10,7 +10,7 @@ package "ParserRegistry frontend  (feature lang-*)" as regpkg #F8F9FA {
 
 component "Caller-supplied\ntree_sitter::Tree\nMode B — feature-free\n(the only path for Rholang / MeTTa)" as MB #E5DBFF
 
-component "TreeSitterCpgBuilder\n.convert_node  (recursive walk)" as TB #DBE4FF
+component "TreeSitterCpgBuilder\n.build_ast  (explicit preorder work stack)" as TB #DBE4FF
 component "NodeMapper.map_kind\ndispatch by Language" as NM #F1F3F5
 
 package "per-language mappers" as mappers #F8F9FA {

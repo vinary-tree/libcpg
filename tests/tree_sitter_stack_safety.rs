@@ -1,12 +1,12 @@
-//! Public-API integration coverage for stack-safe tree-sitter CPG construction.
+//! Public-API integration coverage for stack-safe tree-sitter CPG and CFG construction.
 
 #![cfg(feature = "lang-rust")]
 
 use libcpg::{CpgBuilder, CpgBuilderConfig, CpgEdgeKind, Language, TreeSitterCpgBuilder};
 
 #[test]
-fn public_mode_a_builder_handles_deep_source_on_a_small_native_stack() {
-    const DEPTH: usize = 20_000;
+fn public_mode_a_builder_and_cfg_handle_depth_100_000_on_a_small_native_stack() {
+    const DEPTH: usize = 100_000;
 
     let handle = std::thread::Builder::new()
         .name("public-cpg-builder-small-stack".into())
@@ -20,12 +20,25 @@ fn public_mode_a_builder_handles_deep_source_on_a_small_native_stack() {
             source.push_str(";}");
 
             let builder = TreeSitterCpgBuilder::with_config(
-                CpgBuilderConfig::new().with_cfg(false).with_dfg(false),
+                CpgBuilderConfig::new().with_cfg(true).with_dfg(false),
             );
             let cpg = builder
                 .build(&source, Language::Rust)
                 .expect("public Mode-A builder handles deep syntax");
             assert!(cpg.node_count() >= DEPTH);
+            assert_eq!(
+                cpg.cfg_entries().len(),
+                1,
+                "the parsed function is a CFG entry"
+            );
+            assert!(
+                !cpg.cfg_exits().is_empty(),
+                "the deep expression has a CFG exit"
+            );
+            assert!(
+                cpg.stats().cfg_edges >= DEPTH,
+                "CFG extraction traverses the complete parser-built nesting"
+            );
 
             for edge in cpg
                 .edges()

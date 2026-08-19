@@ -1,8 +1,9 @@
 //! Control Flow Graph extraction from CPG.
 //!
-//! This module provides algorithms to extract CFG edges from the AST
-//! portion of a Code Property Graph. It identifies control flow constructs
-//! and creates appropriate edges between basic blocks.
+//! This module extracts CFG edges from the AST portion of a Code Property
+//! Graph. A typed heap-backed pushdown machine identifies control-flow
+//! constructs and emits their edges without mapping source depth onto native
+//! Rust call frames.
 
 use rustc_hash::{FxHashMap, FxHashSet};
 use smallvec::SmallVec;
@@ -30,10 +31,104 @@ impl Default for CfgExtractorConfig {
     }
 }
 
-/// CFG extractor that adds control flow edges to a CPG.
+/// Stack-safe CFG extractor that adds control-flow edges to a CPG.
+///
+/// Source-shaped control is evaluated by a typed continuation machine whose
+/// frames and intermediate exit sets live on the heap. Native call depth is
+/// therefore independent of AST depth.
 #[derive(Debug)]
 pub struct CfgExtractor {
     config: CfgExtractorConfig,
+}
+
+type CfgExits = SmallVec<[NodeId; 4]>;
+
+/// One instruction or continuation in CFG extraction's pushdown machine.
+#[derive(Debug)]
+enum CfgFrame {
+    Enter(NodeId),
+    Leave(NodeId),
+    BlockAfterChild {
+        block: NodeId,
+        children: Vec<NodeId>,
+        index: usize,
+        all_exits: CfgExits,
+        terminated: bool,
+    },
+    IfAfterThenWithoutElse {
+        condition: NodeId,
+    },
+    IfAfterThen {
+        if_node: NodeId,
+        condition: NodeId,
+        else_branch: NodeId,
+    },
+    IfAfterElse {
+        if_node: NodeId,
+        exits: CfgExits,
+    },
+    WhileAfterBody {
+        condition: NodeId,
+    },
+    ForAfterBody {
+        header: NodeId,
+    },
+    LoopAfterBody {
+        header: NodeId,
+    },
+    MatchNext {
+        match_node: NodeId,
+        source: NodeId,
+        arms: Vec<NodeId>,
+        index: usize,
+        exits: CfgExits,
+    },
+    MatchAfterArm {
+        match_node: NodeId,
+        source: NodeId,
+        arms: Vec<NodeId>,
+        index: usize,
+        exits: CfgExits,
+    },
+    ReturnAfterExpression {
+        return_node: NodeId,
+    },
+    ThrowAfterExpression {
+        throw_node: NodeId,
+    },
+    CallAfterArgument {
+        call: NodeId,
+        arguments: Vec<NodeId>,
+        next_index: usize,
+    },
+    SequentialAfterChild {
+        children: Vec<NodeId>,
+        index: usize,
+    },
+    TryAfterBody {
+        try_node: NodeId,
+        catches: Vec<NodeId>,
+        finally: Option<NodeId>,
+        exits: CfgExits,
+    },
+    TryCatchNext {
+        try_node: NodeId,
+        catches: Vec<NodeId>,
+        index: usize,
+        finally: Option<NodeId>,
+        exits: CfgExits,
+    },
+    TryAfterCatch {
+        try_node: NodeId,
+        catches: Vec<NodeId>,
+        next_index: usize,
+        finally: Option<NodeId>,
+        exits: CfgExits,
+    },
+    TryAfterFinally {
+        try_node: NodeId,
+        exits: CfgExits,
+    },
 }
 
 impl CfgExtractor {
@@ -56,6 +151,15 @@ impl CfgExtractor {
 
         for func_id in functions {
             self.extract_function_cfg(cpg, func_id);
+        }
+    }
+
+    /// Executes the former recursive extractor on fixed-bounded test inputs.
+    #[cfg(test)]
+    fn extract_recursive_oracle(&self, cpg: &mut CodePropertyGraph) {
+        let functions: Vec<NodeId> = cpg.functions().map(|node| node.id).collect();
+        for function in functions {
+            self.extract_function_cfg_recursive_oracle(cpg, function);
         }
     }
 
@@ -87,8 +191,765 @@ impl CfgExtractor {
         }
     }
 
-    /// Processes a node and returns the set of exit points from this node.
+    /// Executes the former recursive equations on fixed-bounded test inputs.
+    #[cfg(test)]
+    fn extract_function_cfg_recursive_oracle(&self, cpg: &mut CodePropertyGraph, function: NodeId) {
+        cpg.add_cfg_entry(function);
+        let mut ctx = CfgContext::new();
+        if let Some(&body) = cpg.ast_children(function).last() {
+            cpg.connect_unique(
+                function,
+                body,
+                CpgEdgeKind::ControlFlow(CfgEdgeKind::Sequential),
+            );
+            for exit in self.process_node_recursive(cpg, body, &mut ctx) {
+                cpg.add_cfg_exit(exit);
+            }
+        }
+    }
+
+    /// Processes one AST region with a typed heap continuation machine.
     fn process_node(
+        &self,
+        cpg: &mut CodePropertyGraph,
+        node_id: NodeId,
+        ctx: &mut CfgContext,
+    ) -> CfgExits {
+        let mut frames = vec![CfgFrame::Enter(node_id)];
+        let mut values: Vec<CfgExits> = Vec::new();
+
+        while let Some(frame) = frames.pop() {
+            match frame {
+                CfgFrame::Enter(node) => {
+                    let Some(kind) = cpg.node(node).map(|node| node.kind.clone()) else {
+                        values.push(smallvec::smallvec![node]);
+                        continue;
+                    };
+
+                    // An active-path set, not a global visited set, gives a
+                    // malformed back edge the same self-exit as the former
+                    // recursive guard while still replaying shared DAG nodes.
+                    if !ctx.on_path.insert(node) {
+                        values.push(smallvec::smallvec![node]);
+                        continue;
+                    }
+                    frames.push(CfgFrame::Leave(node));
+
+                    match kind {
+                        CpgNodeKind::Block { .. } => {
+                            let children = cpg.ast_children(node);
+                            if let Some(&first) = children.first() {
+                                cpg.connect_unique(
+                                    node,
+                                    first,
+                                    CpgEdgeKind::ControlFlow(CfgEdgeKind::Sequential),
+                                );
+                                frames.push(CfgFrame::BlockAfterChild {
+                                    block: node,
+                                    children,
+                                    index: 0,
+                                    all_exits: SmallVec::new(),
+                                    terminated: false,
+                                });
+                                frames.push(CfgFrame::Enter(first));
+                            } else {
+                                values.push(smallvec::smallvec![node]);
+                            }
+                        }
+                        CpgNodeKind::If => {
+                            let children = cpg.ast_children(node);
+                            match children.as_slice() {
+                                [] => values.push(smallvec::smallvec![node]),
+                                [condition] => {
+                                    cpg.connect_unique(
+                                        node,
+                                        *condition,
+                                        CpgEdgeKind::ControlFlow(CfgEdgeKind::Sequential),
+                                    );
+                                    values.push(smallvec::smallvec![*condition]);
+                                }
+                                [condition, then_branch] => {
+                                    cpg.connect_unique(
+                                        node,
+                                        *condition,
+                                        CpgEdgeKind::ControlFlow(CfgEdgeKind::Sequential),
+                                    );
+                                    cpg.connect_unique(
+                                        *condition,
+                                        *then_branch,
+                                        CpgEdgeKind::ControlFlow(CfgEdgeKind::ConditionalTrue),
+                                    );
+                                    frames.push(CfgFrame::IfAfterThenWithoutElse {
+                                        condition: *condition,
+                                    });
+                                    frames.push(CfgFrame::Enter(*then_branch));
+                                }
+                                [condition, then_branch, else_branch, ..] => {
+                                    cpg.connect_unique(
+                                        node,
+                                        *condition,
+                                        CpgEdgeKind::ControlFlow(CfgEdgeKind::Sequential),
+                                    );
+                                    cpg.connect_unique(
+                                        *condition,
+                                        *then_branch,
+                                        CpgEdgeKind::ControlFlow(CfgEdgeKind::ConditionalTrue),
+                                    );
+                                    frames.push(CfgFrame::IfAfterThen {
+                                        if_node: node,
+                                        condition: *condition,
+                                        else_branch: *else_branch,
+                                    });
+                                    frames.push(CfgFrame::Enter(*then_branch));
+                                }
+                            }
+                        }
+                        CpgNodeKind::While => {
+                            let children = cpg.ast_children(node);
+                            let body = (children.len() >= 2)
+                                .then(|| {
+                                    children
+                                        .iter()
+                                        .rev()
+                                        .copied()
+                                        .find(|&child| {
+                                            matches!(
+                                                cpg.node(child).map(|node| &node.kind),
+                                                Some(CpgNodeKind::Block { .. })
+                                            )
+                                        })
+                                        .or_else(|| children.last().copied())
+                                })
+                                .flatten();
+                            let condition = body.and_then(|body| {
+                                children
+                                    .iter()
+                                    .copied()
+                                    .filter(|&child| child != body)
+                                    .find(|&child| !is_loop_syntax_token(cpg, child))
+                                    .or_else(|| {
+                                        children.iter().copied().find(|&child| child != body)
+                                    })
+                            });
+                            if let (Some(body), Some(condition)) = (body, condition) {
+                                ctx.push_loop(node, condition);
+                                cpg.connect_unique(
+                                    node,
+                                    condition,
+                                    CpgEdgeKind::ControlFlow(CfgEdgeKind::Sequential),
+                                );
+                                cpg.connect_unique(
+                                    condition,
+                                    body,
+                                    CpgEdgeKind::ControlFlow(CfgEdgeKind::ConditionalTrue),
+                                );
+                                frames.push(CfgFrame::WhileAfterBody { condition });
+                                frames.push(CfgFrame::Enter(body));
+                            } else {
+                                values.push(smallvec::smallvec![node]);
+                            }
+                        }
+                        CpgNodeKind::For => {
+                            let children = cpg.ast_children(node);
+                            if let Some(&body) = children.last() {
+                                ctx.push_loop(node, node);
+                                cpg.connect_unique(
+                                    node,
+                                    body,
+                                    CpgEdgeKind::ControlFlow(CfgEdgeKind::ConditionalTrue),
+                                );
+                                frames.push(CfgFrame::ForAfterBody { header: node });
+                                frames.push(CfgFrame::Enter(body));
+                            } else {
+                                values.push(smallvec::smallvec![node]);
+                            }
+                        }
+                        CpgNodeKind::Loop => {
+                            let children = cpg.ast_children(node);
+                            if let Some(body) = children
+                                .iter()
+                                .rev()
+                                .copied()
+                                .find(|&child| {
+                                    matches!(
+                                        cpg.node(child).map(|node| &node.kind),
+                                        Some(CpgNodeKind::Block { .. })
+                                    )
+                                })
+                                .or_else(|| children.first().copied())
+                            {
+                                ctx.push_loop(node, node);
+                                cpg.connect_unique(
+                                    node,
+                                    body,
+                                    CpgEdgeKind::ControlFlow(CfgEdgeKind::Sequential),
+                                );
+                                frames.push(CfgFrame::LoopAfterBody { header: node });
+                                frames.push(CfgFrame::Enter(body));
+                            } else {
+                                values.push(smallvec::smallvec![node]);
+                            }
+                        }
+                        CpgNodeKind::Match => {
+                            let children = cpg.ast_children(node);
+                            if children.is_empty() {
+                                values.push(smallvec::smallvec![node]);
+                                continue;
+                            }
+                            let (source, arms_start) = if children.len() > 1
+                                && !matches!(
+                                    cpg.node(children[0]).map(|child| &child.kind),
+                                    Some(CpgNodeKind::MatchArm)
+                                ) {
+                                cpg.connect_unique(
+                                    node,
+                                    children[0],
+                                    CpgEdgeKind::ControlFlow(CfgEdgeKind::Sequential),
+                                );
+                                (children[0], 1)
+                            } else {
+                                (node, 0)
+                            };
+                            frames.push(CfgFrame::MatchNext {
+                                match_node: node,
+                                source,
+                                arms: children[arms_start..].to_vec(),
+                                index: 0,
+                                exits: SmallVec::new(),
+                            });
+                        }
+                        CpgNodeKind::Return => {
+                            if let Some(&expression) = cpg.ast_children(node).first() {
+                                cpg.connect_unique(
+                                    node,
+                                    expression,
+                                    CpgEdgeKind::ControlFlow(CfgEdgeKind::Sequential),
+                                );
+                                frames.push(CfgFrame::ReturnAfterExpression { return_node: node });
+                                frames.push(CfgFrame::Enter(expression));
+                            } else {
+                                values.push(smallvec::smallvec![node]);
+                            }
+                        }
+                        CpgNodeKind::Break => {
+                            if let Some(loop_context) = ctx.loop_stack.last_mut() {
+                                loop_context.break_targets.push(node);
+                                cpg.connect_unique(
+                                    node,
+                                    loop_context.loop_id,
+                                    CpgEdgeKind::ControlFlow(CfgEdgeKind::Break),
+                                );
+                            }
+                            values.push(SmallVec::new());
+                        }
+                        CpgNodeKind::Continue => {
+                            if let Some(loop_context) = ctx.loop_stack.last() {
+                                cpg.connect_unique(
+                                    node,
+                                    loop_context.continue_target,
+                                    CpgEdgeKind::ControlFlow(CfgEdgeKind::Continue),
+                                );
+                            }
+                            values.push(SmallVec::new());
+                        }
+                        CpgNodeKind::Try if self.config.include_exceptions => {
+                            let children = cpg.ast_children(node);
+                            let mut body = None;
+                            let mut catches = Vec::new();
+                            let mut finally = None;
+                            for child in children {
+                                match cpg.node(child).map(|child| &child.kind) {
+                                    Some(CpgNodeKind::Block { .. }) if body.is_none() => {
+                                        body = Some(child);
+                                    }
+                                    Some(CpgNodeKind::Catch) => catches.push(child),
+                                    Some(CpgNodeKind::Finally) => finally = Some(child),
+                                    _ => {}
+                                }
+                            }
+                            if let Some(body) = body {
+                                cpg.connect_unique(
+                                    node,
+                                    body,
+                                    CpgEdgeKind::ControlFlow(CfgEdgeKind::Sequential),
+                                );
+                                ctx.push_try(node, catches.clone());
+                                frames.push(CfgFrame::TryAfterBody {
+                                    try_node: node,
+                                    catches,
+                                    finally,
+                                    exits: SmallVec::new(),
+                                });
+                                frames.push(CfgFrame::Enter(body));
+                            } else {
+                                frames.push(CfgFrame::TryCatchNext {
+                                    try_node: node,
+                                    catches,
+                                    index: 0,
+                                    finally,
+                                    exits: SmallVec::new(),
+                                });
+                            }
+                        }
+                        CpgNodeKind::Throw if self.config.include_exceptions => {
+                            if let Some(&expression) = cpg.ast_children(node).first() {
+                                cpg.connect_unique(
+                                    node,
+                                    expression,
+                                    CpgEdgeKind::ControlFlow(CfgEdgeKind::Sequential),
+                                );
+                                frames.push(CfgFrame::ThrowAfterExpression { throw_node: node });
+                                frames.push(CfgFrame::Enter(expression));
+                            } else {
+                                Self::emit_throw_edges(cpg, node, ctx);
+                                values.push(SmallVec::new());
+                            }
+                        }
+                        CpgNodeKind::Throw => values.push(smallvec::smallvec![node]),
+                        CpgNodeKind::Call { .. } if self.config.include_call_edges => {
+                            let arguments = cpg.ast_children(node);
+                            if let Some(&argument) = arguments.first() {
+                                cpg.connect_unique(
+                                    node,
+                                    argument,
+                                    CpgEdgeKind::ControlFlow(CfgEdgeKind::Sequential),
+                                );
+                                frames.push(CfgFrame::CallAfterArgument {
+                                    call: node,
+                                    arguments,
+                                    next_index: 1,
+                                });
+                                frames.push(CfgFrame::Enter(argument));
+                            } else {
+                                Self::emit_call_edge(cpg, node);
+                                values.push(smallvec::smallvec![node]);
+                            }
+                        }
+                        _ => Self::begin_sequential(cpg, node, &mut frames, &mut values),
+                    }
+                }
+                CfgFrame::Leave(node) => {
+                    ctx.on_path.remove(&node);
+                }
+                CfgFrame::BlockAfterChild {
+                    block,
+                    children,
+                    index,
+                    mut all_exits,
+                    mut terminated,
+                } => {
+                    let child = children[index];
+                    let child_exits = values.pop().expect("a block child produces one exit set");
+                    let is_direct_terminator = matches!(
+                        cpg.node(child).map(|child| &child.kind),
+                        Some(CpgNodeKind::Return)
+                            | Some(CpgNodeKind::Break)
+                            | Some(CpgNodeKind::Continue)
+                            | Some(CpgNodeKind::Throw)
+                    );
+                    let has_only_function_terminal_exits = !child_exits.is_empty()
+                        && child_exits.iter().all(|&exit| {
+                            matches!(
+                                cpg.node(exit).map(|exit| &exit.kind),
+                                Some(CpgNodeKind::Return) | Some(CpgNodeKind::Throw)
+                            )
+                        });
+                    let is_terminator = is_direct_terminator || has_only_function_terminal_exits;
+                    let current_exits = if is_terminator {
+                        all_exits.extend(child_exits);
+                        terminated = true;
+                        SmallVec::new()
+                    } else {
+                        child_exits
+                    };
+
+                    let next_index = index + 1;
+                    if let Some(&next) = children.get(next_index) {
+                        for &exit in &current_exits {
+                            cpg.connect_unique(
+                                exit,
+                                next,
+                                CpgEdgeKind::ControlFlow(Self::continuation_edge_kind(
+                                    cpg, exit, next,
+                                )),
+                            );
+                        }
+                        frames.push(CfgFrame::BlockAfterChild {
+                            block,
+                            children,
+                            index: next_index,
+                            all_exits,
+                            terminated,
+                        });
+                        frames.push(CfgFrame::Enter(next));
+                    } else {
+                        if !terminated {
+                            all_exits.extend(current_exits);
+                        }
+                        values.push(Self::exits_or_node(all_exits, block));
+                    }
+                }
+                CfgFrame::IfAfterThenWithoutElse { condition } => {
+                    let mut exits = values.pop().expect("an if branch produces one exit set");
+                    exits.push(condition);
+                    values.push(exits);
+                }
+                CfgFrame::IfAfterThen {
+                    if_node,
+                    condition,
+                    else_branch,
+                } => {
+                    let exits = values.pop().expect("the then branch produces one exit set");
+                    let actual_else = if matches!(
+                        cpg.node(else_branch).map(|branch| &branch.kind),
+                        Some(CpgNodeKind::Else)
+                    ) {
+                        cpg.ast_children(else_branch)
+                            .first()
+                            .copied()
+                            .unwrap_or(else_branch)
+                    } else {
+                        else_branch
+                    };
+                    cpg.connect_unique(
+                        condition,
+                        actual_else,
+                        CpgEdgeKind::ControlFlow(CfgEdgeKind::ConditionalFalse),
+                    );
+                    frames.push(CfgFrame::IfAfterElse { if_node, exits });
+                    frames.push(CfgFrame::Enter(actual_else));
+                }
+                CfgFrame::IfAfterElse { if_node, mut exits } => {
+                    exits.extend(values.pop().expect("the else branch produces one exit set"));
+                    values.push(Self::exits_or_node(exits, if_node));
+                }
+                CfgFrame::WhileAfterBody { condition } => {
+                    let body_exits = values.pop().expect("a while body produces one exit set");
+                    for exit in body_exits {
+                        cpg.connect_unique(
+                            exit,
+                            condition,
+                            CpgEdgeKind::ControlFlow(CfgEdgeKind::LoopBack),
+                        );
+                    }
+                    let loop_context = ctx.pop_loop();
+                    let mut exits = smallvec::smallvec![condition];
+                    exits.extend(loop_context.break_targets);
+                    values.push(exits);
+                }
+                CfgFrame::ForAfterBody { header } => {
+                    let body_exits = values.pop().expect("a for body produces one exit set");
+                    for exit in body_exits {
+                        cpg.connect_unique(
+                            exit,
+                            header,
+                            CpgEdgeKind::ControlFlow(CfgEdgeKind::LoopBack),
+                        );
+                    }
+                    let loop_context = ctx.pop_loop();
+                    let mut exits = smallvec::smallvec![header];
+                    exits.extend(loop_context.break_targets);
+                    values.push(exits);
+                }
+                CfgFrame::LoopAfterBody { header } => {
+                    let body_exits = values.pop().expect("a loop body produces one exit set");
+                    for exit in body_exits {
+                        cpg.connect_unique(
+                            exit,
+                            header,
+                            CpgEdgeKind::ControlFlow(CfgEdgeKind::LoopBack),
+                        );
+                    }
+                    values.push(ctx.pop_loop().break_targets.into_iter().collect());
+                }
+                CfgFrame::MatchNext {
+                    match_node,
+                    source,
+                    arms,
+                    index,
+                    exits,
+                } => {
+                    let mut cursor = index;
+                    let mut scheduled = false;
+                    let mut exits = Some(exits);
+                    while let Some(&arm) = arms.get(cursor) {
+                        cursor += 1;
+                        if !matches!(
+                            cpg.node(arm).map(|arm| &arm.kind),
+                            Some(CpgNodeKind::MatchArm)
+                        ) {
+                            continue;
+                        }
+                        cpg.connect_unique(
+                            source,
+                            arm,
+                            CpgEdgeKind::ControlFlow(CfgEdgeKind::Case),
+                        );
+                        if let Some(&body) = cpg.ast_children(arm).last() {
+                            cpg.connect_unique(
+                                arm,
+                                body,
+                                CpgEdgeKind::ControlFlow(CfgEdgeKind::Sequential),
+                            );
+                            frames.push(CfgFrame::MatchAfterArm {
+                                match_node,
+                                source,
+                                arms,
+                                index: cursor,
+                                exits: exits.take().expect("scheduled match transfers its exits"),
+                            });
+                            frames.push(CfgFrame::Enter(body));
+                            scheduled = true;
+                            break;
+                        }
+                        exits
+                            .as_mut()
+                            .expect("match exits remain available")
+                            .push(arm);
+                    }
+                    if !scheduled {
+                        values.push(Self::exits_or_node(
+                            exits.expect("unscheduled match retains its exits"),
+                            match_node,
+                        ));
+                    }
+                }
+                CfgFrame::MatchAfterArm {
+                    match_node,
+                    source,
+                    arms,
+                    index,
+                    mut exits,
+                } => {
+                    exits.extend(values.pop().expect("a match arm produces one exit set"));
+                    frames.push(CfgFrame::MatchNext {
+                        match_node,
+                        source,
+                        arms,
+                        index,
+                        exits,
+                    });
+                }
+                CfgFrame::ReturnAfterExpression { return_node } => {
+                    let _ = values
+                        .pop()
+                        .expect("a return expression produces one exit set");
+                    values.push(smallvec::smallvec![return_node]);
+                }
+                CfgFrame::ThrowAfterExpression { throw_node } => {
+                    let _ = values
+                        .pop()
+                        .expect("a thrown expression produces one exit set");
+                    Self::emit_throw_edges(cpg, throw_node, ctx);
+                    values.push(SmallVec::new());
+                }
+                CfgFrame::CallAfterArgument {
+                    call,
+                    arguments,
+                    next_index,
+                } => {
+                    let _ = values.pop().expect("a call argument produces one exit set");
+                    if let Some(&argument) = arguments.get(next_index) {
+                        cpg.connect_unique(
+                            call,
+                            argument,
+                            CpgEdgeKind::ControlFlow(CfgEdgeKind::Sequential),
+                        );
+                        frames.push(CfgFrame::CallAfterArgument {
+                            call,
+                            arguments,
+                            next_index: next_index + 1,
+                        });
+                        frames.push(CfgFrame::Enter(argument));
+                    } else {
+                        Self::emit_call_edge(cpg, call);
+                        values.push(smallvec::smallvec![call]);
+                    }
+                }
+                CfgFrame::SequentialAfterChild { children, index } => {
+                    let exits = values
+                        .pop()
+                        .expect("a sequential child produces one exit set");
+                    let next_index = index + 1;
+                    if let Some(&next) = children.get(next_index) {
+                        for &exit in &exits {
+                            cpg.connect_unique(
+                                exit,
+                                next,
+                                CpgEdgeKind::ControlFlow(CfgEdgeKind::Sequential),
+                            );
+                        }
+                        frames.push(CfgFrame::SequentialAfterChild {
+                            children,
+                            index: next_index,
+                        });
+                        frames.push(CfgFrame::Enter(next));
+                    } else {
+                        values.push(exits);
+                    }
+                }
+                CfgFrame::TryAfterBody {
+                    try_node,
+                    catches,
+                    finally,
+                    mut exits,
+                } => {
+                    let body_exits = values.pop().expect("a try body produces one exit set");
+                    ctx.pop_try();
+                    if let Some(finally) = finally {
+                        for exit in body_exits {
+                            cpg.connect_unique(
+                                exit,
+                                finally,
+                                CpgEdgeKind::ControlFlow(CfgEdgeKind::Sequential),
+                            );
+                        }
+                    } else {
+                        exits.extend(body_exits);
+                    }
+                    frames.push(CfgFrame::TryCatchNext {
+                        try_node,
+                        catches,
+                        index: 0,
+                        finally,
+                        exits,
+                    });
+                }
+                CfgFrame::TryCatchNext {
+                    try_node,
+                    catches,
+                    index,
+                    finally,
+                    exits,
+                } => {
+                    let mut cursor = index;
+                    let mut catch_body = None;
+                    while let Some(&catch) = catches.get(cursor) {
+                        cursor += 1;
+                        if let Some(&body) = cpg.ast_children(catch).last() {
+                            catch_body = Some((catch, body));
+                            break;
+                        }
+                    }
+                    if let Some((catch, body)) = catch_body {
+                        cpg.connect_unique(
+                            catch,
+                            body,
+                            CpgEdgeKind::ControlFlow(CfgEdgeKind::Sequential),
+                        );
+                        frames.push(CfgFrame::TryAfterCatch {
+                            try_node,
+                            catches,
+                            next_index: cursor,
+                            finally,
+                            exits,
+                        });
+                        frames.push(CfgFrame::Enter(body));
+                    } else if let Some(finally) = finally {
+                        frames.push(CfgFrame::TryAfterFinally { try_node, exits });
+                        frames.push(CfgFrame::Enter(finally));
+                    } else {
+                        values.push(Self::exits_or_node(exits, try_node));
+                    }
+                }
+                CfgFrame::TryAfterCatch {
+                    try_node,
+                    catches,
+                    next_index,
+                    finally,
+                    mut exits,
+                } => {
+                    let catch_exits = values.pop().expect("a catch body produces one exit set");
+                    if let Some(finally) = finally {
+                        for exit in catch_exits {
+                            cpg.connect_unique(
+                                exit,
+                                finally,
+                                CpgEdgeKind::ControlFlow(CfgEdgeKind::Sequential),
+                            );
+                        }
+                    } else {
+                        exits.extend(catch_exits);
+                    }
+                    frames.push(CfgFrame::TryCatchNext {
+                        try_node,
+                        catches,
+                        index: next_index,
+                        finally,
+                        exits,
+                    });
+                }
+                CfgFrame::TryAfterFinally {
+                    try_node,
+                    mut exits,
+                } => {
+                    exits.extend(values.pop().expect("a finally block produces one exit set"));
+                    values.push(Self::exits_or_node(exits, try_node));
+                }
+            }
+        }
+
+        assert_eq!(
+            values.len(),
+            1,
+            "one CFG input node must produce exactly one exit set"
+        );
+        values.pop().expect("the CFG machine produced its result")
+    }
+
+    fn begin_sequential(
+        cpg: &mut CodePropertyGraph,
+        node: NodeId,
+        frames: &mut Vec<CfgFrame>,
+        values: &mut Vec<CfgExits>,
+    ) {
+        let children = cpg.ast_children(node);
+        if let Some(&first) = children.first() {
+            cpg.connect_unique(
+                node,
+                first,
+                CpgEdgeKind::ControlFlow(CfgEdgeKind::Sequential),
+            );
+            frames.push(CfgFrame::SequentialAfterChild { children, index: 0 });
+            frames.push(CfgFrame::Enter(first));
+        } else {
+            values.push(smallvec::smallvec![node]);
+        }
+    }
+
+    fn emit_call_edge(cpg: &mut CodePropertyGraph, call: NodeId) {
+        if let Some(CpgNodeKind::Call {
+            target: Some(target),
+            ..
+        }) = cpg.node(call).map(|node| &node.kind)
+        {
+            cpg.connect_unique(call, *target, CpgEdgeKind::ControlFlow(CfgEdgeKind::Call));
+        }
+    }
+
+    fn emit_throw_edges(cpg: &mut CodePropertyGraph, throw_node: NodeId, ctx: &CfgContext) {
+        if let Some(try_context) = ctx.try_stack.last() {
+            for &catch in &try_context.catch_handlers {
+                cpg.connect_unique(
+                    throw_node,
+                    catch,
+                    CpgEdgeKind::ControlFlow(CfgEdgeKind::Throw),
+                );
+            }
+        }
+    }
+
+    fn exits_or_node(exits: CfgExits, node: NodeId) -> CfgExits {
+        if exits.is_empty() {
+            smallvec::smallvec![node]
+        } else {
+            exits
+        }
+    }
+
+    /// Former recursive specification retained only for fixed-bounded tests.
+    #[cfg(test)]
+    fn process_node_recursive(
         &self,
         cpg: &mut CodePropertyGraph,
         node_id: NodeId,
@@ -99,7 +960,7 @@ impl CfgExtractor {
             None => return smallvec::smallvec![node_id],
         };
 
-        // `process_node` and the `process_*` handlers are mutually recursive
+        // The former `process_node` and `process_*` handlers were mutually recursive
         // over `ast_children`. A well-formed AST is a tree, so every node is
         // entered exactly once and this guard never fires. A *malformed* graph
         // can contain an `AstChild` cycle, which would otherwise send the
@@ -115,23 +976,23 @@ impl CfgExtractor {
         }
 
         let exits = match &kind {
-            CpgNodeKind::Block { .. } => self.process_block(cpg, node_id, ctx),
-            CpgNodeKind::If => self.process_if(cpg, node_id, ctx),
-            CpgNodeKind::While => self.process_while(cpg, node_id, ctx),
-            CpgNodeKind::For => self.process_for(cpg, node_id, ctx),
-            CpgNodeKind::Loop => self.process_loop(cpg, node_id, ctx),
-            CpgNodeKind::Match => self.process_match(cpg, node_id, ctx),
-            CpgNodeKind::Return => self.process_return(cpg, node_id, ctx),
-            CpgNodeKind::Break => self.process_break(cpg, node_id, ctx),
-            CpgNodeKind::Continue => self.process_continue(cpg, node_id, ctx),
-            CpgNodeKind::Try => self.process_try(cpg, node_id, ctx),
-            CpgNodeKind::Throw => self.process_throw(cpg, node_id, ctx),
+            CpgNodeKind::Block { .. } => self.recursive_process_block(cpg, node_id, ctx),
+            CpgNodeKind::If => self.recursive_process_if(cpg, node_id, ctx),
+            CpgNodeKind::While => self.recursive_process_while(cpg, node_id, ctx),
+            CpgNodeKind::For => self.recursive_process_for(cpg, node_id, ctx),
+            CpgNodeKind::Loop => self.recursive_process_loop(cpg, node_id, ctx),
+            CpgNodeKind::Match => self.recursive_process_match(cpg, node_id, ctx),
+            CpgNodeKind::Return => self.recursive_process_return(cpg, node_id, ctx),
+            CpgNodeKind::Break => self.recursive_process_break(cpg, node_id, ctx),
+            CpgNodeKind::Continue => self.recursive_process_continue(cpg, node_id, ctx),
+            CpgNodeKind::Try => self.recursive_process_try(cpg, node_id, ctx),
+            CpgNodeKind::Throw => self.recursive_process_throw(cpg, node_id, ctx),
             CpgNodeKind::Call { .. } if self.config.include_call_edges => {
-                self.process_call(cpg, node_id, ctx)
+                self.recursive_process_call(cpg, node_id, ctx)
             }
             _ => {
                 // For other nodes, process children sequentially
-                self.process_sequential(cpg, node_id, ctx)
+                self.recursive_process_sequential(cpg, node_id, ctx)
             }
         };
 
@@ -140,7 +1001,8 @@ impl CfgExtractor {
     }
 
     /// Processes a block (sequence of statements).
-    fn process_block(
+    #[cfg(test)]
+    fn recursive_process_block(
         &self,
         cpg: &mut CodePropertyGraph,
         block_id: NodeId,
@@ -177,7 +1039,7 @@ impl CfgExtractor {
             }
 
             // Process this child
-            let child_exits = self.process_node(cpg, child_id, ctx);
+            let child_exits = self.process_node_recursive(cpg, child_id, ctx);
 
             // Check if this child terminates (return, break, continue, throw)
             let child_kind = cpg.node(child_id).map(|n| n.kind.clone());
@@ -265,7 +1127,8 @@ impl CfgExtractor {
     }
 
     /// Processes an if statement.
-    fn process_if(
+    #[cfg(test)]
+    fn recursive_process_if(
         &self,
         cpg: &mut CodePropertyGraph,
         if_id: NodeId,
@@ -310,7 +1173,7 @@ impl CfgExtractor {
                 );
 
                 // Process then branch
-                let then_exits = self.process_node(cpg, then_branch, ctx);
+                let then_exits = self.process_node_recursive(cpg, then_branch, ctx);
                 exits.extend(then_exits);
 
                 // If no else, condition itself is an exit (false case falls through)
@@ -336,7 +1199,7 @@ impl CfgExtractor {
                 );
 
                 // Process then branch
-                let then_exits = self.process_node(cpg, then_branch, ctx);
+                let then_exits = self.process_node_recursive(cpg, then_branch, ctx);
                 exits.extend(then_exits);
 
                 // Handle else branch (might be Else node or direct block)
@@ -362,7 +1225,7 @@ impl CfgExtractor {
                 );
 
                 // Process else branch
-                let else_exits = self.process_node(cpg, actual_else, ctx);
+                let else_exits = self.process_node_recursive(cpg, actual_else, ctx);
                 exits.extend(else_exits);
             }
         }
@@ -375,7 +1238,8 @@ impl CfgExtractor {
     }
 
     /// Processes a while loop.
-    fn process_while(
+    #[cfg(test)]
+    fn recursive_process_while(
         &self,
         cpg: &mut CodePropertyGraph,
         while_id: NodeId,
@@ -429,7 +1293,7 @@ impl CfgExtractor {
         );
 
         // Process body
-        let body_exits = self.process_node(cpg, body, ctx);
+        let body_exits = self.process_node_recursive(cpg, body, ctx);
 
         // body exits -> condition (loop back)
         for &exit in &body_exits {
@@ -451,7 +1315,8 @@ impl CfgExtractor {
     }
 
     /// Processes a for loop.
-    fn process_for(
+    #[cfg(test)]
+    fn recursive_process_for(
         &self,
         cpg: &mut CodePropertyGraph,
         for_id: NodeId,
@@ -482,7 +1347,7 @@ impl CfgExtractor {
         );
 
         // Process body
-        let body_exits = self.process_node(cpg, body, ctx);
+        let body_exits = self.process_node_recursive(cpg, body, ctx);
 
         // body exits -> header (loop back)
         for &exit in &body_exits {
@@ -503,7 +1368,8 @@ impl CfgExtractor {
     }
 
     /// Processes an infinite loop.
-    fn process_loop(
+    #[cfg(test)]
+    fn recursive_process_loop(
         &self,
         cpg: &mut CodePropertyGraph,
         loop_id: NodeId,
@@ -537,7 +1403,7 @@ impl CfgExtractor {
         );
 
         // Process body
-        let body_exits = self.process_node(cpg, body, ctx);
+        let body_exits = self.process_node_recursive(cpg, body, ctx);
 
         // body exits -> loop (loop back)
         for &exit in &body_exits {
@@ -555,7 +1421,8 @@ impl CfgExtractor {
     }
 
     /// Processes a match/switch statement.
-    fn process_match(
+    #[cfg(test)]
+    fn recursive_process_match(
         &self,
         cpg: &mut CodePropertyGraph,
         match_id: NodeId,
@@ -605,7 +1472,7 @@ impl CfgExtractor {
                         arm_body,
                         CpgEdgeKind::ControlFlow(CfgEdgeKind::Sequential),
                     );
-                    let arm_exits = self.process_node(cpg, arm_body, ctx);
+                    let arm_exits = self.process_node_recursive(cpg, arm_body, ctx);
                     exits.extend(arm_exits);
                 } else {
                     exits.push(arm);
@@ -621,7 +1488,8 @@ impl CfgExtractor {
     }
 
     /// Processes a return statement.
-    fn process_return(
+    #[cfg(test)]
+    fn recursive_process_return(
         &self,
         cpg: &mut CodePropertyGraph,
         return_id: NodeId,
@@ -636,7 +1504,7 @@ impl CfgExtractor {
                 expr,
                 CpgEdgeKind::ControlFlow(CfgEdgeKind::Sequential),
             );
-            let _ = self.process_node(cpg, expr, ctx);
+            let _ = self.process_node_recursive(cpg, expr, ctx);
         }
 
         // Return has no exits within the function
@@ -645,7 +1513,8 @@ impl CfgExtractor {
     }
 
     /// Processes a break statement.
-    fn process_break(
+    #[cfg(test)]
+    fn recursive_process_break(
         &self,
         cpg: &mut CodePropertyGraph,
         break_id: NodeId,
@@ -668,7 +1537,8 @@ impl CfgExtractor {
     }
 
     /// Processes a continue statement.
-    fn process_continue(
+    #[cfg(test)]
+    fn recursive_process_continue(
         &self,
         cpg: &mut CodePropertyGraph,
         continue_id: NodeId,
@@ -688,14 +1558,15 @@ impl CfgExtractor {
     }
 
     /// Processes a try block.
-    fn process_try(
+    #[cfg(test)]
+    fn recursive_process_try(
         &self,
         cpg: &mut CodePropertyGraph,
         try_id: NodeId,
         ctx: &mut CfgContext,
     ) -> SmallVec<[NodeId; 4]> {
         if !self.config.include_exceptions {
-            return self.process_sequential(cpg, try_id, ctx);
+            return self.recursive_process_sequential(cpg, try_id, ctx);
         }
 
         let children = cpg.ast_children(try_id);
@@ -733,7 +1604,7 @@ impl CfgExtractor {
             // Push try context for exception handling
             ctx.push_try(try_id, catch_blocks.clone());
 
-            let body_exits = self.process_node(cpg, body, ctx);
+            let body_exits = self.process_node_recursive(cpg, body, ctx);
 
             ctx.pop_try();
 
@@ -760,7 +1631,7 @@ impl CfgExtractor {
                     catch_body,
                     CpgEdgeKind::ControlFlow(CfgEdgeKind::Sequential),
                 );
-                let catch_exits = self.process_node(cpg, catch_body, ctx);
+                let catch_exits = self.process_node_recursive(cpg, catch_body, ctx);
 
                 if let Some(finally) = finally_block {
                     for &exit in &catch_exits {
@@ -778,7 +1649,7 @@ impl CfgExtractor {
 
         // Process finally block
         if let Some(finally) = finally_block {
-            let finally_exits = self.process_node(cpg, finally, ctx);
+            let finally_exits = self.process_node_recursive(cpg, finally, ctx);
             exits.extend(finally_exits);
         }
 
@@ -790,7 +1661,8 @@ impl CfgExtractor {
     }
 
     /// Processes a throw statement.
-    fn process_throw(
+    #[cfg(test)]
+    fn recursive_process_throw(
         &self,
         cpg: &mut CodePropertyGraph,
         throw_id: NodeId,
@@ -809,7 +1681,7 @@ impl CfgExtractor {
                 expr,
                 CpgEdgeKind::ControlFlow(CfgEdgeKind::Sequential),
             );
-            let _ = self.process_node(cpg, expr, ctx);
+            let _ = self.process_node_recursive(cpg, expr, ctx);
         }
 
         // Connect to catch handlers in the try stack
@@ -828,7 +1700,8 @@ impl CfgExtractor {
     }
 
     /// Processes a function call.
-    fn process_call(
+    #[cfg(test)]
+    fn recursive_process_call(
         &self,
         cpg: &mut CodePropertyGraph,
         call_id: NodeId,
@@ -843,7 +1716,7 @@ impl CfgExtractor {
                 arg,
                 CpgEdgeKind::ControlFlow(CfgEdgeKind::Sequential),
             );
-            let _ = self.process_node(cpg, arg, ctx);
+            let _ = self.process_node_recursive(cpg, arg, ctx);
         }
 
         // Check if we have a target function
@@ -863,7 +1736,8 @@ impl CfgExtractor {
     }
 
     /// Processes nodes sequentially (fallback for non-control-flow nodes).
-    fn process_sequential(
+    #[cfg(test)]
+    fn recursive_process_sequential(
         &self,
         cpg: &mut CodePropertyGraph,
         node_id: NodeId,
@@ -897,7 +1771,7 @@ impl CfgExtractor {
                     CpgEdgeKind::ControlFlow(CfgEdgeKind::Sequential),
                 );
             }
-            exits = self.process_node(cpg, child, ctx);
+            exits = self.process_node_recursive(cpg, child, ctx);
         }
 
         exits
@@ -925,8 +1799,8 @@ struct CfgContext {
     loop_stack: Vec<LoopContext>,
     /// Stack of enclosing try blocks.
     try_stack: Vec<TryContext>,
-    /// Nodes currently on the `process_node` recursion path, used to cut
-    /// `AstChild` cycles in malformed graphs (see `process_node`).
+    /// Nodes currently active between matching `Enter` and `Leave` frames,
+    /// used to cut `AstChild` cycles in malformed graphs.
     on_path: FxHashSet<NodeId>,
 }
 
@@ -1225,6 +2099,134 @@ mod tests {
     fn block() -> CpgNodeKind {
         CpgNodeKind::Block {
             scope: ScopeId::GLOBAL,
+        }
+    }
+
+    fn assert_machine_matches_recursive_oracle(cpg: CodePropertyGraph, config: CfgExtractorConfig) {
+        let original_nodes = cpg.node_count();
+        let mut machine = cpg.clone();
+        let mut oracle = cpg;
+
+        CfgExtractor::with_config(config.clone()).extract(&mut machine);
+        CfgExtractor::with_config(config).extract_recursive_oracle(&mut oracle);
+
+        assert_eq!(machine.node_count(), original_nodes);
+        assert_eq!(oracle.node_count(), original_nodes);
+        assert_eq!(machine.cfg_entries(), oracle.cfg_entries());
+        assert_eq!(machine.cfg_exits(), oracle.cfg_exits());
+        assert_eq!(
+            machine.edges().cloned().collect::<Vec<_>>(),
+            oracle.edges().cloned().collect::<Vec<_>>(),
+            "the typed machine must preserve exact edge ids, insertion order, labels, and kinds"
+        );
+    }
+
+    /// Builds one bounded AST containing every mutually-recursive CFG handler.
+    /// Its source order deliberately mixes nested loop, branch, match,
+    /// exception, terminator, call, and fallback-sequential regions.
+    fn comprehensive_cfg_fixture() -> CodePropertyGraph {
+        let mut cpg = CodePropertyGraph::new(Language::Rust);
+        let (function, body) = shell(&mut cpg);
+        let callee = create_test_function(&mut cpg);
+
+        let sequential = ast_child(
+            &mut cpg,
+            body,
+            CpgNodeKind::Assignment {
+                operator: "=".into(),
+            },
+        );
+        let _left = ast_child(&mut cpg, sequential, ident("left"));
+        let _right = ast_child(&mut cpg, sequential, ident("right"));
+
+        let if_node = ast_child(&mut cpg, body, CpgNodeKind::If);
+        let _if_condition = ast_child(&mut cpg, if_node, ident("if_condition"));
+        let then_block = ast_child(&mut cpg, if_node, block());
+        let while_node = ast_child(&mut cpg, then_block, CpgNodeKind::While);
+        let _while_condition = ast_child(&mut cpg, while_node, ident("while_condition"));
+        let while_body = ast_child(&mut cpg, while_node, block());
+        let _continue_node = ast_child(&mut cpg, while_body, CpgNodeKind::Continue);
+        let _break_node = ast_child(&mut cpg, while_body, CpgNodeKind::Break);
+
+        let else_wrapper = ast_child(&mut cpg, if_node, CpgNodeKind::Else);
+        let else_block = ast_child(&mut cpg, else_wrapper, block());
+        let for_node = ast_child(&mut cpg, else_block, CpgNodeKind::For);
+        let _for_iterator = ast_child(&mut cpg, for_node, ident("iterator"));
+        let for_body = ast_child(&mut cpg, for_node, block());
+        let loop_node = ast_child(&mut cpg, for_body, CpgNodeKind::Loop);
+        let loop_body = ast_child(&mut cpg, loop_node, block());
+        let _loop_break = ast_child(&mut cpg, loop_body, CpgNodeKind::Break);
+
+        let match_node = ast_child(&mut cpg, body, CpgNodeKind::Match);
+        let _scrutinee = ast_child(&mut cpg, match_node, ident("scrutinee"));
+        let first_arm = ast_child(&mut cpg, match_node, CpgNodeKind::MatchArm);
+        let first_arm_body = ast_child(&mut cpg, first_arm, block());
+        let return_node = ast_child(&mut cpg, first_arm_body, CpgNodeKind::Return);
+        let _return_value = ast_child(&mut cpg, return_node, ident("return_value"));
+        let _empty_arm = ast_child(&mut cpg, match_node, CpgNodeKind::MatchArm);
+
+        let try_node = ast_child(&mut cpg, body, CpgNodeKind::Try);
+        let try_body = ast_child(&mut cpg, try_node, block());
+        let call = ast_child(
+            &mut cpg,
+            try_body,
+            CpgNodeKind::Call {
+                target: Some(callee),
+                is_method: false,
+            },
+        );
+        let _first_argument = ast_child(&mut cpg, call, ident("first_argument"));
+        let nested_argument = ast_child(
+            &mut cpg,
+            call,
+            CpgNodeKind::Assignment {
+                operator: "+=".into(),
+            },
+        );
+        let _nested_operand = ast_child(&mut cpg, nested_argument, ident("nested_operand"));
+        let throw_node = ast_child(&mut cpg, try_body, CpgNodeKind::Throw);
+        let _thrown_value = ast_child(&mut cpg, throw_node, ident("thrown_value"));
+
+        let first_catch = ast_child(&mut cpg, try_node, CpgNodeKind::Catch);
+        let first_catch_body = ast_child(&mut cpg, first_catch, block());
+        let _caught = ast_child(&mut cpg, first_catch_body, ident("caught"));
+        let _empty_catch = ast_child(&mut cpg, try_node, CpgNodeKind::Catch);
+        let finally_node = ast_child(&mut cpg, try_node, CpgNodeKind::Finally);
+        let finally_body = ast_child(&mut cpg, finally_node, block());
+        let _cleanup = ast_child(&mut cpg, finally_body, ident("cleanup"));
+
+        let _outside_break = ast_child(&mut cpg, body, CpgNodeKind::Break);
+        let _outside_continue = ast_child(&mut cpg, body, CpgNodeKind::Continue);
+        let outside_throw = ast_child(&mut cpg, body, CpgNodeKind::Throw);
+        let _outside_thrown_value = ast_child(&mut cpg, outside_throw, ident("outside_throw"));
+
+        assert_eq!(cpg.functions().next().map(|node| node.id), Some(function));
+        cpg
+    }
+
+    #[test]
+    fn typed_machine_matches_recursive_oracle_for_every_handler_and_configuration() {
+        for mask in 0_u8..8 {
+            let config = CfgExtractorConfig {
+                include_fallthrough: mask & 1 != 0,
+                include_exceptions: mask & 2 != 0,
+                include_call_edges: mask & 4 != 0,
+            };
+            assert_machine_matches_recursive_oracle(comprehensive_cfg_fixture(), config.clone());
+
+            let mut malformed = comprehensive_cfg_fixture();
+            let function = malformed.functions().next().expect("main function").id;
+            let deepest = malformed
+                .node_ids()
+                .last()
+                .expect("comprehensive fixture has nodes");
+            malformed.connect(deepest, function, CpgEdgeKind::AstChild);
+            malformed
+                .node_mut(deepest)
+                .expect("deepest node exists")
+                .children
+                .push(function);
+            assert_machine_matches_recursive_oracle(malformed, config);
         }
     }
 
@@ -2063,10 +3065,351 @@ mod tests {
 mod proptests {
     use super::*;
     use crate::testutil::*;
+    use crate::{
+        CpgNode, DfgEdgeKind, Language, MethodSignature, ScopeId, SourceRange, Visibility,
+    };
     use proptest::prelude::*;
 
+    #[derive(Debug, Clone)]
+    enum CfgSpec {
+        Plain(u8),
+        Block(Vec<CfgSpec>),
+        If {
+            then_branch: Vec<CfgSpec>,
+            else_branch: Option<Vec<CfgSpec>>,
+            wrap_else: bool,
+        },
+        While(Vec<CfgSpec>),
+        For(Vec<CfgSpec>),
+        Loop(Vec<CfgSpec>),
+        Match(Vec<Vec<CfgSpec>>),
+        Return(Vec<CfgSpec>),
+        Break,
+        Continue,
+        Try {
+            body: Vec<CfgSpec>,
+            catches: Vec<Vec<CfgSpec>>,
+            finally: Option<Vec<CfgSpec>>,
+        },
+        Throw(Vec<CfgSpec>),
+        Call(Vec<CfgSpec>),
+        Sequential(Vec<CfgSpec>),
+    }
+
+    fn arb_cfg_spec() -> impl Strategy<Value = CfgSpec> {
+        let leaf = prop_oneof![
+            any::<u8>().prop_map(CfgSpec::Plain),
+            Just(CfgSpec::Return(Vec::new())),
+            Just(CfgSpec::Break),
+            Just(CfgSpec::Continue),
+            Just(CfgSpec::Throw(Vec::new())),
+            Just(CfgSpec::Call(Vec::new())),
+        ];
+
+        leaf.prop_recursive(3, 64, 3, |inner| {
+            let children = prop::collection::vec(inner.clone(), 0..=3);
+            let branches = (
+                children.clone(),
+                prop::option::of(children.clone()),
+                any::<bool>(),
+            );
+            let catches = prop::collection::vec(children.clone(), 0..=2);
+            let try_region = (
+                children.clone(),
+                catches,
+                prop::option::of(children.clone()),
+            );
+
+            prop_oneof![
+                children.clone().prop_map(CfgSpec::Block),
+                branches.prop_map(|(then_branch, else_branch, wrap_else)| CfgSpec::If {
+                    then_branch,
+                    else_branch,
+                    wrap_else,
+                }),
+                children.clone().prop_map(CfgSpec::While),
+                children.clone().prop_map(CfgSpec::For),
+                children.clone().prop_map(CfgSpec::Loop),
+                prop::collection::vec(children.clone(), 0..=3).prop_map(CfgSpec::Match),
+                prop::collection::vec(inner.clone(), 0..=1).prop_map(CfgSpec::Return),
+                try_region.prop_map(|(body, catches, finally)| CfgSpec::Try {
+                    body,
+                    catches,
+                    finally,
+                }),
+                prop::collection::vec(inner.clone(), 0..=1).prop_map(CfgSpec::Throw),
+                children.clone().prop_map(CfgSpec::Call),
+                children.prop_map(CfgSpec::Sequential),
+            ]
+        })
+    }
+
+    fn cfg_kind_block() -> CpgNodeKind {
+        CpgNodeKind::Block {
+            scope: ScopeId::GLOBAL,
+        }
+    }
+
+    fn cfg_ident(seed: u8) -> CpgNodeKind {
+        CpgNodeKind::Identifier {
+            name: format!("v{seed}").into(),
+            definition: None,
+        }
+    }
+
+    fn build_cfg_specs(
+        cpg: &mut CodePropertyGraph,
+        parent: NodeId,
+        function: NodeId,
+        specs: &[CfgSpec],
+    ) {
+        for spec in specs {
+            build_cfg_spec(cpg, parent, function, spec);
+        }
+    }
+
+    fn build_cfg_spec(
+        cpg: &mut CodePropertyGraph,
+        parent: NodeId,
+        function: NodeId,
+        spec: &CfgSpec,
+    ) {
+        match spec {
+            CfgSpec::Plain(seed) => {
+                wf_child(cpg, parent, cfg_ident(*seed));
+            }
+            CfgSpec::Block(children) => {
+                let node = wf_child(cpg, parent, cfg_kind_block());
+                build_cfg_specs(cpg, node, function, children);
+            }
+            CfgSpec::If {
+                then_branch,
+                else_branch,
+                wrap_else,
+            } => {
+                let node = wf_child(cpg, parent, CpgNodeKind::If);
+                wf_child(cpg, node, cfg_ident(1));
+                let then_block = wf_child(cpg, node, cfg_kind_block());
+                build_cfg_specs(cpg, then_block, function, then_branch);
+                if let Some(else_branch) = else_branch {
+                    let else_parent = if *wrap_else {
+                        wf_child(cpg, node, CpgNodeKind::Else)
+                    } else {
+                        node
+                    };
+                    let else_block = wf_child(cpg, else_parent, cfg_kind_block());
+                    build_cfg_specs(cpg, else_block, function, else_branch);
+                }
+            }
+            CfgSpec::While(children) => {
+                let node = wf_child(cpg, parent, CpgNodeKind::While);
+                wf_child(cpg, node, cfg_ident(2));
+                let body = wf_child(cpg, node, cfg_kind_block());
+                build_cfg_specs(cpg, body, function, children);
+            }
+            CfgSpec::For(children) => {
+                let node = wf_child(cpg, parent, CpgNodeKind::For);
+                wf_child(cpg, node, cfg_ident(3));
+                let body = wf_child(cpg, node, cfg_kind_block());
+                build_cfg_specs(cpg, body, function, children);
+            }
+            CfgSpec::Loop(children) => {
+                let node = wf_child(cpg, parent, CpgNodeKind::Loop);
+                let body = wf_child(cpg, node, cfg_kind_block());
+                build_cfg_specs(cpg, body, function, children);
+            }
+            CfgSpec::Match(arms) => {
+                let node = wf_child(cpg, parent, CpgNodeKind::Match);
+                wf_child(cpg, node, cfg_ident(4));
+                for arm_specs in arms {
+                    let arm = wf_child(cpg, node, CpgNodeKind::MatchArm);
+                    let body = wf_child(cpg, arm, cfg_kind_block());
+                    build_cfg_specs(cpg, body, function, arm_specs);
+                }
+            }
+            CfgSpec::Return(values) => {
+                let node = wf_child(cpg, parent, CpgNodeKind::Return);
+                build_cfg_specs(cpg, node, function, values);
+            }
+            CfgSpec::Break => {
+                wf_child(cpg, parent, CpgNodeKind::Break);
+            }
+            CfgSpec::Continue => {
+                wf_child(cpg, parent, CpgNodeKind::Continue);
+            }
+            CfgSpec::Try {
+                body,
+                catches,
+                finally,
+            } => {
+                let node = wf_child(cpg, parent, CpgNodeKind::Try);
+                let body_node = wf_child(cpg, node, cfg_kind_block());
+                build_cfg_specs(cpg, body_node, function, body);
+                for catch_specs in catches {
+                    let catch = wf_child(cpg, node, CpgNodeKind::Catch);
+                    let catch_body = wf_child(cpg, catch, cfg_kind_block());
+                    build_cfg_specs(cpg, catch_body, function, catch_specs);
+                }
+                if let Some(finally_specs) = finally {
+                    let finally = wf_child(cpg, node, CpgNodeKind::Finally);
+                    let finally_body = wf_child(cpg, finally, cfg_kind_block());
+                    build_cfg_specs(cpg, finally_body, function, finally_specs);
+                }
+            }
+            CfgSpec::Throw(values) => {
+                let node = wf_child(cpg, parent, CpgNodeKind::Throw);
+                build_cfg_specs(cpg, node, function, values);
+            }
+            CfgSpec::Call(arguments) => {
+                let node = wf_child(
+                    cpg,
+                    parent,
+                    CpgNodeKind::Call {
+                        target: Some(function),
+                        is_method: false,
+                    },
+                );
+                build_cfg_specs(cpg, node, function, arguments);
+            }
+            CfgSpec::Sequential(children) => {
+                let node = wf_child(
+                    cpg,
+                    parent,
+                    CpgNodeKind::Assignment {
+                        operator: "=".into(),
+                    },
+                );
+                build_cfg_specs(cpg, node, function, children);
+            }
+        }
+    }
+
+    fn build_cfg_cpg(specs: Vec<CfgSpec>) -> CodePropertyGraph {
+        let mut cpg = CodePropertyGraph::new(Language::Rust);
+        let function = cpg.add_node(CpgNode::new(
+            NodeId::new(0),
+            CpgNodeKind::Function {
+                signature: MethodSignature {
+                    name: "generated_cfg".into(),
+                    params: Default::default(),
+                    return_type: None,
+                    is_static: false,
+                    is_async: false,
+                    visibility: Visibility::Public,
+                },
+            },
+            SourceRange::default(),
+        ));
+        let body = wf_child(&mut cpg, function, cfg_kind_block());
+        build_cfg_specs(&mut cpg, body, function, &specs);
+        cpg
+    }
+
+    fn arb_cfg_cpg() -> impl Strategy<Value = CodePropertyGraph> {
+        prop::collection::vec(arb_cfg_spec(), 0..=5).prop_map(build_cfg_cpg)
+    }
+
+    fn cfg_edges(cpg: &CodePropertyGraph) -> Vec<crate::CpgEdge> {
+        cpg.edges()
+            .filter(|edge| matches!(edge.kind, CpgEdgeKind::ControlFlow(_)))
+            .cloned()
+            .collect()
+    }
+
     proptest! {
-        #![proptest_config(ProptestConfig::with_cases(128))]
+        #![proptest_config(ProptestConfig::with_cases(192))]
+
+        /// The pushdown machine is an exact defunctionalization of the former
+        /// mutually-recursive equations on generated bounded ASTs. All three
+        /// public configuration bits vary independently.
+        #[test]
+        fn prop_typed_machine_exactly_matches_recursive_oracle(
+            cpg in arb_cfg_cpg(),
+            mask in 0_u8..8,
+        ) {
+            let config = CfgExtractorConfig {
+                include_fallthrough: mask & 1 != 0,
+                include_exceptions: mask & 2 != 0,
+                include_call_edges: mask & 4 != 0,
+            };
+            let mut machine = cpg.clone();
+            let mut oracle = cpg;
+            CfgExtractor::with_config(config.clone()).extract(&mut machine);
+            CfgExtractor::with_config(config).extract_recursive_oracle(&mut oracle);
+
+            prop_assert_eq!(machine.cfg_entries(), oracle.cfg_entries());
+            prop_assert_eq!(machine.cfg_exits(), oracle.cfg_exits());
+            prop_assert_eq!(
+                machine.edges().cloned().collect::<Vec<_>>(),
+                oracle.edges().cloned().collect::<Vec<_>>()
+            );
+        }
+
+        /// Adding an arbitrary extra `AstChild` relation creates sharing, a
+        /// duplicate, a self-loop, or a longer cycle. The bounded recursive
+        /// oracle and the production machine must still terminate with exactly
+        /// the same edge stream and entry/exit order.
+        #[test]
+        fn prop_malformed_ast_exactly_matches_recursive_oracle(
+            mut cpg in arb_cfg_cpg(),
+            source_index in any::<u16>(),
+            target_index in any::<u16>(),
+            mask in 0_u8..8,
+        ) {
+            let ids: Vec<_> = cpg.node_ids().collect();
+            let source = ids[usize::from(source_index) % ids.len()];
+            let target = ids[usize::from(target_index) % ids.len()];
+            cpg.connect(source, target, CpgEdgeKind::AstChild);
+            cpg.node_mut(source).expect("generated source").children.push(target);
+
+            let config = CfgExtractorConfig {
+                include_fallthrough: mask & 1 != 0,
+                include_exceptions: mask & 2 != 0,
+                include_call_edges: mask & 4 != 0,
+            };
+            let mut machine = cpg.clone();
+            let mut oracle = cpg;
+            CfgExtractor::with_config(config.clone()).extract(&mut machine);
+            CfgExtractor::with_config(config).extract_recursive_oracle(&mut oracle);
+
+            prop_assert_eq!(machine.cfg_entries(), oracle.cfg_entries());
+            prop_assert_eq!(machine.cfg_exits(), oracle.cfg_exits());
+            prop_assert_eq!(
+                machine.edges().cloned().collect::<Vec<_>>(),
+                oracle.edges().cloned().collect::<Vec<_>>()
+            );
+        }
+
+        /// Reversing insertion of irrelevant non-AST edges cannot perturb CFG
+        /// edge ids, emission order, endpoints, or kinds.
+        #[test]
+        fn prop_cfg_is_exact_under_non_ast_insertion_permutations(cpg in arb_cfg_cpg()) {
+            let mut forward = cpg.clone();
+            let mut reverse = cpg;
+            let ids: Vec<_> = forward.node_ids().collect();
+            let relations: Vec<_> = ids.windows(2).map(|pair| (pair[0], pair[1])).collect();
+
+            for &(source, target) in &relations {
+                forward.connect(
+                    source,
+                    target,
+                    CpgEdgeKind::DataFlow(DfgEdgeKind::DataDependency),
+                );
+            }
+            for &(source, target) in relations.iter().rev() {
+                reverse.connect(
+                    source,
+                    target,
+                    CpgEdgeKind::DataFlow(DfgEdgeKind::DataDependency),
+                );
+            }
+
+            CfgExtractor::new().extract(&mut forward);
+            CfgExtractor::new().extract(&mut reverse);
+            prop_assert_eq!(forward.cfg_entries(), reverse.cfg_entries());
+            prop_assert_eq!(forward.cfg_exits(), reverse.cfg_exits());
+            prop_assert_eq!(cfg_edges(&forward), cfg_edges(&reverse));
+        }
 
         /// On a well-formed CPG, a second `CfgExtractor::extract` leaves the CFG
         /// edge count unchanged — the fixed idempotency (all edges are added via

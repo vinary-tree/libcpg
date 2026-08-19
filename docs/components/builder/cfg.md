@@ -7,9 +7,10 @@ possible execution order between constructs. Because the edges share the AST's n
 the resulting CFG is one of the four overlays of the unified CPG rather than a separate
 graph.
 
-This page covers the extractor's API and configuration, the per-construct
-handlers, the loop/try context stacks, the 14 `CfgEdgeKind` variants, the
-`block_cfg` view and its `BasicBlockIdentifier` compatibility adapter, and the
+This page covers the extractor's API and configuration, its typed heap
+pushdown machine, the per-construct continuations, the loop/try context stacks,
+the 14 `CfgEdgeKind` variants, the `block_cfg` view and its
+`BasicBlockIdentifier` compatibility adapter, and the
 [cyclomatic complexity](../../GLOSSARY.md#cyclomatic-complexity) metric the CFG
 makes computable.
 
@@ -66,7 +67,7 @@ other way.
 1. Mark the function node as a CFG **entry** (`cpg.add_cfg_entry`).
 2. Treat the function's **last AST child** as its body, and connect the function to it with
    a `Sequential` edge.
-3. Process the body recursively, then mark every returned exit node as a CFG **exit**
+3. Run the typed continuation machine over the body, then mark every returned exit node as a CFG **exit**
    (`cpg.add_cfg_exit`).
 
 The "last child is the body" convention is deliberate and load-bearing: across grammars, a
@@ -88,43 +89,99 @@ extract_function_cfg(function):
 
 ---
 
-## Per-construct handlers
+## Typed heap pushdown machine
+
+A **continuation** records work that must resume after a child construct has
+produced its exit set. A **pushdown machine** is a state machine with a
+last-in-first-out continuation stack. Here, `Vec<CfgFrame>` is that stack,
+`Vec<CfgExits>` is the value stack, and `CfgContext` carries the active lexical
+loop, exception, and cycle state. This is a defunctionalization of the former
+mutually recursive handlers: each suspended Rust call became a concrete
+`CfgFrame` variant [2].
+
+![CFG extraction uses typed Enter, continuation, and Leave frames while exit sets and lexical context remain explicit heap state.](../../diagrams/cfg-extraction-machine.svg)
+
+*Figure — end-to-end CFG pushdown-machine lifecycle. Source: [`diagrams/cfg-extraction-machine.puml`](../../diagrams/cfg-extraction-machine.puml).*
+
+`Enter(node)` first checks the active-path set. A repeated active node is a
+malformed `AstChild` back edge and returns `{node}` without re-entering it. A
+fresh node schedules its matching `Leave(node)`, schedules the continuation
+for its concrete kind, and then schedules children in reverse stack order so
+execution still observes exact AST/source order. `Leave(node)` removes only
+that active occurrence; a shared directed-acyclic-graph node can therefore be
+evaluated again from a disjoint path. Every successful `Enter` contributes
+exactly one `CfgExits` value before its caller continuation resumes.
+
+In literate pseudocode:
+
+```text
+push Enter(body)
+while frames is not empty:
+  frame := pop frames
+  case frame of
+    Enter(node):
+      if node is active: push value {node}
+      else:
+        mark node active
+        push Leave(node)
+        emit node-local edges
+        push the typed continuation for node
+        push Enter(first required child)
+    Continuation(state):
+      pop the completed child's exit set
+      emit edges in the former equation's order
+      update loop/try state
+      push another child or the construct's one completed exit set
+    Leave(node):
+      mark node inactive
+assert exactly one value remains
+```
+
+For a parser-built AST with $`N`$ nodes and $`E_c`$ emitted control-flow
+edges, time is $`O(N + E_c)`$. Heap state is $`O(D + X)`$, where $`D`$ is AST
+depth and $`X`$ is the largest live exit frontier; native call depth is
+$`O(1)`$. Hand-built shared subgraphs retain the historical path semantics and
+may be replayed once per incoming path. `connect_unique` preserves exact edge
+identity, insertion order, and extraction idempotency.
+
+## Per-construct continuations
 
 `process_node` dispatches on the node's `CpgNodeKind` and returns the set of **exit
 points** — the nodes from which control leaves the construct — as a `SmallVec<[NodeId; 4]>`
-(kept on the stack for the common small-fan-out case). A construct wires its own internal
-edges and hands its exits back to the caller, which chains them into the next statement.
+(avoiding a secondary allocation for the common small-fan-out case). A construct wires its
+own internal edges and hands its exits back to its continuation, which chains them into the
+next statement.
 
 ![Control-flow constructs: how if/else, while, for, loop, match, and try are wired with ConditionalTrue/ConditionalFalse/LoopBack/Case edges.](../../diagrams/cfg-control-constructs.svg)
 
 *Figure — the edge patterns each control construct emits. Source: [`diagrams/cfg-control-constructs.dot`](../../diagrams/cfg-control-constructs.dot).*
 
-| `CpgNodeKind` | Handler | Edges emitted | Exits returned |
+| `CpgNodeKind` | Machine continuation | Edges emitted | Exits returned |
 |---------------|---------|---------------|----------------|
-| `Block { .. }` | `process_block` | `Sequential` between consecutive statements | last statement's exits (or the block if empty) |
-| `If` | `process_if` | condition → then `ConditionalTrue`; condition → else `ConditionalFalse` | then-exits + else-exits (or the condition, when there is no `else`) |
-| `While` | `process_while` | semantic condition → final block `ConditionalTrue`; body-exits → condition `LoopBack` | the condition (false branch) + break targets |
-| `For` | `process_for` | header → body `ConditionalTrue`; body-exits → header `LoopBack` | the `for` node + break targets |
-| `Loop` | `process_loop` | loop → body `Sequential`; body-exits → loop `LoopBack` | **break targets only** (an infinite loop exits only via `break`) |
-| `Match` | `process_match` | source → each arm `Case` | union of arm-body exits |
-| `Return` | `process_return` | return → value expr `Sequential` | the return node (a terminator) |
-| `Break` | `process_break` | break → loop header `Break` | none (removed from normal flow) |
-| `Continue` | `process_continue` | continue → continue target `Continue` | none |
-| `Try` | `process_try` | body/catch → finally `Sequential`; (`throw` wires the `Throw` edges) | finally-exits, or body+catch exits |
-| `Throw` | `process_throw` | throw → value `Sequential`; throw → each in-scope catch `Throw` | none |
-| `Call { .. }` | `process_call` *(if `include_call_edges`)* | call → args `Sequential`; call → resolved `target` `Call` | the call node |
-| *anything else* | `process_sequential` | node → first child, then each child-exit → next child, all `Sequential` | final child's exits |
+| `Block { .. }` | `BlockAfterChild` | `Sequential` between consecutive statements | last statement's exits (or the block if empty) |
+| `If` | `IfAfterThen*`, `IfAfterElse` | condition → then `ConditionalTrue`; condition → else `ConditionalFalse` | then-exits + else-exits (or the condition, when there is no `else`) |
+| `While` | `WhileAfterBody` | semantic condition → final block `ConditionalTrue`; body-exits → condition `LoopBack` | the condition (false branch) + break targets |
+| `For` | `ForAfterBody` | header → body `ConditionalTrue`; body-exits → header `LoopBack` | the `for` node + break targets |
+| `Loop` | `LoopAfterBody` | loop → body `Sequential`; body-exits → loop `LoopBack` | **break targets only** (an infinite loop exits only via `break`) |
+| `Match` | `MatchNext`, `MatchAfterArm` | source → each arm `Case` | union of arm-body exits |
+| `Return` | `ReturnAfterExpression` | return → value expr `Sequential` | the return node (a terminator) |
+| `Break` | completed directly | break → loop header `Break` | none (removed from normal flow) |
+| `Continue` | completed directly | continue → continue target `Continue` | none |
+| `Try` | `TryAfterBody`, `TryCatchNext`, `TryAfterCatch`, `TryAfterFinally` | body/catch → finally `Sequential`; (`throw` wires the `Throw` edges) | finally-exits, or body+catch exits |
+| `Throw` | `ThrowAfterExpression` | throw → value `Sequential`; throw → each in-scope catch `Throw` | none |
+| `Call { .. }` | `CallAfterArgument` *(if `include_call_edges`)* | call → args `Sequential`; call → resolved `target` `Call` | the call node |
+| *anything else* | `SequentialAfterChild` | node → first child, then each child-exit → next child, all `Sequential` | final child's exits |
 
 ### `if` — the shape of a branch
 
-`process_if` reads the `if` node's children as `[condition, then, else?]`. It threads the
+The `If` transition reads the node's children as `[condition, then, else?]`. It threads the
 condition, forks `ConditionalTrue` to the `then` branch and `ConditionalFalse` to the
 `else` branch, and — crucially — when there is **no** `else`, it returns the condition
 node itself as an exit, so the "false, fall-through" path continues to the next statement.
 An `Else` wrapper node is unwrapped to its inner block so the false edge lands on real code.
 
 ```text
-process_if(if_node):
+enter If(if_node):
     [cond, then, else?] ← cpg.ast_children(if_node)
     connect(if_node, cond, Sequential)
     connect(cond, then, ConditionalTrue)
@@ -140,7 +197,7 @@ process_if(if_node):
 
 ### `block` — chaining and terminators
 
-`process_block` connects the block entry to its first statement, then chains each
+The `BlockAfterChild` continuation connects the block entry to its first statement, then chains each
 statement's exits into the next. The edge is ordinarily `Sequential`; it is
 retyped to `LoopExit` when the source belongs to an AST loop scope that does not
 contain the target. This is the extractor's single loop-continuation emission
@@ -167,22 +224,24 @@ loop's header, and a `throw` must reach the enclosing `try`'s catch handlers. `C
 carries this non-local information down the walk as two stacks:
 
 - **`loop_stack`** of `LoopContext { loop_id, continue_target, break_targets }`. Each loop
-  pushes a frame on entry (`push_loop`) and pops it on exit (`pop_loop`). `process_break`
+  pushes a frame on entry (`push_loop`) and pops it on exit (`pop_loop`). `Break` dispatch
   appends the break node to the innermost frame's `break_targets` and wires a `Break` edge
-  to `loop_id`; `process_continue` wires a `Continue` edge to `continue_target`. On
+  to `loop_id`; `Continue` dispatch wires a `Continue` edge to `continue_target`. On
   `pop_loop`, the collected `break_targets` become additional exits of the loop.
-- **`try_stack`** of `TryContext { catch_handlers }`. `process_try` pushes the catch blocks
-  before processing the try body; `process_throw` reads the innermost frame and wires a
+- **`try_stack`** of `TryContext { catch_handlers }`. `Try` dispatch pushes the catch blocks
+  before processing the try body; `Throw` dispatch reads the innermost frame and wires a
   `Throw` edge from the throw to each catch handler.
 
-Parser frontends may retain keyword and delimiter children. `process_while`
+Parser frontends may retain keyword and delimiter children. `While` dispatch
 therefore selects the semantic condition and final block instead of assuming
-that child zero is always the guard; `process_loop` likewise selects its final
+that child zero is always the guard; `Loop` dispatch likewise selects its final
 block. The generic sequential handler connects *all* expression children in AST
 order, ensuring that the exit handed to a loop-back edge is reachable.
 
-This is a textbook use of an explicit stack to reconstruct lexical nesting during a single
-pass — the same shape the DFG uses for its reaching environment
+These context stacks are distinct from the continuation stack: they reconstruct
+lexical targets, while `CfgFrame` reconstructs suspended control. Together they
+form the explicit machine state used during a single pass — the same broad
+shape the DFG uses for its reaching environment
 ([`dfg.md`](dfg.md)) and the PDG for its post-dominator walk
 ([`pdg-and-slicing.md`](pdg-and-slicing.md)).
 
@@ -341,9 +400,14 @@ than adding a parallel edge. The DFG and PDG stages are likewise safe to rerun.
   `CfgExtractorConfig`, and `BasicBlockIdentifier` signatures.
 - [`../../theory/02-control-flow-and-complexity.md`](../../theory/02-control-flow-and-complexity.md)
   — CFG theory and cyclomatic complexity.
+- [ADR-0042](../../design/0042-stack-safe-cfg-extraction.md) — why the complete
+  recursive handler component was defunctionalized as one typed machine.
+- [Scientific validation 37](../../scientific/37-cfg-extraction-machine-validation.md)
+  — exact oracle, malformed-input, determinism, and 100,000-depth evidence.
 
 ---
 
 ## References
 
 1. McCabe, T. J. (1976). *A Complexity Measure.* IEEE Transactions on Software Engineering SE-2(4). DOI: [10.1109/TSE.1976.233837](https://doi.org/10.1109/TSE.1976.233837)
+2. Danvy, O., & Nielsen, L. R. (2001). *Defunctionalization at Work.* BRICS Report Series 8(23). DOI: [10.7146/brics.v8i23.21684](https://doi.org/10.7146/brics.v8i23.21684)

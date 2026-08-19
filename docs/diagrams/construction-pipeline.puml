@@ -5,7 +5,7 @@ start
 :Source text + Language;
 :tree-sitter parse
 (ParserRegistry grammar, or caller-supplied tree in Mode B);<<#DBE4FF>>
-:convert_node recursion
+:build_ast explicit preorder work stack
 AST nodes + AstChild edges + parent pointers;<<#DBE4FF>>
 if (config.build_cfg?) then (yes)
   :CfgExtractor.extract(&mut cpg)

@@ -165,6 +165,7 @@ The invariants fall into complementary families.
 | **Graph projections** | CSR nodes and adjacency are sorted; parallel-edge weights merge deterministically; transpose is an involution; all overlay constructors equal direct typed-edge traversal and do not mutate the CPG |
 | **Session-protocol sketches** | a 128-case exact-dual generator preserves complete sketches under reversed node/edge insertion and keeps all evidence in graph; examples cover every concrete mismatch, explicit uncertainty, literal/named/definition-backed payload types, nested/cyclic AST boundaries, real Rholang normalization, serde, and graph non-mutation |
 | **Function CFG scope** | the reachable CFG view is invariant under node, edge, and recorded-exit insertion permutations; call edges never enter the view; dense entry/exit identifiers map back to the same stable nodes |
+| **CFG extraction machine** | one comprehensive fixture covers every typed continuation and all eight config combinations; three 192-case campaigns require exact edge-id/order/kind/label and entry/exit equality with the bounded former-recursive equations on well-formed and arbitrarily corrupted ASTs, plus exact invariance under reversed non-AST insertion; examples cover cycles, sharing, terminators, nested loop/try state, idempotency, and degenerate forms; a public parser-built depth-100,000 CFG completes on 256 KiB |
 | **Dominance** | CHK immediate dominators equal `petgraph::algo::dominators::simple_fast` under edge permutations; post-dominators and control edges equal the former PDG oracle; `PdgBuilder` emits exactly `PostDominatorTree::control_dependence_edges`; a 25,000-node path is stack-safe |
 | **Natural loops** | insertion permutations preserve the forest; dominator-qualified back edges and reverse-closure bodies equal independent brute-force oracles through 24 nodes; every body lies in a cyclic SCC; child bodies are strict parent subsets; `LoopExit` exactly crosses AST loop scope and starts a basic block; a 25,000-node loop is stack-safe |
 | **Loop invariants / induction variables** | every invariant use has non-empty `DefUse` evidence only from outside or already-invariant definitions; explicit recurrences are unique and dominate every latch; five 192-case campaigns cover insertion-order report equality, checked direction/comparison laws, exact differential equivalence of typed affine and signed-integer heap machines with bounded former-recursive specifications, and cached candidate-use equality with exact reachability on arbitrary eight-node cyclic multigraphs in both query orders; examples cover every supported update/range/affine shape, exact depth-three semantics, cycle/path restoration, duplicate/conditional updates, nested/irreducible loops, hoist dominance, symbolic/overflow outcomes, serde, invalid/foreign forests, graph non-mutation, a real Rust `for i in 0..x`, a 25,000-node region, and a parent-before-child public 100,000-operator step on 256 KiB; the malformed-graph property harness checks result references and subset laws |
@@ -277,7 +278,7 @@ test beside the fix:
 | # | Defect | Consequence | Found by |
 | --- | --- | --- | --- |
 | 1 | `ast_depth` / `ast_descendants` / `ast_ancestors` recursed with no visited set | infinite loop or stack overflow on a cyclic `AstChild` graph | property |
-| 2 | `CfgExtractor::process_node` recursed with no path guard | **stack overflow → process abort** on a cyclic AST | robustness |
+| 2 | `CfgExtractor::process_node` and its handlers formed an input-depth recursive component | **stack overflow → process abort** on cyclic or sufficiently deep valid ASTs | exact recursive-oracle properties + 256 KiB integration |
 | 3 | `visit_reaching` (DFG reaching-defs) recursed with no path guard | same | robustness |
 | 4 | `ast_ancestors` returned ids absent from the graph | callers resolving an "ancestor" got `None` | robustness |
 | 5 | `CfgExtractor` / DFG auxiliary edge builders were not idempotent | re-extraction silently duplicated edges | property |
@@ -292,7 +293,7 @@ test beside the fix:
 | 14 | `async fn` was never detected as async (Rust, and latently Python) | tree-sitter-rust groups `async` under a `function_modifiers` node, so the direct-child check never saw it | mapping tables |
 | 15 | a cyclic `idom` map from malformed serialized data made `dominators_of` unbounded | a consumer collecting the iterator could run indefinitely or exhaust memory | robustness review |
 | 16 | callee-name reconstruction was depth-bounded but had no visited set | a cyclic malformed callee subtree could repeat nodes exponentially before reaching the depth cap | robustness review |
-| 17 | a parser wrapper around `Return` hid the terminator from `process_block` | the return node was wired sequentially into source that must be unreachable | parser-backed integration test |
+| 17 | a parser wrapper around `Return` hid the terminator from the former `process_block` equation | the return node was wired sequentially into source that must be unreachable | parser-backed integration test |
 | 18 | anonymous tree-sitter keyword/operator tokens were retained as semantic CPG nodes outside Rholang | Rust `+` became a binary operand and `if` became the CFG condition, corrupting expression and branch semantics | parser-backed SCCP integration oracle |
 | 19 | declarative field normalization was incomplete: Go emitted no `Field`, Java/C/C++ discarded its name, and TypeScript read JavaScript's `property` slot instead of its `name` slot | parsed member accesses could not resolve to declarations even when the source declared the field | Mode-A field fixture matrix |
 
@@ -308,12 +309,11 @@ public integration test, a parsed Rust integration test, and eleven real Mode-A
 frontend fixtures. Its complete ledger is
 [`scientific/23-member-field-flow-validation.md`](../scientific/23-member-field-flow-validation.md).
 
-The CFG recursion guard (2) and DFG heap machine (3) use a **path** set rather
-than a global visited set, so a node legitimately reachable from two disjoint
-branches is still processed on each path; only a genuine cycle is cut. The DFG
-machine additionally removes source depth from the native call stack. Tree
-inputs are unaffected bit-for-bit, which the example-based and bounded
-differential suites confirm.
+The CFG and DFG heap machines (2–3) use a **path** set rather than a global
+visited set, so a node legitimately reachable from two disjoint branches is
+still processed on each path; only a genuine cycle is cut. Both machines remove
+source depth from the native call stack. Tree inputs are unaffected bit-for-bit,
+which the example-based and bounded differential suites confirm.
 
 ## Coverage
 

@@ -192,7 +192,7 @@ payloads, typed edges, and language. Source:
 | I3 (idempotency) | Re-running an extractor adds no edge | `parsed_shadowing_and_idempotent` | `assert_eq!(before, cpg.stats().dfg_edges, …)` |
 | E (equivalence) | `build` ≡ `build_from_tree` in typed shape | example + property `build_from_tree_matches_build` tests | equal node payloads, typed edges, and language |
 
-See also: [`theory/01-code-property-graphs.md`](../theory/01-code-property-graphs.md) for the formal overlay model, and [`components/builder/overview.md`](../components/builder/overview.md) for how `convert_node` emits the AST edges and CFG entry points these invariants govern.
+See also: [`theory/01-code-property-graphs.md`](../theory/01-code-property-graphs.md) for the formal overlay model, and [`components/builder/overview.md`](../components/builder/overview.md) for how `build_ast` emits the AST edges and CFG entry points these invariants govern.
 
 ## References
 

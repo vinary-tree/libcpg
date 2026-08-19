@@ -162,7 +162,7 @@ path-enumeration cap because every dense vertex is expanded at most once.
 
 ## Builder termination semantics
 
-`CfgExtractor::process_block` still processes AST siblings after `Return`,
+`CfgFrame::BlockAfterChild` still processes AST siblings after `Return`,
 `Break`, `Continue`, or `Throw` so their syntax and nested overlays remain
 available. It clears the current fallthrough exits, leaving the following CFG
 island disconnected from the function entry.

@@ -846,9 +846,9 @@ An `AstChild` cycle turns an unguarded recursive walk into an unbounded descent.
 Historically, both the CFG extractor's mutually recursive `process_*` handlers
 and the former recursive DFG reaching-definitions sweep could overflow the stack
 and **abort the process**, a denial of service reachable from any caller that
-builds a graph by hand. Both now cut active-path cycles; the DFG additionally
-uses typed heap frames so even a deep valid AST cannot consume native stack by
-source depth.
+builds a graph by hand. Both now combine active-path cycle cuts with typed heap
+frames, so malformed cycles terminate and deep valid ASTs do not consume native
+stack by source depth.
 
 ### The contract
 
@@ -874,16 +874,16 @@ correctness**: an analysis may return a meaningless answer, but it must
 | `value_ranges` | typed heap expression frames with active-path cycle checks, loop-header-only widening, 64 visits per block, and two bounded narrowing sweeps; a 100,000-level initializer is tested on 256 KiB |
 | `loop_induction` | validates every supplied loop reference; finite invariant rounds, typed postorder/affine/sign heap machines, exact depth-three affine semantics, checked arithmetic, and cycle-bounded AST walks; 25,000-node region and public 100,000-operator/256 KiB regressions pass |
 | `build_symbol_table` / `resolve_calls` | visited sets cut parent and callee-subtree cycles; deterministic scope-depth, candidate-retention, and call-count caps bound configured work |
-| `CfgExtractor::process_node` (and every `process_*` handler) | a **path set** on `CfgContext` — a node already on the current recursion path becomes its own exit instead of being re-entered |
+| `CfgExtractor::process_node` | typed `CfgFrame` continuations and a heap value stack; `Enter`/`Leave` maintain a **path set**, so an active node becomes its own exit instead of being re-entered; a parser-built depth-100,000 CFG completes on 256 KiB |
 | DFG reaching definitions (`visit_reaching`) | typed heap `Enter`/`Bind`/`Exit` frames plus an **active-path set**; source depth consumes no native call frames, and a node may re-enter after its matching `Exit` |
 | DFG member-to-field resolution | one immutable declaration index; every owner/scope walk uses cycle-bounded `ast_ancestors`; exact lexical/type/field names and uniqueness are required, so malformed, missing, or ambiguous evidence emits no `Reference` |
 | `method_field_graph` / `ck_metrics` / `function_metrics` | iterative visited function/member walks, declaration uniqueness, typed field/call evidence, inheritance SCC condensation, ordered sets, saturating counts, and finite arithmetic edge cases; nested functions remain separate scopes |
 
 A *path* set rather than a global visited set is used in both extractors so that
 a node legitimately reachable from two disjoint branches is still processed on
-each path; only a genuine cycle is cut. The DFG machine stores that path and its
-continuations on the heap, while the CFG extractor currently threads the path
-through its recursive construct handlers. Tree input is therefore unaffected.
+each path; only a genuine cycle is cut. Both machines store the path and their
+typed continuations on the heap. Tree input and the historical CFG edge stream
+are therefore unaffected.
 
 Field resolution has a different threat: a hostile graph can repeat names or
 forge parent pointers to induce a false declaration link. The resolver therefore

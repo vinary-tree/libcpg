@@ -133,7 +133,7 @@ that the common AST cannot support. See [DFG extraction](dfg.md#complex-l-values
 ## Inclusion filtering: `should_include` vs `should_include_node`
 
 Not every tree-sitter node becomes a CPG node. Two cooperating predicates decide inclusion;
-the builder walk (`convert_node`) calls the node-aware one.
+the builder walk (`build_ast`) calls the node-aware one.
 
 **`should_include(ts_kind, include_comments) -> bool`** is the string-keyed test. It drops:
 
@@ -149,9 +149,9 @@ the builder walk (`convert_node`) calls the node-aware one.
     `send_single`, `send_multiple`, `var_ref_kind`.
 
 Dropping a wrapper **reparents its children** to the enclosing construct (see
-[`overview.md`](overview.md#inside-ast-construction-convert_node)), so the surviving CPG
+[`overview.md`](overview.md#inside-ast-construction-build_ast)), so the surviving CPG
 tree has the real structure the CFG/DFG expect — e.g. an `ifElse`'s children collapse to
-exactly `[condition, consequence, alternative]`, matching `process_if`.
+exactly `[condition, consequence, alternative]`, matching the CFG `If` transition.
 
 **`should_include_node(node, include_comments) -> bool`** layers a node-aware
 check on top: it drops every anonymous keyword/operator/punctuation **token**
@@ -404,7 +404,7 @@ use inside `(* $x 2)` — a def-use edge over symbolic S-expression source.
 
 ## See also
 
-- [`overview.md`](overview.md) — how `convert_node` calls the mapper and reparents dropped
+- [`overview.md`](overview.md) — how `build_ast` calls the mapper and reparents dropped
   nodes.
 - [`cfg.md`](cfg.md) / [`dfg.md`](dfg.md) — the extractors that consume the mapper's
   `CpgNodeKind`s.

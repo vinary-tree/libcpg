@@ -174,6 +174,8 @@ let slice = backward_slice(&cpg, func, 256);         // bounded backward slice
 
 [0041 Shared flat expression facts](design/0041-shared-flat-expression-facts.md)
 
+[0042 Stack-safe CFG extraction](design/0042-stack-safe-cfg-extraction.md)
+
 ### API reference
 [Graph / analysis reference](api/graph-reference.md) · [Builder reference](api/builder-reference.md) · [Pattern / algorithm / GNN reference](api/pattern-reference.md)
 
@@ -254,6 +256,8 @@ let slice = backward_slice(&cpg, func, 256);         // bounded backward slice
 [Flat property-value validation](scientific/35-property-value-validation.md)
 
 [Shared expression-fact arena validation](scientific/36-expression-fact-arena-validation.md)
+
+[Stack-safe CFG extraction validation](scientific/37-cfg-extraction-machine-validation.md)
 
 ### Security
 [Threat model](security/00-threat-model.md) · [Input & resource hardening](security/01-input-and-resource-hardening.md) · [Taint-analysis security boundary](security/02-taint-analysis.md) · [Interprocedural-slicing security boundary](security/03-system-dependence-slicing.md) · [Channel-topology security boundary](security/04-channel-topology.md) · [Deadlock-analysis security boundary](security/05-deadlock-analysis.md) · [MHP-analysis security boundary](security/06-mhp-analysis.md) · [Session-analysis security boundary](security/07-session-analysis.md)

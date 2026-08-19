@@ -57,7 +57,9 @@ call-resolution, and DFG passes. Source:
 
 ## The `NodeMapper` dispatch
 
-Once a tree exists, AST construction (`convert_node`) asks the `NodeMapper` two questions per tree-sitter node: *should this node be kept?* and *what `CpgNodeKind` is it?*
+Once a tree exists, the stack-safe AST construction worklist (`build_ast`) asks
+the `NodeMapper` two questions per tree-sitter node: *should this node be kept?*
+and *what `CpgNodeKind` is it?*
 
 ### Inclusion: `should_include` and `should_include_node`
 

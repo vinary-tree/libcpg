@@ -54,7 +54,8 @@ built:
 1. **Parse.** Tree-sitter turns source text into a concrete syntax tree. In the internal
    path this is done by libcpg; in [Mode B](../../GLOSSARY.md#mode-b--build_from_tree) the
    caller has already produced the `tree_sitter::Tree`.
-2. **AST construction.** `convert_node` walks the tree-sitter tree, maps each node's kind
+2. **AST construction.** `build_ast` walks the tree-sitter tree with an explicit
+   preorder work stack, maps each node's kind
    string to a `CpgNodeKind` via the [`NodeMapper`](node-mapper.md), creates a `CpgNode`,
    and wires an `AstChild` edge (plus a parent pointer) from parent to child. Function
    nodes are registered as CFG entry points here.
@@ -219,52 +220,49 @@ identical graphs — an invariant pinned by the inline test
 
 ---
 
-## Inside AST construction: `convert_node`
+## Inside AST construction: `build_ast`
 
-Phase 2 is a recursive pre-order walk of the tree-sitter tree. Understanding it explains
-three load-bearing invariants the rest of the library depends on: the `AstChild` edge, the
-parent pointer, and the function → CFG-entry registration.
+Phase 2 is a stack-safe preorder walk of the tree-sitter tree. Its explicit
+`Vec<(tree_sitter::Node, Option<NodeId>)>` work stack holds source-shaped
+pending work on the heap rather than in native Rust frames. Understanding it
+explains three load-bearing invariants the rest of the library depends on: the
+`AstChild` edge, the parent pointer, and the function → CFG-entry registration.
 
-The walk is driven by `convert_node(ts_node, parent_id, source, mapper, cpg)`, expressed
-here as literate pseudocode:
+The walk is driven by `build_ast(tree, source, mapper, cpg)`, expressed here as
+literate pseudocode:
 
 ```text
-convert_node(ts_node, parent_id):
+work ← [(tree.root_node(), None)]
+while work is not empty:
+    (ts_node, parent_id) ← pop(work)
     kind_str ← ts_node.kind()                          # the grammar's rule/token name
 
     # 1. Inclusion filter (node-aware; see node-mapper.md).
     if not mapper.should_include_node(ts_node, include_comments):
-        # The node itself is dropped, but its CHILDREN reparent to `parent_id`
-        # so a transparent wrapper (a grouping container) vanishes without
-        # orphaning its contents.
-        for child in ts_node.children():
-            convert_node(child, parent_id)             # same parent — reparent
-        return None
+        child_parent ← parent_id                       # transparent reparenting
+    else:
+        # 2. Map the grammar kind string to the language-agnostic CpgNodeKind.
+        cpg_kind ← mapper.map_kind(kind_str, ts_node, source)
 
-    # 2. Map the grammar kind string to the language-agnostic CpgNodeKind.
-    cpg_kind ← mapper.map_kind(kind_str, ts_node, source)
+        # 3. Create the CPG node over the tree-sitter byte/point range.
+        node_id ← cpg.add_node(CpgNode(cpg_kind, SourceRange(ts_node)))
 
-    # 3. Create the CPG node over the tree-sitter byte range.
-    range   ← SourceRange::from_bytes(ts_node.start_byte(), ts_node.end_byte())
-    node_id ← cpg.add_node(CpgNode::new(placeholder_id, cpg_kind, range))
+        # 4. Wire the AST edge AND the parent pointer. BOTH are needed.
+        if parent_id is Some(parent):
+            cpg.connect(parent, node_id, AstChild)
+            cpg.node_mut(node_id).parent ← parent
 
-    # 4. Wire the AST edge AND the parent pointer. BOTH are needed:
-    #    ast_children reads the AstChild edges; ast_parent/ast_ancestors read
-    #    the pointer. Omitting the pointer makes every node look like an AST
-    #    root and silently breaks def/use classification, scope lookup, slicing.
-    if parent_id is Some(parent):
-        cpg.connect(parent, node_id, AstChild)
-        cpg.node_mut(node_id).parent ← parent
+        # 5. A function is a CFG entry point.
+        if cpg_kind is Function { .. }:
+            cpg.add_cfg_entry(node_id)
+        child_parent ← Some(node_id)
 
-    # 5. A function is a CFG entry point.
-    if cpg_kind is Function { .. }:
-        cpg.add_cfg_entry(node_id)
-
-    # 6. Recurse into children, now parented at THIS node.
+    # 6. Append children, then reverse only that suffix. LIFO popping now
+    #    retains exact source order without native recursive descent.
+    first_child ← len(work)
     for child in ts_node.children():
-        convert_node(child, Some(node_id))
-
-    return Some(node_id)
+        work.push((child, child_parent))
+    reverse(work[first_child..])
 ```
 
 Three details are worth emphasising:
@@ -275,8 +273,8 @@ Three details are worth emphasising:
   sets both. This dual bookkeeping is what lets the DFG's binder detection, the PDG's
   enclosing-function test, and the slicer all ask "who is my ancestor?" cheaply.
 - **Reparenting of skipped nodes.** When `should_include_node` rejects a node (punctuation,
-  a comment, or a transparent grammar wrapper), the walk still recurses into that node's
-  children with the *current* parent. The wrapper disappears and its meaningful contents
+  a comment, or a transparent grammar wrapper), its frames retain the *current*
+  parent. The wrapper disappears and its meaningful contents
   become direct children of the enclosing construct — which is exactly what the CFG's
   child-ordering assumptions (`[condition, then, else]`) and the MeTTa/Rholang mappers
   depend on. See [`node-mapper.md`](node-mapper.md).

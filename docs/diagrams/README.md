@@ -1,6 +1,6 @@
 # Diagram catalog
 
-Every figure in the `libcpg` documentation is a **committed source** (`.puml` for PlantUML, `.dot` for Graphviz) rendered to a **committed `.svg`** that the Markdown pages embed. Sources are version-controlled so figures are reproducible and reviewable; SVGs are committed so they render on GitHub (which does not render PlantUML/Graphviz inline). This directory holds all 95 figures plus the shared theme.
+Every figure in the `libcpg` documentation is a **committed source** (`.puml` for PlantUML, `.dot` for Graphviz) rendered to a **committed `.svg`** that the Markdown pages embed. Sources are version-controlled so figures are reproducible and reviewable; SVGs are committed so they render on GitHub (which does not render PlantUML/Graphviz inline). This directory holds all 98 figures plus the shared theme.
 
 ## Conventions
 
@@ -100,6 +100,7 @@ Grouped by subject. Each row: the source (its `.svg` sibling is embedded by the 
 |---|---|---|---|
 | `cfg-example.dot` | graph | CFG of a small function with `CfgEdgeKind` labels | theory/02, components/builder/cfg |
 | `cfg-control-constructs.dot` | graph | if / while / try CFG shapes | theory/02, components/graph/edges, components/builder/cfg |
+| `cfg-extraction-machine.puml` | activity/pushdown flow | function body → typed `Enter`/continuation/`Leave` frames → exact edge emission, lexical context, and one exit set | components/builder/cfg, design/0042, scientific/37, security/01 |
 | `reaching-defs-sweep.puml` | activity | AST-ordered reaching-defs sweep (strong/weak/loop) | theory/03, design/0003, components/builder/dfg, scientific/02 |
 | `member-field-flow.puml` | typed topology | member/index reads and writes plus evidence-bounded member-to-field resolution | theory/03, design/0028, components/builder/dfg, components/graph/edges, architecture/data-flow, scientific/23 |
 | `def-use-example.dot` | graph | Def-use / reaching-def edges | theory/03, components/graph/edges, components/builder/dfg, scientific/02 |
