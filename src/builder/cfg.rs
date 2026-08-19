@@ -835,7 +835,7 @@ impl CfgExtractor {
                         cpg.connect_unique(
                             catch,
                             body,
-                            CpgEdgeKind::ControlFlow(CfgEdgeKind::Sequential),
+                            CpgEdgeKind::ControlFlow(CfgEdgeKind::Catch),
                         );
                         frames.push(CfgFrame::TryAfterCatch {
                             try_node,
@@ -1629,7 +1629,7 @@ impl CfgExtractor {
                 cpg.connect_unique(
                     catch,
                     catch_body,
-                    CpgEdgeKind::ControlFlow(CfgEdgeKind::Sequential),
+                    CpgEdgeKind::ControlFlow(CfgEdgeKind::Catch),
                 );
                 let catch_exits = self.process_node_recursive(cpg, catch_body, ctx);
 
@@ -2706,7 +2706,7 @@ mod tests {
         CfgExtractor::new().extract_function_cfg(&mut cpg, func);
 
         assert!(has_cfg(&cpg, try_node, try_body, CfgEdgeKind::Sequential));
-        assert!(has_cfg(&cpg, catch, catch_body, CfgEdgeKind::Sequential));
+        assert!(has_cfg(&cpg, catch, catch_body, CfgEdgeKind::Catch));
         assert!(
             has_cfg(&cpg, try_stmt, finally, CfgEdgeKind::Sequential),
             "the try body's exit reaches `finally`"
@@ -2738,7 +2738,7 @@ mod tests {
             "both the normal and the handler path exit the construct"
         );
         assert!(has_cfg(&cpg, try_node, try_body, CfgEdgeKind::Sequential));
-        assert!(has_cfg(&cpg, catch, catch_body, CfgEdgeKind::Sequential));
+        assert!(has_cfg(&cpg, catch, catch_body, CfgEdgeKind::Catch));
     }
 
     /// `throw e` inside a `try` connects to every enclosing handler and, like
