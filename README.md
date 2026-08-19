@@ -84,6 +84,9 @@ PDG). A query can therefore mix syntax, control flow, and data flow freely.
   composition, and an explicit quadratic-output cap.
 - **Advisory session-protocol sketches** — Rholang-gated, definition-resolved
   endpoint traces with three-valued binary direction and payload-type duality.
+- **Finite-state typestate analysis** — feature-free allocation-site object
+  identities, typed event/alias evidence, deterministic CFG may-facts,
+  canonical forbidden-transition witnesses, and explicit completeness bounds.
 - **Projection centrality** — deterministic PageRank variants, vertex/edge
   betweenness, eigenvector, Katz, closeness, harmonic, HITS, and Burt
   structural-hole scores with explicit iteration and traversal budgets.

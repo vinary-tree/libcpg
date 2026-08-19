@@ -1,0 +1,42 @@
+@startuml
+!include _libcpg-theme.iuml
+title Example resource property automaton
+
+skinparam backgroundColor #FCFCFC
+skinparam state {
+  BorderColor #495057
+}
+
+state "not yet allocated" as Untracked #F1F3F5
+state "open\n(non-accepting)" as Open #FFF3BF
+state "closed\n(accepting)" as Closed #D3F9D8
+state "error\n(absorbing)" as Error #FFE3E3
+
+[*] --> Untracked
+Untracked --> Open : open / allocate object
+Open --> Open : use
+Open --> Closed : close
+Open --> Error : every other property event
+Closed --> Error : use or close
+Error --> Error : every property event
+Closed --> [*] : acceptable function exit
+
+note right of Untracked
+  No fact exists before the allocation site.
+  Each allocation call creates a distinct object.
+end note
+
+note right of Error
+  A missing ordinary transition is forbidden.
+  The designated error state is absorbing,
+  so one path does not emit duplicate follow-on findings.
+end note
+
+legend bottom
+|= Colour |= Meaning |
+|<#F1F3F5>| no tracked object yet |
+|<#FFF3BF>| live resource state |
+|<#D3F9D8>| acceptable terminal state |
+|<#FFE3E3>| forbidden-transition state |
+endlegend
+@enduml

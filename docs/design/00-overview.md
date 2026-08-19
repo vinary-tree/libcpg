@@ -86,8 +86,9 @@ alternatives is folklore, and a decision without its costs is marketing.
 | [0040 — Flat property-value arena](0040-flat-property-value-arena.md) | Own logical property trees as canonical postorder node and edge tapes, with explicit lifecycle machines and a bounded versioned CPV1 persistence boundary. | Accepted |
 | [0041 — Shared flat expression facts](0041-shared-flat-expression-facts.md) | Represent expression roots in one shared postorder arena, deduplicate exact structural classes, and persist standalone keys through bounded canonical CEK1 bytes. | Accepted |
 | [0042 — Stack-safe CFG extraction](0042-stack-safe-cfg-extraction.md) | Defunctionalize the complete recursive CFG-handler component into typed heap continuations while preserving its exact edge stream, context lifetime, and malformed-path semantics. | Accepted |
+| [0043 — Deterministic typestate analysis](0043-deterministic-typestate-analysis.md) | Validate caller-defined finite-state properties, propagate allocation-site object/state facts over typed CPG evidence, and expose forbidden transitions with bounded canonical witnesses. | Accepted |
 
-These forty-two are not independent. ADR-0001 fixes the substrate that all analyses
+These forty-three are not independent. ADR-0001 fixes the substrate that all analyses
 write onto; ADR-0002 and ADR-0005 together explain how a language reaches that
 substrate and what you must switch on to get there; ADR-0003 and ADR-0004 are
 two analyses *over* the substrate (one always-on, one feature-gated) that each
@@ -195,6 +196,10 @@ ADR-0042 applies whole-component defunctionalization to CFG construction:
 `CfgFrame` values own every suspended handler call, while explicit exit values
 and lexical context preserve the observable equations without source-depth
 native recursion.
+ADR-0043 composes typed call, DFG/reference, canonical CFG, and shared cap
+evidence into a feature-free finite typestate may-analysis. It retains
+allocation-site identity and graph-depth state in ordered heap structures and
+keeps all policy-dependent facts out of graph.
 
 ![Module architecture of libcpg, showing the graph core and the analysis modules layered over it](../diagrams/module-architecture.svg)
 
@@ -206,7 +211,7 @@ native recursion.
   (`0001`…). Numbers are never reused; a reversed decision is marked
   *Superseded* and a new record supersedes it, so history stays legible.
 - **Status lifecycle.** `Proposed → Accepted → (Superseded by NNNN | Deprecated)`.
-  All forty-two current records are **Accepted** and reflect the shipped `v0.1.1`
+  All forty-three current records are **Accepted** and reflect the shipped `v0.1.1`
   code.
 - **Grounding.** Every claim here is traceable to source: the
   [`Cargo.toml`](../engineering/01-build-and-features.md) feature block, the

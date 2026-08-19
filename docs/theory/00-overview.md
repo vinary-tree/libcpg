@@ -268,6 +268,10 @@ development, or jump to the layer you need:
     Definition-resolved channel events, ordered shallow payload types, and a
     three-valued binary linear-duality rule define auditable Rholang protocol
     sketches without claiming a complete session type system.
+33. **[33 — Finite-state typestate properties](33-finite-state-typestate-properties.md).**
+    Caller-defined property automata, allocation-site identity, typed object
+    flow, and CFG may-facts define deterministic advisory forbidden-transition
+    evidence with explicit completeness bounds.
 
 The later chapters define deterministic projection structure, architecture
 metrics, inspectable evidence, and their interpretation limits.

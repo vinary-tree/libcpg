@@ -417,6 +417,9 @@ So the safe pattern is: build (single-threaded, `&mut`), then analyse
 - [Advisory session-protocol analysis](session-analysis.md) — definition-
   resolved per-channel endpoint traces, shallow payload types, and conservative
   three-valued binary linear-duality evidence under the `rholang` feature.
+- [Deterministic typestate analysis](typestate-analysis.md) — feature-free
+  finite-state properties, allocation-site object flow, CFG may-facts,
+  canonical witnesses, and explicit incomplete-result evidence.
 - [`api/graph-reference.md`](../../api/graph-reference.md) — the precise,
   method-by-method API reference for `CodePropertyGraph`.
 - [`theory/01-code-property-graphs.md`](../../theory/01-code-property-graphs.md)

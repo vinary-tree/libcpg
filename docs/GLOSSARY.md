@@ -639,6 +639,20 @@ session type system or deadlock-freedom proof. See [Theory
 32](theory/32-session-protocol-duality.md) and Honda–Vasconcelos–Kubo
 [[46]](#references).
 
+### Typestate / Property automaton / Allocation-site abstraction
+
+**Typestate** is a finite abstract state associated with an object's permitted
+operations. A **property automaton** supplies states, call events, deterministic
+transitions, allocation seeds, accepting terminal states, and an absorbing
+error state; an absent ordinary transition is forbidden. **Allocation-site
+abstraction** gives every allocation call one static object identity, so
+different call sites remain distinct while repeated runtime instances at one
+loop call may be merged. libcpg propagates these identities over typed
+DFG/reference/alias evidence and evaluates property facts over the canonical
+CFG. Results are advisory and require a complete report for negative claims.
+See [Theory 33](theory/33-finite-state-typestate-properties.md), Strom–Yemini
+[[48]](#references), and Fink et al. [[49]](#references).
+
 ### Message passing (GNN)
 
 One round of GNN computation: every node updates its vector from its neighbours' vectors. `libcpg` uses mean aggregation with a ReLU nonlinearity over AST, CFG, and DFG neighbourhoods:
@@ -1038,3 +1052,5 @@ strict tree interpretation. See
 45. Naumovich, G., Avrunin, G. S. (1998). *A Conservative Data Flow Algorithm for Detecting All Pairs of Statements That May Happen in Parallel.* Proceedings of the 6th ACM SIGSOFT International Symposium on Foundations of Software Engineering, 24–34. DOI: [10.1145/288195.288213](https://doi.org/10.1145/288195.288213).
 46. Honda, K., Vasconcelos, V. T., Kubo, M. (1998). *Language Primitives and Type Discipline for Structured Communication-Based Programming.* ESOP 1998. DOI: [10.1007/BFb0053567](https://doi.org/10.1007/BFb0053567).
 47. Reynolds, J. C. (1972). *Definitional Interpreters for Higher-Order Programming Languages.* DOI: [10.1145/800194.805852](https://doi.org/10.1145/800194.805852).
+48. Strom, R. E., Yemini, S. (1986). *Typestate: A Programming Language Concept for Enhancing Software Reliability.* DOI: [10.1109/TSE.1986.6312929](https://doi.org/10.1109/TSE.1986.6312929).
+49. Fink, S. J., Yahav, E., Dor, N., Ramalingam, G., Geay, E. (2008). *Effective Typestate Verification in the Presence of Aliasing.* DOI: [10.1145/1348250.1348255](https://doi.org/10.1145/1348250.1348255).

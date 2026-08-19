@@ -424,6 +424,29 @@ guide](../components/graph/session-analysis.md), [usage
 guide](../usage/15-session-protocol-sketches.md), [theory](../theory/32-session-protocol-duality.md),
 and [security boundary](../security/07-session-analysis.md).
 
+### Deterministic typestate analysis
+
+The feature-free typestate API evaluates a caller-defined `PropertyFsm` over
+typed allocation, object-flow, call, and canonical intraprocedural CFG
+evidence.
+
+| Item | Contract |
+|---|---|
+| `PropertyFsm` | Ordered closed vocabularies, partial ordinary transitions, allocation seeds, accepting states, and one absorbing error state. |
+| `PropertyFsm::validate` | Deterministic set of every structural property issue. |
+| `analyze_typestate` | `fn(&CodePropertyGraph, &PropertyFsm, &IfdsCaps) -> TypestateAnalysis`; retains findings, terminal states, caps, issues, and work evidence. |
+| `check_typestate` | Positive-finding convenience projection; use the report before a negative claim. |
+| `TypestateViolation` | Allocation object, violating site, prior state, event, canonical witness, and cap qualifier. |
+| `TypestateAnalysis::is_complete` | True only when no resource or structural/evidence boundary qualifies the result. |
+| `TypestateAnalysis::object_is_accepting` | Whether all represented terminal states for one object belong to the policy's accepting set. |
+
+Missing ordinary transitions enter the absorbing error state. Branch joins
+retain may-unions, so one legal and one forbidden path can coexist. The analysis
+is read-only, out of graph, deterministic, and stack-safe over graph depth. See
+the [component guide](../components/graph/typestate-analysis.md), [usage
+guide](../usage/16-typestate-analysis.md), [theory](../theory/33-finite-state-typestate-properties.md),
+and [security boundary](../security/08-typestate-analysis.md).
+
 ### Deterministic graph projections
 
 `GraphProjection` is the feature-free, payload-free compressed-sparse-row view

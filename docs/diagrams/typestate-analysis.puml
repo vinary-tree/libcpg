@@ -1,0 +1,72 @@
+@startuml
+!include _libcpg-theme.iuml
+title Deterministic bounded typestate evidence flow
+
+skinparam backgroundColor #FCFCFC
+skinparam component {
+  BorderColor #495057
+}
+skinparam note {
+  BackgroundColor #F1F3F5
+  BorderColor #495057
+}
+
+component "CodePropertyGraph\ntyped AST · CFG · DFG · calls" as CPG #DBE4FF
+component "PropertyFsm\nstates · events · transitions\nallocations · accepting · error" as FSM #FFE8CC
+component "structural validation\nclosed vocabulary · absorbing error" as VALIDATE #F1F3F5
+component "typed call classification\nIdentifier / MemberAccess / target" as EVENTS #E9ECEF
+component "allocation-site objects\nDFG · reference · alias worklist" as OBJECTS #FFF3BF
+component "canonical function CFG\nordered may-facts (object, state)" as FACTS #D3F9D8
+component "property transfer\n<latex>\delta^{\bot}(q,a)</latex>" as TRANSFER #C3FAE8
+component "canonical predecessor map\nshortest stable witness" as WITNESS #FCC2D7
+component "TypestateViolation\nobject · site · from · event · witness" as FINDING #FFE3E3
+component "TypestateAnalysis\nterminal states · caps · issues" as REPORT #E5DBFF
+
+CPG --> EVENTS : typed evidence only
+FSM --> VALIDATE
+VALIDATE --> EVENTS : valid alphabet
+CPG --> OBJECTS : allocation and value flow
+EVENTS --> OBJECTS : allocation events
+OBJECTS --> FACTS : one identity per allocation site
+CPG --> FACTS : canonical intraprocedural projection
+FSM --> TRANSFER
+EVENTS --> TRANSFER : ordered event occurrences
+FACTS --> TRANSFER : current may-fact
+TRANSFER --> FACTS : successor facts
+FACTS --> WITNESS : first canonical discovery
+TRANSFER --> FINDING : forbidden transition
+WITNESS --> FINDING
+FINDING --> REPORT
+VALIDATE --> REPORT : invalid FSM issue
+EVENTS --> REPORT : unresolved / ambiguous / capped
+FACTS --> REPORT : terminal states and resource caps
+
+note bottom of EVENTS
+  No source-string parser exists in this analysis.
+  Missing typed evidence remains explicit incompleteness.
+end note
+
+note bottom of FACTS
+  Every input-sized traversal uses heap worklists and ordered maps.
+  The CPG is read-only and no parallel graph is materialized.
+end note
+
+note bottom of REPORT
+  Findings are advisory review evidence.
+  A negative claim additionally requires is_complete().
+end note
+
+legend bottom
+|= Colour |= Meaning |
+|<#DBE4FF>| represented program evidence |
+|<#FFE8CC>| caller-supplied property policy |
+|<#F1F3F5>| structural validation and qualification |
+|<#E9ECEF>| typed event classification |
+|<#FFF3BF>| abstract object/value-flow evidence |
+|<#D3F9D8>| canonical CFG may-facts |
+|<#C3FAE8>| property transfer |
+|<#FCC2D7>| canonical witness evidence |
+|<#FFE3E3>| forbidden-transition candidate |
+|<#E5DBFF>| complete or explicitly partial report |
+endlegend
+@enduml

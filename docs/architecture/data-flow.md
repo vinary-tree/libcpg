@@ -536,6 +536,27 @@ See the [component guide](../components/graph/session-analysis.md), [Theory
 32](../theory/32-session-protocol-duality.md), and [Usage
 15](../usage/15-session-protocol-sketches.md).
 
+### Finite-state typestate properties (feature-free)
+
+`analyze_typestate` combines a caller-owned `PropertyFsm` with four existing
+CPG views: typed callee/target evidence classifies events, DFG/reference/alias
+relations carry allocation-site object identity, the canonical function CFG
+orders property transfer, and `IfdsCaps` qualifies finite resource use.
+Policy-dependent `(object, state)` facts and witnesses remain immutable and out
+of graph.
+
+The flow is intentionally intraprocedural and finite. Ordered heap worklists
+propagate may-facts until no new object/state pair reaches a CFG point. Missing
+ordinary transitions enter an absorbing error state; missing graph or event
+evidence instead makes the report incomplete. Terminal accepting-state policy
+is exposed separately from forbidden-transition findings.
+
+![Typed CPG evidence and a caller property become a qualified typestate report](../diagrams/typestate-analysis.svg)
+
+See the [component guide](../components/graph/typestate-analysis.md), [Theory
+33](../theory/33-finite-state-typestate-properties.md), and [Usage
+16](../usage/16-typestate-analysis.md).
+
 ### Pattern detection
 
 Two layers, at two feature levels:

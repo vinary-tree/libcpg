@@ -65,6 +65,9 @@ unused-write evidence),
 CSE/PRE evidence),
 **sparse conditional constant propagation** (checked scalar constants,
 executable/dead CFG edges, and value-sensitive reachability refinement),
+**finite-state typestate analysis** (allocation-site identities, typed
+object/event evidence, deterministic CFG may-facts, forbidden-transition
+witnesses, terminal states, and explicit completeness bounds),
 **interval value-range analysis** (branch constraints, loop-header widening,
 bounded narrowing, and immutable block-entry ranges),
 **loop-induction analysis** (DFG-backed invariants, additive/affine induction
@@ -148,6 +151,8 @@ let slice = backward_slice(&cpg, func, 256);         // bounded backward slice
 
 [Advisory session-protocol duality](theory/32-session-protocol-duality.md)
 
+[Finite-state typestate properties](theory/33-finite-state-typestate-properties.md)
+
 ### Architecture — the "what / where"
 [Overview](architecture/overview.md) · [Graph data model](architecture/graph-data-model.md) · [Construction & analysis data flow](architecture/data-flow.md) · [Language frontends](architecture/language-frontends.md)
 
@@ -176,6 +181,8 @@ let slice = backward_slice(&cpg, func, 256);         // bounded backward slice
 
 [0042 Stack-safe CFG extraction](design/0042-stack-safe-cfg-extraction.md)
 
+[0043 Deterministic typestate analysis](design/0043-deterministic-typestate-analysis.md)
+
 ### API reference
 [Graph / analysis reference](api/graph-reference.md) · [Builder reference](api/builder-reference.md) · [Pattern / algorithm / GNN reference](api/pattern-reference.md)
 
@@ -199,6 +206,8 @@ let slice = backward_slice(&cpg, func, 256);         // bounded backward slice
 [May-happen-in-parallel analysis](components/graph/mhp-analysis.md)
 
 [Advisory session-protocol analysis](components/graph/session-analysis.md)
+
+[Deterministic typestate analysis](components/graph/typestate-analysis.md)
 
 #### Builder
 [Overview](components/builder/overview.md) · [CFG extraction](components/builder/cfg.md) · [DFG extraction](components/builder/dfg.md) · [PDG & slicing](components/builder/pdg-and-slicing.md) · [Node mapper](components/builder/node-mapper.md)
@@ -231,6 +240,8 @@ let slice = backward_slice(&cpg, func, 256);         // bounded backward slice
 
 [Rholang session-protocol sketches](usage/15-session-protocol-sketches.md)
 
+[Finite-state typestate analysis](usage/16-typestate-analysis.md)
+
 ### Engineering
 [Overview](engineering/00-overview.md) · [Build & features](engineering/01-build-and-features.md) · [Testing](engineering/02-testing.md) · [Performance](engineering/03-performance.md) · [Contributing](engineering/04-contributing.md)
 
@@ -259,8 +270,10 @@ let slice = backward_slice(&cpg, func, 256);         // bounded backward slice
 
 [Stack-safe CFG extraction validation](scientific/37-cfg-extraction-machine-validation.md)
 
+[Finite-state typestate validation](scientific/38-typestate-validation.md)
+
 ### Security
-[Threat model](security/00-threat-model.md) · [Input & resource hardening](security/01-input-and-resource-hardening.md) · [Taint-analysis security boundary](security/02-taint-analysis.md) · [Interprocedural-slicing security boundary](security/03-system-dependence-slicing.md) · [Channel-topology security boundary](security/04-channel-topology.md) · [Deadlock-analysis security boundary](security/05-deadlock-analysis.md) · [MHP-analysis security boundary](security/06-mhp-analysis.md) · [Session-analysis security boundary](security/07-session-analysis.md)
+[Threat model](security/00-threat-model.md) · [Input & resource hardening](security/01-input-and-resource-hardening.md) · [Taint-analysis security boundary](security/02-taint-analysis.md) · [Interprocedural-slicing security boundary](security/03-system-dependence-slicing.md) · [Channel-topology security boundary](security/04-channel-topology.md) · [Deadlock-analysis security boundary](security/05-deadlock-analysis.md) · [MHP-analysis security boundary](security/06-mhp-analysis.md) · [Session-analysis security boundary](security/07-session-analysis.md) · [Typestate-analysis security boundary](security/08-typestate-analysis.md)
 
 ### Reference
 [Glossary](GLOSSARY.md) · [Diagram catalog](diagrams/README.md)
