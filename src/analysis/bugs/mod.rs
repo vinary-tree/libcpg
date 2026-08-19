@@ -4,6 +4,7 @@
 //! evidence. Graph-shaped traversal is performed with heap-backed worklists so
 //! source depth and graph depth never consume native call-stack depth.
 
+mod clone_bugs;
 mod deviant;
 mod evidence;
 mod exceptions;
@@ -11,6 +12,11 @@ mod leaks;
 mod missing_check;
 mod uninit;
 
+pub use clone_bugs::{
+    analyze_inconsistent_clones, inconsistent_clone_bugs, CloneBugAnalysis, CloneBugConfig,
+    CloneBugIssue, CloneGuardValue, ClonePairEvidence, InconsistentCloneBug, InconsistentCloneKind,
+    RenameDirection, MAX_CLONE_ALIGNMENT_CELLS, MAX_CLONE_BUG_AST_NODES,
+};
 pub use deviant::{
     analyze_deviant_behavior, deviant_behaviors, CallOrderBelief, DeviantBehavior,
     DeviantBehaviorAnalysis, DeviantBehaviorConfig, DeviantBehaviorIssue, DeviantBehaviorKind,

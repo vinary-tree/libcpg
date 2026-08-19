@@ -44,16 +44,18 @@ use crate::NodeId;
 pub use basic_blocks::{block_cfg, BasicBlock, BlockCfg, BlockEdge, BlockId};
 
 pub use bugs::{
-    analyze_deviant_behavior, analyze_exception_flow, analyze_missing_checks,
-    analyze_resource_leaks, analyze_uninitialized_uses, dead_catches, deviant_behaviors,
-    missing_checks, resource_leaks, uncaught_exceptions, uninitialized_uses, ApiIdentity,
-    CallOrderBelief, CheckFingerprint, CheckFingerprintNode, CheckNodeKind, DeadCatch,
-    DeviantBehavior, DeviantBehaviorAnalysis, DeviantBehaviorConfig, DeviantBehaviorIssue,
-    DeviantBehaviorKind, ExceptionFlowAnalysis, ExceptionFlowIssue, ExceptionSummary,
-    ExceptionType, MissingCheck, MissingCheckAnalysis, MissingCheckConfig, MissingCheckIssue,
-    PeerScope, PopulationFraction, PopulationThreshold, ResourceLeak, ResourceLeakAnalysis,
-    ResourceLeakIssue, ReturnCheckBelief, UncaughtException, UninitializedUse,
-    UninitializedUseAnalysis,
+    analyze_deviant_behavior, analyze_exception_flow, analyze_inconsistent_clones,
+    analyze_missing_checks, analyze_resource_leaks, analyze_uninitialized_uses, dead_catches,
+    deviant_behaviors, inconsistent_clone_bugs, missing_checks, resource_leaks,
+    uncaught_exceptions, uninitialized_uses, ApiIdentity, CallOrderBelief, CheckFingerprint,
+    CheckFingerprintNode, CheckNodeKind, CloneBugAnalysis, CloneBugConfig, CloneBugIssue,
+    CloneGuardValue, ClonePairEvidence, DeadCatch, DeviantBehavior, DeviantBehaviorAnalysis,
+    DeviantBehaviorConfig, DeviantBehaviorIssue, DeviantBehaviorKind, ExceptionFlowAnalysis,
+    ExceptionFlowIssue, ExceptionSummary, ExceptionType, InconsistentCloneBug,
+    InconsistentCloneKind, MissingCheck, MissingCheckAnalysis, MissingCheckConfig,
+    MissingCheckIssue, PeerScope, PopulationFraction, PopulationThreshold, RenameDirection,
+    ResourceLeak, ResourceLeakAnalysis, ResourceLeakIssue, ReturnCheckBelief, UncaughtException,
+    UninitializedUse, UninitializedUseAnalysis, MAX_CLONE_ALIGNMENT_CELLS, MAX_CLONE_BUG_AST_NODES,
 };
 
 pub use centrality::{

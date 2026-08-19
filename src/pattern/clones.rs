@@ -107,6 +107,16 @@ struct PairRelation {
     similarity: f64,
 }
 
+/// Exact pairwise clone evidence consumed by analyses that must not infer
+/// pair membership from a transitive clone class.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub(crate) struct ClonePairRelation {
+    pub(crate) left: NodeId,
+    pub(crate) right: NodeId,
+    pub(crate) clone_type: CloneType,
+    pub(crate) similarity: f64,
+}
+
 /// Detects deterministic Type-1 through Type-4 clone classes among functions.
 ///
 /// Nested functions are analyzed as their own roots and excluded from their
@@ -129,6 +139,33 @@ pub fn detect_clones(
     cpg: &CodePropertyGraph,
     options: &CloneOptions,
 ) -> Result<Vec<CloneClass>, AnalysisError> {
+    let (features, relations) = clone_relations(cpg, options)?;
+    Ok(group_relations(&features, &relations))
+}
+
+/// Returns the exact pair relation before same-type connected-component
+/// grouping. This remains crate-private because clone classes are the stable
+/// public abstraction, while advisory analyses need pair-local evidence.
+pub(crate) fn detect_clone_pairs(
+    cpg: &CodePropertyGraph,
+    options: &CloneOptions,
+) -> Result<Vec<ClonePairRelation>, AnalysisError> {
+    let (features, relations) = clone_relations(cpg, options)?;
+    Ok(relations
+        .into_iter()
+        .map(|relation| ClonePairRelation {
+            left: features[relation.left].root,
+            right: features[relation.right].root,
+            clone_type: relation.clone_type,
+            similarity: relation.similarity,
+        })
+        .collect())
+}
+
+fn clone_relations(
+    cpg: &CodePropertyGraph,
+    options: &CloneOptions,
+) -> Result<(Vec<FunctionFeatures>, Vec<PairRelation>), AnalysisError> {
     validate_options(options)?;
 
     let mut functions: Vec<_> = cpg.functions().map(|node| node.id).collect();
@@ -193,7 +230,7 @@ pub fn detect_clones(
         }
     }
 
-    Ok(group_relations(&features, &relations))
+    Ok((features, relations))
 }
 
 fn validate_options(options: &CloneOptions) -> Result<(), AnalysisError> {
