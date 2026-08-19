@@ -399,6 +399,265 @@ fn permuted_copy(original: &CodePropertyGraph) -> CodePropertyGraph {
     copy
 }
 
+#[derive(Debug, Clone)]
+enum AffineExprSpec {
+    Basic,
+    Integer(i64),
+    SymbolicInvariant,
+    Other,
+    Unary(&'static str, Box<AffineExprSpec>),
+    Binary(&'static str, Box<AffineExprSpec>, Box<AffineExprSpec>),
+}
+
+fn affine_expr_strategy() -> impl Strategy<Value = AffineExprSpec> {
+    prop_oneof![
+        Just(AffineExprSpec::Basic),
+        (-32i64..=32).prop_map(AffineExprSpec::Integer),
+        Just(AffineExprSpec::SymbolicInvariant),
+        Just(AffineExprSpec::Other),
+    ]
+    // The recursive reference evaluator below is deliberately restricted to
+    // this generator's four levels and 32 nodes. Production input depth is not
+    // bounded by the test oracle; the public 100,000-level test proves that
+    // the production machines consume their continuations from the heap.
+    .prop_recursive(4, 32, 2, |inner| {
+        prop_oneof![
+            (prop::sample::select(vec!["+", "-", "!"]), inner.clone())
+                .prop_map(|(operator, operand)| AffineExprSpec::Unary(operator, Box::new(operand))),
+            (
+                prop::sample::select(vec!["+", "-", "*", "/"]),
+                inner.clone(),
+                inner
+            )
+                .prop_map(|(operator, left, right)| AffineExprSpec::Binary(
+                    operator,
+                    Box::new(left),
+                    Box::new(right),
+                )),
+        ]
+    })
+}
+
+fn materialize_affine_expr(
+    cpg: &mut CodePropertyGraph,
+    spec: &AffineExprSpec,
+    invariant: &mut BTreeSet<NodeId>,
+    next_id: &mut u32,
+) -> NodeId {
+    let id = NodeId::new(*next_id);
+    *next_id += 1;
+    let kind = match spec {
+        AffineExprSpec::Basic => identifier("i"),
+        AffineExprSpec::Integer(value) => integer(*value),
+        AffineExprSpec::SymbolicInvariant => identifier("scale"),
+        AffineExprSpec::Other => identifier("other"),
+        AffineExprSpec::Unary(operator, _) => CpgNodeKind::UnaryOp {
+            operator: (*operator).into(),
+        },
+        AffineExprSpec::Binary(operator, _, _) => binary(operator),
+    };
+    cpg.add_node_with_id(node(id.0, kind));
+    if matches!(
+        spec,
+        AffineExprSpec::Integer(_) | AffineExprSpec::SymbolicInvariant
+    ) {
+        invariant.insert(id);
+    }
+    match spec {
+        AffineExprSpec::Unary(_, operand) => {
+            let operand = materialize_affine_expr(cpg, operand, invariant, next_id);
+            connect_ast(cpg, id, operand);
+        }
+        AffineExprSpec::Binary(_, left, right) => {
+            let left = materialize_affine_expr(cpg, left, invariant, next_id);
+            let right = materialize_affine_expr(cpg, right, invariant, next_id);
+            connect_ast(cpg, id, left);
+            connect_ast(cpg, id, right);
+        }
+        AffineExprSpec::Basic
+        | AffineExprSpec::Integer(_)
+        | AffineExprSpec::SymbolicInvariant
+        | AffineExprSpec::Other => {}
+    }
+    id
+}
+
+/// Exact copy of the former recursive integer evaluator.
+///
+/// Callers only provide acyclic expressions bounded by
+/// [`affine_expr_strategy`] or a twelve-operator vector, so recursion here is
+/// fixed test-fixture depth rather than attacker-controlled production depth.
+fn recursive_integer_constant_oracle(cpg: &CodePropertyGraph, node: NodeId) -> Option<i64> {
+    match cpg.node(node).map(|node| &node.kind) {
+        Some(CpgNodeKind::Literal {
+            kind: LiteralKind::Integer(value),
+        }) => Some(*value),
+        Some(CpgNodeKind::UnaryOp { operator }) => {
+            let operand = cpg.ast_children(node).first().copied()?;
+            let value = recursive_integer_constant_oracle(cpg, operand)?;
+            match &**operator {
+                "+" => Some(value),
+                "-" => value.checked_neg(),
+                _ => None,
+            }
+        }
+        _ => None,
+    }
+}
+
+fn recursive_multiply_coefficient_oracle(
+    cpg: &CodePropertyGraph,
+    coefficient: Option<i64>,
+    operand: NodeId,
+) -> Option<i64> {
+    match (coefficient, recursive_integer_constant_oracle(cpg, operand)) {
+        (Some(coefficient), Some(multiplier)) => coefficient.checked_mul(multiplier),
+        _ => None,
+    }
+}
+
+#[allow(clippy::too_many_arguments)]
+fn recursive_affine_binary_oracle(
+    cpg: &CodePropertyGraph,
+    operator: &str,
+    left: NodeId,
+    right: NodeId,
+    basics: &BTreeMap<Arc<str>, &InductionVariable>,
+    invariant: &BTreeSet<NodeId>,
+    depth: usize,
+    seen: &mut BTreeSet<NodeId>,
+) -> Option<AffineBase> {
+    let left_affine = recursive_affine_oracle(cpg, left, basics, invariant, depth, seen);
+    let right_affine = recursive_affine_oracle(cpg, right, basics, invariant, depth, seen);
+    match operator {
+        "+" | "-" => match (left_affine, right_affine) {
+            (Some(affine), None) if operand_is_invariant(cpg, right, invariant) => Some(affine),
+            (None, Some(mut affine)) if operand_is_invariant(cpg, left, invariant) => {
+                if operator == "-" {
+                    affine.coefficient = affine.coefficient.and_then(i64::checked_neg);
+                }
+                Some(affine)
+            }
+            (Some(mut left), Some(right)) if left.base == right.base => {
+                left.coefficient = match (left.coefficient, right.coefficient) {
+                    (Some(left), Some(right)) if operator == "+" => left.checked_add(right),
+                    (Some(left), Some(right)) => left.checked_sub(right),
+                    _ => None,
+                };
+                Some(left)
+            }
+            _ => None,
+        },
+        "*" => match (left_affine, right_affine) {
+            (Some(mut affine), None) if operand_is_invariant(cpg, right, invariant) => {
+                affine.coefficient =
+                    recursive_multiply_coefficient_oracle(cpg, affine.coefficient, right);
+                Some(affine)
+            }
+            (None, Some(mut affine)) if operand_is_invariant(cpg, left, invariant) => {
+                affine.coefficient =
+                    recursive_multiply_coefficient_oracle(cpg, affine.coefficient, left);
+                Some(affine)
+            }
+            _ => None,
+        },
+        _ => None,
+    }
+}
+
+/// Exact copy of the former recursive affine evaluator.
+///
+/// It is safe in tests because [`affine_expr_strategy`] fixes both generated
+/// depth and size. Production expressions use [`AffineFrame`] instead.
+fn recursive_affine_oracle(
+    cpg: &CodePropertyGraph,
+    node: NodeId,
+    basics: &BTreeMap<Arc<str>, &InductionVariable>,
+    invariant: &BTreeSet<NodeId>,
+    depth: usize,
+    seen: &mut BTreeSet<NodeId>,
+) -> Option<AffineBase> {
+    if !seen.insert(node) {
+        return None;
+    }
+    let result = (|| {
+        if let Some(name) = identifier_name(cpg, node) {
+            return basics.contains_key(&name).then_some(AffineBase {
+                base: name,
+                coefficient: Some(1),
+            });
+        }
+        if depth == 0 {
+            return None;
+        }
+        match cpg.node(node).map(|node| &node.kind) {
+            Some(CpgNodeKind::UnaryOp { operator }) => {
+                let operand = cpg.ast_children(node).first().copied()?;
+                let mut affine =
+                    recursive_affine_oracle(cpg, operand, basics, invariant, depth - 1, seen)?;
+                match &**operator {
+                    "+" => Some(affine),
+                    "-" => {
+                        affine.coefficient = affine.coefficient.and_then(i64::checked_neg);
+                        Some(affine)
+                    }
+                    _ => None,
+                }
+            }
+            Some(CpgNodeKind::BinaryOp { operator }) => {
+                let children = cpg.ast_children(node);
+                let [left, right, ..] = children.as_slice() else {
+                    return None;
+                };
+                recursive_affine_binary_oracle(
+                    cpg,
+                    operator,
+                    *left,
+                    *right,
+                    basics,
+                    invariant,
+                    depth - 1,
+                    seen,
+                )
+            }
+            _ => None,
+        }
+    })();
+    seen.remove(&node);
+    result
+}
+
+/// Independent exact reachability specification for candidate-use summaries.
+///
+/// This intentionally omits production memoization. Its visited-set work is
+/// bounded by the generated eight-node graph.
+fn uncached_candidate_uses_oracle(
+    cpg: &CodePropertyGraph,
+    root: NodeId,
+    facts: &VarFacts,
+) -> Arc<[NodeId]> {
+    let mut uses = BTreeSet::new();
+    let mut seen = BTreeSet::new();
+    let mut pending = vec![root];
+    while let Some(node) = pending.pop() {
+        if !seen.insert(node) {
+            continue;
+        }
+        if !facts.uses_at(node).is_empty() {
+            uses.insert(node);
+        }
+        if node != root
+            && cpg
+                .node(node)
+                .is_some_and(|node| matches!(node.kind, CpgNodeKind::Function { .. }))
+        {
+            continue;
+        }
+        pending.extend(cpg.ast_children(node));
+    }
+    uses.into_iter().collect::<Vec<_>>().into()
+}
+
 fn assert_analysis_contracts(
     cpg: &CodePropertyGraph,
     function: NodeId,
@@ -414,10 +673,11 @@ fn assert_analysis_contracts(
         let region = loop_region_nodes(cpg, &body, &scope);
         let invariant: BTreeSet<_> = report.invariant_nodes.iter().copied().collect();
         assert!(report.hoistable.iter().all(|node| invariant.contains(node)));
+        let mut use_cache = BTreeMap::new();
         for &candidate in &report.invariant_nodes {
-            for use_site in candidate_uses(cpg, candidate, &facts) {
+            for use_site in candidate_uses(cpg, candidate, &facts, &mut use_cache).iter() {
                 let predecessors: Vec<_> = cpg
-                    .dfg_predecessors(use_site)
+                    .dfg_predecessors(*use_site)
                     .into_iter()
                     .filter_map(|(source, kind)| (kind == DfgEdgeKind::DefUse).then_some(source))
                     .collect();
@@ -1016,6 +1276,110 @@ fn affine_recognition_and_malformed_semantic_shapes_cover_every_operator_family(
 }
 
 #[test]
+fn affine_and_integer_machines_preserve_depth_overflow_and_cycle_semantics() {
+    let mut cpg = CodePropertyGraph::new(Language::Rust);
+    for (id, kind) in [
+        (0, identifier("i")),
+        (
+            1,
+            CpgNodeKind::UnaryOp {
+                operator: "+".into(),
+            },
+        ),
+        (
+            2,
+            CpgNodeKind::UnaryOp {
+                operator: "+".into(),
+            },
+        ),
+        (
+            3,
+            CpgNodeKind::UnaryOp {
+                operator: "+".into(),
+            },
+        ),
+        (
+            4,
+            CpgNodeKind::UnaryOp {
+                operator: "-".into(),
+            },
+        ),
+        (5, identifier("i")),
+        (6, integer(i64::MAX)),
+        (7, binary("*")),
+        (8, identifier("i")),
+        (9, binary("+")),
+        (
+            10,
+            CpgNodeKind::UnaryOp {
+                operator: "!".into(),
+            },
+        ),
+    ] {
+        cpg.add_node_with_id(node(id, kind));
+    }
+    for (parent, child) in [
+        (1, 0),
+        (2, 1),
+        (3, 2),
+        (4, 4),
+        (7, 5),
+        (7, 6),
+        (9, 7),
+        (9, 8),
+        (10, 0),
+    ] {
+        connect_ast(&mut cpg, NodeId::new(parent), NodeId::new(child));
+    }
+
+    let base = InductionVariable {
+        loop_id: 0,
+        variable: "i".into(),
+        update_node: NodeId::new(20),
+        step: Some(1),
+        direction: IvDirection::Increasing,
+        init_defs: Vec::new(),
+    };
+    let basics = BTreeMap::from([(base.variable.clone(), &base)]);
+    let invariant = BTreeSet::from([NodeId::new(6)]);
+
+    let mut seen = BTreeSet::new();
+    assert_eq!(
+        affine_in_basic(&cpg, NodeId::new(3), &basics, &invariant, 3, &mut seen),
+        Some(AffineBase {
+            base: "i".into(),
+            coefficient: Some(1),
+        })
+    );
+    assert!(seen.is_empty());
+    assert_eq!(
+        affine_in_basic(&cpg, NodeId::new(3), &basics, &invariant, 2, &mut seen),
+        None
+    );
+    assert!(seen.is_empty());
+
+    assert_eq!(
+        affine_in_basic(&cpg, NodeId::new(9), &basics, &invariant, 3, &mut seen),
+        Some(AffineBase {
+            base: "i".into(),
+            coefficient: None,
+        })
+    );
+    assert!(seen.is_empty());
+    assert_eq!(
+        affine_in_basic(&cpg, NodeId::new(10), &basics, &invariant, 3, &mut seen),
+        None
+    );
+    assert!(seen.is_empty());
+    assert_eq!(
+        affine_in_basic(&cpg, NodeId::new(4), &basics, &invariant, 3, &mut seen),
+        None
+    );
+    assert!(seen.is_empty());
+    assert_eq!(integer_constant(&cpg, NodeId::new(4)), None);
+}
+
+#[test]
 fn unknown_and_irreducible_loops_do_not_claim_counted_trip_evidence() {
     let fixture = explicit_fixture(0, 2, false);
     let mut forest = loop_forest(&fixture.cpg, fixture.function).expect("stationary forest");
@@ -1185,5 +1549,137 @@ proptest! {
         prop_assert_eq!(comparison_direction_matches(operator, direction), expected_match);
         let reversed = reverse_comparison(operator).expect("supported comparison");
         prop_assert_eq!(reverse_comparison(reversed), Some(operator));
+    }
+
+    #[test]
+    fn affine_machine_matches_the_bounded_former_recursive_evaluator(
+        expression in affine_expr_strategy(),
+        depth in 0usize..=4,
+    ) {
+        let mut cpg = CodePropertyGraph::new(Language::Rust);
+        let mut invariant = BTreeSet::new();
+        let mut next_id = 0;
+        let root = materialize_affine_expr(
+            &mut cpg,
+            &expression,
+            &mut invariant,
+            &mut next_id,
+        );
+        let base = InductionVariable {
+            loop_id: 0,
+            variable: "i".into(),
+            update_node: NodeId::new(u32::MAX - 1),
+            step: Some(3),
+            direction: IvDirection::Increasing,
+            init_defs: Vec::new(),
+        };
+        let basics = BTreeMap::from([(base.variable.clone(), &base)]);
+        let initial_seen = BTreeSet::from([NodeId::new(u32::MAX)]);
+        let mut expected_seen = initial_seen.clone();
+        let expected = recursive_affine_oracle(
+            &cpg,
+            root,
+            &basics,
+            &invariant,
+            depth,
+            &mut expected_seen,
+        );
+        let mut actual_seen = initial_seen.clone();
+        let actual = affine_in_basic(
+            &cpg,
+            root,
+            &basics,
+            &invariant,
+            depth,
+            &mut actual_seen,
+        );
+        let mut repeated_seen = initial_seen.clone();
+        let repeated = affine_in_basic(
+            &cpg,
+            root,
+            &basics,
+            &invariant,
+            depth,
+            &mut repeated_seen,
+        );
+
+        prop_assert_eq!(&actual, &expected);
+        prop_assert_eq!(&repeated, &expected);
+        prop_assert_eq!(actual_seen, initial_seen.clone());
+        prop_assert_eq!(repeated_seen, initial_seen.clone());
+        prop_assert_eq!(expected_seen, initial_seen);
+    }
+
+    #[test]
+    fn integer_machine_matches_the_bounded_former_recursive_evaluator(
+        value in any::<i64>(),
+        operators in prop::collection::vec(
+            prop::sample::select(vec!["+", "-", "!"]),
+            0..=12,
+        ),
+    ) {
+        let mut cpg = CodePropertyGraph::new(Language::Rust);
+        cpg.add_node_with_id(node(0, integer(value)));
+        let mut root = NodeId::new(0);
+        for (offset, operator) in operators.iter().enumerate() {
+            let parent = NodeId::new(u32::try_from(offset + 1).expect("bounded operator count"));
+            cpg.add_node_with_id(node(
+                parent.0,
+                CpgNodeKind::UnaryOp {
+                    operator: (*operator).into(),
+                },
+            ));
+            connect_ast(&mut cpg, parent, root);
+            root = parent;
+        }
+
+        let expected = recursive_integer_constant_oracle(&cpg, root);
+        prop_assert_eq!(integer_constant(&cpg, root), expected);
+        prop_assert_eq!(integer_constant(&cpg, root), expected);
+    }
+
+    #[test]
+    fn candidate_use_cache_matches_exact_reachability_in_both_orders(
+        node_count in 1usize..=8,
+        edges in prop::collection::vec((0u8..8, 0u8..8), 0..=24),
+        use_flags in prop::collection::vec(any::<bool>(), 8),
+    ) {
+        let mut cpg = CodePropertyGraph::new(Language::Rust);
+        cpg.add_node_with_id(node(0, function("candidate_uses")));
+        for (index, &is_use) in use_flags.iter().take(node_count).enumerate() {
+            let id = u32::try_from(index + 1).expect("bounded node count");
+            let kind = if is_use {
+                identifier(&format!("v{index}"))
+            } else {
+                integer(i64::try_from(index).expect("bounded node index"))
+            };
+            cpg.add_node_with_id(node(id, kind));
+            cpg.connect(
+                FUNCTION,
+                NodeId::new(id),
+                CpgEdgeKind::AstChild,
+            )
+            .expect("scope edge endpoints exist");
+        }
+        for (source, target) in edges {
+            let source = NodeId::new(u32::from(source) % node_count as u32 + 1);
+            let target = NodeId::new(u32::from(target) % node_count as u32 + 1);
+            cpg.connect(source, target, CpgEdgeKind::AstChild)
+                .expect("generated AST endpoints exist");
+        }
+        let facts = variable_facts(&cpg, FUNCTION);
+        let ascending: Vec<_> = (1..=node_count)
+            .map(|id| NodeId::new(u32::try_from(id).expect("bounded node id")))
+            .collect();
+        let descending: Vec<_> = ascending.iter().rev().copied().collect();
+
+        for order in [&ascending, &descending] {
+            let mut cache = BTreeMap::new();
+            for &candidate in order {
+                let expected = uncached_candidate_uses_oracle(&cpg, candidate, &facts);
+                let actual = candidate_uses(&cpg, candidate, &facts, &mut cache);
+                prop_assert_eq!(actual, expected);
+            }
+        }
     }
 }

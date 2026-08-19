@@ -112,6 +112,14 @@ variables, and assignments with right-hand sides. A use without `DefUse`
 evidence is not guessed invariant. Because every round only adds candidates,
 the least fixed point stabilizes in at most $`|C| + 1`$ rounds.
 
+Before those rounds, a typed `Enter`/`Exit` postorder machine computes each
+candidate's sorted use summary. An outer acyclic expression thereby populates
+the summaries of all descendants in one walk, independent of whether the
+frontend allocated parent or child node ids first. A malformed AST cycle
+switches that root to an exact iterative reachability walk; its completed
+summary is then safe to reuse. Nested functions remain hard boundaries in both
+paths.
+
 ## Hoistability filter
 
 Invariance and legal motion are different questions. The `hoistable` subset
@@ -170,6 +178,15 @@ derived step is checked as $`a s`$; otherwise the variable is still identified
 but its step and direction remain unknown. Derived variables are not recursively
 used as bases, which makes the advertised one-level contract explicit.
 
+The semantic depth budget is independent of the native call stack. Affine
+recognition runs a typed heap machine with `Enter`, `ApplyUnary`, `AfterLeft`,
+and `ApplyBinary` continuations. Its active-path set rejects malformed cycles
+and is restored exactly after each child. Signed integer constants use a second
+heap machine: it follows the unary chain once, records positive/negative sign
+continuations, and applies them inside-out with checked negation. Consequently,
+the affine language remains deliberately depth-three while an invariant
+integer step may contain any unary depth that fits the input and heap.
+
 ## Counted-trip evidence
 
 `TripEvidence::Counted` records the IV name, comparison/range node, and invariant
@@ -201,6 +218,9 @@ LOOP_INDUCTION(cpg, function, forest):
         validate every loop reference belongs to view
         region := loop CFG body plus scoped AST descendants
 
+        uses := postorder Enter/Exit summaries for candidate subtrees
+                (exact visited-set fallback for malformed cycles)
+
         invariant := empty set
         repeat at most candidate_count + 1 times:
             add each candidate whose DefUse sources are outside region
@@ -224,6 +244,33 @@ LOOP_INDUCTION(cpg, function, forest):
     return immutable InductionAnalysis
 ```
 
+The bounded affine evaluator is a pushdown automaton whose stack alphabet is
+the four continuation variants:
+
+```text
+AFFINE(root, depth_budget):
+    frames := [Enter(root, depth_budget)]
+    values := []
+    active := caller's active-path set
+
+    while frames is not empty:
+        Enter(node, depth):
+            reject node already in active
+            recognize a basic-IV identifier even when depth = 0
+            otherwise reject a non-identifier when depth = 0
+            for unary:  push ApplyUnary; push Enter(operand, depth - 1)
+            for binary: push AfterLeft; push Enter(left, depth - 1)
+
+        AfterLeft:
+            pop left value; push ApplyBinary(left value); push Enter(right)
+
+        ApplyUnary / ApplyBinary:
+            pop child value(s), apply checked affine transfer,
+            remove the completed node from active, and push one result
+
+    return the single result
+```
+
 ## Determinism, complexity, and resource bounds
 
 Loop order comes from the validated forest. Regions, invariant sets, definition
@@ -232,17 +279,25 @@ and deduplicated. Property tests rebuild equivalent graphs with reversed node
 and edge insertion and require byte-for-byte equal reports.
 
 Let $`C_l`$ be the invariant-candidate count, $`R_l`$ the region size, and
-$`D_l`$ the relevant DFG-edge count for loop $`l`$. The deliberately simple
-fixed point is bounded by $`C_l + 1`$ rounds, with conservative worst-case work
-$`O(C_l^2(R_l + D_l))`$ when candidate subtrees are rescanned. Basic-IV,
-constant-depth affine, guard, and hoist filters are polynomial scans over the
-same finite region and loop observations. Space is
-$`O(N + \sum_l(R_l + D_l))`$ including shared function/dominator evidence.
-Nested loops may intentionally account for a node in more than one region.
+$`D_l`$ the relevant DFG-edge count for loop $`l`$. Let $`U_l`$ be the total
+size of the materialized candidate-use summaries, including repeated use ids
+that genuinely occur in more than one candidate subtree. Summary discovery is
+$`O(C_l(R_l + E_{AST,l}))`$ in the conservative malformed/DAG worst case, but
+postorder memoization visits an ordinary nested expression once plus the cost
+of its materialized summaries. The fixed point is bounded by $`C_l + 1`$
+rounds and scans the already-built summaries; a conservative bound is
+$`O(C_l(C_l + U_l + D_l))`$. Basic-IV, affine, guard, and hoist filters are
+polynomial scans over the same finite region and loop observations. Space is
+$`O(N + \sum_l(R_l + D_l + U_l))`$ including shared function/dominator
+evidence. Nested loops may intentionally account for a node in more than one
+region.
 
-All AST walks are iterative and visited-set bounded. Checked arithmetic turns
-overflow into unknown evidence. A 25,000-node region regression proves the
-analysis does not consume one native stack frame per AST node.
+All input-depth AST walks and expression evaluators are iterative and
+visited/active-set bounded. Checked arithmetic turns overflow into unknown
+evidence. A 25,000-node region regression covers region discovery, while a
+public 100,000-operator unary step—allocated parent before child—runs through
+`loop_forest` and `loop_induction` on a 256 KiB native stack without graph
+mutation.
 
 ## Oracle-guarded benchmark
 
@@ -266,12 +321,16 @@ before comparing implementations.
 
 ## Validation and limitations
 
-The tests combine fixed semantic examples, two property campaigns, parser
-integration, malformed-input integration, serialization, and stack-depth
-stress. They cover every supported recurrence form and direction, reversed
-guards, ranges, nested loops, derived coefficients, overflow, duplicate and
+The tests combine fixed semantic examples, five 192-case property campaigns,
+parser integration, malformed-input integration, serialization, and
+stack-depth stress. They cover every supported recurrence form and direction,
+reversed guards, ranges, nested loops, derived coefficients, overflow, duplicate and
 conditional updates, hoist dominance, irreducibility, foreign forests, graph
-non-mutation, and insertion-order determinism. See the reproducible ledger in
+non-mutation, insertion-order determinism, exact agreement between both heap
+machines and their bounded former-recursive specifications, and exact
+active-path restoration. An independent eight-node cyclic-graph reachability
+oracle also proves candidate-use summaries in both ascending and descending
+query orders. See the reproducible ledger in
 [Scientific validation 07](../../scientific/07-induction-analysis-validation.md).
 The clean maximal matrix measures 97.67% line and 84.44% branch coverage for
 the module, above the epic's 90% and 80% thresholds.

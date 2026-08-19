@@ -57,7 +57,7 @@ Source: [`diagrams/resource-bounds.puml`](../diagrams/resource-bounds.puml).*
 | `MAX_CYCLE_LENGTH` / `MAX_SIMPLE_CYCLES` | `32` / `100_000` hard maxima | `simple_cycles` | clamps path depth and retained count; stops inside DFS at the first over-cap unique cycle and returns that omitted witness |
 | `MAX_TRIAD_NODES` / `MAX_GRAPHLET_NODES` | `512` / `50` hard maxima | `motif_census` | rejects before cubic/quartic enumeration with `AnalysisError::BudgetExceeded`; never returns a partial census |
 | `MAX_GED_NODES` | `512` hard maximum | `ged_upper_bound`; `SimilarityMetric::GraphEdit` | bounds the cubic Hungarian matrix; direct results set `capped = true` and clearly label the linear compatibility fallback |
-| Loop-induction structural bounds | at most `candidate_count + 1` invariant rounds per loop; affine depth `3` | `loop_induction` | reaches a finite fixed point; malformed AST cycles are cut by visited sets and arithmetic overflow becomes unknown evidence |
+| Loop-induction structural bounds | at most `candidate_count + 1` invariant rounds per loop; affine semantic depth `3`; arbitrary signed-integer unary depth | `loop_induction` | typed postorder/affine/sign machines keep input depth off the native stack; malformed AST cycles are cut by active/visited sets and arithmetic overflow becomes unknown evidence |
 | Complexity-evidence bounds | validated finite function scope plus loop/induction provider bounds | `estimate_time_complexity_with_evidence` (feature `algorithm-detection`) | provider failure or absent CFG evidence returns the exact legacy total estimate; justification grows with loop count |
 
 The underlying bounds are on the **feature-free surface**. The final complexity
@@ -723,13 +723,17 @@ finite loop region; derived affine recognition descends through at most three
 operator levels. Checked `i64` arithmetic maps negation, coefficient, or step
 overflow to unknown evidence rather than panicking or wrapping.
 
-Region, candidate-use, initialization, and guard discovery all use explicit
-work vectors plus visited sets. Malformed `AstChild` cycles therefore terminate,
-and a 25,000-node region is regression-tested for native-stack safety. The
-caller-supplied `LoopForest` is not trusted blindly: every header, entry, latch,
-body member, exit source, and exit target must resolve inside the selected
-function's reachable CFG projection or the call returns
-`AnalysisError::UnknownNode`.
+Region, initialization, and guard discovery use explicit work vectors plus
+visited sets. Candidate uses are summarized by typed postorder `Enter`/`Exit`
+frames, with an exact visited-set fallback for malformed cycles. Affine
+recognition uses typed evaluation continuations and an active-path set; signed
+integer constants use positive/negative continuations and checked unwinding.
+Malformed `AstChild` cycles therefore terminate, a 25,000-node region is
+regression-tested, and a parent-before-child 100,000-operator step passes the
+public loop API on a 256 KiB native stack. The caller-supplied `LoopForest` is
+not trusted blindly: every header, entry, latch, body member, exit source, and
+exit target must resolve inside the selected function's reachable CFG
+projection or the call returns `AnalysisError::UnknownNode`.
 
 The fixed point bounds termination, not output size or transformation safety.
 Nested loop regions may overlap, worst-case candidate rescanning is polynomial,
@@ -868,7 +872,7 @@ correctness**: an analysis may return a meaningless answer, but it must
 | `unreachable_code` | visited function-scope and dense CFG sets bound discovery; iterative DFS is stack-safe on a 25,000-node reachable/disconnected graph |
 | `block_cfg` / `solve` | iterative CFG traversal and work queues avoid native-stack growth; `solve` also caps extractions per block and ignores inconsistent public loop-header mappings |
 | `value_ranges` | typed heap expression frames with active-path cycle checks, loop-header-only widening, 64 visits per block, and two bounded narrowing sweeps; a 100,000-level initializer is tested on 256 KiB |
-| `loop_induction` | validates every supplied loop reference; finite invariant rounds, depth-three affine recognition, checked arithmetic, and iterative visited-set AST walks; a 25,000-node region is regression-tested |
+| `loop_induction` | validates every supplied loop reference; finite invariant rounds, typed postorder/affine/sign heap machines, exact depth-three affine semantics, checked arithmetic, and cycle-bounded AST walks; 25,000-node region and public 100,000-operator/256 KiB regressions pass |
 | `build_symbol_table` / `resolve_calls` | visited sets cut parent and callee-subtree cycles; deterministic scope-depth, candidate-retention, and call-count caps bound configured work |
 | `CfgExtractor::process_node` (and every `process_*` handler) | a **path set** on `CfgContext` — a node already on the current recursion path becomes its own exit instead of being re-entered |
 | DFG reaching definitions (`visit_reaching`) | typed heap `Enter`/`Bind`/`Exit` frames plus an **active-path set**; source depth consumes no native call frames, and a node may re-enter after its matching `Exit` |

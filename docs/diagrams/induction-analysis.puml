@@ -11,9 +11,12 @@ component "LoopForest\nbody, latches, exits" as LOOPS #D3F9D8
 component "DominatorTree\nmandatory-path evidence" as DOM #E5DBFF
 component "VarFacts\ncanonical definitions + uses" as FACTS #FFF3BF
 
+component "Candidate-use machine\nEnter / Exit postorder\ncycle-safe exact fallback" as USES #E7F5FF
 component "Least fixed point\nloop-invariant nodes" as INV #FFE8CC
 component "Hoist filter\nside-effect-free shape\n+ unique definition\n+ dominated observations/uses" as HOIST #C3FAE8
 component "Basic induction variables\nunique dominating recurrence\nor semantic range" as BASIC #FCC2D7
+component "Signed-integer machine\nPositive / Negative frames\nchecked inside-out unwind" as SIGN #FFF0F6
+component "Affine pushdown machine\nEnter / ApplyUnary\nAfterLeft / ApplyBinary" as AFFINE #D0BFFF
 component "One-level affine variables\ny = a*i + b" as DERIVED #FCC2D7
 component "Counted-trip evidence\ndirection-compatible guard\n+ invariant bound" as BOUND #FFE3E3
 
@@ -27,15 +30,23 @@ CFG --> DOM : dominance analysis
 AST --> FACTS : classify names
 DFG --> FACTS : bind uses to definitions
 
-LOOPS --> INV : finite loop region
+LOOPS --> USES : finite loop region
+AST --> USES : candidate subtrees
+FACTS --> USES : canonical use sites
+USES --> INV : cached sorted summaries
 FACTS --> INV : outside/invariant definitions
 INV --> HOIST : candidate subset
 DOM --> HOIST : dominates latches, exits, uses
 INV --> BASIC : invariant recurrence operand
 FACTS --> BASIC : one in-loop definition
 DOM --> BASIC : update reaches every latch
-BASIC --> DERIVED : affine base
-INV --> DERIVED : invariant coefficients/offsets
+BASIC --> SIGN : constant recurrence operand
+AST --> SIGN : unary sign chain
+BASIC --> AFFINE : affine base
+INV --> AFFINE : invariant coefficients/offsets
+AST --> AFFINE : bounded expression
+SIGN --> AFFINE : exact integer multiplier
+AFFINE --> DERIVED : checked affine result
 BASIC --> BOUND : step direction
 DERIVED --> BOUND : derived step direction
 LOOPS --> BOUND : exit guards / range header
@@ -53,8 +64,11 @@ legend right
   |<#D3F9D8>| control flow and loop structure |
   |<#FFF3BF>| data flow and variable facts |
   |<#E5DBFF>| dominance evidence |
+  |<#E7F5FF>| candidate-use heap machine |
   |<#FFE8CC>| invariant fixed point |
   |<#C3FAE8>| advisory hoist candidates |
+  |<#FFF0F6>| signed-integer heap machine |
+  |<#D0BFFF>| affine heap machine |
   |<#FCC2D7>| induction variables |
   |<#FFE3E3>| counted-trip evidence |
   |<#F1F3F5>| immutable result |

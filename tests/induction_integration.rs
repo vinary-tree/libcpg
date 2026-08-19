@@ -232,6 +232,118 @@ fn root_api_recognizes_compound_basic_iv_and_direction_compatible_guard() {
     ));
 }
 
+#[test]
+fn root_api_evaluates_a_hundred_thousand_unary_steps_on_a_small_native_stack() {
+    const UNARY_DEPTH: u32 = 100_000;
+    const FUNCTION: u32 = 0;
+    const INITIAL: u32 = 1;
+    const INITIAL_NAME: u32 = 2;
+    const INITIAL_VALUE: u32 = 3;
+    const HEADER: u32 = 4;
+    const BODY: u32 = 5;
+    const UPDATE: u32 = 6;
+    const TARGET: u32 = 7;
+    const RETURN: u32 = 8;
+    const LITERAL: u32 = 9;
+    const FIRST_UNARY: u32 = 10;
+    const LAST_UNARY: u32 = FIRST_UNARY + UNARY_DEPTH - 1;
+
+    std::thread::Builder::new()
+        .name("induction-expression-small-stack".into())
+        .stack_size(256 * 1024)
+        .spawn(|| {
+            let mut cpg = CodePropertyGraph::new(Language::Rust);
+            for (id, kind) in [
+                (FUNCTION, function("deep_step")),
+                (INITIAL, variable("i")),
+                (INITIAL_NAME, identifier("i")),
+                (INITIAL_VALUE, integer(0)),
+                (HEADER, CpgNodeKind::While),
+                (BODY, block()),
+                (
+                    UPDATE,
+                    CpgNodeKind::Assignment {
+                        operator: "+=".into(),
+                    },
+                ),
+                (TARGET, identifier("i")),
+                (RETURN, CpgNodeKind::Return),
+                (LITERAL, integer(1)),
+            ] {
+                cpg.add_node_with_id(node(id, kind));
+            }
+            // Parent-before-child ids model the pre-order allocation used by
+            // ordinary AST builders. Stack safety and summary reuse must not
+            // depend on a favorable child-before-parent numbering scheme.
+            for id in FIRST_UNARY..=LAST_UNARY {
+                cpg.add_node_with_id(node(
+                    id,
+                    CpgNodeKind::UnaryOp {
+                        operator: "-".into(),
+                    },
+                ));
+            }
+
+            for (parent, child) in [
+                (FUNCTION, INITIAL),
+                (FUNCTION, HEADER),
+                (FUNCTION, RETURN),
+                (INITIAL, INITIAL_NAME),
+                (INITIAL, INITIAL_VALUE),
+                (HEADER, BODY),
+                (BODY, UPDATE),
+                (UPDATE, TARGET),
+                (UPDATE, FIRST_UNARY),
+            ] {
+                ast(&mut cpg, parent, child);
+            }
+            for id in FIRST_UNARY..=LAST_UNARY {
+                let child = if id == LAST_UNARY { LITERAL } else { id + 1 };
+                ast(&mut cpg, id, child);
+            }
+
+            for (source, target, kind) in [
+                (FUNCTION, INITIAL, CfgEdgeKind::Sequential),
+                (INITIAL, HEADER, CfgEdgeKind::Sequential),
+                (HEADER, UPDATE, CfgEdgeKind::ConditionalTrue),
+                (UPDATE, FIRST_UNARY, CfgEdgeKind::Sequential),
+            ] {
+                cfg(&mut cpg, source, target, kind);
+            }
+            for id in FIRST_UNARY..=LAST_UNARY {
+                let target = if id == LAST_UNARY { LITERAL } else { id + 1 };
+                cfg(&mut cpg, id, target, CfgEdgeKind::Sequential);
+            }
+            cfg(&mut cpg, LITERAL, HEADER, CfgEdgeKind::LoopBack);
+            cfg(&mut cpg, HEADER, RETURN, CfgEdgeKind::LoopExit);
+            cpg.add_cfg_entry(NodeId::new(FUNCTION));
+            cpg.add_cfg_exit(NodeId::new(RETURN));
+
+            for definition in [INITIAL, UPDATE] {
+                def_use(&mut cpg, definition, TARGET);
+            }
+
+            let before = (cpg.node_count(), cpg.edge_count());
+            let forest = loop_forest(&cpg, NodeId::new(FUNCTION)).expect("deep loop forest");
+            let analysis = loop_induction(&cpg, NodeId::new(FUNCTION), &forest)
+                .expect("stack-safe induction analysis");
+            let iv = analysis
+                .ivs
+                .iter()
+                .find(|iv| &*iv.variable == "i")
+                .expect("deep unary step retains the basic IV");
+
+            assert_eq!(iv.update_node, NodeId::new(UPDATE));
+            assert_eq!(iv.step, Some(1));
+            assert_eq!(iv.direction, IvDirection::Increasing);
+            assert_eq!(iv.init_defs, vec![NodeId::new(INITIAL)]);
+            assert_eq!((cpg.node_count(), cpg.edge_count()), before);
+        })
+        .expect("spawn small-stack induction test")
+        .join()
+        .expect("induction analysis must not overflow the native stack");
+}
+
 #[cfg(feature = "lang-rust")]
 #[test]
 fn parser_generated_rust_range_loop_satisfies_the_acceptance_oracle() {

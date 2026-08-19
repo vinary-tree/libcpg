@@ -18,8 +18,10 @@ conservative boundary where evidence must remain absent or unknown.
 | H5 | Counted evidence uses only invariant bounds and direction-compatible comparisons; stationary, unknown, incompatible, and irreducible cases remain `Unknown`. | comparison oracle; subtraction/irreducible examples |
 | H6 | `hoistable` is a subset of invariant nodes and rejects duplicate definitions or non-dominated observations/uses. | hoist fixtures and shared contract assertions |
 | H7 | Equivalent CPGs built in opposite node/edge insertion orders produce identical forests and induction reports. | 192-case insertion-permutation property |
-| H8 | The analysis is read-only, rejects foreign forest references, terminates on cyclic malformed ASTs, and is native-stack safe on deep regions. | public integration, malformed harness, 25,000-node stress test |
+| H8 | The analysis is read-only, rejects foreign forest references, terminates on cyclic malformed ASTs, and keeps input depth off the native stack. | public integration, malformed harness, 25,000-node region and 100,000-operator/256 KiB expression stresses |
 | H9 | A real Rust `for i in 0..x` build exposes semantic range/binder nodes and reports `i`, step one, a body-contained update, and counted evidence. | `parser_generated_rust_range_loop_satisfies_the_acceptance_oracle` |
+| H10 | Typed affine and signed-integer heap machines preserve the former recursive equations exactly, including depth budgets, checked arithmetic, determinism, and active-path restoration. | two 192-case bounded differential properties; fixed overflow/operator/cycle examples |
+| H11 | Memoized candidate-use summaries equal exact visited-set reachability on trees, DAGs, and cyclic malformed ASTs, independent of query order. | 192-case eight-node multigraph property in ascending and descending candidate orders |
 
 Each claim can fail independently. For example, testing only that `i` appears
 would not decide H1, H2, H5, or H9; those tests inspect the proof relations and
@@ -39,19 +41,23 @@ semantics from a particular grammar:
 | `subtraction_unknown_coefficients_and_overflow_remain_conservative` | Checks negative direction, incompatible guard rejection, symbolic coefficient, and checked multiplication overflow. |
 | `update_shapes_directions_and_checked_arithmetic_cover_supported_forms` | Enumerates compound/simple update shapes, zero direction, and negation overflow. |
 | `affine_recognition_and_malformed_semantic_shapes_cover_every_operator_family` | Exercises supported affine operators and malformed/missing operands without relying on parser behavior. |
+| `affine_and_integer_machines_preserve_depth_overflow_and_cycle_semantics` | Separates the three-level semantic budget from stack capacity and pins coefficient overflow, unsupported operators, active-path cleanup, and cycle rejection. |
 | `unknown_and_irreducible_loops_do_not_claim_counted_trip_evidence` | Prevents structural cycles from being mislabeled as counted loops. |
 | `malformed_selectors_foreign_forests_and_ast_cycles_are_bounded` | Decides error identity and termination for absent nodes, foreign forest members, and cyclic AST relations. |
 | `twenty_five_thousand_node_loop_region_is_stack_safe` | Makes recursive region traversal fail on ordinary native stack limits while the iterative implementation completes. |
 | `all_public_result_layers_round_trip_through_serde` | Serializes and reconstructs the complete public report when `serde` is enabled. |
 
-The public integration file adds two feature-free downstream-user tests: one
-for semantic ranges and graph non-mutation, and one for a compound basic IV and
-direction-compatible guard. These import only crate-root APIs, catching missing
-exports or accidental feature gates that unit tests inside the module cannot.
+The public integration file adds three feature-free downstream-user tests: one
+for semantic ranges and graph non-mutation, one for a compound basic IV and
+direction-compatible guard, and one for a parent-before-child 100,000-operator
+unary step on a 256 KiB native stack. These import only crate-root APIs,
+catching missing exports, accidental feature gates, native-stack regressions,
+or identifier-order-dependent summary construction that unit tests inside the
+module cannot.
 
 ## 3. Property-based experiments
 
-Both `proptest` campaigns run 192 generated cases.
+All five `proptest` campaigns run 192 generated cases.
 
 ### Insertion-order determinism and contracts
 
@@ -84,6 +90,33 @@ reverse(reverse(op)) = op.
 
 This experiment covers extreme integer endpoints that a small list of examples
 would be unlikely to select.
+
+### Former-recursive expression oracles
+
+`affine_machine_matches_the_bounded_former_recursive_evaluator` generates
+semantic expression trees from basic-IV identifiers, exact and symbolic
+invariants, unrelated identifiers, unary `+`/`-`/`!`, and binary
+`+`/`-`/`*`/`/`. Trees are capped at four levels and 32 nodes solely so the
+retired recursive equations are safe as a test oracle. For every generated
+tree and budget in $`[0,4]`$, the test requires exact `Option<AffineBase>`
+equality, equal repeated results, and restoration of a pre-seeded caller path
+set.
+
+`integer_machine_matches_the_bounded_former_recursive_evaluator` generates the
+full `i64` value domain and up to twelve unary `+`/`-`/`!` operators. It checks
+the heap machine twice against the exact former recursive checked-negation
+equations. The generator bounds only the recursive oracle; the production
+machine is exercised at 100,000 levels by the public test.
+
+### Candidate-use cache oracle
+
+`candidate_use_cache_matches_exact_reachability_in_both_orders` generates up
+to eight semantic nodes, 24 arbitrary `AstChild` edges (including parallel
+edges, self-loops, DAG sharing, and cycles), and arbitrary identifier-use
+placements. For every candidate, a cache-free visited-set traversal is the
+specification. The property queries the production postorder cache in both
+ascending and descending node order and requires exact sorted use sets, so
+memoization cannot change semantics or depend on identifier order.
 
 ## 4. Parser-backed acceptance experiment
 
@@ -124,9 +157,14 @@ absence of panics, real-node result references, equal loop/result cardinality,
 and the hoist-subset law. An absent selector must return the exact
 `AnalysisError::UnknownNode` value.
 
-The dedicated 25,000-node example isolates stack safety from the mixed
-corruption campaign. Together these experiments decide structural robustness;
-they do not claim a semantically meaningful result for a corrupt graph.
+The dedicated 25,000-node example isolates stack-safe region discovery from the
+mixed corruption campaign. The public 100,000-operator example separately
+forces candidate-use summarization and signed-integer evaluation through the
+complete loop API on a 256 KiB stack, preserves graph counts, and expects the
+exact even-negation step of one. Parent-before-child ids prevent a favorable
+allocation order from hiding repeated subtree traversal. Together these
+experiments decide structural robustness; they do not claim a semantically
+meaningful result for a corrupt graph.
 
 ## 6. Clean maximal-matrix coverage result
 

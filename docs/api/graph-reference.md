@@ -1021,7 +1021,10 @@ The analysis recognizes additive explicit recurrences, semantic step-one
 ranges, and one level of affine derivation. A counted record is structural
 direction/bound evidence, not an exact trip count or termination proof. Every
 forest node and exit endpoint is validated against the function; foreign
-references return `AnalysisError::UnknownNode`. The CPG is never mutated.
+references return `AnalysisError::UnknownNode`. Candidate-use summaries,
+depth-three affine recognition, and arbitrary-depth signed integer constants
+use typed heap continuations with cycle guards; input depth does not consume
+native call frames. The CPG is never mutated.
 
 See [Loop invariants, induction variables, and trip
 evidence](../components/graph/induction-analysis.md) for fixed-point equations,

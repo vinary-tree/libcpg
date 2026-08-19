@@ -27,7 +27,7 @@ think to write down.
 | Malformed-input robustness tests | 5 | `tests/robustness.rs` |
 | SCCP public/parser integration tests | 3 | `tests/sccp_integration.rs` |
 | Interval public/parser integration tests | 4 | `tests/intervals_integration.rs` |
-| Loop-induction public/parser integration tests | 3 | `tests/induction_integration.rs` |
+| Loop-induction public/parser integration tests | 4 | `tests/induction_integration.rs` |
 | Complexity-evidence public/parser integration tests | 3 | `tests/complexity_evidence_integration.rs` |
 | Condensation public/parser integration tests | 2 | `tests/condensation_integration.rs` |
 | Layering public/serialization integration tests | 2 | `tests/layering_integration.rs` |
@@ -167,7 +167,7 @@ The invariants fall into complementary families.
 | **Function CFG scope** | the reachable CFG view is invariant under node, edge, and recorded-exit insertion permutations; call edges never enter the view; dense entry/exit identifiers map back to the same stable nodes |
 | **Dominance** | CHK immediate dominators equal `petgraph::algo::dominators::simple_fast` under edge permutations; post-dominators and control edges equal the former PDG oracle; `PdgBuilder` emits exactly `PostDominatorTree::control_dependence_edges`; a 25,000-node path is stack-safe |
 | **Natural loops** | insertion permutations preserve the forest; dominator-qualified back edges and reverse-closure bodies equal independent brute-force oracles through 24 nodes; every body lies in a cyclic SCC; child bodies are strict parent subsets; `LoopExit` exactly crosses AST loop scope and starts a basic block; a 25,000-node loop is stack-safe |
-| **Loop invariants / induction variables** | every invariant use has non-empty `DefUse` evidence only from outside or already-invariant definitions; explicit recurrences are unique and dominate every latch; 192-case insertion permutations preserve complete reports and checked affine steps; a second 192-case oracle covers the full `i64` direction domain and comparison reversal; examples cover every supported update/range/affine shape, duplicate/conditional updates, nested/irreducible loops, hoist dominance, symbolic/overflow outcomes, serde, invalid/foreign forests, graph non-mutation, a real Rust `for i in 0..x`, and a 25,000-node stack-safe region; the malformed-graph property harness checks result references and subset laws |
+| **Loop invariants / induction variables** | every invariant use has non-empty `DefUse` evidence only from outside or already-invariant definitions; explicit recurrences are unique and dominate every latch; five 192-case campaigns cover insertion-order report equality, checked direction/comparison laws, exact differential equivalence of typed affine and signed-integer heap machines with bounded former-recursive specifications, and cached candidate-use equality with exact reachability on arbitrary eight-node cyclic multigraphs in both query orders; examples cover every supported update/range/affine shape, exact depth-three semantics, cycle/path restoration, duplicate/conditional updates, nested/irreducible loops, hoist dominance, symbolic/overflow outcomes, serde, invalid/foreign forests, graph non-mutation, a real Rust `for i in 0..x`, a 25,000-node region, and a parent-before-child public 100,000-operator step on 256 KiB; the malformed-graph property harness checks result references and subset laws |
 | **CFG reachability** | iterative DFS equals `petgraph::visit::Bfs`; reachable and unreachable sets form a disjoint, exhaustive partition; insertion permutations preserve reports; adding an edge never shrinks reachability; generated post-terminator tails remain unreachable; parser wrappers and all-return branches preserve termination; a 25,000-node graph is stack-safe |
 | **Basic-block CFGs** | insertion permutations preserve blocks, membership, typed edges, exits, and traversal orders; the blocks form a disjoint exhaustive projection partition; intra-block pairs have the required unique `Sequential` relation; every typed CFG edge is either an internal chain step or a block edge; parser, CFG-only, serde, invalid-selector, and non-mutation examples pass; a 25,000-block graph is stack-safe |
 | **AST-ordered DFG reaching definitions** | 256 generated graphs through eight nodes prove the typed heap machine exactly matches the bounded former recursive equations for pair order, environment updates, conditional context, two-pass loops, lexical boundaries, and active-path cycles; exact examples cover latest-write wins, shadowing, loop-carried definitions, nested uses, lexical capture/isolation, malformed cycles, config families, parser composition, idempotence, and field/index resolution; a public 100,000-level definition-to-use path completes on a 256 KiB stack while preserving nodes and AST edges |
@@ -378,10 +378,11 @@ and resource boundaries, shared-DAG and malformed-graph cases, public API,
 wire-format experiment, and identifier-permutation property are catalogued in
 [`scientific/25-function-clone-validation.md`](../scientific/25-function-clone-validation.md).
 The new `analysis/induction.rs` module measures **97.67 %** line,
-**97.44 %** region, **97.26 %** function, and **84.44 %** branch coverage,
-clearing the same thresholds. Its DFG invariant contracts, unique/dominating
-recurrence counterexamples, affine/direction oracles, insertion permutations,
-parser experiment, corruption campaign, and stack test are catalogued in
+**97.44 %** region, **97.26 %** function, and **84.44 %** branch coverage in
+the recorded clean maximal matrix, clearing the same thresholds. Its DFG
+invariant contracts, unique/dominating recurrence counterexamples,
+affine/direction/differential expression oracles, insertion permutations,
+parser experiment, corruption campaign, and two stack tests are catalogued in
 [`scientific/07-induction-analysis-validation.md`](../scientific/07-induction-analysis-validation.md).
 The extended `algorithms/detection/complexity.rs` module measures **97.36 %**
 line, **97.32 %** region, **100.00 %** function, and **88.46 %** branch

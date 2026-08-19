@@ -122,7 +122,8 @@ PDG). A query can therefore mix syntax, control flow, and data flow freely.
   native call stack.
 - **Loop invariants and induction variables** — DFG-backed invariant fixed
   points, unique latch-dominating additive/affine IVs, conservative hoist
-  candidates, and counted-trip evidence.
+  candidates, and counted-trip evidence; typed postorder and expression
+  machines keep candidate and constant depth off the native stack.
 - **DFG extraction** — intraprocedural, stack-safe AST-ordered reaching
   definitions (Kildall 1973) and def-use chains (13 `DfgEdgeKind` variants).
 - **PDG + program slicing** — control-dependence edges via the reverse dominance

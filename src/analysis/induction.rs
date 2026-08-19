@@ -262,6 +262,14 @@ fn invariant_fixed_point(
         .filter(|&node| invariant_candidate(cpg, node, facts))
         .collect();
     let mut invariant = BTreeSet::new();
+    let mut use_cache: BTreeMap<NodeId, Arc<[NodeId]>> = BTreeMap::new();
+    let mut uses_by_candidate = BTreeMap::new();
+    for &candidate in &candidates {
+        uses_by_candidate.insert(
+            candidate,
+            candidate_uses(cpg, candidate, facts, &mut use_cache),
+        );
+    }
 
     for _ in 0..=candidates.len() {
         let mut changed = false;
@@ -269,7 +277,7 @@ fn invariant_fixed_point(
             if invariant.contains(&candidate) {
                 continue;
             }
-            let uses = candidate_uses(cpg, candidate, facts);
+            let uses = &uses_by_candidate[&candidate];
             let operands_are_invariant = uses.iter().all(|&use_site| {
                 let predecessors: Vec<_> = cpg
                     .dfg_predecessors(use_site)
@@ -306,7 +314,89 @@ fn invariant_candidate(cpg: &CodePropertyGraph, node: NodeId, facts: &VarFacts) 
     }
 }
 
-fn candidate_uses(cpg: &CodePropertyGraph, root: NodeId, facts: &VarFacts) -> Vec<NodeId> {
+/// One continuation in postorder candidate-use summarization.
+#[derive(Debug)]
+enum CandidateUseFrame {
+    Enter(NodeId),
+    Exit { node: NodeId, children: Vec<NodeId> },
+}
+
+fn candidate_uses(
+    cpg: &CodePropertyGraph,
+    root: NodeId,
+    facts: &VarFacts,
+    cache: &mut BTreeMap<NodeId, Arc<[NodeId]>>,
+) -> Arc<[NodeId]> {
+    if let Some(cached) = cache.get(&root) {
+        return cached.clone();
+    }
+
+    // Build summaries in postorder so an outer expression computes every
+    // acyclic descendant once even when parents have smaller NodeIds. Keep the
+    // new summaries local until the whole traversal proves acyclic: a summary
+    // assembled across an active-path back edge would not be transitive.
+    let mut frames = vec![CandidateUseFrame::Enter(root)];
+    let mut active = BTreeSet::new();
+    let mut local: BTreeMap<NodeId, Arc<[NodeId]>> = BTreeMap::new();
+    let mut cyclic = false;
+    while let Some(frame) = frames.pop() {
+        match frame {
+            CandidateUseFrame::Enter(node) => {
+                if cache.contains_key(&node) || local.contains_key(&node) {
+                    continue;
+                }
+                if !active.insert(node) {
+                    cyclic = true;
+                    break;
+                }
+                let children = if node != root
+                    && cpg
+                        .node(node)
+                        .is_some_and(|node| matches!(node.kind, CpgNodeKind::Function { .. }))
+                {
+                    Vec::new()
+                } else {
+                    cpg.ast_children(node)
+                };
+                frames.push(CandidateUseFrame::Exit {
+                    node,
+                    children: children.clone(),
+                });
+                frames.extend(children.into_iter().rev().map(CandidateUseFrame::Enter));
+            }
+            CandidateUseFrame::Exit { node, children } => {
+                let mut uses = BTreeSet::new();
+                if !facts.uses_at(node).is_empty() {
+                    uses.insert(node);
+                }
+                for child in children {
+                    let Some(child_uses) = local.get(&child).or_else(|| cache.get(&child)) else {
+                        cyclic = true;
+                        break;
+                    };
+                    uses.extend(child_uses.iter().copied());
+                }
+                if cyclic {
+                    break;
+                }
+                active.remove(&node);
+                local.insert(node, uses.into_iter().collect::<Vec<_>>().into());
+            }
+        }
+    }
+
+    if !cyclic {
+        cache.extend(local);
+        return cache
+            .get(&root)
+            .expect("postorder traversal summarizes its root")
+            .clone();
+    }
+
+    // Malformed AST cycles still have a precise finite reachability meaning.
+    // A global visited set computes it without recursive calls; caching the
+    // completed root summary makes later candidates that reach this cycle
+    // safe to reuse it.
     let mut uses = BTreeSet::new();
     let mut seen = BTreeSet::new();
     let mut pending = vec![root];
@@ -328,7 +418,9 @@ fn candidate_uses(cpg: &CodePropertyGraph, root: NodeId, facts: &VarFacts) -> Ve
         children.reverse();
         pending.extend(children);
     }
-    uses.into_iter().collect()
+    let uses: Arc<[NodeId]> = uses.into_iter().collect::<Vec<_>>().into();
+    cache.insert(root, uses.clone());
+    uses
 }
 
 fn hoistable_nodes(
@@ -561,10 +653,37 @@ fn derived_induction_variables(
     derived
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 struct AffineBase {
     base: Arc<str>,
     coefficient: Option<i64>,
+}
+
+/// One continuation in the bounded affine-expression evaluator.
+#[derive(Debug)]
+enum AffineFrame {
+    Enter {
+        node: NodeId,
+        depth: usize,
+    },
+    ApplyUnary {
+        node: NodeId,
+        operator: Arc<str>,
+    },
+    AfterLeft {
+        node: NodeId,
+        operator: Arc<str>,
+        left: NodeId,
+        right: NodeId,
+        child_depth: usize,
+    },
+    ApplyBinary {
+        node: NodeId,
+        operator: Arc<str>,
+        left: NodeId,
+        right: NodeId,
+        left_affine: Option<AffineBase>,
+    },
 }
 
 fn affine_in_basic(
@@ -575,68 +694,140 @@ fn affine_in_basic(
     depth: usize,
     seen: &mut BTreeSet<NodeId>,
 ) -> Option<AffineBase> {
-    if !seen.insert(node) {
-        return None;
-    }
-    let result = (|| {
-        if let Some(name) = identifier_name(cpg, node) {
-            return basics.contains_key(&name).then_some(AffineBase {
-                base: name,
-                coefficient: Some(1),
-            });
-        }
-        if depth == 0 {
-            return None;
-        }
-        match cpg.node(node).map(|node| &node.kind) {
-            Some(CpgNodeKind::UnaryOp { operator }) => {
-                let operand = cpg.ast_children(node).first().copied()?;
-                let mut affine = affine_in_basic(cpg, operand, basics, invariant, depth - 1, seen)?;
-                match &**operator {
-                    "+" => Some(affine),
-                    "-" => {
-                        affine.coefficient = affine.coefficient.and_then(i64::checked_neg);
-                        Some(affine)
+    let mut frames = vec![AffineFrame::Enter { node, depth }];
+    let mut values: Vec<Option<AffineBase>> = Vec::new();
+
+    while let Some(frame) = frames.pop() {
+        match frame {
+            AffineFrame::Enter { node, depth } => {
+                if !seen.insert(node) {
+                    values.push(None);
+                    continue;
+                }
+                if let Some(name) = identifier_name(cpg, node) {
+                    let affine = basics.contains_key(&name).then_some(AffineBase {
+                        base: name,
+                        coefficient: Some(1),
+                    });
+                    seen.remove(&node);
+                    values.push(affine);
+                    continue;
+                }
+                if depth == 0 {
+                    seen.remove(&node);
+                    values.push(None);
+                    continue;
+                }
+
+                match cpg.node(node).map(|node| &node.kind) {
+                    Some(CpgNodeKind::UnaryOp { operator }) => {
+                        let Some(operand) = cpg.ast_children(node).first().copied() else {
+                            seen.remove(&node);
+                            values.push(None);
+                            continue;
+                        };
+                        frames.push(AffineFrame::ApplyUnary {
+                            node,
+                            operator: operator.clone(),
+                        });
+                        frames.push(AffineFrame::Enter {
+                            node: operand,
+                            depth: depth - 1,
+                        });
                     }
-                    _ => None,
+                    Some(CpgNodeKind::BinaryOp { operator }) => {
+                        let children = cpg.ast_children(node);
+                        let [left, right, ..] = children.as_slice() else {
+                            seen.remove(&node);
+                            values.push(None);
+                            continue;
+                        };
+                        frames.push(AffineFrame::AfterLeft {
+                            node,
+                            operator: operator.clone(),
+                            left: *left,
+                            right: *right,
+                            child_depth: depth - 1,
+                        });
+                        frames.push(AffineFrame::Enter {
+                            node: *left,
+                            depth: depth - 1,
+                        });
+                    }
+                    _ => {
+                        seen.remove(&node);
+                        values.push(None);
+                    }
                 }
             }
-            Some(CpgNodeKind::BinaryOp { operator }) => {
-                let children = cpg.ast_children(node);
-                let [left, right, ..] = children.as_slice() else {
-                    return None;
+            AffineFrame::ApplyUnary { node, operator } => {
+                let affine = values.pop().expect("unary child produces one value");
+                let result = match &*operator {
+                    "+" => affine,
+                    "-" => affine.map(|mut affine| {
+                        affine.coefficient = affine.coefficient.and_then(i64::checked_neg);
+                        affine
+                    }),
+                    _ => None,
                 };
-                affine_binary(
-                    cpg,
-                    operator,
-                    *left,
-                    *right,
-                    basics,
-                    invariant,
-                    depth - 1,
-                    seen,
-                )
+                seen.remove(&node);
+                values.push(result);
             }
-            _ => None,
+            AffineFrame::AfterLeft {
+                node,
+                operator,
+                left,
+                right,
+                child_depth,
+            } => {
+                let left_affine = values.pop().expect("left child produces one value");
+                frames.push(AffineFrame::ApplyBinary {
+                    node,
+                    operator,
+                    left,
+                    right,
+                    left_affine,
+                });
+                frames.push(AffineFrame::Enter {
+                    node: right,
+                    depth: child_depth,
+                });
+            }
+            AffineFrame::ApplyBinary {
+                node,
+                operator,
+                left,
+                right,
+                left_affine,
+            } => {
+                let right_affine = values.pop().expect("right child produces one value");
+                let result = affine_binary(
+                    cpg,
+                    &operator,
+                    left,
+                    right,
+                    invariant,
+                    left_affine,
+                    right_affine,
+                );
+                seen.remove(&node);
+                values.push(result);
+            }
         }
-    })();
-    seen.remove(&node);
-    result
+    }
+
+    values.pop().flatten()
 }
 
-#[allow(clippy::too_many_arguments)]
 fn affine_binary(
     cpg: &CodePropertyGraph,
     operator: &str,
     left: NodeId,
     right: NodeId,
-    basics: &BTreeMap<Arc<str>, &InductionVariable>,
     invariant: &BTreeSet<NodeId>,
-    depth: usize,
-    seen: &mut BTreeSet<NodeId>,
+    left_affine: Option<AffineBase>,
+    right_affine: Option<AffineBase>,
 ) -> Option<AffineBase> {
-    let left_affine = affine_in_basic(cpg, left, basics, invariant, depth, seen);
-    let right_affine = affine_in_basic(cpg, right, basics, invariant, depth, seen);
     match operator {
         "+" | "-" => match (left_affine, right_affine) {
             (Some(affine), None) if operand_is_invariant(cpg, right, invariant) => Some(affine),
@@ -845,20 +1036,43 @@ fn operand_is_invariant(
 }
 
 fn integer_constant(cpg: &CodePropertyGraph, node: NodeId) -> Option<i64> {
-    match cpg.node(node).map(|node| &node.kind) {
-        Some(CpgNodeKind::Literal {
-            kind: LiteralKind::Integer(value),
-        }) => Some(*value),
-        Some(CpgNodeKind::UnaryOp { operator }) => {
-            let operand = cpg.ast_children(node).first().copied()?;
-            let value = integer_constant(cpg, operand)?;
-            match &**operator {
-                "+" => Some(value),
-                "-" => value.checked_neg(),
-                _ => None,
-            }
+    #[derive(Debug, Clone, Copy)]
+    enum SignFrame {
+        Positive,
+        Negative,
+    }
+
+    let mut current = node;
+    let mut seen = BTreeSet::new();
+    let mut continuations = Vec::new();
+    loop {
+        if !seen.insert(current) {
+            return None;
         }
-        _ => None,
+        match cpg.node(current).map(|node| &node.kind) {
+            Some(CpgNodeKind::Literal {
+                kind: LiteralKind::Integer(value),
+            }) => {
+                let mut value = *value;
+                while let Some(frame) = continuations.pop() {
+                    value = match frame {
+                        SignFrame::Positive => value,
+                        SignFrame::Negative => value.checked_neg()?,
+                    };
+                }
+                return Some(value);
+            }
+            Some(CpgNodeKind::UnaryOp { operator }) => {
+                let operand = cpg.ast_children(current).first().copied()?;
+                continuations.push(match &**operator {
+                    "+" => SignFrame::Positive,
+                    "-" => SignFrame::Negative,
+                    _ => return None,
+                });
+                current = operand;
+            }
+            _ => return None,
+        }
     }
 }
 

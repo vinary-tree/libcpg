@@ -35,13 +35,19 @@ For each loop, form a finite function-scoped region from its CFG body and AST
 descendants. Compute the least loop-invariant fixed point from non-empty
 `DefUse` predecessor sets: a use is invariant only when all reaching
 definitions are outside the region or already invariant. Never infer a missing
-DFG relation.
+DFG relation. Precompute candidate-use sets with a typed postorder heap machine
+that memoizes completed descendant summaries. If malformed `AstChild` edges
+form a cycle, compute that root's exact reachability summary with an iterative
+visited-set fallback and cache only the completed result.
 
 Recognize an explicit basic induction variable only when one supported additive
 recurrence is the variable's unique in-region definition and its update
 dominates every latch. Recognize semantic `For` ranges as implicit increasing
 step-one variables. Recognize one level of affine derived variables over a
-basic IV, using checked integer coefficient arithmetic. Leave symbolic or
+basic IV, using checked integer coefficient arithmetic and an exact semantic
+budget of three operator levels. Execute affine and signed-integer expression
+evaluation with typed heap continuations and active-path cycle checks, so input
+depth never consumes one native call frame per node. Leave symbolic or
 overflowing steps unknown.
 
 Emit counted-trip evidence only for reducible loops whose range or exit guard
@@ -66,15 +72,19 @@ advisory and out of graph.
   across language integer models.
 - Canonical ordered collections make reports independent of graph insertion
   order and reproducible across runs.
-- Iterative, visited-set-bounded AST walks terminate on cyclic malformed graphs
-  and are stack-safe for deeply nested regions.
+- Typed postorder, affine, and signed-integer machines plus bounded visited sets
+  terminate on cyclic malformed graphs and are stack-safe for deeply nested
+  regions and constant expressions.
+- Postorder use summaries remove repeated descendant traversal from ordinary
+  nested candidate expressions regardless of parent/child identifier order.
 - Out-of-graph results compose with later cost analyses without mutating source
   evidence or invalidating graph identifiers.
 
 ### Negative
 
-- The fixed point rescans candidate subtrees and may be quadratic in the number
-  of candidates per loop; nested regions intentionally overlap.
+- Materialized use summaries may repeat one use id for multiple enclosing
+  candidates, and the monotone fixed point may still be quadratic in the
+  number of candidates; nested loop regions intentionally overlap.
 - Only additive basic recurrences and one-level affine derived expressions are
   recognized. Nonlinear, pointer, iterator, and recursively derived patterns
   remain absent.
