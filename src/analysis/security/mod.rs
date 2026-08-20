@@ -5,8 +5,14 @@
 //! each complete report and check its [`is_complete`](CweAnalysis::is_complete)
 //! predicate.
 
+mod crypto;
 mod cwe;
 
+pub use crypto::{
+    analyze_builtin_crypto, analyze_crypto_misuse, builtin_crypto_rules, CryptoAnalysis,
+    CryptoAnalysisConfig, CryptoAnalysisIssue, CryptoArgumentRule, CryptoEvidence, CryptoFinding,
+    CryptoMisuseKind, CryptoRuleSet, MAX_CRYPTO_CALLS, MAX_CRYPTO_ORIGIN_NODES,
+};
 pub use cwe::{
     analyze_builtin_cwes, analyze_cwe_templates, builtin_cwe_templates, CweAnalysis,
     CweAnalysisConfig, CweAnalysisError, CweAnalysisIssue, CweCandidate, CweEvidence,
