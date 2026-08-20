@@ -76,6 +76,9 @@
 //! - **Cryptographic API Misuse**: Compose CrySL-style call-order properties,
 //!   typed parameter constraints, and literal-origin taint into qualified
 //!   advisory weak-hash, ECB, predictable-IV, and hardcoded-key evidence
+//! - **Secret and Access Policy Analysis**: Qualify typed literals through
+//!   entropy or binding evidence, propagate them to security sinks, and infer
+//!   missing authN/authZ guards from exact peer-supported check populations
 //! - **Pattern Detection**: Detect design patterns using subgraph isomorphism (VF2/VF3)
 //! - **Algorithm Analysis**: Extract algorithm signatures and estimate complexity
 //! - **GNN Support**: Graph neural network message passing for semantic embeddings

@@ -103,6 +103,9 @@ PDG). A query can therefore mix syntax, control flow, and data flow freely.
   qualification composed with shared taint, null-flow, typestate, interval,
   and typed-literal evidence for ten shipped weakness families, with explicit
   completeness and immutable advisory reports.
+- **Cryptographic and security-policy analysis** — feature-free CrySL-style
+  crypto misuse, high-entropy/name-hinted secret flow to governed sinks, and
+  exact peer-inferred missing authN/authZ guards with typed completeness.
 - **Projection centrality** — deterministic PageRank variants, vertex/edge
   betweenness, eigenvector, Katz, closeness, harmonic, HITS, and Burt
   structural-hole scores with explicit iteration and traversal budgets.

@@ -1,0 +1,80 @@
+@startuml
+!include _libcpg-theme.iuml
+title Secret-flow and missing access-guard composition
+
+skinparam backgroundColor #FCFCFC
+skinparam component {
+  BorderColor #495057
+}
+skinparam note {
+  BackgroundColor #F1F3F5
+  BorderColor #495057
+}
+
+component "CodePropertyGraph\ntyped AST · CFG · DFG · PDG · calls" as CPG #DBE4FF
+
+package "J3 · secret and credential flow" #F8F9FA {
+  component "SecretRuleSet\nsinks · positions · name hints" as SRULE #FFE8CC
+  component "literal qualifier\nShannon entropy OR typed binding hint" as QUAL #E5DBFF
+  component "shared IFDS taint\nall string origins → security sinks" as TAINT #FFF3BF
+  component "flow filter\nqualified origin + governed argument" as SFILTER #74C0FC
+  component "SecretAnalysis\nfindings · taint · issues" as SREPORT #D3F9D8
+}
+
+package "J4 · missing authentication/authorization" #F8F9FA {
+  component "AuthzRuleSet\nmutations · access-guard patterns" as ARULE #FFE8CC
+  component "shared missing-check engine\nAPI populations · exact support" as POP #C3FAE8
+  component "flat fingerprint filter\ntyped authN/authZ call or member" as AFILTER #74C0FC
+  component "AuthzAnalysis\nfindings · analyzed sites · issues" as AREPORT #D3F9D8
+}
+
+component "typed incompleteness\npolicy · graph · cap · delegated" as ISSUE #FCC2D7
+
+CPG --> QUAL : typed literals + binding context
+SRULE --> QUAL : thresholds + hints
+CPG --> TAINT : AST + DFG + calls + summaries
+SRULE --> TAINT : categorical strings + sink catalog
+QUAL --> SFILTER : qualified literal NodeIds
+TAINT --> SFILTER : canonical flow witnesses
+SRULE --> SFILTER : governed positions
+SFILTER --> SREPORT
+QUAL --> ISSUE : literal/context caps
+TAINT --> ISSUE : delegated cap/issues
+
+CPG --> POP : calls + AST + PDG + call graph
+ARULE --> POP : mutation sink catalog + peer policy
+POP --> AFILTER : normalized missing fingerprints
+ARULE --> AFILTER : access-guard patterns
+AFILTER --> AREPORT
+POP --> ISSUE : structural/cap issues
+ARULE --> ISSUE : invalid patterns
+ISSUE --> SREPORT
+ISSUE --> AREPORT
+
+note bottom of CPG
+  Both analyses are read-only. Typed graph evidence is
+  consumed directly; neither branch reparses source text.
+end note
+
+note bottom of SREPORT
+  Literal contents are omitted from findings.
+  A negative claim requires is_complete() = true.
+end note
+
+note bottom of AREPORT
+  Population convention is advisory, not an authorization proof.
+  A negative claim requires is_complete() = true.
+end note
+
+legend bottom
+|= Colour |= Meaning |
+|<#DBE4FF>| normalized CPG evidence |
+|<#FFE8CC>| caller-owned declarative policy |
+|<#E5DBFF>| explicit stack-safe qualification machine |
+|<#FFF3BF>| shared taint/data-flow semantics |
+|<#C3FAE8>| shared exact population inference |
+|<#74C0FC>| detector-specific typed filtering |
+|<#D3F9D8>| immutable advisory report |
+|<#FCC2D7>| incomplete or invalid evidence |
+endlegend
+@enduml

@@ -679,6 +679,26 @@ See the [component guide](../components/graph/crypto-misuse-analysis.md),
 [Theory 39](../theory/39-cryptographic-api-misuse.md), and
 [Usage 22](../usage/22-cryptographic-api-misuse.md).
 
+### Secret-flow and missing access-guard analysis (feature-free)
+
+`analyze_secret_flows` follows `CodePropertyGraph + SecretRuleSet → bounded
+entropy/name qualification + shared literal-source taint → governed security
+sink flows`. Qualification stores only integer entropy or matched policy/context
+IDs; the existing IFDS-style engine owns propagation and witnesses.
+
+`analyze_missing_authz` follows `CodePropertyGraph + AuthzRuleSet → shared exact
+missing-check populations → flat typed authN/authZ fingerprint filter`. It
+preserves exact peer support and witnesses rather than reconstructing them.
+
+Both paths are feature-free, read-only, deterministic, and explicitly
+three-valued. Local and delegated caps/issues prevent a clean interpretation.
+
+![Two security-policy analyses reuse taint and population semantics](../diagrams/security-policy-pipeline.svg)
+
+See the [component guide](../components/graph/security-policy-analysis.md),
+[Theory 40](../theory/40-secret-flow-and-access-policy-inference.md), and
+[Usage 23](../usage/23-secret-and-access-policy-analysis.md).
+
 ### Pattern detection
 
 Two layers, at two feature levels:

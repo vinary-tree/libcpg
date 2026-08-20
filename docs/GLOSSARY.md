@@ -154,6 +154,27 @@ represented evidence by composing typestate, literal-origin taint, and typed
 argument provenance. See
 [`theory/39-cryptographic-api-misuse.md`](theory/39-cryptographic-api-misuse.md).
 
+### Secret candidate / Secret flow
+
+A **secret candidate** is a typed string literal qualified by a configured
+Shannon-entropy threshold or typed binding-name hint. It is not necessarily a
+live or valid credential. A **secret flow** additionally has a represented
+taint witness from that candidate to a governed authentication, network, or
+cryptographic-key argument. libcpg records node provenance and non-sensitive
+qualification metadata rather than copying the literal value [[61]](#references),
+[[62]](#references). See
+[`theory/40-secret-flow-and-access-policy-inference.md`](theory/40-secret-flow-and-access-policy-inference.md).
+
+### Authentication (authN) / Authorization (authZ)
+
+**Authentication (authN)** establishes the identity associated with a request
+or principal. **Authorization (authZ)** decides whether that identity may
+perform a specific operation. libcpg's missing-access-guard analysis reports a
+state-mutating call that lacks a normalized authN/authZ check supported by its
+peer population; it does not prove that the peers implement correct access
+policy [[52]](#references). See
+[`components/graph/security-policy-analysis.md`](components/graph/security-policy-analysis.md).
+
 ### CrySL
 
 **CrySL** is a specification language for cryptographic API usage rules. A rule
@@ -1193,3 +1214,5 @@ strict tree interpretation. See
 58. Yamaguchi, F., Golde, N., Arp, D., Rieck, K. (2014). *Modeling and Discovering Vulnerabilities with Code Property Graphs.* DOI: [10.1109/SP.2014.44](https://doi.org/10.1109/SP.2014.44).
 59. Li, P., Yao, S., Korich, J. S., Luo, C., Yu, J., Cao, Y., Yang, J. (2025). *Neuro-symbolic Static Analysis with LLM-generated Vulnerability Patterns.* DOI: [10.48550/arXiv.2504.16057](https://doi.org/10.48550/arXiv.2504.16057).
 60. Lekssays, A., Mouhcine, H., Tran, K., Yu, T., Khalil, I. (2025). *LLMxCPG: Context-Aware Vulnerability Detection Through Code Property Graph-Guided Large Language Models.* DOI: [10.48550/arXiv.2507.16585](https://doi.org/10.48550/arXiv.2507.16585).
+61. Meli, M., McNiece, M. R., Reaves, B. (2019). *How Bad Can It Git? Characterizing Secret Leakage in Public GitHub Repositories.* DOI: [10.14722/ndss.2019.23418](https://doi.org/10.14722/ndss.2019.23418).
+62. Shannon, C. E. (1948). *A Mathematical Theory of Communication.* DOI: [10.1002/j.1538-7305.1948.tb01338](https://doi.org/10.1002/j.1538-7305.1948.tb01338).

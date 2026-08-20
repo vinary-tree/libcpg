@@ -296,6 +296,10 @@ development, or jump to the layer you need:
     CrySL-style finite call protocols, positional value constraints,
     literal-origin key taint, explicit provenance machines, and aggregate
     completeness semantics define qualified cryptographic misuse evidence.
+40. **[40 — Secret flow and access-policy inference](40-secret-flow-and-access-policy-inference.md).**
+    Shannon-entropy and typed binding qualification compose with shared taint;
+    exact missing-check populations specialize to typed authentication and
+    authorization guards.
 
 The later chapters define deterministic projection structure, architecture
 metrics, inspectable evidence, and their interpretation limits.

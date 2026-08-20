@@ -28,6 +28,7 @@ Source: [`diagrams/resource-bounds.puml`](../diagrams/resource-bounds.puml).*
 | `IfdsCaps::{max_functions,max_facts_per_node,max_worklist_steps,max_scc_iters,max_call_depth}` | `100_000`, `4_096`, `1_000_000`, `64`, `128` | `solve_summaries`; default callee resolver | returns ordered partial evidence, never a false completeness claim; fact overflow stops before solving and recursive overflow stops before callers |
 | Effect-domain local machines | inherit `IfdsCaps::{max_call_depth,max_worklist_steps}` | `analyze_effects`; return-dependency and constant evaluation | typed heap frames keep native depth constant; active-path cycles terminate; logical depth/work or allocation exhaustion widens conservatively, records the function as capped, and prevents a false completeness claim |
 | Taint/nullflow traversal and retention bounds | inherit `IfdsCaps` | `analyze_taint_report`; `analyze_null_flows_report` | typed call-path/value walks terminate by depth and visited sets; parameter masks visibly truncate after 64 positions; solver fact/work/SCC caps and domain-local cap evidence prevent false absence claims |
+| Secret/access-policy bounds | `100_000` literals, `10_000` binding-context nodes, inherited missing-check `100_000` fingerprint nodes / `128` callee depth | `analyze_secret_flows`; `analyze_missing_authz` | literal/context hard ceilings are both `1_000_000`; typed cap/policy/population issues prevent a false clean result; all depth state is heap-resident |
 | Typestate and resource-leak bounds | inherit `IfdsCaps::{max_functions,max_facts_per_node,max_worklist_steps,max_call_depth}` | `analyze_typestate`; `analyze_resource_leaks` | ordered object/value-flow and CFG fact worklists stop visibly; invalid policies, missing events/placement, and absent leak accepting states prevent false completeness |
 | Exception-flow bounds | inherit `IfdsCaps::{max_functions,max_facts_per_node,max_worklist_steps,max_scc_iters}` | `analyze_exception_flow` | finite exception-type summaries stop visibly at solver caps; unknown types, ambiguous calls, malformed catch entry, and missing witnesses prevent false completeness; call depth is inapplicable because SCC summaries replace path expansion |
 | Uninitialized-use traversal guards | always on | `analyze_uninitialized_uses` | finite function/use/definition scans and cycle-safe heap traversals; results describe only the represented binding and reaching-definition relation |
@@ -260,6 +261,22 @@ making an absence claim; the vector conveniences retain positive evidence but
 cannot represent an empty capped result. The separate [taint security
 boundary](02-taint-analysis.md) covers policy provenance and witness
 interpretation.
+
+### Secret and access-policy cap evidence
+
+`SecretAnalysisConfig::max_literals` and
+`max_name_context_nodes_per_literal` are clamped by
+`MAX_SECRET_LITERALS` and `MAX_SECRET_NAME_CONTEXT_NODES`, each `1_000_000`.
+The qualifier stops canonically, emits `LiteralsCapped` or
+`NameContextCapped`, and makes the aggregate report incomplete. Delegated
+propagation retains every `IfdsCaps` event through `SecretAnalysis::taint`.
+
+`AuthzAnalysisConfig` passes `max_check_nodes` and `max_callee_depth` into the
+shared missing-check engine. Fingerprint, call identity, ownership, and malformed
+AST issues are translated without loss. Bound mutation/guard rule counts and
+pattern bytes at ingress when policy is untrusted; compile-time graph ceilings
+do not bound caller policy allocation. See the dedicated
+[secret/access-policy security boundary](15-secret-and-access-policy-analysis.md).
 
 ### Typestate and advisory bug-detector evidence
 
@@ -969,5 +986,7 @@ over each one — see
   bounds cap.
 - [Taint-analysis security boundary](02-taint-analysis.md) — catalog trust,
   advisory findings, witnesses, confidence, and absence claims.
+- [Secret/access-policy security boundary](15-secret-and-access-policy-analysis.md)
+  — secret minimization, heuristic limits, peer-policy trust, and clean claims.
 - [`usage/04-program-slicing.md`](../usage/04-program-slicing.md) — using slices in
   anger.

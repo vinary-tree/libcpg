@@ -1,0 +1,60 @@
+@startuml
+!include _libcpg-theme.iuml
+title Qualified interpretation of J3 and J4 security-policy reports
+
+skinparam backgroundColor #FCFCFC
+skinparam activity {
+  BorderColor #495057
+  DiamondBackgroundColor #FFF3BF
+  DiamondBorderColor #F08C00
+}
+
+start
+:Validate policy and explicit resource bounds; <<#DBE4FF>>
+fork
+  :Enumerate typed string literals\nin canonical order; <<#E5DBFF>>
+  if (Length + entropy threshold?) then (yes)
+    :Record non-sensitive entropy evidence; <<#D3F9D8>>
+  else (no)
+    :Walk bounded typed binding context\nwith heap state; <<#E5DBFF>>
+    if (Configured name hint?) then (yes)
+      :Record pattern + context NodeId; <<#D3F9D8>>
+    else (no)
+      :Do not qualify literal; <<#F1F3F5>>
+    endif
+  endif
+  :Run shared IFDS taint to\nauth, network, and key sinks; <<#FFF3BF>>
+  :Retain qualified, position-governed flows; <<#74C0FC>>
+fork again
+  :Compile mutating APIs into\nmissing-check sink catalog; <<#FFE8CC>>
+  :Infer exact peer-supported\nnormalized missing checks; <<#C3FAE8>>
+  :Retain fingerprints containing\ntyped authN/authZ APIs; <<#74C0FC>>
+end fork
+:Collect policy, structural, cap,\nand delegated issues; <<#FCC2D7>>
+if (Selected report is complete?) then (yes)
+  if (Findings present?) then (yes)
+    :Return advisory candidates\nwith canonical witnesses; <<#FFE8CC>>
+  else (no)
+    :Permit only a represented-policy\nno-candidate statement; <<#C3FAE8>>
+  endif
+else (no)
+  :Retain useful findings and all issues; <<#FCC2D7>>
+  :Forbid a clean-scan interpretation; <<#FFE3E3>>
+endif
+:Leave the input CPG unchanged and\nkeep literal text out of findings; <<#F1F3F5>>
+stop
+
+legend bottom
+|= Colour |= Meaning |
+|<#DBE4FF>| validated normalized input |
+|<#E5DBFF>| explicit heap-resident traversal |
+|<#D3F9D8>| qualified literal evidence |
+|<#FFF3BF>| shared taint semantics |
+|<#FFE8CC>| policy or advisory positive evidence |
+|<#C3FAE8>| population inference or qualified no-candidate result |
+|<#74C0FC>| detector-specific filtering |
+|<#FCC2D7>| incomplete or invalid evidence |
+|<#FFE3E3>| prohibited negative interpretation |
+|<#F1F3F5>| immutability/confidentiality boundary |
+endlegend
+@enduml

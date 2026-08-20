@@ -126,6 +126,10 @@ evidence plus the typestate/resource-leak provider without graph mutation.
 Declarative CWE analysis is provided by `analysis::security::cwe`; it reuses
 the stack-safe VF2 matcher and the shared taint, null-flow, typestate, and
 interval providers without graph mutation or source reparsing.
+Cryptographic misuse and security-policy analysis are provided by
+`analysis::security::{crypto,secrets,authz}`; they reuse typestate, taint, and
+population missing-check providers while keeping secret qualification and
+typed authN/authZ filtering local, stack-safe, and out of graph.
 Clone and feasibility advisories are provided by
 `analysis::bugs::{clone_bugs,infeasible}` and reuse `pattern::clones`, SCCP,
 and interval providers without moving policy into the graph.

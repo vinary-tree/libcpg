@@ -106,6 +106,8 @@ Grouped by subject. Each row: the source (its `.svg` sibling is embedded by the 
 | `cwe-evidence-qualification.puml` | activity/decision flow | validated request → bounded structural and semantic evidence → candidate/no-match → complete or explicitly incomplete interpretation | design/0048, theory/38, scientific/43, security/13 |
 | `crypto-misuse-pipeline.puml` | component/evidence flow | declarative crypto policy → shared typestate/taint plus explicit argument provenance → canonical advisory findings | architecture/data-flow, components/graph/crypto-misuse-analysis, design/0049, theory/39 |
 | `crypto-evidence-qualification.puml` | activity/decision flow | policy validation → three composed evidence branches → complete/advisory or explicitly incomplete interpretation | design/0049, theory/39, scientific/44, security/14 |
+| `security-policy-pipeline.puml` | two-lane component/evidence flow | entropy/name-qualified literal taint and exact missing-check populations → secret-flow and missing authN/authZ reports | architecture/data-flow, components/graph/security-policy-analysis, design/0050, theory/40 |
+| `security-policy-qualification.puml` | two-lane activity/decision flow | literal qualification and access-guard population inference → complete/advisory or explicitly incomplete interpretation | design/0050, theory/40, scientific/45, security/15 |
 
 ### Control flow, data flow, dependence
 | Source | Type | Depicts | Embedded by |

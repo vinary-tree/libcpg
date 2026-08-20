@@ -603,6 +603,31 @@ See the [component guide](../components/graph/crypto-misuse-analysis.md),
 [theory](../theory/39-cryptographic-api-misuse.md), and
 [security boundary](../security/14-cryptographic-api-misuse.md).
 
+### Secret-flow and missing access-guard analysis
+
+The feature-free J3/J4 APIs compose typed literal qualification with shared
+taint and specialize shared population inference for authN/authZ guards. They
+do not parse source, copy secret values into findings, or mutate the CPG.
+
+| API/type | Meaning |
+|---|---|
+| `builtin_secret_rules` / `analyze_builtin_secrets` | Owned cross-language secret policy and its analysis entry point. |
+| `analyze_secret_flows` | Runs a caller-supplied `SecretRuleSet`. |
+| `SecretSinkRule` / `SecretSinkFamily` | Stable rule, typed paths, optional zero-based positions, and authentication/network/crypto-key family. |
+| `SecretAnalysisConfig` | Integer entropy thresholds, literal/context bounds, and delegated `IfdsCaps`. |
+| `SecretLiteralEvidence` | Value-minimizing high-entropy or typed name-hint evidence. |
+| `SecretFinding` / `SecretAnalysis` | Canonical source-to-sink witness plus complete delegated taint and issues. |
+| `builtin_authz_rules` / `analyze_builtin_authz` | Owned mutation/access defaults and their analysis entry point. |
+| `analyze_missing_authz` | Runs a caller-supplied `AuthzRuleSet`. |
+| `AuthzMutationRule` / `AuthzRuleSet` | Typed mutating APIs and access-guard fingerprint patterns. |
+| `AuthzAnalysisConfig` | Exact population support, peer topology, and fingerprint/path bounds. |
+| `AuthzFinding` / `AuthzAnalysis` | Missing normalized access guards, exact support, peers, witnesses, and translated issues. |
+
+See the [component guide](../components/graph/security-policy-analysis.md),
+[usage guide](../usage/23-secret-and-access-policy-analysis.md),
+[theory](../theory/40-secret-flow-and-access-policy-inference.md), and
+[security boundary](../security/15-secret-and-access-policy-analysis.md).
+
 ### Deterministic graph projections
 
 `GraphProjection` is the feature-free, payload-free compressed-sparse-row view
