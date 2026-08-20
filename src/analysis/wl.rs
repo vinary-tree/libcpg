@@ -39,49 +39,73 @@ pub(crate) const fn stable_wl_mix(hash: u64, value: u64) -> u64 {
 /// `iterations` is clamped to [`MAX_WL_ITERATIONS`]. A malformed public-field
 /// projection returns an empty vector before indexed traversal.
 pub fn wl_labels(graph: &GraphProjection, iterations: usize) -> Vec<u64> {
-    if !graph.is_well_formed() {
-        return Vec::new();
+    comparable_wl_labels(&[graph], iterations)
+        .and_then(|mut labels| labels.pop())
+        .unwrap_or_default()
+}
+
+/// Computes WL labels in one shared vocabulary across all input projections.
+///
+/// Per-graph canonical ranks are not comparable across independently refined
+/// graphs: rank zero can denote different raw neighborhood signatures in each
+/// graph. Joint canonicalization retains the compact public labels while
+/// ensuring that equal ranks mean equal refinement signatures throughout one
+/// comparison. `None` reports a malformed public-field projection.
+pub(crate) fn comparable_wl_labels(
+    graphs: &[&GraphProjection],
+    iterations: usize,
+) -> Option<Vec<Vec<u64>>> {
+    if graphs.iter().any(|graph| !graph.is_well_formed()) {
+        return None;
     }
 
-    let n = graph.node_count();
-    let mut labels = (0..n)
-        .map(|dense| {
-            let incoming = graph.predecessors(dense as u32).len() as u64;
-            let outgoing = graph.successors(dense as u32).len() as u64;
-            stable_wl_mix(stable_wl_mix(0xABCD, incoming), outgoing)
+    let mut labels = graphs
+        .iter()
+        .map(|graph| {
+            (0..graph.node_count())
+                .map(|dense| {
+                    let incoming = graph.predecessors(dense as u32).len() as u64;
+                    let outgoing = graph.successors(dense as u32).len() as u64;
+                    stable_wl_mix(stable_wl_mix(0xABCD, incoming), outgoing)
+                })
+                .collect::<Vec<_>>()
         })
         .collect::<Vec<_>>();
 
     let mut neighbor_labels = Vec::new();
     for _ in 0..iterations.min(MAX_WL_ITERATIONS) {
-        let mut next = Vec::with_capacity(n);
-        for dense in 0..n {
-            neighbor_labels.clear();
-            neighbor_labels.extend(
-                graph
-                    .successors(dense as u32)
-                    .iter()
-                    .map(|&neighbor| labels[neighbor as usize]),
-            );
-            neighbor_labels.extend(
-                graph
-                    .predecessors(dense as u32)
-                    .iter()
-                    .map(|&neighbor| labels[neighbor as usize]),
-            );
-            neighbor_labels.sort_unstable();
+        let mut next = Vec::with_capacity(graphs.len());
+        for (graph, graph_labels) in graphs.iter().zip(&labels) {
+            let mut graph_next = Vec::with_capacity(graph.node_count());
+            for dense in 0..graph.node_count() {
+                neighbor_labels.clear();
+                neighbor_labels.extend(
+                    graph
+                        .successors(dense as u32)
+                        .iter()
+                        .map(|&neighbor| graph_labels[neighbor as usize]),
+                );
+                neighbor_labels.extend(
+                    graph
+                        .predecessors(dense as u32)
+                        .iter()
+                        .map(|&neighbor| graph_labels[neighbor as usize]),
+                );
+                neighbor_labels.sort_unstable();
 
-            let mut hash = stable_wl_mix(0x1234, labels[dense]);
-            for &neighbor in &neighbor_labels {
-                hash = stable_wl_mix(hash, neighbor);
+                let mut hash = stable_wl_mix(0x1234, graph_labels[dense]);
+                for &neighbor in &neighbor_labels {
+                    hash = stable_wl_mix(hash, neighbor);
+                }
+                graph_next.push(hash);
             }
-            next.push(hash);
+            next.push(graph_next);
         }
 
-        let mut canonical = next.clone();
+        let mut canonical = next.iter().flatten().copied().collect::<Vec<_>>();
         canonical.sort_unstable();
         canonical.dedup();
-        for label in &mut next {
+        for label in next.iter_mut().flatten() {
             *label = canonical
                 .binary_search(label)
                 .expect("a raw WL label is present in its canonical set")
@@ -90,7 +114,48 @@ pub fn wl_labels(graph: &GraphProjection, iterations: usize) -> Vec<u64> {
         labels = next;
     }
 
-    labels
+    Some(labels)
+}
+
+/// Cosine similarity between jointly canonicalized WL-label multisets.
+pub(crate) fn wl_multiset_cosine(
+    left: &GraphProjection,
+    right: &GraphProjection,
+    iterations: usize,
+) -> Option<f64> {
+    let labels = comparable_wl_labels(&[left, right], iterations)?;
+    Some(multiset_cosine(&labels[0], &labels[1]))
+}
+
+pub(crate) fn multiset_cosine(left: &[u64], right: &[u64]) -> f64 {
+    let mut left_counts = BTreeMap::<u64, usize>::new();
+    let mut right_counts = BTreeMap::<u64, usize>::new();
+    for &label in left {
+        *left_counts.entry(label).or_default() += 1;
+    }
+    for &label in right {
+        *right_counts.entry(label).or_default() += 1;
+    }
+    if left_counts == right_counts {
+        return 1.0;
+    }
+    let dot: f64 = left_counts
+        .iter()
+        .map(|(label, &count)| count as f64 * right_counts.get(label).copied().unwrap_or(0) as f64)
+        .sum();
+    let left_norm: f64 = left_counts
+        .values()
+        .map(|&count| (count * count) as f64)
+        .sum();
+    let right_norm: f64 = right_counts
+        .values()
+        .map(|&count| (count * count) as f64)
+        .sum();
+    if left_norm == 0.0 || right_norm == 0.0 {
+        f64::from(left.is_empty() && right.is_empty())
+    } else {
+        (dot / (left_norm.sqrt() * right_norm.sqrt())).clamp(0.0, 1.0)
+    }
 }
 
 /// Groups structurally indistinguishable projection nodes by final WL label.
@@ -258,6 +323,31 @@ mod tests {
         assert_eq!(stable_wl_mix(0x1234, 0x5678), 0xd1d1_0597_aec7_16b6);
     }
 
+    #[test]
+    fn joint_vocabulary_compares_isomorphic_graphs_without_local_rank_aliasing() {
+        let original = graph_from(5, &[(0, 1), (1, 2), (1, 3), (3, 4)]);
+        let relabeled = GraphProjection::from_edges(
+            ProjectionKind::External,
+            (0..5).map(|index| NodeId::new(100 + index * 7)),
+            [(100, 107), (107, 114), (107, 121), (121, 128)]
+                .map(|(source, target)| (NodeId::new(source), NodeId::new(target), 1.0)),
+        );
+        assert_eq!(wl_multiset_cosine(&original, &relabeled, 4), Some(1.0));
+
+        let unrelated = graph_from(5, &[(0, 1), (0, 2), (0, 3), (0, 4)]);
+        assert!(wl_multiset_cosine(&original, &unrelated, 4).unwrap() < 1.0);
+    }
+
+    #[test]
+    fn joint_vocabulary_rejects_malformed_inputs_and_handles_empty_graphs() {
+        let empty = graph_from(0, &[]);
+        assert_eq!(wl_multiset_cosine(&empty, &empty, 3), Some(1.0));
+
+        let mut malformed = graph_from(2, &[(0, 1)]);
+        malformed.targets.push(9);
+        assert_eq!(wl_multiset_cosine(&empty, &malformed, 3), None);
+    }
+
     fn normalized_logical_classes(
         classes: Vec<Vec<NodeId>>,
         logical_by_node: &BTreeMap<NodeId, usize>,
@@ -340,6 +430,14 @@ mod tests {
                 &relabeled_lookup,
             );
             prop_assert_eq!(original_classes, relabeled_classes);
+            prop_assert_eq!(
+                wl_multiset_cosine(&original, &relabeled, iterations),
+                Some(1.0),
+            );
+            prop_assert_eq!(
+                wl_multiset_cosine(&original, &relabeled, iterations),
+                wl_multiset_cosine(&relabeled, &original, iterations),
+            );
         }
     }
 }

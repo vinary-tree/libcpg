@@ -14,10 +14,9 @@ use rustc_hash::{FxHashMap, FxHashSet};
 use serde::{Deserialize, Serialize};
 
 use super::{NodeKindTag, SubgraphMatcher, Vf2Matcher};
-use crate::analysis::wl::stable_wl_mix;
+use crate::analysis::wl::{stable_wl_mix, wl_multiset_cosine};
 use crate::analysis::{
-    function_scope_nodes, pdg_projection, wl_labels, AnalysisError, GraphProjection,
-    MAX_WL_ITERATIONS,
+    function_scope_nodes, pdg_projection, AnalysisError, GraphProjection, MAX_WL_ITERATIONS,
 };
 use crate::{CodePropertyGraph, CpgEdgeKind, CpgNode, CpgNodeKind, LiteralKind, NodeId};
 
@@ -580,9 +579,8 @@ fn type4_equivalent(
         return Ok(false);
     }
 
-    let left_labels = wl_labels(left_pdg, options.wl_iterations);
-    let right_labels = wl_labels(right_pdg, options.wl_iterations);
-    let cosine = multiset_cosine(&left_labels, &right_labels);
+    let cosine = wl_multiset_cosine(left_pdg, right_pdg, options.wl_iterations)
+        .expect("CPG-derived PDG projections are well formed");
     if cosine < options.type4_wl_threshold {
         return Ok(false);
     }
@@ -602,34 +600,6 @@ fn type4_equivalent(
         .with_strict_edges(false)
         .with_max_matches(1);
     Ok(matcher.contains_pattern(&left_graph, &right_graph))
-}
-
-fn multiset_cosine(left: &[u64], right: &[u64]) -> f64 {
-    let mut left_counts = BTreeMap::<u64, usize>::new();
-    let mut right_counts = BTreeMap::<u64, usize>::new();
-    for &label in left {
-        *left_counts.entry(label).or_default() += 1;
-    }
-    for &label in right {
-        *right_counts.entry(label).or_default() += 1;
-    }
-    let dot: f64 = left_counts
-        .iter()
-        .map(|(label, &count)| count as f64 * right_counts.get(label).copied().unwrap_or(0) as f64)
-        .sum();
-    let left_norm: f64 = left_counts
-        .values()
-        .map(|&count| (count * count) as f64)
-        .sum();
-    let right_norm: f64 = right_counts
-        .values()
-        .map(|&count| (count * count) as f64)
-        .sum();
-    if left_norm == 0.0 || right_norm == 0.0 {
-        f64::from(left.is_empty() && right.is_empty())
-    } else {
-        dot / (left_norm.sqrt() * right_norm.sqrt())
-    }
 }
 
 fn pdg_cpg(source: &CodePropertyGraph, projection: &GraphProjection) -> CodePropertyGraph {
@@ -1046,9 +1016,9 @@ mod tests {
         assert!(size_ratio_qualifies(0, 0, 0.8));
         assert!(!size_ratio_qualifies(0, 1, 0.0));
         assert_eq!(multiset_jaccard(&BTreeMap::new(), &BTreeMap::new()), 1.0);
-        assert_eq!(multiset_cosine(&[], &[]), 1.0);
-        assert_eq!(multiset_cosine(&[], &[1]), 0.0);
-        assert_eq!(multiset_cosine(&[1], &[]), 0.0);
+        assert_eq!(crate::analysis::wl::multiset_cosine(&[], &[]), 1.0);
+        assert_eq!(crate::analysis::wl::multiset_cosine(&[], &[1]), 0.0);
+        assert_eq!(crate::analysis::wl::multiset_cosine(&[1], &[]), 0.0);
 
         let zero_sized = vec![
             FunctionFeatures {
