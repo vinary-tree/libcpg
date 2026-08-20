@@ -432,6 +432,9 @@ So the safe pattern is: build (single-threaded, `&mut`), then analyse
 - [API-usage protocol mining](api-usage-protocol-mining.md) — feature-free
   centered typed AUGs, exact strict-majority peer fragments, deviations, and
   named temporal-property projection through the shared typestate worklist.
+- [Declarative CWE-template analysis](cwe-template-analysis.md) — feature-free
+  bounded structural qualification composed with shared taint, null-flow,
+  typestate, interval, and typed-literal evidence for ten weakness families.
 - [`api/graph-reference.md`](../../api/graph-reference.md) — the precise,
   method-by-method API reference for `CodePropertyGraph`.
 - [`theory/01-code-property-graphs.md`](../../theory/01-code-property-graphs.md)

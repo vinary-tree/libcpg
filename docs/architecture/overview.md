@@ -87,6 +87,9 @@ bounded heap-resident machines.
 It also includes centered API-usage and named temporal protocol mining, which
 composes stable call identity, CFG/AST/DFG/PDG evidence, exact strict-majority
 population arithmetic, and the shared typestate worklist.
+Declarative CWE-template analysis composes bounded stack-safe VF2 structural
+qualification with shared taint, null-flow, typestate, interval, and
+typed-literal evidence while retaining every delegated completeness boundary.
 
 ### 5. Thread-safety, honestly
 
@@ -94,7 +97,7 @@ The public types are built for concurrency but do **not** silently parallelize:
 
 - `CodePropertyGraph` is a plain owned value: it is **mutable** during construction (`add_node`, `connect`, and the extractors all mutate it) and implements `Clone`. It is *not* "immutable after construction".
 - The matcher and detector traits are `Send + Sync` (`SubgraphMatcher`, `PatternDetector`, `AlgorithmDetector`, `CpgBuilder`), so a caller can run them across files or functions with its own thread pool.
-- `rayon` is a declared dependency and the crate is written to be parallelizable, but the current extractors and detectors iterate functions **sequentially** — no `par_iter` is wired in `src/` yet. There are **no** atomic progress counters and **no** SIMD paths; the `gpu` feature is reserved with no code behind it. Twenty-one Criterion targets currently measure SCC analysis, condensation analytics, CPG construction, pattern matching, variable liveness, loop induction, DSM, WL, centrality, community detection/refinement, cohesion/robustness, spectral connectivity, bounded cycle enumeration, directed motif census, bounded bipartite GED, function-clone detection, clone/feasibility advisories, API-usage/temporal mining, program composition, IFDS/IDE summaries, and taint-summary propagation. Remaining benchmark gaps are tracked in [`../engineering/03-performance.md`](../engineering/03-performance.md).
+- `rayon` is a declared dependency and the crate is written to be parallelizable, but the current extractors and detectors iterate functions **sequentially** — no `par_iter` is wired in `src/` yet. There are **no** atomic progress counters and **no** SIMD paths; the `gpu` feature is reserved with no code behind it. Twenty-two Criterion targets currently measure SCC analysis, condensation analytics, CPG construction, pattern matching, variable liveness, loop induction, DSM, WL, centrality, community detection/refinement, cohesion/robustness, spectral connectivity, bounded cycle enumeration, directed motif census, bounded bipartite GED, function-clone detection, clone/feasibility advisories, API-usage/temporal mining, declarative CWE templates, program composition, IFDS/IDE summaries, and taint-summary propagation. Remaining benchmark gaps are tracked in [`../engineering/03-performance.md`](../engineering/03-performance.md).
 
 ## Module map
 
@@ -120,6 +123,9 @@ typed completeness evidence through the crate root.
 API-usage and temporal protocol mining is provided by
 `analysis::bugs::api_mining`; it reuses the same call identity and population
 evidence plus the typestate/resource-leak provider without graph mutation.
+Declarative CWE analysis is provided by `analysis::security::cwe`; it reuses
+the stack-safe VF2 matcher and the shared taint, null-flow, typestate, and
+interval providers without graph mutation or source reparsing.
 Clone and feasibility advisories are provided by
 `analysis::bugs::{clone_bugs,infeasible}` and reuse `pattern::clones`, SCCP,
 and interval providers without moving policy into the graph.

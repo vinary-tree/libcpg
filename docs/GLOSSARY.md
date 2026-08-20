@@ -666,6 +666,19 @@ the learned population. Findings are advisory and qualified by completeness.
 See [Theory 37](theory/37-api-usage-graphs-and-temporal-properties.md),
 ASAP-Repair [[56]](#references), and ProveNFix [[57]](#references).
 
+### CWE template / Structural qualification / CWE candidate
+
+A **Common Weakness Enumeration (CWE) template** is libcpg's declarative value
+that combines a finite typed graph shape, origin/neutralizer/sensitive-use
+roles, and one shared semantic primitive. **Structural qualification** is the
+requirement that a semantic site also occur as the designated sink of a
+retained bounded VF2 embedding. A **CWE candidate** is the resulting immutable,
+out-of-graph advisory evidence; it is not an exploitability verdict. A negative
+represented-domain claim requires `CweAnalysis::is_complete()`. See
+[Theory 38](theory/38-declarative-cwe-query-semantics.md), Yamaguchi et al.
+[[58]](#references), Li et al. [[59]](#references), and Lekssays et al.
+[[60]](#references).
+
 ### Resource leak
 
 A **resource leak** candidate is an allocation-site object that reaches a
@@ -1159,3 +1172,6 @@ strict tree interpretation. See
 55. Juergens, E., Deissenboeck, F., Hummel, B., Wagner, S. (2009). *Do Code Clones Matter?* DOI: [10.1109/ICSE.2009.5070547](https://doi.org/10.1109/ICSE.2009.5070547).
 56. Nielebock, S., Blockhaus, P., Krüger, J., Ortmeier, F. (2024). *ASAP-Repair: API-Specific Automated Program Repair Based on API Usage Graphs.* DOI: [10.1145/3643788.3648011](https://doi.org/10.1145/3643788.3648011).
 57. Song, Y., Gao, X., Li, W., Chin, W.-N., Roychoudhury, A. (2024). *ProveNFix: Temporal Property-Guided Program Repair.* DOI: [10.1145/3643737](https://doi.org/10.1145/3643737).
+58. Yamaguchi, F., Golde, N., Arp, D., Rieck, K. (2014). *Modeling and Discovering Vulnerabilities with Code Property Graphs.* DOI: [10.1109/SP.2014.44](https://doi.org/10.1109/SP.2014.44).
+59. Li, P., Yao, S., Korich, J. S., Luo, C., Yu, J., Cao, Y., Yang, J. (2025). *Neuro-symbolic Static Analysis with LLM-generated Vulnerability Patterns.* DOI: [10.48550/arXiv.2504.16057](https://doi.org/10.48550/arXiv.2504.16057).
+60. Lekssays, A., Mouhcine, H., Tran, K., Yu, T., Khalil, I. (2025). *LLMxCPG: Context-Aware Vulnerability Detection Through Code Property Graph-Guided Large Language Models.* DOI: [10.48550/arXiv.2507.16585](https://doi.org/10.48550/arXiv.2507.16585).

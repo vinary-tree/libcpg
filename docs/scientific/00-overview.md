@@ -114,6 +114,7 @@ Because `default = []`, many tests are **feature-gated**. The end-to-end reachin
 | [40 — Population-anomaly validation](40-population-anomaly-validation.md) | Exact missing-check, call-order, and return-check support; semantic fingerprints; peer scopes; typed incompleteness; determinism; and constant native call depth | exact 4/5 and 9/10 examples, two generated population oracles, public aggregate/Rust/depth-100,000 integration, serde regressions | feature-free / `serde` / `lang-rust` |
 | [41 — Clone and feasibility validation](41-clone-feasibility-validation.md) | Exact rename/guard witnesses, pair-local admission, Boolean path partitions, SCCP/interval proof composition, typed incompleteness, determinism, and constant native call depth | 128 alignment/insertion and 256 exhaustive integer-oracle cases, public/parser integration, serde, depth 100,000, Criterion smoke | feature-free / `serde` / `lang-rust` |
 | [42 — API-usage and temporal validation](42-api-usage-temporal-validation.md) | Exact strict-majority AUG fragments, usage deviations, named temporal findings, qualification, determinism, and constant native call depth | fourteen examples, two 128-case properties, public/parser integration, serde, depth 100,000/64 KiB, oracle-guarded Criterion target | feature-free / `serde` / `lang-rust` |
+| [43 — Declarative CWE-template validation](43-cwe-template-validation.md) | Exact ten-template registry, structural/semantic intersection, vulnerable/clean pairs, typed ambiguity and caps, determinism, and constant native call depth | twelve examples plus serde, one 128-case property, public/parser integration, depth 100,000/64 KiB, oracle-guarded Criterion target | feature-free / `serde` / `lang-rust` |
 
 ## 5. What is proven, and what is advisory
 
@@ -202,10 +203,14 @@ Scientific honesty requires separating the two:
   dominant convention is not a specification. Temporal findings are exact for
   the caller FSM and represented typestate evidence; neither path authorizes
   repair or proves all runtime executions.
+  CWE structural embeddings and primitive-specific evidence are exact for the
+  admitted graph, templates, role catalogs, and bounds; exploitability,
+  severity, frontend completeness, and unmodeled weakness families remain
+  advisory.
 - **Empirically bounded.** Performance results apply only to a target's named
   fixture, size, and controlled environment. DFG/PDG
   construction, whole-corpus analysis, and GNN propagation remain measurement gaps; no result
-  from the twenty-one active targets (or thirty-seven enabled operation groups) may be
+  from the twenty-two active targets (or thirty-eight enabled operation groups) may be
   generalized to them. Martin metrics, reflexion conformance, architectural
   layering, and architectural-smell detection have no dedicated targets, so
   their validation supports correctness but makes no

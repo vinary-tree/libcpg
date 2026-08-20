@@ -288,6 +288,10 @@ development, or jump to the layer you need:
     Centered directed labeled acyclic usage graphs, exact strict-majority
     fragment support, and caller-defined finite-state properties define
     qualified API-context and lifecycle evidence.
+38. **[38 — Declarative CWE-query semantics](38-declarative-cwe-query-semantics.md).**
+    Bounded structural embeddings intersect shared taint, null-flow,
+    typestate, interval, and literal relations to produce qualified advisory
+    weakness candidates.
 
 The later chapters define deterministic projection structure, architecture
 metrics, inspectable evidence, and their interpretation limits.

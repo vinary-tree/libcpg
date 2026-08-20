@@ -91,8 +91,9 @@ alternatives is folklore, and a decision without its costs is marketing.
 | [0045 — Exact population anomaly detectors](0045-exact-population-anomaly-detectors.md) | Infer missing checks and deviant call behavior from canonical CPG evidence, exact peer fractions, and explicit incomplete-result semantics. | Accepted |
 | [0046 — Evidence-bounded clone and feasibility advisories](0046-evidence-bounded-clone-and-feasibility-advisories.md) | Diagnose typed divergences in exact low-edit clone pairs and compose SCCP with path-partitioned intervals for qualified branch/condition findings. | Accepted |
 | [0047 — Evidence-bounded API-usage and temporal mining](0047-evidence-bounded-api-usage-and-temporal-mining.md) | Build centered typed AUGs, infer exact strict-majority fragments, and reuse typestate for named temporal properties with explicit completeness. | Accepted |
+| [0048 — Declarative qualified CWE templates](0048-declarative-qualified-cwe-templates.md) | Intersect bounded VF2 structural sites with shared taint, null-flow, typestate, interval, and literal evidence while retaining explicit completeness. | Accepted |
 
-These forty-six are not independent. ADR-0001 fixes the substrate that all analyses
+These forty-eight are not independent. ADR-0001 fixes the substrate that all analyses
 write onto; ADR-0002 and ADR-0005 together explain how a language reaches that
 substrate and what you must switch on to get there; ADR-0003 and ADR-0004 are
 two analyses *over* the substrate (one always-on, one feature-gated) that each
@@ -220,6 +221,10 @@ ADR-0047 composes ADR-0006's stable call identity, canonical CFG/DFG/PDG
 evidence, ADR-0045's exact population arithmetic, and ADR-0043's finite-state
 typestate engine. It admits only complete call-site AUGs, enforces
 strict-majority uniqueness, and preserves delegated temporal qualification.
+ADR-0048 composes ADR-0004's bounded stack-safe VF2 engine, ADR-0034's
+summary-based taint/null flow, ADR-0043's typestate worklist, and ADR-0011's
+interval domain. It treats templates as data, intersects structural and
+semantic evidence, and preserves every missing, contradictory, or capped fact.
 
 ![Module architecture of libcpg, showing the graph core and the analysis modules layered over it](../diagrams/module-architecture.svg)
 

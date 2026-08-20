@@ -1,6 +1,6 @@
 # Measurement methodology
 
-`libcpg` ships twenty-one runnable Criterion targets. Their baseline groups are
+`libcpg` ships twenty-two runnable Criterion targets. Their baseline groups are
 feature-free; the `induction_analysis` target also registers an
 `algorithm-detection`-gated complexity-evidence group. Each active group
 asserts a deterministic correctness oracle **before** entering the timed loop.
@@ -19,7 +19,7 @@ the source transformation under study does not [[1]](#references).
 
 ## 1. Current evidence
 
-All twenty-one targets use `harness = false`, which hands execution to Criterion
+All twenty-two targets use `harness = false`, which hands execution to Criterion
 rather than Rust's test harness:
 
 ```toml
@@ -132,6 +132,7 @@ harness = false
 | `clones` | `detect_clones` | dense Type-1 equality, Type-3 insertion, and Type-4 reordering corpora at 16/64 functions | exact class taxonomy, complete membership, and similarity score |
 | `advisory_bugs` | `analyze_inconsistent_clones` / `analyze_infeasible_paths` | Type-2 guard-divergence and contradictory-condition corpora at 8/32 functions | complete reports, nonempty typed clone findings, and exactly one contradiction per feasibility function |
 | `api_usage_mining` | `analyze_api_usage_mining` | exact 19/20 release populations at 20/100 peers | complete report plus exactly one missing-following-call and one non-accepting temporal exit per twenty peers |
+| `cwe_templates` | `analyze_builtin_cwes` | ten-template registry over 20/100 independent request-to-SQL endpoints | complete report plus exactly one CWE-89 candidate per endpoint and no cross-template candidates |
 | `program_merge` | `merge_programs`, `build_import_graph` | 16/64 files with 16 statement nodes per file; represented import chains | summed counts, contiguous identities, embedded-reference totality, file scopes, exact resolutions, and dependency counts |
 | `ifds_summaries` | `solve_summaries` | acyclic and recursive call graphs at 256/1,024 functions | exact first-function transitive closure, complete reports, and nonempty per-function summaries |
 | `ifds_taint` | `analyze_taint_report` | call-graph paths, rings, and cyclic clusters at 32/128 workers | exact source-to-sink pair, valid witness endpoints, and complete reports before timing; SCC construction remains outside the timed closure |

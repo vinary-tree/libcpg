@@ -1,0 +1,89 @@
+@startuml
+!include _libcpg-theme.iuml
+title Declarative CWE-template qualification pipeline
+
+skinparam backgroundColor #FCFCFC
+skinparam component {
+  BorderColor #495057
+}
+skinparam note {
+  BackgroundColor #F1F3F5
+  BorderColor #495057
+}
+
+component "CodePropertyGraph\ntyped AST · CFG · DFG · PDG · calls" as CPG #DBE4FF
+component "CweTemplate registry\nroles · shapes · primitive" as TEMPLATE #FFE8CC
+
+package "Structural qualification" #F8F9FA {
+  component "dense finite pattern CPG\nexact node tags · typed edge classes" as SHAPE #E9ECEF
+  component "stack-safe bounded VF2\ncanonical embeddings" as VF2 #E5DBFF
+  component "qualified sink sites\n<latex>P_t</latex>" as SITES #C3FAE8
+}
+
+package "Shared semantic primitives" #F8F9FA {
+  component "summary taint\nCWE 22 · 78 · 79 · 89 · 502" as TAINT #FFF3BF
+  component "maybe-null flow\nCWE 476" as NULLFLOW #FCC2D7
+  component "typestate FSM\nCWE 416" as TYPESTATE #D3F9D8
+  component "intervals + origins\nCWE 190 · 787" as INTERVAL #74C0FC
+  component "typed literal provenance\nCWE 798" as LITERAL #FFE3E3
+}
+
+component "structural ∩ semantic\n<latex>C_t=P_t\cap S_t</latex>" as JOIN #D3F9D8
+component "CweAnalysisIssue\nmissing · ambiguous · unsupported · capped" as ISSUE #FCC2D7
+component "immutable CweAnalysis\ncandidates · witnesses · delegated reports" as REPORT #FFE8CC
+
+TEMPLATE --> SHAPE : structural alternatives
+SHAPE --> VF2
+CPG --> VF2 : target graph
+VF2 --> SITES : mapped designated sinks
+
+TEMPLATE --> TAINT : source/sanitizer/sink calls
+TEMPLATE --> NULLFLOW : dereference role
+TEMPLATE --> TYPESTATE : property + violation events
+TEMPLATE --> INTERVAL : operators + write shape
+TEMPLATE --> LITERAL : credential identifiers
+CPG --> TAINT : DFG + calls + summaries
+CPG --> NULLFLOW : null origins + DFG
+CPG --> TYPESTATE : CFG + DFG/reference + events
+CPG --> INTERVAL : CFG + types + expressions
+CPG --> LITERAL : assignment + typed literal
+
+SITES --> JOIN
+TAINT --> JOIN
+NULLFLOW --> JOIN
+TYPESTATE --> JOIN
+INTERVAL --> JOIN
+LITERAL --> JOIN
+
+VF2 --> ISSUE : cap + 1 observed
+NULLFLOW --> ISSUE : delegated incomplete report
+TYPESTATE --> ISSUE : delegated incomplete report
+INTERVAL --> ISSUE : missing/contradictory context
+TAINT --> ISSUE : delegated incomplete report
+JOIN --> REPORT : typed advisory candidates
+ISSUE --> REPORT : explicit qualification
+
+note bottom of TEMPLATE
+  Templates are data. They never parse source,
+  mutate the target CPG, or implement a second solver.
+end note
+
+note bottom of REPORT
+  A positive candidate is advisory evidence.
+  An empty result is meaningful only when is_complete() is true.
+end note
+
+legend bottom
+|= Colour |= Meaning |
+|<#DBE4FF>| normalized CPG evidence |
+|<#FFE8CC>| caller policy or report boundary |
+|<#E9ECEF>| declarative structural shape |
+|<#E5DBFF>| bounded graph matching |
+|<#C3FAE8>| structurally qualified sites |
+|<#FFF3BF>| taint evidence |
+|<#FCC2D7>| null/incomplete evidence |
+|<#D3F9D8>| typestate or qualified intersection |
+|<#74C0FC>| interval evidence |
+|<#FFE3E3>| sensitive literal provenance |
+endlegend
+@enduml

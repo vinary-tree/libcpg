@@ -80,6 +80,9 @@ integer contradictions),
 **API-usage and temporal protocol mining** (centered typed AUGs, exact
 strict-majority following/argument/receiver/control fragments, advisory
 deviations, and named finite-state lifecycle properties),
+**declarative CWE-template analysis** (bounded structural qualification,
+shared taint/null/typestate/interval evidence, ten shipped weakness templates,
+and explicit incomplete-result semantics),
 **interval value-range analysis** (branch constraints, loop-header widening,
 bounded narrowing, and immutable block-entry ranges),
 **loop-induction analysis** (DFG-backed invariants, additive/affine induction
@@ -173,6 +176,8 @@ let slice = backward_slice(&cpg, func, 256);         // bounded backward slice
 
 [API-usage graphs and temporal properties](theory/37-api-usage-graphs-and-temporal-properties.md)
 
+[Declarative CWE-query semantics](theory/38-declarative-cwe-query-semantics.md)
+
 ### Architecture — the "what / where"
 [Overview](architecture/overview.md) · [Graph data model](architecture/graph-data-model.md) · [Construction & analysis data flow](architecture/data-flow.md) · [Language frontends](architecture/language-frontends.md)
 
@@ -211,6 +216,8 @@ let slice = backward_slice(&cpg, func, 256);         // bounded backward slice
 
 [0047 Evidence-bounded API-usage and temporal mining](design/0047-evidence-bounded-api-usage-and-temporal-mining.md)
 
+[0048 Declarative qualified CWE templates](design/0048-declarative-qualified-cwe-templates.md)
+
 ### API reference
 [Graph / analysis reference](api/graph-reference.md) · [Builder reference](api/builder-reference.md) · [Pattern / algorithm / GNN reference](api/pattern-reference.md)
 
@@ -244,6 +251,8 @@ let slice = backward_slice(&cpg, func, 256);         // bounded backward slice
 [Clone-consistency and path-feasibility detectors](components/graph/clone-feasibility-bug-detectors.md)
 
 [API-usage protocol mining](components/graph/api-usage-protocol-mining.md)
+
+[Declarative CWE-template analysis](components/graph/cwe-template-analysis.md)
 
 #### Builder
 [Overview](components/builder/overview.md) · [CFG extraction](components/builder/cfg.md) · [DFG extraction](components/builder/dfg.md) · [PDG & slicing](components/builder/pdg-and-slicing.md) · [Node mapper](components/builder/node-mapper.md)
@@ -286,6 +295,8 @@ let slice = backward_slice(&cpg, func, 256);         // bounded backward slice
 
 [API-usage and temporal protocol mining](usage/20-api-usage-protocol-mining.md)
 
+[Declarative CWE-template analysis](usage/21-cwe-template-analysis.md)
+
 ### Engineering
 [Overview](engineering/00-overview.md) · [Build & features](engineering/01-build-and-features.md) · [Testing](engineering/02-testing.md) · [Performance](engineering/03-performance.md) · [Contributing](engineering/04-contributing.md)
 
@@ -324,8 +335,10 @@ let slice = backward_slice(&cpg, func, 256);         // bounded backward slice
 
 [API-usage and temporal validation](scientific/42-api-usage-temporal-validation.md)
 
+[Declarative CWE-template validation](scientific/43-cwe-template-validation.md)
+
 ### Security
-[Threat model](security/00-threat-model.md) · [Input & resource hardening](security/01-input-and-resource-hardening.md) · [Taint-analysis security boundary](security/02-taint-analysis.md) · [Interprocedural-slicing security boundary](security/03-system-dependence-slicing.md) · [Channel-topology security boundary](security/04-channel-topology.md) · [Deadlock-analysis security boundary](security/05-deadlock-analysis.md) · [MHP-analysis security boundary](security/06-mhp-analysis.md) · [Session-analysis security boundary](security/07-session-analysis.md) · [Typestate-analysis security boundary](security/08-typestate-analysis.md) · [Bug-detector security boundary](security/09-bug-detectors.md) · [Population-anomaly security boundary](security/10-population-anomaly-detectors.md) · [Clone/feasibility security boundary](security/11-clone-feasibility-detectors.md) · [API-usage protocol-mining security boundary](security/12-api-usage-protocol-mining.md)
+[Threat model](security/00-threat-model.md) · [Input & resource hardening](security/01-input-and-resource-hardening.md) · [Taint-analysis security boundary](security/02-taint-analysis.md) · [Interprocedural-slicing security boundary](security/03-system-dependence-slicing.md) · [Channel-topology security boundary](security/04-channel-topology.md) · [Deadlock-analysis security boundary](security/05-deadlock-analysis.md) · [MHP-analysis security boundary](security/06-mhp-analysis.md) · [Session-analysis security boundary](security/07-session-analysis.md) · [Typestate-analysis security boundary](security/08-typestate-analysis.md) · [Bug-detector security boundary](security/09-bug-detectors.md) · [Population-anomaly security boundary](security/10-population-anomaly-detectors.md) · [Clone/feasibility security boundary](security/11-clone-feasibility-detectors.md) · [API-usage protocol-mining security boundary](security/12-api-usage-protocol-mining.md) · [CWE-template security boundary](security/13-cwe-template-analysis.md)
 
 ### Reference
 [Glossary](GLOSSARY.md) · [Diagram catalog](diagrams/README.md)

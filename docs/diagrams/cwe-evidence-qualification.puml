@@ -1,0 +1,58 @@
+@startuml
+!include _libcpg-theme.iuml
+title Qualified interpretation of a CWE-template report
+
+skinparam backgroundColor #FCFCFC
+skinparam activity {
+  BorderColor #495057
+  DiamondBackgroundColor #FFF3BF
+  DiamondBorderColor #F08C00
+}
+
+start
+:Validate template identities, dense shapes,\nand bounded resource policy; <<#DBE4FF>>
+if (Request valid?) then (yes)
+  :Enumerate structural embeddings\nwith explicit VF2 search states; <<#E5DBFF>>
+  if (Extra embedding beyond cap?) then (yes)
+    :Record StructuralMatchCap; <<#FCC2D7>>
+  else (no)
+    :Retain complete structural match set; <<#C3FAE8>>
+  endif
+  :Run only the selected shared\nsemantic primitives; <<#FFF3BF>>
+  if (Evidence missing, contradictory,\nunsupported, or capped?) then (yes)
+    :Retain typed issue and\ncomplete delegated report; <<#FCC2D7>>
+  else (no)
+    :Retain complete semantic evidence; <<#D3F9D8>>
+  endif
+  :Intersect structural sites with\nprimitive-specific evidence; <<#74C0FC>>
+  if (Intersection nonempty?) then (yes)
+    :Emit immutable advisory candidates\nwith NodeId provenance and witnesses; <<#FFE3E3>>
+  else (no)
+    :Emit no candidate for this template; <<#E9ECEF>>
+  endif
+  if (CWE issues empty and all\ndelegated reports complete?) then (yes)
+    :Mark aggregate report complete; <<#D3F9D8>>
+    :Permit only a represented-domain\nno-match statement when empty; <<#C3FAE8>>
+  else (no)
+    :Mark aggregate report incomplete; <<#FCC2D7>>
+    :Forbid a clean-scan interpretation; <<#FFE3E3>>
+  endif
+else (no)
+  :Return CweAnalysisError; <<#FFE3E3>>
+endif
+:Leave the input CPG unchanged; <<#FFE8CC>>
+stop
+
+legend bottom
+|= Colour |= Meaning |
+|<#DBE4FF>| validated normalized input |
+|<#E5DBFF>| explicit stack-safe search |
+|<#C3FAE8>| complete represented evidence |
+|<#FFF3BF>| delegated semantic analysis |
+|<#D3F9D8>| successful qualification |
+|<#74C0FC>| structural/semantic intersection |
+|<#FCC2D7>| incomplete evidence |
+|<#FFE3E3>| advisory or prohibited interpretation |
+|<#FFE8CC>| immutable boundary |
+endlegend
+@enduml

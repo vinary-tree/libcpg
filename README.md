@@ -99,6 +99,10 @@ PDG). A query can therefore mix syntax, control flow, and data flow freely.
 - **API-usage and temporal protocol mining** — feature-free centered typed API
   Usage Graphs, exact strict-majority following/argument/receiver/control
   patterns, advisory deviations, and named finite-state temporal properties.
+- **Declarative CWE-template analysis** — feature-free bounded VF2 structural
+  qualification composed with shared taint, null-flow, typestate, interval,
+  and typed-literal evidence for ten shipped weakness families, with explicit
+  completeness and immutable advisory reports.
 - **Projection centrality** — deterministic PageRank variants, vertex/edge
   betweenness, eigenvector, Katz, closeness, harmonic, HITS, and Burt
   structural-hole scores with explicit iteration and traversal budgets.
@@ -201,6 +205,17 @@ cargo run --example clone_feasibility_advisories --no-default-features
 See the [I8/I9 usage guide](docs/usage/19-clone-feasibility-advisories.md) for
 typed witnesses, SCCP/interval proof sources, resource bounds, and report
 qualification.
+
+The feature-free CWE-template example exercises the complete ten-template
+registry on a represented request-to-SQL flow:
+
+```sh
+cargo run --example cwe_templates --no-default-features
+```
+
+See the [CWE-template usage guide](docs/usage/21-cwe-template-analysis.md) for
+custom role catalogs, resource policy, evidence interpretation, and complete
+versus incomplete report handling.
 
 ## Features
 

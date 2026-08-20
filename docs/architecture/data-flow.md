@@ -641,6 +641,26 @@ See the [component guide](../components/graph/api-usage-protocol-mining.md),
 [Theory 37](../theory/37-api-usage-graphs-and-temporal-properties.md), and
 [Usage 20](../usage/20-api-usage-protocol-mining.md).
 
+### Declarative CWE-template analysis (feature-free)
+
+`analyze_cwe_templates` follows `CodePropertyGraph + declarative role/shape
+templates → bounded stack-safe VF2 embeddings → structurally qualified sites →
+shared taint/null/typestate/interval or typed-literal evidence → immutable
+advisory candidates`. Taint-backed templates share one catalog and solver run;
+interval requests are grouped by containing function; delegated reports remain
+in the aggregate result.
+
+The result path is read-only and explicitly three-valued for interpretation:
+positive represented evidence, complete represented no-match, or incomplete
+evidence. Structural cap exhaustion, missing or contradictory numeric context,
+and delegated solver qualification remain typed issues.
+
+![Declarative shapes and shared semantic engines converge at one qualification boundary](../diagrams/cwe-template-pipeline.svg)
+
+See the [component guide](../components/graph/cwe-template-analysis.md),
+[Theory 38](../theory/38-declarative-cwe-query-semantics.md), and
+[Usage 21](../usage/21-cwe-template-analysis.md).
+
 ### Pattern detection
 
 Two layers, at two feature levels:

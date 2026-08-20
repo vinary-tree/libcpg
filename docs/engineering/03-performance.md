@@ -138,9 +138,9 @@ once, loop bodies twice, and a path set cuts malformed AST cycles.
 
 ## Benchmark coverage and remaining gaps
 
-Twenty-one Criterion targets are active. Their thirty-six baseline operation
+Twenty-two Criterion targets are active. Their thirty-seven baseline operation
 groups are feature-free; `induction_analysis` also registers one
-`algorithm-detection`-gated operation, making thirty-seven in that build. Every
+`algorithm-detection`-gated operation, making thirty-eight in that build. Every
 active group constructs and checks a deterministic oracle
 before Criterion enters the timed loop:
 
@@ -179,6 +179,9 @@ before Criterion enters the timed loop:
   release-after-acquire checking over 20- and 100-peer corpora. Exactly one
   missing-following-call and one non-accepting exit per twenty peers are
   asserted before timing.
+- `cwe_templates` measures the complete ten-template registry over 20- and
+  100-endpoint request-to-SQL corpora. Complete reports and exactly one CWE-89
+  candidate per endpoint are asserted before timing.
 - `program_merge` measures collision-free merge and import-graph construction
   over 16- and 64-file programs with 16 statement nodes per file. Exact summed
   counts, contiguous ids, embedded-reference totality, file scopes, resolution
@@ -296,6 +299,10 @@ name = "api_usage_mining"
 harness = false
 
 [[bench]]
+name = "cwe_templates"
+harness = false
+
+[[bench]]
 name = "program_merge"
 harness = false
 ```
@@ -322,6 +329,7 @@ cargo bench --bench motifs --no-default-features
 cargo bench --bench ged --no-default-features
 cargo bench --bench clones --no-default-features
 cargo bench --bench api_usage_mining --no-default-features
+cargo bench --bench cwe_templates --no-default-features
 cargo bench --bench program_merge --no-default-features
 cargo bench --bench ifds_taint --no-default-features
 cargo bench --no-default-features --features algorithm-detection \

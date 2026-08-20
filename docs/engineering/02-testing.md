@@ -22,7 +22,7 @@ think to write down.
 
 | Kind | Count | Where |
 | --- | ---: | --- |
-| Maximal-matrix library tests | 1,128 | inline `#[cfg(test)] mod …` next to the code; includes examples and properties |
+| Maximal-matrix library tests | 1,141 | inline `#[cfg(test)] mod …` next to the code; includes examples and properties |
 | Public-API integration tests | 21 | `tests/integration.rs` |
 | Malformed-input robustness tests | 5 | `tests/robustness.rs` |
 | SCCP public/parser integration tests | 3 | `tests/sccp_integration.rs` |
@@ -60,8 +60,9 @@ think to write down.
 | Population-anomaly public/parser integration tests | 2 | `tests/population_bug_detectors_integration.rs` |
 | Clone/feasibility public/parser integration tests | 2 | `tests/clone_feasibility_bug_detectors_integration.rs` |
 | API-usage/temporal public/parser integration tests | 2 | `tests/api_usage_mining_integration.rs` |
-| **Executable test cases** | **1,246** | measured by the all-features test inventory: 1,128 library and 118 integration/robustness tests; excludes rustdoc examples |
-| `proptest!` blocks (subset of the library/robustness rows) | 85 | exact source-level macro count in `src/` and `tests/` |
+| CWE-template public/parser integration tests | 2 | `tests/cwe_templates_integration.rs` |
+| **Executable test cases** | **1,261** | measured by the all-features test inventory: 1,141 library and 120 integration/robustness tests; excludes rustdoc examples |
+| `proptest!` blocks (subset of the library/robustness rows) | 86 | exact source-level macro count in `src/` and `tests/` |
 
 The maximal-matrix library count is up from **99** inline tests and **zero**
 property tests before this work.
@@ -79,10 +80,10 @@ on the features enabled:
 
 | Command | Lib tests | Notes |
 | --- | ---: | --- |
-| `cargo test` | 766 | `default = []`: the feature-free library surface, including typestate, bug detectors, population anomaly inference, clone/feasibility advisories, and API-usage/temporal mining |
-| `cargo test --features "full rholang metta"` | 1,128 | the maximal library matrix, including the Mode-B mappers, session sketches, typestate, bug detectors, population/clone/feasibility/API-usage advisories, named temporal properties, and evidence-aware complexity |
+| `cargo test` | 778 | `default = []`: the feature-free library surface, including typestate, bug detectors, population anomaly inference, clone/feasibility advisories, API-usage/temporal mining, and declarative CWE templates |
+| `cargo test --features "full rholang metta"` | 1,141 | the maximal library matrix, including the Mode-B mappers, session sketches, typestate, bug detectors, population/clone/feasibility/API-usage/CWE advisories, named temporal properties, and evidence-aware complexity |
 
-The feature-free 766 exercise the graph model, deterministic multi-file merge
+The feature-free 778 exercise the graph model, deterministic multi-file merge
 and import linkage, exact dominator/post-dominator,
 natural-loop, monotone data-flow, IFDS/IDE procedure summaries,
 interprocedural effect/constant, taint, and maybe-null summaries, variable-liveness/dead-store,
@@ -178,6 +179,7 @@ The invariants fall into complementary families.
 | **Population anomaly detectors** | independent generated population oracles check exact missing-check and return-check fractions; examples cover 4/5 and 9/10 support, semantic check fingerprints, whole/call-neighborhood peers, call-order reachability, every identity/AST/CFG/value cap and issue, serde, graph immutability, parsed Rust PDG evidence, and 100,000-node paths on 256 KiB |
 | **Clone/feasibility advisories** | independent generated alignment/insertion and exhaustive integer-domain oracles check exact rename/guard evidence and Boolean path partitions; examples cover Type-2/3 pair identity, `9/10` rename support, guard flips, SCCP/interval proof composition, equality/disequality/extrema, every AST/alignment/GED/condition cap and issue, serde, graph immutability, parsed Rust evidence, and 100,000 nodes on 64 KiB |
 | **API-usage/temporal mining** | two 128-case generated oracles check exact strict-majority missing-following-call sites and report equality under CFG insertion permutations; examples cover 19/20 support, argument/receiver/control fragments, graph acyclicity, forbidden transitions, non-accepting exits, every call/identity/CFG/AUG/property boundary, serde, graph immutability, parsed Rust evidence, and 100,000 CFG nodes on 64 KiB |
+| **Declarative CWE templates** | one 128-case property compares complete reports under template and graph-relation insertion permutations; examples cover all ten shipped CWE families and clean counterparts, contradictory integer types, structural caps, serde, graph immutability, parsed Rust vulnerable/sanitized SQL evidence, and 100,000 expression levels on 64 KiB |
 | **Function CFG scope** | the reachable CFG view is invariant under node, edge, and recorded-exit insertion permutations; call edges never enter the view; dense entry/exit identifiers map back to the same stable nodes |
 | **CFG extraction machine** | one comprehensive fixture covers every typed continuation and all eight config combinations; three 192-case campaigns require exact edge-id/order/kind/label and entry/exit equality with the bounded former-recursive equations on well-formed and arbitrarily corrupted ASTs, plus exact invariance under reversed non-AST insertion; examples cover cycles, sharing, terminators, nested loop/try state, idempotency, and degenerate forms; a public parser-built depth-100,000 CFG completes on 256 KiB |
 | **Dominance** | CHK immediate dominators equal `petgraph::algo::dominators::simple_fast` under edge permutations; post-dominators and control edges equal the former PDG oracle; `PdgBuilder` emits exactly `PostDominatorTree::control_dependence_edges`; a 25,000-node path is stack-safe |
@@ -531,7 +533,7 @@ dependencies and are not part of the `full` feature set.
 | Surface | State |
 | --- | --- |
 | Doctests | none run — every code fence in a doc comment is marked `ignore` / `rust,ignore`, so `cargo test --doc` executes nothing. Feature-gating individual doctests in a `default = []` crate is awkward; the snippets are instead validated by the documentation snippet-check harness. |
-| Benchmarks | Twenty-one active Criterion targets cover SCC paths/rings/clusters, condensation paths/independent chains with and without CG layering, graph-arena paths, bounded VF2 paths, liveness chains/diamond ladders/nested loops, counted-loop induction regions, DSM paths/rings, WL rings/stars, centrality paths/rings/clusters, Louvain rings of cliques, disconnected-community refinement, cohesion lattices/clique chains/weighted seams/star attacks, spectral stars/complete-bipartite/disconnected-star families, bounded cycles over acyclic paths/disjoint triangles/dense digraphs, motif censuses over paths/bidirected cliques/out-stars, GED over identical/relabelled/retyped graphs, function clones, clone/feasibility advisories, API-usage/temporal populations, program merge/import linkage, IFDS/IDE summaries, and taint summaries over path/ring/clustered call graphs, plus—under `algorithm-detection`—complexity evidence on counted-loop fixtures. Each active group asserts a deterministic oracle before timing. See [performance](03-performance.md). |
+| Benchmarks | Twenty-two active Criterion targets cover SCC paths/rings/clusters, condensation paths/independent chains with and without CG layering, graph-arena paths, bounded VF2 paths, liveness chains/diamond ladders/nested loops, counted-loop induction regions, DSM paths/rings, WL rings/stars, centrality paths/rings/clusters, Louvain rings of cliques, disconnected-community refinement, cohesion lattices/clique chains/weighted seams/star attacks, spectral stars/complete-bipartite/disconnected-star families, bounded cycles over acyclic paths/disjoint triangles/dense digraphs, motif censuses over paths/bidirected cliques/out-stars, GED over identical/relabelled/retyped graphs, function clones, clone/feasibility advisories, API-usage/temporal populations, declarative CWE registries, program merge/import linkage, IFDS/IDE summaries, and taint summaries over path/ring/clustered call graphs, plus—under `algorithm-detection`—complexity evidence on counted-loop fixtures. Each active group asserts a deterministic oracle before timing. See [performance](03-performance.md). |
 | `ml-linfa`, `gpu` | not exercised: optional heavy dependencies outside the `full` feature set. |
 
 The feature-free [`population_anomalies`](../../examples/population_anomalies.rs)
@@ -546,6 +548,11 @@ The feature-free [`api_usage_protocols`](../../examples/api_usage_protocols.rs)
 example asserts exact 19/20 usage support and a matching named temporal
 violation. Run it with
 `cargo run --example api_usage_protocols --no-default-features`.
+
+The feature-free [`cwe_templates`](../../examples/cwe_templates.rs) example
+asserts one qualified CWE-89 request-to-SQL flow through the complete shipped
+registry. Run it with
+`cargo run --example cwe_templates --no-default-features`.
 
 ## Related pages
 

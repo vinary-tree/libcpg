@@ -551,6 +551,31 @@ See the [component guide](../components/graph/api-usage-protocol-mining.md),
 [theory](../theory/37-api-usage-graphs-and-temporal-properties.md), and
 [security boundary](../security/12-api-usage-protocol-mining.md).
 
+### Declarative CWE-template analysis
+
+The feature-free CWE API intersects bounded structural embeddings with shared
+semantic analysis evidence. It never parses source or mutates the target CPG.
+
+| API/type | Meaning |
+|---|---|
+| `builtin_cwe_templates` | Owned canonical registry for CWE-22, 78, 79, 89, 190, 416, 476, 502, 787, and 798. |
+| `analyze_builtin_cwes` | Qualified analysis of the complete shipped registry. |
+| `analyze_cwe_templates` | Qualified analysis of a validated caller-supplied template set. |
+| `CweTemplate` / `CweRole` / `CwePrimitive` | Stable identity and CWE metadata, source/neutralizer/sink role predicates, structural alternatives, and selected shared primitive. |
+| `CweStructuralPattern` / `CwePatternEdge` | Dense exact node tags, typed directed relations, and designated mapped sink. |
+| `CweAnalysisConfig` | CWE structural/origin caps plus delegated `IfdsCaps`. |
+| `CweAnalysis` | Ordered templates, embeddings, candidates, delegated reports, typed issues, and aggregate `is_complete()`. |
+| `CweStructuralMatch` | Template/pattern identity, mapped sink, and dense pattern-index-to-target mapping. |
+| `CweCandidate` / `CweEvidence` | Immutable represented site/origin/witness, integer evidence score, and primitive-specific evidence. |
+| `CweAnalysisError` | Invalid request rejected before evaluation. |
+| `CweAnalysisIssue` | Missing, contradictory, unsupported, failed, or capped represented evidence. |
+| `CweTypestateAnalysis` | Template identity paired with the complete delegated typestate report. |
+
+See the [component guide](../components/graph/cwe-template-analysis.md),
+[usage guide](../usage/21-cwe-template-analysis.md),
+[theory](../theory/38-declarative-cwe-query-semantics.md), and
+[security boundary](../security/13-cwe-template-analysis.md).
+
 ### Deterministic graph projections
 
 `GraphProjection` is the feature-free, payload-free compressed-sparse-row view
