@@ -593,13 +593,25 @@ fn type4_equivalent(
         options.max_vf2_invocations,
     )?;
 
-    let left_graph = pdg_cpg(cpg, left_pdg);
-    let right_graph = pdg_cpg(cpg, right_pdg);
-    let matcher = Vf2Matcher::new()
+    Ok(relaxed_pdg_equivalent(cpg, left_pdg, right_pdg))
+}
+
+/// Confirms equal-size PDG equivalence using the stack-safe relaxed VF2 engine.
+pub(crate) fn relaxed_pdg_equivalent(
+    source: &CodePropertyGraph,
+    left: &GraphProjection,
+    right: &GraphProjection,
+) -> bool {
+    if left.node_count() != right.node_count() || left.edge_count() != right.edge_count() {
+        return false;
+    }
+    let left_graph = pdg_cpg(source, left);
+    let right_graph = pdg_cpg(source, right);
+    Vf2Matcher::new()
         .with_strict_kinds(false)
         .with_strict_edges(false)
-        .with_max_matches(1);
-    Ok(matcher.contains_pattern(&left_graph, &right_graph))
+        .with_max_matches(1)
+        .contains_pattern(&left_graph, &right_graph)
 }
 
 fn pdg_cpg(source: &CodePropertyGraph, projection: &GraphProjection) -> CodePropertyGraph {

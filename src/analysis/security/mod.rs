@@ -8,6 +8,7 @@
 mod authz;
 mod crypto;
 mod cwe;
+mod extrapolate;
 mod secrets;
 
 pub use authz::{
@@ -26,8 +27,16 @@ pub use cwe::{
     CweTypestateAnalysis, MAX_CWE_ARRAY_ORIGIN_NODES, MAX_CWE_MATCHES_PER_PATTERN,
     MAX_CWE_PATTERNS_PER_TEMPLATE, MAX_CWE_TEMPLATES,
 };
+pub use extrapolate::{
+    analyze_vulnerability_extrapolation, extrapolate, ExtrapolationAnalysis,
+    ExtrapolationCandidate, ExtrapolationIssue, ExtrapolationOptions, MAX_EXTRAPOLATION_FUNCTIONS,
+    MAX_EXTRAPOLATION_PDG_NODES, MAX_EXTRAPOLATION_RESULTS, MAX_EXTRAPOLATION_VF2_INVOCATIONS,
+};
 pub use secrets::{
     analyze_builtin_secrets, analyze_secret_flows, builtin_secret_rules, SecretAnalysis,
     SecretAnalysisConfig, SecretAnalysisIssue, SecretFinding, SecretLiteralEvidence, SecretRuleSet,
     SecretSinkFamily, SecretSinkRule, MAX_SECRET_LITERALS, MAX_SECRET_NAME_CONTEXT_NODES,
 };
+
+#[cfg(test)]
+mod extrapolate_tests;

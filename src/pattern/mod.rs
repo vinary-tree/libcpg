@@ -8,7 +8,7 @@ mod ged;
 mod similarity;
 mod vf2;
 
-pub(crate) use clones::{detect_clone_pairs, ClonePairRelation};
+pub(crate) use clones::{detect_clone_pairs, relaxed_pdg_equivalent, ClonePairRelation};
 pub use clones::{
     detect_clones, CloneClass, CloneOptions, CloneType, MAX_CLONE_PAIRS, MAX_CLONE_PDG_NODES,
     MAX_CLONE_VF2_INVOCATIONS,

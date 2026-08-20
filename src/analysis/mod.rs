@@ -180,17 +180,20 @@ pub use resolve::{
 pub use security::{
     analyze_builtin_authz, analyze_builtin_crypto, analyze_builtin_cwes, analyze_builtin_secrets,
     analyze_crypto_misuse, analyze_cwe_templates, analyze_missing_authz, analyze_secret_flows,
-    builtin_authz_rules, builtin_crypto_rules, builtin_cwe_templates, builtin_secret_rules,
-    AuthzAnalysis, AuthzAnalysisConfig, AuthzAnalysisIssue, AuthzFinding, AuthzMutationRule,
-    AuthzRuleSet, CryptoAnalysis, CryptoAnalysisConfig, CryptoAnalysisIssue, CryptoArgumentRule,
-    CryptoEvidence, CryptoFinding, CryptoMisuseKind, CryptoRuleSet, CweAnalysis, CweAnalysisConfig,
-    CweAnalysisError, CweAnalysisIssue, CweCandidate, CweEvidence, CwePatternEdge, CwePrimitive,
-    CweRole, CweStructuralMatch, CweStructuralPattern, CweTemplate, CweTypestateAnalysis,
+    analyze_vulnerability_extrapolation, builtin_authz_rules, builtin_crypto_rules,
+    builtin_cwe_templates, builtin_secret_rules, extrapolate, AuthzAnalysis, AuthzAnalysisConfig,
+    AuthzAnalysisIssue, AuthzFinding, AuthzMutationRule, AuthzRuleSet, CryptoAnalysis,
+    CryptoAnalysisConfig, CryptoAnalysisIssue, CryptoArgumentRule, CryptoEvidence, CryptoFinding,
+    CryptoMisuseKind, CryptoRuleSet, CweAnalysis, CweAnalysisConfig, CweAnalysisError,
+    CweAnalysisIssue, CweCandidate, CweEvidence, CwePatternEdge, CwePrimitive, CweRole,
+    CweStructuralMatch, CweStructuralPattern, CweTemplate, CweTypestateAnalysis,
+    ExtrapolationAnalysis, ExtrapolationCandidate, ExtrapolationIssue, ExtrapolationOptions,
     SecretAnalysis, SecretAnalysisConfig, SecretAnalysisIssue, SecretFinding,
     SecretLiteralEvidence, SecretRuleSet, SecretSinkFamily, SecretSinkRule, MAX_CRYPTO_CALLS,
     MAX_CRYPTO_ORIGIN_NODES, MAX_CWE_ARRAY_ORIGIN_NODES, MAX_CWE_MATCHES_PER_PATTERN,
-    MAX_CWE_PATTERNS_PER_TEMPLATE, MAX_CWE_TEMPLATES, MAX_SECRET_LITERALS,
-    MAX_SECRET_NAME_CONTEXT_NODES,
+    MAX_CWE_PATTERNS_PER_TEMPLATE, MAX_CWE_TEMPLATES, MAX_EXTRAPOLATION_FUNCTIONS,
+    MAX_EXTRAPOLATION_PDG_NODES, MAX_EXTRAPOLATION_RESULTS, MAX_EXTRAPOLATION_VF2_INVOCATIONS,
+    MAX_SECRET_LITERALS, MAX_SECRET_NAME_CONTEXT_NODES,
 };
 
 pub use sdg::{
