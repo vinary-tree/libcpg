@@ -145,6 +145,49 @@ fn scenario_01_direct_source_to_sink_is_reported_with_cwe() {
 }
 
 #[test]
+fn typed_literal_source_flows_to_a_catalog_sink() {
+    let mut cpg = CodePropertyGraph::new(Language::Rust);
+    let function = function(&mut cpg, "entry");
+    let sink = call(&mut cpg, function, "Cipher::with_key", None);
+    let literal = child(
+        &mut cpg,
+        sink,
+        CpgNodeKind::Literal {
+            kind: LiteralKind::String("redacted-test-key".into()),
+        },
+    );
+    let catalog = TaintCatalog {
+        literal_sources: vec![LiteralSourceRule {
+            pattern: LiteralPattern::String,
+            class: "hardcoded-crypto-material".into(),
+            cwe: Some(798),
+        }],
+        sinks: vec![CatalogRule {
+            pattern: Pattern::Exact("Cipher::with_key".into()),
+            class: "crypto-key".into(),
+            cwe: Some(798),
+        }],
+        ..TaintCatalog::empty()
+    };
+
+    let analysis = analyze_taint_report(
+        &cpg,
+        &CallGraphResolution::default(),
+        &catalog,
+        &IfdsCaps::default(),
+    );
+    assert!(analysis.is_complete(), "{analysis:#?}");
+    assert_eq!(analysis.flows.len(), 1, "{analysis:#?}");
+    assert_eq!(analysis.flows[0].source, literal);
+    assert_eq!(analysis.flows[0].sink, sink);
+    assert_eq!(analysis.flows[0].param_index, Some(0));
+    assert_eq!(
+        analysis.flows[0].source_class.as_ref(),
+        "hardcoded-crypto-material"
+    );
+}
+
+#[test]
 fn scenario_02_helper_laundering_is_caught_interprocedurally() {
     let mut cpg = CodePropertyGraph::new(Language::Rust);
     let caller = function(&mut cpg, "caller");

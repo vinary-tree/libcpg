@@ -10,6 +10,8 @@ use std::sync::Arc;
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
 
+use crate::LiteralKind;
+
 use super::{SinkClass, SourceClass};
 
 /// A bounded string-matching strategy for a reconstructed callee path.
@@ -84,6 +86,61 @@ pub struct CatalogRule {
     pub cwe: Option<u32>,
 }
 
+/// A typed literal category that may introduce an open taint class.
+///
+/// The matcher is deliberately categorical rather than value-bearing: clients
+/// can model provenance such as embedded credentials or fixed cryptographic
+/// material without retaining, parsing, or copying source text.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+pub enum LiteralPattern {
+    /// Any string literal.
+    String,
+    /// Any integer literal, including array elements used as byte values.
+    Integer,
+    /// Any character literal.
+    Character,
+    /// Any Boolean literal.
+    Boolean,
+    /// The null literal.
+    Null,
+    /// Any array/list literal node.
+    Array,
+    /// Any object/map literal node.
+    Object,
+    /// Any regular-expression literal.
+    Regex,
+}
+
+impl LiteralPattern {
+    /// Returns whether this category recognizes `literal`.
+    pub const fn matches(self, literal: &LiteralKind) -> bool {
+        matches!(
+            (self, literal),
+            (Self::String, LiteralKind::String(_))
+                | (Self::Integer, LiteralKind::Integer(_))
+                | (Self::Character, LiteralKind::Char(_))
+                | (Self::Boolean, LiteralKind::Bool(_))
+                | (Self::Null, LiteralKind::Null)
+                | (Self::Array, LiteralKind::Array)
+                | (Self::Object, LiteralKind::Object)
+                | (Self::Regex, LiteralKind::Regex(_))
+        )
+    }
+}
+
+/// One literal-origin taint rule.
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+pub struct LiteralSourceRule {
+    /// Typed literal category.
+    pub pattern: LiteralPattern,
+    /// Open, consumer-defined source class.
+    pub class: SourceClass,
+    /// Optional Common Weakness Enumeration identifier.
+    pub cwe: Option<u32>,
+}
+
 /// Evidence returned for one matching catalog class.
 #[derive(Debug, Clone, PartialEq)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
@@ -139,6 +196,9 @@ pub enum ExternalModel {
 pub struct TaintCatalog {
     /// Rules classifying calls that introduce attacker-controlled values.
     pub sources: Vec<CatalogRule>,
+    /// Rules classifying typed literal nodes as provenance sources.
+    #[cfg_attr(feature = "serde", serde(default))]
+    pub literal_sources: Vec<LiteralSourceRule>,
     /// Rules classifying calls that consume security-sensitive values.
     pub sinks: Vec<CatalogRule>,
     /// Rules classifying calls that remove taint.
@@ -152,6 +212,7 @@ impl TaintCatalog {
     pub const fn empty() -> Self {
         Self {
             sources: Vec::new(),
+            literal_sources: Vec::new(),
             sinks: Vec::new(),
             sanitizers: Vec::new(),
             externals: Vec::new(),
@@ -346,6 +407,23 @@ impl TaintCatalog {
             sinks: matching_rules(&self.sinks, callee_path),
             sanitizers: matching_rules(&self.sanitizers, callee_path),
         }
+    }
+
+    /// Classifies a typed literal under every literal-origin source rule.
+    pub fn classify_literal(&self, literal: &LiteralKind) -> Vec<CatalogMatch> {
+        let mut matches = BTreeMap::<(Arc<str>, Option<u32>), CatalogMatch>::new();
+        for rule in &self.literal_sources {
+            if rule.pattern.matches(literal) {
+                matches
+                    .entry((rule.class.clone(), rule.cwe))
+                    .or_insert_with(|| CatalogMatch {
+                        class: rule.class.clone(),
+                        cwe: rule.cwe,
+                        confidence: 1.0,
+                    });
+            }
+        }
+        matches.into_values().collect()
     }
 
     /// Returns the most-specific opaque-call model, defaulting to passthrough.

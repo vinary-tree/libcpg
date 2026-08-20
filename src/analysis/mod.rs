@@ -205,10 +205,10 @@ pub use spectral::{
 
 pub use taint::{
     analyze_null_flows, analyze_null_flows_report, analyze_taint, analyze_taint_report,
-    AmbientFlowKey, CatalogClassification, CatalogMatch, CatalogRule, ExternalModel, MaybeNull,
-    NullAnalysis, NullFlow, NullFlowKey, NullOriginKind, NullSummary, ParamSinkKey, Pattern,
-    ReturnSourceKey, SinkClass, SourceClass, TaintAnalysis, TaintCatalog, TaintFact, TaintFlow,
-    TaintSummary, TaintWitness,
+    AmbientFlowKey, CatalogClassification, CatalogMatch, CatalogRule, ExternalModel,
+    LiteralPattern, LiteralSourceRule, MaybeNull, NullAnalysis, NullFlow, NullFlowKey,
+    NullOriginKind, NullSummary, ParamSinkKey, Pattern, ReturnSourceKey, SinkClass, SourceClass,
+    TaintAnalysis, TaintCatalog, TaintFact, TaintFlow, TaintSummary, TaintWitness,
 };
 
 pub use typestate::{

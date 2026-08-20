@@ -27,7 +27,8 @@ use super::{
 };
 
 pub use catalog::{
-    CatalogClassification, CatalogMatch, CatalogRule, ExternalModel, Pattern, TaintCatalog,
+    CatalogClassification, CatalogMatch, CatalogRule, ExternalModel, LiteralPattern,
+    LiteralSourceRule, Pattern, TaintCatalog,
 };
 pub use nullflow::{
     analyze_null_flows, analyze_null_flows_report, MaybeNull, NullAnalysis, NullFlow, NullFlowKey,
@@ -460,6 +461,14 @@ impl SummaryDomain for TaintDomain<'_> {
                 }
             }
         }
+        for &node in &local.nodes {
+            let Some(CpgNodeKind::Literal { kind }) = cpg.node(node).map(|node| &node.kind) else {
+                continue;
+            };
+            for source in self.catalog.classify_literal(kind) {
+                seeds.push((node, TaintFact::Ambient(source.class)));
+            }
+        }
         seeds
     }
 
@@ -628,6 +637,25 @@ fn compute_tokens(
     }
 
     let mut work = 0usize;
+    for &node in &local.nodes {
+        let Some(CpgNodeKind::Literal { kind }) = cpg.node(node).map(|node| &node.kind) else {
+            continue;
+        };
+        for source in catalog.classify_literal(kind) {
+            let token = TokenKey {
+                fact: TaintFact::Ambient(source.class),
+                origin: node,
+            };
+            add_token(
+                &mut tokens,
+                node,
+                token,
+                TaintWitness::at(node, confidence_milli(source.confidence)),
+                ctx.caps,
+                &mut capped,
+            );
+        }
+    }
     loop {
         let mut changed = false;
         for &node in &local.nodes {

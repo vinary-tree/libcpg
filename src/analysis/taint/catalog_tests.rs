@@ -59,6 +59,43 @@ fn generic_catalog_preserves_open_source_sink_and_cwe_classes() {
 }
 
 #[test]
+fn literal_source_rules_match_only_their_typed_categories() {
+    let catalog = TaintCatalog {
+        literal_sources: vec![
+            LiteralSourceRule {
+                pattern: LiteralPattern::String,
+                class: "embedded-text".into(),
+                cwe: Some(798),
+            },
+            LiteralSourceRule {
+                pattern: LiteralPattern::Array,
+                class: "embedded-bytes".into(),
+                cwe: Some(798),
+            },
+        ],
+        ..TaintCatalog::empty()
+    };
+
+    assert_eq!(
+        catalog.classify_literal(&LiteralKind::String("secret".into())),
+        vec![CatalogMatch {
+            class: "embedded-text".into(),
+            cwe: Some(798),
+            confidence: 1.0,
+        }]
+    );
+    assert_eq!(
+        catalog.classify_literal(&LiteralKind::Array)[0]
+            .class
+            .as_ref(),
+        "embedded-bytes"
+    );
+    assert!(catalog
+        .classify_literal(&LiteralKind::Integer(7))
+        .is_empty());
+}
+
+#[test]
 fn best_duplicate_match_and_external_specificity_are_deterministic() {
     let catalog = TaintCatalog {
         sources: vec![
@@ -113,6 +150,23 @@ proptest! {
         let catalog = TaintCatalog::builtin_generic();
         prop_assert_eq!(catalog.classify(&path), catalog.classify(&path));
         prop_assert_eq!(catalog.external_model(&path), catalog.external_model(&path));
+    }
+
+    #[test]
+    fn literal_classification_is_repeatable_for_arbitrary_strings(value in ".{0,96}") {
+        let catalog = TaintCatalog {
+            literal_sources: vec![LiteralSourceRule {
+                pattern: LiteralPattern::String,
+                class: "literal".into(),
+                cwe: Some(798),
+            }],
+            ..TaintCatalog::empty()
+        };
+        let literal = LiteralKind::String(value.into());
+        prop_assert_eq!(
+            catalog.classify_literal(&literal),
+            catalog.classify_literal(&literal)
+        );
     }
 
     #[test]
