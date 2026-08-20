@@ -166,7 +166,9 @@ So VF2 matching is available with `default = []`; GoF detection requires `--feat
 - `analysis::concurrency` — extracts frontend-normalized message events,
   resolves stable channel/lock identities, reports advisory F1/F4 topology,
   reuses projections/SCCs for F3 communication and lock-order candidates, and
-  derives bounded MHP pairs from typed parallel operand subtrees; with
+  derives bounded MHP pairs from typed parallel operand subtrees; exact
+  field/index/channel access identity and source-ordered locksets then produce
+  immutable F6 race and F7 RMW-gap candidates; with
   `rholang`, it also infers advisory per-channel session sketches.
 
 ## Error model

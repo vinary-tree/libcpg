@@ -29,8 +29,10 @@ serde_json = "1"
 
 The `serde` feature expands to `["dep:serde", "petgraph/serde-1"]` — it pulls in serde itself and turns on serde support in `petgraph`, so the underlying `DiGraph` (and therefore the whole `CodePropertyGraph`) becomes serialisable. Supported graph types include `CodePropertyGraph`, `CpgNode`, `CpgEdge`, `PropertyValue`, all the kind enums (`CpgNodeKind`, `CpgEdgeKind`, `CfgEdgeKind`, `DfgEdgeKind`, `MsgKind`, `LockKind`, and `LockMode`), `NodeId`/`EdgeId`, `SourceRange`, `Language`, and `CpgStats`.
 
-Analysis result types include `ExprKey` and `ExprFacts`; their expression roots
-serialize through CEK1 rather than a recursive Serde visitor.
+Analysis result types include `ExprKey`, `ExprFacts`, `MhpRelation`,
+`RaceCandidate`, `AtomicityCandidate`, and their witness types. Expression
+roots serialize through CEK1 rather than a recursive Serde visitor; concurrency
+reports use ordinary finite Serde fields and preserve the input MHP cap flag.
 
 `CpgNode.message_kind`, `CpgNode.lock_kind`, and `CpgNode.allocation_type` are
 optional typed semantic metadata. All three fields deserialize with a `None`

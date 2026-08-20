@@ -1,0 +1,53 @@
+@startuml
+title Read-modify-write split across a lock gap
+
+skinparam backgroundColor #FCFCFC
+skinparam shadowing false
+skinparam defaultFontName "DejaVu Sans"
+skinparam sequence {
+  ArrowColor #495057
+  LifeLineBorderColor #495057
+  LifeLineBackgroundColor #F8F9FA
+  ParticipantBorderColor #495057
+}
+
+participant "update strand" as U #DBE4FF
+participant "exact lock <latex>q</latex>" as L #FFF3BF
+participant "shared location <latex>\ell</latex>" as X #FFE8CC
+participant "interfering strand" as I #FCC2D7
+
+U -> L : AcquireWrite(<latex>q</latex>)
+activate U #D0EBFF
+U -> X : read(<latex>\ell</latex>)
+U -> L : Release(<latex>q</latex>)
+deactivate U
+
+group #FFE3E3 represented atomicity gap
+  I -> L : AcquireWrite(<latex>q</latex>)
+  activate I #FCC2D7
+  I -> X : write(<latex>\ell</latex>)\nMHP with read and write
+  I -> L : Release(<latex>q</latex>)
+  deactivate I
+end
+
+U -> L : AcquireWrite(<latex>q</latex>)
+activate U #D0EBFF
+U -> X : write(<latex>\ell</latex>)
+U -> L : Release(<latex>q</latex>)
+deactivate U
+
+note over U,I #F1F3F5
+  <latex>q</latex> protects each endpoint but not the gap.
+  Only another acquisition held continuously
+  across read and write can exclude interference.
+end note
+
+legend right
+|= Colour |= Meaning |
+|<#DBE4FF> | logical update strand |
+|<#FFF3BF> | exact lock resource |
+|<#FFE8CC> | exact shared location |
+|<#FCC2D7> | possible interferer |
+|<#FFE3E3> | unprotected interval |
+endlegend
+@enduml

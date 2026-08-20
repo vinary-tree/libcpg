@@ -150,6 +150,10 @@ security guarantees:
   have exact support or finite-state witnesses for admitted represented
   evidence. A dominant convention or caller FSM can be wrong; neither finding
   establishes exploitability, all runtime paths, or a safe repair.
+- [Race and atomicity candidates](18-concurrency-bug-detection.md) have exact
+  conflicts and lock-gap witnesses for represented identities, access kinds,
+  locksets, and supplied MHP. They do not establish runtime overlap, alias
+  completeness, memory-model behavior, exploitability, or a safe repair.
 
 Use these to *prioritise* human attention, not to *gate* a security decision on
 their own. Exact structural analyses are exact with respect to their input
@@ -187,6 +191,7 @@ and its build pipeline.
 | Poisoned hierarchy/type/allocation evidence or over-trusted devirtualization | exact nominal admission, typed frontend allocations, immutable reports, cycle-safe heap worklists, recorded mode, and closed-world qualification | [virtual-call type-refinement boundary](17-type-refinement-boundary.md) |
 | Adversarial clone/condition evidence or over-trusted path proof | exact pair identity, typed guard roots, disjoint regions, SCCP reachability filtering, AST/alignment/GED/node/state/step caps, heap continuations, and report-level completeness | [clone/feasibility boundary](11-clone-feasibility-detectors.md) |
 | Poisoned/oversized API usage or untrusted temporal policy | complete-site admission, exact strict-majority support, supporting-site provenance, call/CFG/AUG/property/typestate caps, heap worklists, and aggregate completeness | [API-usage protocol boundary](12-api-usage-protocol-mining.md) |
+| Hostile access, lock, parent, or public MHP evidence | exact identity, unique nearest-site/strand lifting, canonical MHP normalization, conservative unresolved-lock behavior, heap work queues, and immutable advisory witnesses | [race/atomicity boundary](18-concurrency-bug-detection.md) |
 | Unbounded slice | `backward_slice` / `forward_slice` `max_nodes` cap | [hardening §slicing](01-input-and-resource-hardening.md#slicing-max_nodes) |
 | Expensive or divergent centrality | hard iteration ceiling, explicit traversal budgets, finite-option validation, and complete projection validation | [hardening §centrality](01-input-and-resource-hardening.md#centrality-iteration-ceilings-traversal-budgets-and-safe-numerics) |
 | Adversarial community search or weights | 50-pass/10-level ceilings plus complete CSR, resolution, weight, and overflow validation | [hardening §community detection](01-input-and-resource-hardening.md#community-detection-pass-level-and-numeric-bounds) |
@@ -201,7 +206,7 @@ and its build pipeline.
 | Forged or oversized smell evidence bundle | complete projection/options/metric/assignment validation, exact SCC recomputation, fail-closed empty result; caller-side projection cap | [hardening §architectural smells](01-input-and-resource-hardening.md#architectural-smells-validated-bundle-and-ingress-cap) |
 | Oversized or misleading code-metric evidence | finite iterative graph traversals, inheritance-SCC condensation, stable ordered sets, defined arithmetic edge cases; caller-side CPG cap and retained resolver policy | [hardening §code metrics](01-input-and-resource-hardening.md#code-metrics-finite-evidence-and-ingress-cap) |
 | Untrusted serialized graph | Deserialize only trusted bytes | [`usage/05-serialization.md`](../usage/05-serialization.md) |
-| Over-trusting heuristics, taint/nullflow/population/security-policy findings, rankings, type-refined closed worlds, partitions, edit bounds, architecture/code metrics, cut/robustness evidence, bounded cycle prefixes, or motif frequencies | Treat taint/nullflow, missing-check/deviant, secret-flow/access-policy, vulnerability-extrapolation, CHA/RTA/VTA, pattern/algorithm/GNN, GED, Martin, CK/LCOM/function metrics, reflexion, layering, smells, centrality, community, cohesion, spectral, truncated-cycle, and motif output as advisory outside each represented contract | this page |
+| Over-trusting heuristics, concurrency findings, taint/nullflow/population/security-policy findings, rankings, type-refined closed worlds, partitions, edit bounds, architecture/code metrics, cut/robustness evidence, bounded cycle prefixes, or motif frequencies | Treat race/atomicity, taint/nullflow, missing-check/deviant, secret-flow/access-policy, vulnerability-extrapolation, CHA/RTA/VTA, pattern/algorithm/GNN, GED, Martin, CK/LCOM/function metrics, reflexion, layering, smells, centrality, community, cohesion, spectral, truncated-cycle, and motif output as advisory outside each represented contract | this page |
 
 ## References
 

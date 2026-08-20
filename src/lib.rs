@@ -32,6 +32,8 @@
 //!   seed with shared-vocabulary WL cosine and bounded relaxed VF2 evidence
 //! - **Virtual-Call Type Refinement**: Narrow dynamic method targets with
 //!   immutable CHA, RTA, and receiver-local VTA evidence
+//! - **Concurrency Bug Candidates**: Compose exact access identity, MHP, and
+//!   typed locksets into immutable race and read-modify-write gap witnesses
 //! - **Graph Projections**: Build deterministic forward/reverse CSR views
 //! - **Graph Cohesion**: Compute cores, trusses, cut structure, weighted seams,
 //!   endpoint assortativity, and bounded attack traces

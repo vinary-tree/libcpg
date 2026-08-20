@@ -67,3 +67,7 @@ function boundaries, cap behavior, query helpers, and immutability. A 128-case
 property checks an independent Cartesian-product oracle plus insertion-order
 determinism. Public integration covers the feature-free crate root and a real
 Rholang Mode-B parse tree; serde coverage round-trips the public relation.
+
+MHP remains a reusable substrate. The current downstream consumers are the
+[race and atomicity candidate detectors](concurrency-bug-detection.md), which
+add exact access identity and lock evidence without changing this relation.

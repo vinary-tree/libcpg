@@ -691,6 +691,22 @@ reached. MHP is not by itself a conflicting access or data-race finding. See
 [Theory 31](theory/31-may-happen-in-parallel.md) and Naumovich–Avrunin
 [[45]](#references).
 
+### Data-race candidate / Atomicity candidate / Execution strand / Lockset
+
+A **data-race candidate** is a canonical MHP pair whose exact represented
+location is accessed at least once for writing and whose endpoint
+**locksets** contain no common mutually excluding acquisition. A lockset is the
+multiset of exact typed lock acquisitions held at an access site; two shared
+read modes do not exclude one another. An **atomicity candidate** is a
+read-modify-write pair split by a resolved release/reacquire gap, together with
+an other-strand same-location access that is MHP with both endpoints and is not
+excluded by a different continuously held acquisition. An **execution strand**
+is the unique nearest function or direct typed parallel operand used only for
+lexical access and lock ordering. These are evidence-bounded advisories, not
+runtime race proofs. See [Theory
+43](theory/43-evidence-bounded-race-and-atomicity.md), RacerD [[65]](#references),
+and RacerX [[66]](#references).
+
 ### Session sketch / Endpoint trace / Duality
 
 A **session sketch** is libcpg's ordered, shallow behavioral summary for one
@@ -1244,3 +1260,5 @@ strict tree interpretation. See
 62. Shannon, C. E. (1948). *A Mathematical Theory of Communication.* DOI: [10.1002/j.1538-7305.1948.tb01338](https://doi.org/10.1002/j.1538-7305.1948.tb01338).
 63. Yamaguchi, F., Lindner, F., Rieck, K. (2011). *Vulnerability Extrapolation: Assisted Discovery of Vulnerabilities Using Machine Learning.* [USENIX WOOT '11](https://www.usenix.org/conference/woot11/vulnerability-extrapolation-assisted-discovery-vulnerabilities-using-machine) (no DOI advertised in the proceedings record).
 64. Yamaguchi, F., Lottmann, M., Rieck, K. (2012). *Generalized Vulnerability Extrapolation using Abstract Syntax Trees.* DOI: [10.1145/2420950.2421003](https://doi.org/10.1145/2420950.2421003).
+65. Blackshear, S., Gorogiannis, N., O'Hearn, P. W., Sergey, I. (2018). *RacerD: Compositional Static Race Detection.* DOI: [10.1145/3276514](https://doi.org/10.1145/3276514).
+66. Engler, D., Ashcraft, K. (2003). *RacerX: Effective, Static Detection of Race Conditions and Deadlocks.* DOI: [10.1145/945445.945468](https://doi.org/10.1145/945445.945468).

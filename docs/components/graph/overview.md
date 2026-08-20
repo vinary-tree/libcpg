@@ -426,6 +426,9 @@ So the safe pattern is: build (single-threaded, `&mut`), then analyse
 - [May-happen-in-parallel analysis](mhp-analysis.md) — typed parallel operand
   subtrees, canonical symmetric execution-site pairs, nested-region
   composition, and explicit quadratic-output truncation.
+- [Race and atomicity candidate detection](concurrency-bug-detection.md) — exact
+  field/index/channel identity, statement lifting, canonical MHP conflicts,
+  source-ordered typed locksets, and RMW release/reacquire witnesses.
 - [Advisory session-protocol analysis](session-analysis.md) — definition-
   resolved per-channel endpoint traces, shallow payload types, and conservative
   three-valued binary linear-duality evidence under the `rholang` feature.

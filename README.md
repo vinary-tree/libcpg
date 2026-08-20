@@ -82,6 +82,9 @@ PDG). A query can therefore mix syntax, control flow, and data flow freely.
 - **May-happen-in-parallel relation** — feature-free typed parallel-operand
   cross-products with canonical symmetric statement pairs, nested-region
   composition, and an explicit quadratic-output cap.
+- **Race and atomicity candidates** — feature-free exact field/index/channel
+  identity, statement-lifted MHP conflicts, typed locksets, and witnessed
+  read-modify-write release/reacquire gaps.
 - **Advisory session-protocol sketches** — Rholang-gated, definition-resolved
   endpoint traces with three-valued binary direction and payload-type duality.
 - **Finite-state typestate analysis** — feature-free allocation-site object

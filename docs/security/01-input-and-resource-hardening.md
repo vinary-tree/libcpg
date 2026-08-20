@@ -33,6 +33,7 @@ Source: [`diagrams/resource-bounds.puml`](../diagrams/resource-bounds.puml).*
 | Typestate and resource-leak bounds | inherit `IfdsCaps::{max_functions,max_facts_per_node,max_worklist_steps,max_call_depth}` | `analyze_typestate`; `analyze_resource_leaks` | ordered object/value-flow and CFG fact worklists stop visibly; invalid policies, missing events/placement, and absent leak accepting states prevent false completeness |
 | Exception-flow bounds | inherit `IfdsCaps::{max_functions,max_facts_per_node,max_worklist_steps,max_scc_iters}` | `analyze_exception_flow` | finite exception-type summaries stop visibly at solver caps; unknown types, ambiguous calls, malformed catch entry, and missing witnesses prevent false completeness; call depth is inapplicable because SCC summaries replace path expansion |
 | Uninitialized-use traversal guards | always on | `analyze_uninitialized_uses` | finite function/use/definition scans and cycle-safe heap traversals; results describe only the represented binding and reaching-definition relation |
+| Race/atomicity structural guards | always on; caller caps CPG and MHP size | `race_candidates`; `atomicity_candidates` | canonical MHP normalization, unique cycle-safe heap parent walks, exact identities, conservative unresolved-lock replay, per-site merge joins, and same-location indexes terminate without native recursion; witnesses preserve a capped MHP input |
 | `Vf2Matcher::max_matches` | `0` (unlimited) | `pattern::Vf2Matcher` | search short-circuits once the match count is reached |
 | `Vf2Matcher` strict toggles | `strict_kinds`/`strict_edges` off | `pattern::Vf2Matcher` | tighter feasibility test prunes branches earlier |
 | Clone pair / PDG / VF2 budgets | `100_000` pairs, `300` PDG nodes, `10_000` VF2 calls | `pattern::detect_clones` | returns `AnalysisError::BudgetExceeded` before omitting a required comparison; hard maxima are `100_000`, `300`, and `100_000` |
@@ -335,6 +336,25 @@ relations with cycle-safe graph primitives. Its completeness is therefore
 about that normalized relation, not behavior omitted by a frontend. The
 [bug-detector security boundary](09-bug-detectors.md) covers policy provenance,
 false-positive/negative modes, and safe finding interpretation.
+
+### Race and atomicity evidence
+
+[`race_candidates`](../components/graph/concurrency-bug-detection.md) and
+`atomicity_candidates` consume caller-constructible MHP values as well as CPG
+evidence. They canonicalize and deduplicate every MHP pair, discard reflexive
+pairs, and use only exact typed access and lock identities. Unique nearest-site
+and execution-strand searches are breadth-first heap machines with visited
+sets; ambiguity suppresses evidence instead of selecting an arbitrary parent.
+
+An unresolved acquisition creates no protection, while an unresolved release
+clears held state so malformed lock evidence cannot conceal a finding. Race
+locations are compared by a linear merge of per-site sorted vectors, and
+atomicity interferers come from a same-location index rather than a whole-graph
+Cartesian product. These APIs have no internal input-size cap beyond the finite
+CPG and supplied MHP relation, so callers handling hostile graphs must cap both
+at ingress. A capped MHP relation is visibly copied into each witness and can
+never support a complete negative claim. See the
+[race/atomicity security boundary](18-concurrency-bug-detection.md).
 
 ## Pattern matching: VF2
 
@@ -956,6 +976,7 @@ correctness**: an analysis may return a meaningless answer, but it must
 | DFG reaching definitions (`visit_reaching`) | typed heap `Enter`/`Bind`/`Exit` frames plus an **active-path set**; source depth consumes no native call frames, and a node may re-enter after its matching `Exit` |
 | DFG member-to-field resolution | one immutable declaration index; every owner/scope walk uses cycle-bounded `ast_ancestors`; exact lexical/type/field names and uniqueness are required, so malformed, missing, or ambiguous evidence emits no `Reference` |
 | `method_field_graph` / `ck_metrics` / `function_metrics` | iterative visited function/member walks, declaration uniqueness, typed field/call evidence, inheritance SCC condensation, ordered sets, saturating counts, and finite arithmetic edge cases; nested functions remain separate scopes |
+| `race_candidates` / `atomicity_candidates` | breadth-first heap parent/strand machines with visited sets, finite source-ordered lock replay, canonical hostile MHP normalization, per-site location merge, and same-location interference index; a 100,000-level parent chain is regression-tested on 256 KiB |
 
 A *path* set rather than a global visited set is used in both extractors so that
 a node legitimately reachable from two disjoint branches is still processed on
@@ -1013,6 +1034,9 @@ over each one — see
 16. **Cap CPG/type size before code metrics**, persist frontend/DFG/resolver and
     `CkOptions` policy with the report, and inspect method-field witnesses before
     interpreting a cohesion or coupling threshold.
+17. **Cap both CPG and supplied MHP size before concurrency bug detection**,
+    reject capped MHP for complete-coverage workflows, and treat race/atomicity
+    absence as inconclusive when typed identity evidence is missing.
 
 ## Related pages
 
@@ -1026,5 +1050,7 @@ over each one — see
   — secret minimization, heuristic limits, peer-policy trust, and clean claims.
 - [Vulnerability-extrapolation security boundary](16-vulnerability-extrapolation.md)
   — seed trust, similarity limits, bounded search, ranking manipulation, and clean claims.
+- [Race/atomicity security boundary](18-concurrency-bug-detection.md) — exact
+  identity, hostile MHP normalization, lock uncertainty, and advisory claims.
 - [`usage/04-program-slicing.md`](../usage/04-program-slicing.md) — using slices in
   anger.

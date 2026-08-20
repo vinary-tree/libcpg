@@ -22,7 +22,7 @@ think to write down.
 
 | Kind | Count | Where |
 | --- | ---: | --- |
-| Maximal-matrix library tests | 1,188 | inline `#[cfg(test)] mod …` next to the code; includes examples and properties |
+| Maximal-matrix library tests | 1,203 | inline `#[cfg(test)] mod …` next to the code; includes examples and properties |
 | Public-API integration tests | 21 | `tests/integration.rs` |
 | Malformed-input robustness tests | 5 | `tests/robustness.rs` |
 | SCCP public/parser integration tests | 3 | `tests/sccp_integration.rs` |
@@ -64,8 +64,10 @@ think to write down.
 | Crypto-misuse public/parser integration tests | 2 | `tests/crypto_misuse_integration.rs` |
 | Virtual-call type-refinement public integration tests | 2 | `tests/devirtualization_integration.rs` |
 | Virtual-call type-refinement stack-safety tests | 1 | `tests/devirtualization_stack_safety.rs` |
-| **Executable test cases** | **1,317** | measured by the all-features test inventory: 1,188 library and 129 integration/robustness tests; excludes rustdoc examples |
-| `proptest!` blocks (subset of the library/robustness rows) | 91 | exact source-level macro count in `src/` and `tests/` |
+| Race/atomicity public integration tests | 1 | `tests/concurrency_bugs_integration.rs` |
+| Race/atomicity stack-safety tests | 1 | `tests/concurrency_bugs_stack_safety.rs` |
+| **Executable test cases** | **1,334** | measured by the all-features test inventory: 1,203 library and 131 integration/robustness tests; excludes rustdoc examples |
+| `proptest!` blocks (subset of the library/robustness rows) | 93 | exact source-level macro count in `src/` and `tests/` |
 
 The maximal-matrix library count is up from **99** inline tests and **zero**
 property tests before this work.
@@ -83,10 +85,10 @@ on the features enabled:
 
 | Command | Lib tests | Notes |
 | --- | ---: | --- |
-| `cargo test` | 817 | `default = []`: the feature-free library surface, including type refinement, typestate, bug detectors, population anomaly inference, clone/feasibility advisories, API-usage/temporal mining, and declarative CWE templates |
-| `cargo test --features "full rholang metta"` | 1,188 | the maximal library matrix, including the Mode-B mappers, session sketches, type refinement, typestate, bug detectors, population/clone/feasibility/API-usage/CWE advisories, named temporal properties, and evidence-aware complexity |
+| `cargo test` | 830 | `default = []`: the feature-free library surface, including concurrency candidates, type refinement, typestate, bug detectors, population anomaly inference, clone/feasibility advisories, API-usage/temporal mining, and declarative CWE templates |
+| `cargo test --features "full rholang metta"` | 1,203 | the maximal library matrix, including the Mode-B mappers, session sketches, race/atomicity candidates, type refinement, typestate, bug detectors, population/clone/feasibility/API-usage/CWE advisories, named temporal properties, and evidence-aware complexity |
 
-The feature-free 817 exercise the graph model, deterministic multi-file merge
+The feature-free 830 exercise the graph model, deterministic multi-file merge
 and import linkage, exact dominator/post-dominator,
 natural-loop, monotone data-flow, IFDS/IDE procedure summaries,
 interprocedural effect/constant, taint, and maybe-null summaries, variable-liveness/dead-store,
@@ -97,6 +99,7 @@ metrics, architectural-smell detection, WL
 structural-clone and Type-1 through Type-4 function-clone detection, centrality, community, cohesion/robustness,
 spectral-connectivity classification, bounded simple cycles, directed motifs,
 bipartite GED, typed channel/deadlock evidence, may-happen-in-parallel relations,
+exact-location race and RMW atomicity candidates,
 finite-state typestate properties,
 resource-leak, uninitialized-use, uncaught-exception, dead-catch,
 missing-check, call-order, and return-check detection,

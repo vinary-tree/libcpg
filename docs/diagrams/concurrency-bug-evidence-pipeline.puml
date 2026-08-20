@@ -1,0 +1,56 @@
+@startuml
+title Evidence-bounded race and atomicity candidate pipeline
+
+skinparam backgroundColor #FCFCFC
+skinparam shadowing false
+skinparam defaultFontName "DejaVu Sans"
+skinparam ArrowColor #495057
+skinparam ArrowThickness 1.2
+skinparam componentStyle rectangle
+
+rectangle "Typed CPG evidence" as CPG #DBE4FF {
+  component "DFG access kind\nField/Index Read/Write" as DFG #D0EBFF
+  component "exact Reference\nField or Variable" as REF #D0EBFF
+  component "MsgKind\nchannel read/write" as MSG #C5F6FA
+  component "LockKind\nacquire/release" as LOCK #C5F6FA
+  component "AST parent overlay" as AST #E5DBFF
+}
+
+component "iterative evidence machine\nunique site + strand\nsource-ordered locksets" as MACHINE #FFF3BF
+component "canonical MHP index\ndeduplicate · no self-pairs" as MHP #FFE8CC
+component "per-site sorted locations\nlinear merge" as RACE #FFD8A8
+component "per-(strand,location) order\nper-location interferer index" as ATOMIC #FCC2D7
+component "RaceCandidate\nexact conflict witness" as ROUT #FFE3E3
+component "AtomicityCandidate\nRMW gap witness" as AOUT #FFE3E3
+
+DFG --> MACHINE : typed access
+REF --> MACHINE : exact identity
+MSG --> MACHINE : channel identity
+LOCK --> MACHINE : lock transitions
+AST --> MACHINE : lift / group
+MHP --> RACE : possible overlap
+MHP --> ATOMIC : both endpoints
+MACHINE --> RACE : access + locksets
+MACHINE --> ATOMIC : access + boundaries
+RACE --> ROUT : write and no\nexcluding common lock
+ATOMIC --> AOUT : split guard + interferer +\nno continuous exclusion
+
+note right of MACHINE #F1F3F5
+  All source-depth state is heap allocated.
+  Ambiguity suppresses evidence.
+  The CPG is never mutated.
+end note
+
+legend right
+|= Colour |= Meaning |
+|<#DBE4FF> | typed-evidence container |
+|<#D0EBFF> | access and exact identity |
+|<#C5F6FA> | typed concurrency metadata |
+|<#E5DBFF> | AST topology |
+|<#FFF3BF> | explicit heap state machine |
+|<#FFE8CC> | normalized relation input |
+|<#FFD8A8> | race classifier |
+|<#FCC2D7> | atomicity classifier |
+|<#FFE3E3> | advisory output |
+endlegend
+@enduml

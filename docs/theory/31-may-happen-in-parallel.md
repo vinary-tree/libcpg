@@ -121,6 +121,10 @@ the same conservative question but deliberately implements the smaller typed
 parallel-structure abstraction required by this epic; it does not claim their
 full interprocedural data-flow precision.
 
+[Theory 43](43-evidence-bounded-race-and-atomicity.md) defines how the
+feature-free race and atomicity APIs compose this relation with exact access
+identity and locksets.
+
 ## References
 
 1. Naumovich, G., Avrunin, G. S. (1998). *A Conservative Data Flow Algorithm

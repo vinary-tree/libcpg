@@ -50,14 +50,14 @@ Two properties of the suite make this rigorous rather than merely suggestive:
 
 ## 3. The evidence base
 
-The all-features Cargo inventory contains **1,188 library tests** and **129
-integration/robustness tests**, for **1,317 executable cases**. The integration
+The all-features Cargo inventory contains **1,203 library tests** and **131
+integration/robustness tests**, for **1,334 executable cases**. The integration
 inventory includes public and parser-backed gates for graph construction,
 optimization, architecture, concurrency, summaries, slicing, persistence, and
 typestate plus resource/definition/exception, population, clone, and path bug detectors,
 including aggregate, Rust, Java dual-build, exact 4/5 and 9/10, and
 depth-100,000 detector targets. These cases combine fixed examples,
-differential oracles, and 91 exact
+differential oracles, and 93 exact
 source-level `proptest!` blocks. The feature-free matrix remains
 independently runnable and exercises the exact graph/data-flow substrate
 without compiling any grammar. Twenty active Criterion targets supplement
@@ -119,6 +119,7 @@ Because `default = []`, many tests are **feature-gated**. The end-to-end reachin
 | [45 — Secret-flow and access-policy validation](45-security-policy-validation.md) | Entropy/name qualification, positional source-to-sink flow, exact authN/authZ guard populations, qualification, determinism, and constant native call depth | paired examples, three 128-case properties, public/parser integration, serde, two depth-100,000/64 KiB gates | feature-free / `serde` / `lang-rust` |
 | [46 — Vulnerability-extrapolation validation](46-vulnerability-extrapolation-validation.md) | Shared-vocabulary WL cosine, deterministic bounded ranking, relaxed VF2 qualification, complete boundary evidence, and constant native call depth | planted near duplicate, 256/128-case properties, public/parser integration, serde, depth-100,000/64 KiB gate | feature-free / `serde` / `lang-rust` |
 | [47 — Virtual-call type-refinement validation](47-type-refinement-validation.md) | Exact represented CHA/RTA/VTA target lattice, inherited/default dispatch, deterministic insertion behavior, and constant native call depth | exact three-level hierarchy, 128-case property, public C1 integration, three parser allocation frontends, serde, depth-100,000/256 KiB gate | feature-free / `serde` / `lang-javascript` / `lang-typescript` / `lang-java` |
+| [48 — Race and atomicity validation](48-concurrency-bug-validation.md) | Exact represented shared-location conflicts, lock-mode exclusion, RMW release/reacquire gaps, hostile MHP normalization, determinism, and constant native call depth | conflict/lock/gap examples, two 128-case insertion-order properties, public composition, serde, depth-100,000/256 KiB gate | feature-free / `serde` |
 
 ## 5. What is proven, and what is advisory
 
@@ -190,6 +191,10 @@ Scientific honesty requires separating the two:
   MHP pairs are exact for the represented typed parallel AST up to the visible
   output cap; runtime overlap, shared-memory conflict, and race severity remain
   advisory questions outside this relation.
+  Race and atomicity candidates are exact for the represented typed access,
+  exact declaration, lockset, lexical-order, and supplied MHP evidence; runtime
+  reachability, aliases, atomics, memory-model behavior, defect severity, and
+  safe remediation remain advisory.
   Session-sketch verdicts are exact for the represented ordered shallow endpoint
   evidence; dynamic endpoint instances, operational reductions, recursive or
   multiparty protocols, progress, and deadlock freedom remain advisory or out of

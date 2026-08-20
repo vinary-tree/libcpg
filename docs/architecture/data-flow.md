@@ -539,6 +539,30 @@ See the [component guide](../components/graph/mhp-analysis.md), [Theory
 31](../theory/31-may-happen-in-parallel.md), and [Usage
 14](../usage/14-may-happen-in-parallel.md).
 
+### Race and atomicity candidates (feature-free)
+
+`race_candidates` and `atomicity_candidates` consume a caller-supplied MHP
+relation rather than changing it. Typed field/index DFG edges plus one exact
+`Reference`, or typed channel metadata plus resolved identity, first become
+access facts. Iterative parent machines lift expressions to executable sites
+and execution strands. A source-ordered state machine replays typed lock
+acquisitions/releases and snapshots exact held-lock instances.
+
+The race path merge-joins locations attached to each MHP pair and retains
+write conflicts without a common excluding lock. The atomicity path finds an
+adjacent same-location read/write split across release/reacquire of a guard,
+then requires an other-strand access that is MHP with both endpoints and not
+excluded by a different continuously held acquisition. Both paths are
+deterministic, stack-safe, immutable, and advisory.
+
+![Concurrency candidate evidence flow](../diagrams/concurrency-bug-evidence-pipeline.svg)
+
+![Read-modify-write lock gap](../diagrams/atomicity-lock-gap.svg)
+
+See the [component guide](../components/graph/concurrency-bug-detection.md),
+[Theory 43](../theory/43-evidence-bounded-race-and-atomicity.md), and [Usage
+26](../usage/26-concurrency-bug-candidates.md).
+
 ### Session-protocol sketches (`rholang`)
 
 `session_sketches` reuses the ordered, definition-resolved events above. It

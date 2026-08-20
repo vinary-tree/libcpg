@@ -429,6 +429,37 @@ guide](../components/graph/mhp-analysis.md), [usage
 guide](../usage/14-may-happen-in-parallel.md), [theory](../theory/31-may-happen-in-parallel.md),
 and [security boundary](../security/06-mhp-analysis.md).
 
+### Race and atomicity candidates
+
+Both feature-free APIs consume an immutable CPG and a caller-supplied
+`MhpRelation`. They return sorted advisory records without adding graph edges.
+
+| Function | Signature | Result |
+|---|---|---|
+| `race_candidates` | `fn(&CodePropertyGraph, &MhpRelation) -> Vec<RaceCandidate>` | Exact same-location MHP conflicts containing a write and lacking a common excluding lock. |
+| `atomicity_candidates` | `fn(&CodePropertyGraph, &MhpRelation) -> Vec<AtomicityCandidate>` | Adjacent same-location read/write updates split across release/reacquire with represented MHP interference. |
+
+| Type | Stable fields/meaning |
+|---|---|
+| `ConcurrentAccessKind` | `Read`, `Write`, or `ReadWrite`; `reads()`/`writes()` expose the conflict bits. |
+| `HeldLock` | Exact resource, `LockMode`, acquisition site, and acquisition `SourceRange`. |
+| `RaceCandidate` | `access_a < access_b`, exact `location`, and `RaceWitness`. |
+| `RaceWitness` | Underlying expressions, access kinds, endpoint ranges/locksets, and `mhp_capped`. |
+| `AtomicityCandidate` | `read`, later `write`, exact `location`, and `AtomicityWitness`. |
+| `AtomicityWitness` | Expressions, interfering access/kind/lockset, boundary lock, release/reacquire sites/ranges, endpoint locksets, and `mhp_capped`. |
+
+Field/index facts require a typed DFG access relation and one exact `Reference`;
+channel facts require typed `MsgKind` and resolved identity. Iterative parent
+walks lift expressions to executable MHP sites and execution strands. Typed
+lock events are replayed in source order. Ambiguous identity/site/strand input
+is suppressed, hostile public MHP pairs are normalized, and unresolved releases
+clear held state conservatively.
+
+See the [component guide](../components/graph/concurrency-bug-detection.md),
+[usage guide](../usage/26-concurrency-bug-candidates.md), [Theory
+43](../theory/43-evidence-bounded-race-and-atomicity.md), and [security
+boundary](../security/18-concurrency-bug-detection.md).
+
 ### Advisory session-protocol sketches (`rholang`)
 
 With `feature = "rholang"`, `session_sketches(&CodePropertyGraph) ->
