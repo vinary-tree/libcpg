@@ -33,7 +33,9 @@ pub use facts::{
     expression_facts, expression_facts_with_limits, variable_facts, ExprFacts, ExprUniverse,
     FactUniverse, VarFacts, VariableDefinition,
 };
-pub(crate) use intervals::{comparison_regions, node_value_ranges, reverse_comparison};
+pub(crate) use intervals::{
+    comparison_regions, expression_value_ranges, node_value_ranges, reverse_comparison,
+};
 pub use intervals::{value_ranges, Bound, Interval, IntervalEnv, IntervalReport};
 pub use liveness::{dead_stores, liveness, DeadStore, DeadStoreReport, LivenessResult};
 pub(crate) use sccp::{fold_binary, fold_unary, literal_value};

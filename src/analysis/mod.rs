@@ -31,6 +31,7 @@ mod reflexion;
 mod resolve;
 mod scc;
 mod sdg;
+pub mod security;
 #[cfg(feature = "serde")]
 pub(crate) mod serde_util;
 mod smells;
@@ -174,6 +175,14 @@ pub use reflexion::{
 pub use resolve::{
     build_symbol_table, resolve_calls, CallGraphResolution, CallResolution, Confidence,
     ResolveConfig, SymbolCandidates, SymbolTable,
+};
+
+pub use security::{
+    analyze_builtin_cwes, analyze_cwe_templates, builtin_cwe_templates, CweAnalysis,
+    CweAnalysisConfig, CweAnalysisError, CweAnalysisIssue, CweCandidate, CweEvidence,
+    CwePatternEdge, CwePrimitive, CweRole, CweStructuralMatch, CweStructuralPattern, CweTemplate,
+    CweTypestateAnalysis, MAX_CWE_ARRAY_ORIGIN_NODES, MAX_CWE_MATCHES_PER_PATTERN,
+    MAX_CWE_PATTERNS_PER_TEMPLATE, MAX_CWE_TEMPLATES,
 };
 
 pub use sdg::{

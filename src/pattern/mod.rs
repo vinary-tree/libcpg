@@ -248,7 +248,7 @@ impl NodeKindMatcher {
 
 impl NodeKindTag {
     /// Converts this tag to a CpgNodeKind.
-    fn to_cpg_node_kind(self, name_pattern: &Option<String>) -> CpgNodeKind {
+    pub(crate) fn to_cpg_node_kind(self, name_pattern: &Option<String>) -> CpgNodeKind {
         use crate::{MethodSignature, ScopeId, Visibility};
         use smallvec::smallvec;
         use std::sync::Arc;

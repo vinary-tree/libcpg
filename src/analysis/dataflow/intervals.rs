@@ -8,7 +8,7 @@
 
 use std::{
     cmp::Ordering,
-    collections::{BTreeMap, HashSet},
+    collections::{BTreeMap, BTreeSet, HashSet, VecDeque},
     sync::Arc,
 };
 
@@ -773,6 +773,96 @@ pub(crate) fn node_value_ranges(
         }
     }
     Ok(NodeIntervalReport { before_node })
+}
+
+/// Evaluates selected expression roots in their nearest represented CFG states.
+///
+/// This crate-internal adapter keeps consumers on the interval engine's exact
+/// transfer semantics. It first replays the solved block inputs to retain the
+/// state before every CFG node, then walks AST-parent relations iteratively for
+/// each requested expression. Malformed multi-parent ASTs are conservative: all
+/// equally-near CFG contexts are evaluated and joined with an interval hull.
+/// Expressions without a represented CFG context are absent from the result.
+pub(crate) fn expression_value_ranges(
+    cpg: &CodePropertyGraph,
+    function: NodeId,
+    expressions: &BTreeSet<NodeId>,
+) -> Result<BTreeMap<NodeId, Interval>, AnalysisError> {
+    let (cfg, facts, solution) = solve_function(cpg, function)?;
+    let analysis = IntervalAnalysis { facts: &facts };
+    let mut reachable_blocks = BTreeSet::new();
+    let mut block_work = VecDeque::from([cfg.entry]);
+    while let Some(block) = block_work.pop_front() {
+        if !reachable_blocks.insert(block) {
+            continue;
+        }
+        for edge in cfg.successors(block) {
+            block_work.push_back(edge.target);
+        }
+    }
+    let mut states_before = BTreeMap::<NodeId, IntervalEnv>::new();
+    for block in &cfg.blocks {
+        if !reachable_blocks.contains(&block.id) {
+            continue;
+        }
+        let mut state = solution.before[block.id.0 as usize].clone();
+        for &node in &block.nodes {
+            states_before.insert(node, state.clone());
+            analysis.transfer_node(cpg, node, &mut state);
+        }
+    }
+
+    let mut values = BTreeMap::new();
+    for &expression in expressions {
+        let mut frontier = BTreeSet::from([expression]);
+        let mut visited = BTreeSet::new();
+        let contexts = loop {
+            let contexts = frontier
+                .iter()
+                .filter_map(|node| states_before.get(node))
+                .collect::<Vec<_>>();
+            if !contexts.is_empty() || frontier.is_empty() {
+                break contexts;
+            }
+
+            let mut next = BTreeSet::new();
+            for node in frontier {
+                if !visited.insert(node) {
+                    continue;
+                }
+                if let Some(parent) = cpg.ast_parent(node) {
+                    if !visited.contains(&parent) {
+                        next.insert(parent);
+                    }
+                }
+                for edge in cpg.incoming_edges(node) {
+                    if matches!(edge.kind, crate::CpgEdgeKind::AstChild)
+                        && !visited.contains(&edge.source)
+                    {
+                        next.insert(edge.source);
+                    }
+                }
+                for edge in cpg.outgoing_edges(node) {
+                    if matches!(edge.kind, crate::CpgEdgeKind::AstParent)
+                        && !visited.contains(&edge.target)
+                    {
+                        next.insert(edge.target);
+                    }
+                }
+            }
+            frontier = next;
+        };
+
+        let mut joined = None::<Interval>;
+        for state in contexts {
+            let value = analysis.eval_expr(cpg, expression, state);
+            joined = Some(joined.map_or(value, |current| current.hull(value)));
+        }
+        if let Some(value) = joined {
+            values.insert(expression, value);
+        }
+    }
+    Ok(values)
 }
 
 fn named_intervals(facts: &VarFacts, state: &IntervalEnv) -> Vec<(Arc<str>, Interval)> {
