@@ -271,6 +271,10 @@ name = "api_usage_mining"
 harness = false
 
 [[bench]]
+name = "cwe_templates"
+harness = false
+
+[[bench]]
 name = "program_merge"
 harness = false
 
