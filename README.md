@@ -161,6 +161,9 @@ PDG). A query can therefore mix syntax, control flow, and data flow freely.
   frontier (Ferrante–Ottenstein–Warren 1987; Cytron et al. 1991) plus
   data-dependence edges, with bounded backward/forward Weiser slices
   (`PdgBuilder`, `backward_slice`, `forward_slice`).
+- **Deterministic CPG diff** — feature-free bounded-GED node alignment, exact
+  translated node/typed-edge edit scripts, and represented-PDG change
+  classification under complete-or-error node/edge/edit budgets.
 - **Function clones and subgraph isomorphism** — feature-free
   `pattern::detect_clones`, deterministic stack-safe VF2 pattern matching
   (`pattern::Vf2Matcher`), and

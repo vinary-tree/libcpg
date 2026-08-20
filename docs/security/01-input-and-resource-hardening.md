@@ -63,6 +63,7 @@ Source: [`diagrams/resource-bounds.puml`](../diagrams/resource-bounds.puml).*
 | `MAX_CYCLE_LENGTH` / `MAX_SIMPLE_CYCLES` | `32` / `100_000` hard maxima | `simple_cycles` | clamps path depth and retained count; stops inside DFS at the first over-cap unique cycle and returns that omitted witness |
 | `MAX_TRIAD_NODES` / `MAX_GRAPHLET_NODES` | `512` / `50` hard maxima | `motif_census` | rejects before cubic/quartic enumeration with `AnalysisError::BudgetExceeded`; never returns a partial census |
 | `MAX_GED_NODES` | `512` hard maximum | `ged_upper_bound`; `SimilarityMetric::GraphEdit` | bounds the cubic Hungarian matrix; direct results set `capped = true` and clearly label the linear compatibility fallback |
+| `MAX_CPG_DIFF_NODES` / `MAX_CPG_DIFF_EDGES` / `MAX_CPG_DIFF_EDITS` | `512` / `2_000_000` / `2_000_000` hard maxima; edge/edit defaults `200_000` | `cpg_diff` | rejects before or during complete structural comparison; no partial script/classification; callers must separately bound total node-payload bytes |
 | Loop-induction structural bounds | at most `candidate_count + 1` invariant rounds per loop; affine semantic depth `3`; arbitrary signed-integer unary depth | `loop_induction` | typed postorder/affine/sign machines keep input depth off the native stack; malformed AST cycles are cut by active/visited sets and arithmetic overflow becomes unknown evidence |
 | Complexity-evidence bounds | validated finite function scope plus loop/induction provider bounds | `estimate_time_complexity_with_evidence` (feature `algorithm-detection`) | provider failure or absent CFG evidence returns the exact legacy total estimate; justification grows with loop count |
 
@@ -811,6 +812,16 @@ distances. An uncapped GED upper bound remains advisory: node equality uses
 coarse `NodeKindTag` labels, and the bipartite mapping is approximate. It must
 not independently authorize a code change or suppress a security finding.
 
+The feature-free [`cpg_diff`](../components/graph/cpg-diff.md) API reuses that
+alignment but does not use GED's capped linear fallback because it needs a real
+correspondence. It independently admits each graph's edge count and claims one
+budget unit for every returned addition, deletion, or substitution. Any node,
+edge, or edit breach returns `BudgetExceeded` without a partial script. This
+complete-or-error rule protects the PDG-based classifier from an omitted
+dependence edit. Hosts must also bound already-constructed node payload bytes;
+complete snapshots can retain large strings and logical property trees even
+though their lifecycle is stack-safe.
+
 ## Loop induction: finite structural bounds
 
 [`loop_induction`](../components/graph/induction-analysis.md) computes each
@@ -1042,6 +1053,10 @@ over each one — see
     reject incomplete localization instead of substituting a partial label,
     preserve knownness/convergence qualifiers, and split data before global
     centrality when cross-sample leakage matters.
+19. **Build comparable PDGs and set all three CPG-diff budgets**; treat the
+    change label as represented dependence evidence, compare omitted container
+    metadata separately, and never interpret `Refactoring` as semantic
+    equivalence.
 
 ## Related pages
 
@@ -1059,5 +1074,7 @@ over each one — see
   identity, hostile MHP normalization, lock uncertainty, and advisory claims.
 - [ML-export security boundary](19-ml-export-boundary.md) — schema integrity,
   hostile AST behavior, resource caps, source confidentiality, and data leakage.
+- [CPG-diff security boundary](20-cpg-diff-boundary.md) — heuristic alignment,
+  PDG classification, complete budgets, structural omissions, and payload trust.
 - [`usage/04-program-slicing.md`](../usage/04-program-slicing.md) — using slices in
   anger.

@@ -22,7 +22,7 @@ think to write down.
 
 | Kind | Count | Where |
 | --- | ---: | --- |
-| Maximal-matrix library tests | 1,211 | inline `#[cfg(test)] mod …` next to the code; includes examples and properties |
+| Maximal-matrix library tests | 1,220 | inline `#[cfg(test)] mod …` next to the code; includes examples and properties |
 | Public-API integration tests | 22 | `tests/integration.rs` |
 | Malformed-input robustness tests | 5 | `tests/robustness.rs` |
 | SCCP public/parser integration tests | 3 | `tests/sccp_integration.rs` |
@@ -68,8 +68,10 @@ think to write down.
 | Race/atomicity stack-safety tests | 1 | `tests/concurrency_bugs_stack_safety.rs` |
 | ML-export public integration tests | 1 | `tests/ml_export_integration.rs` |
 | ML-export stack-safety tests | 1 | `tests/ml_export_stack_safety.rs` |
-| **Executable test cases** | **1,344** | measured by the all-features test inventory: 1,211 library and 133 integration/robustness tests; excludes rustdoc examples |
-| `proptest!` blocks (subset of the library/robustness rows) | 94 | exact source-level macro count in `src/` and `tests/` |
+| CPG-diff public/parser integration tests | 2 | `tests/cpg_diff_integration.rs` |
+| CPG-diff stack-safety tests | 1 | `tests/cpg_diff_stack_safety.rs` |
+| **Executable test cases** | **1,356** | measured by the all-features test inventory: 1,220 library and 136 integration/robustness tests; excludes rustdoc examples |
+| `proptest!` blocks (subset of the library/robustness rows) | 95 | exact source-level macro count in `src/` and `tests/` |
 
 The maximal-matrix library count is up from **99** inline tests and **zero**
 property tests before this work.
@@ -87,10 +89,10 @@ on the features enabled:
 
 | Command | Lib tests | Notes |
 | --- | ---: | --- |
-| `cargo test` | 837 | `default = []`: the feature-free library surface, including deterministic ML export, concurrency candidates, type refinement, typestate, bug detectors, population anomaly inference, clone/feasibility advisories, API-usage/temporal mining, and declarative CWE templates |
-| `cargo test --features "full rholang metta"` | 1,211 | the maximal library matrix, including serde ML export, the Mode-B mappers, session sketches, race/atomicity candidates, type refinement, typestate, bug detectors, population/clone/feasibility/API-usage/CWE advisories, named temporal properties, and evidence-aware complexity |
+| `cargo test` | 845 | `default = []`: the feature-free library surface, including deterministic ML export and CPG diff, concurrency candidates, type refinement, typestate, bug detectors, population anomaly inference, clone/feasibility advisories, API-usage/temporal mining, and declarative CWE templates |
+| `cargo test --features "full rholang metta"` | 1,220 | the maximal library matrix, including serde ML export/CPG diff, the Mode-B mappers, session sketches, race/atomicity candidates, type refinement, typestate, bug detectors, population/clone/feasibility/API-usage/CWE advisories, named temporal properties, and evidence-aware complexity |
 
-The feature-free 837 exercise the graph model, deterministic multi-file merge
+The feature-free 845 exercise the graph model, deterministic multi-file merge
 and import linkage, exact dominator/post-dominator,
 natural-loop, monotone data-flow, IFDS/IDE procedure summaries,
 interprocedural effect/constant, taint, and maybe-null summaries, variable-liveness/dead-store,
@@ -103,6 +105,7 @@ spectral-connectivity classification, bounded simple cycles, directed motifs,
 bipartite GED, typed channel/deadlock evidence, may-happen-in-parallel relations,
 exact-location race and RMW atomicity candidates,
 canonical graph tensors and exact AST path contexts,
+deterministic aligned CPG edit scripts and represented-PDG classification,
 finite-state typestate properties,
 resource-leak, uninitialized-use, uncaught-exception, dead-catch,
 missing-check, call-order, and return-check detection,
@@ -213,6 +216,7 @@ The invariants fall into complementary families.
 | **Slicing** | $`\lvert S\rvert \le \mathit{max\_nodes}`$; the criterion is in its own backward slice; $`\mathit{max\_nodes} = 0 \Rightarrow S = \varnothing`$; $`S`$ is monotone in $`\mathit{max\_nodes}`$; every sliced id is a real node |
 | **System dependence slicing** | labeled summary edges are selective, append-only, idempotent, and conservative under cap/truncation; exact two-caller oracles prove both directions cross the intended call without a sibling return; 256-case generated multigraphs preserve exact slices under reversed edge insertion, prove node/depth cap monotonicity, and retain every legacy PDG-only predecessor; examples cover missing and multi-target summaries, zero caps, unknown criteria, serde, and the public effect-to-slice pipeline |
 | **Matching, similarity, and GED** | VF2 embeddings are injective, kind-consistent, and edge-preserving; relaxed matching $`\supseteq`$ strict; 64-case campaigns prove the iterative machine exactly matches a bounded recursive specification, graph insertion order cannot change the embedding sequence, positive result caps select monotone canonical prefixes, and `find_matches_limited` performs the effective capped search; a 100,000-node public path match completes on a 256 KiB stack without graph mutation; all four metrics land in $`[0,1]`$, are symmetric, and are maximal on self-comparison; Hungarian assignments equal brute-force permutations through order seven; 128 generated graph pairs through six nodes produce deterministic symmetric concrete-script bounds no smaller than exhaustive exact GED; examples cover typed multiedges, stable ids, caps, invalid numerics, serde, public/parser composition, robustness, stable WL hash vectors, and non-mutation |
+| **Deterministic CPG diff** | exact examples pin identical graphs, renumbered pure renames, added PDG guards, typed/labelled parallel-edge substitutions, translated embedded ids, canonical properties, malformed cached links, every cap, serde, and immutability; one 128-case property requires exact scripts under opposite storage orders; public feature-free/parser-PDG composition distinguishes rename from dependence edits; a depth-100,000 property plus 128-node alignment completes on 256 KiB |
 | **Ordering & confidence** | `ComplexityClass::is_better_than` is a strict order (irreflexive, asymmetric, transitive); complexity is monotone in loop nesting; every detector's results are sorted by descending confidence and clear its `min_confidence` |
 | **Complexity evidence** | fully counted reducible depth maps to the exact polynomial degree; opposite storage orders produce identical class/confidence/justification; every generated CFG-free function returns the exact legacy estimate; fixed examples decide unknown-trip and irreducible confidence precedence, provenance, recursion composition, public parsing, and graph non-mutation |
 | **DSM visibility / architecture roles** | repeated-BFS VFO/VFI vectors and propagation cost equal an independent Floyd–Warshall closure; the largest multi-vertex SCC equals an independent mutual-reachability partition; reversed enumeration and duplicate edges preserve reports; examples cover chain/cycle/hub/isolates, equal-core ties, caps, malformed CSR/reverse data, cross-projection provenance, serde, public construction, parser integration, and graph non-mutation |
@@ -479,6 +483,13 @@ malformed-input harness, stable WL vectors, and six benchmark cases; see
 [`scientific/18-ged-validation.md`](../scientific/18-ged-validation.md).
 It measures **99.83%** line, **99.28%** region, **100.00%** function, and
 **93.33%** branch coverage in the clean maximal matrix.
+The CPG-diff module reuses that assignment substrate and is independently
+evaluated against exact edit/classification examples, a 128-case storage-order
+property, public/parser-PDG composition, serde, exact caps, graph immutability,
+and a depth-100,000 property on 256 KiB; see
+[`scientific/50-cpg-diff-validation.md`](../scientific/50-cpg-diff-validation.md).
+No standalone coverage percentage is claimed until the next clean coverage
+snapshot.
 The Martin module is evaluated against a complete three-module arithmetic
 oracle, 256 sparse assignment/topology permutations, hostile public values,
 serde, the public/parser boundary, and whole-CPG corruption; see

@@ -432,6 +432,9 @@ So the safe pattern is: build (single-threaded, `&mut`), then analyse
 - [Deterministic ML export](ml-export.md) — feature-free canonical node rows,
   typed dense edges, complete PDG localization, and reconstructable
   source-ordered AST path contexts with heap-backed depth state.
+- [Deterministic CPG diff](cpg-diff.md) — feature-free symmetric GED alignment,
+  exact translated node/typed-edge edits, and represented-PDG change
+  classification under explicit complete-or-error budgets.
 - [Advisory session-protocol analysis](session-analysis.md) — definition-
   resolved per-channel endpoint traces, shallow payload types, and conservative
   three-valued binary linear-duality evidence under the `rholang` feature.

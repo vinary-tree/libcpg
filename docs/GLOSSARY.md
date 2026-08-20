@@ -159,6 +159,20 @@ following the path-representation lineage of code2vec [[67]](#references).
 See [Theory 44](theory/44-deterministic-cpg-ml-representations.md) and the
 [component contract](components/graph/ml-export.md).
 
+### CPG diff / node alignment / dependence-aware classification
+
+A **CPG diff** is libcpg's complete deterministic structural edit script
+between two admitted Code Property Graphs. **Node alignment** is the partial
+old-to-new correspondence selected by the symmetric bounded bipartite
+[GED](#graph-edit-distance) assignment; it translates graph-local ids but is a
+heuristic, not proof of semantic identity. **Dependence-aware classification**
+labels the script `BehaviorChanging` exactly when an inserted, removed, or
+substituted edge is represented `ControlDependence` or `DataDependence`;
+otherwise it labels it `Refactoring`. That second label is not a behavioral-
+equivalence claim, especially when no PDG was built. See [Theory
+45](theory/45-deterministic-cpg-diff.md) and the [component
+contract](components/graph/cpg-diff.md).
+
 ### Cryptographic API misuse
 
 A violation of a cryptographic library's required call protocol or parameter

@@ -314,6 +314,10 @@ development, or jump to the layer you need:
     Stable dense identity, typed edge classes, aligned structural features,
     complete PDG localization, and exact terminal AST paths define a
     feature-free machine-learning interchange boundary.
+45. **[45 — Deterministic dependence-aware CPG differencing](45-deterministic-cpg-diff.md).**
+    Symmetric bounded GED correspondence, exact translated node/edge evidence,
+    canonical multiset edits, and a represented-PDG classification boundary
+    define the feature-free version comparison contract.
 
 The later chapters define deterministic projection structure, architecture
 metrics, inspectable evidence, and their interpretation limits.

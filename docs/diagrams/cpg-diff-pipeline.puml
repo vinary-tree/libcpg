@@ -1,0 +1,53 @@
+@startuml
+title Deterministic CPG diff pipeline
+
+skinparam backgroundColor #FAFAFA
+skinparam shadowing false
+skinparam defaultFontName DejaVu Sans
+skinparam ArrowColor #334155
+skinparam rectangle {
+  BorderColor #334155
+  FontColor #0F172A
+  RoundCorner 12
+}
+
+rectangle "Old CPG\n(nodes + typed edge multiset)" as OLD #DBEAFE
+rectangle "New CPG\n(nodes + typed edge multiset)" as NEW #DBEAFE
+rectangle "Admission boundary\nnode + edge caps" as ADMIT #FEF3C7
+rectangle "Bounded GED correspondence\nforward + reverse + delete-all\ncanonical least-cost tie-break" as ALIGN #EDE9FE
+rectangle "Stable old -> new\nnode alignment" as MAP #DDD6FE
+rectangle "Exact node payload\ncomparison\n(translated embedded ids)" as NODES #DCFCE7
+rectangle "Exact edge multiset\nmatching\n(type + label + multiplicity)" as EDGES #DCFCE7
+rectangle "Complete edit budget\nadd / remove / substitute" as EDITS #FEF3C7
+rectangle "PDG-edge classifier" as CLASSIFY #FCE7F3
+rectangle "CpgDiff\nalignment + cost + edits + class" as RESULT #CCFBF1
+
+OLD --> ADMIT
+NEW --> ADMIT
+ADMIT --> ALIGN : admitted
+ALIGN --> MAP
+MAP --> NODES
+OLD --> NODES
+NEW --> NODES
+MAP --> EDGES
+OLD --> EDGES
+NEW --> EDGES
+NODES --> EDITS
+EDGES --> EDITS
+EDITS --> CLASSIFY
+CLASSIFY --> RESULT
+
+note right of ADMIT
+  Exceeded cap => BudgetExceeded
+  No partial script
+end note
+
+note bottom of ALIGN
+  Heuristic correspondence,
+  not semantic identity or exact GED
+end note
+
+note bottom of RESULT
+  Read-only; all input-sized state heap-backed
+end note
+@enduml

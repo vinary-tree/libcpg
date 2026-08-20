@@ -506,6 +506,43 @@ guide](../usage/27-ml-export-and-ast-paths.md), [Theory
 44](../theory/44-deterministic-cpg-ml-representations.md), and [security
 boundary](../security/19-ml-export-boundary.md).
 
+### Deterministic CPG diff (feature-free)
+
+The graph-diff surface reuses bounded GED correspondence, then compares exact
+node payloads and directed typed/labelled edge multisets in aligned
+coordinates.
+
+```rust,ignore
+pub fn cpg_diff(
+    old: &CodePropertyGraph,
+    new: &CodePropertyGraph,
+    options: &CpgDiffOptions,
+) -> Result<CpgDiff, AnalysisError>;
+```
+
+| Type or constant | Stable contract |
+|---|---|
+| `CpgDiffOptions` | independent `max_nodes`, `max_edges`, and aggregate `max_edits` complete-or-error caps |
+| `CpgDiff` | canonical alignment/cost plus added, removed, changed, and classified evidence |
+| `NodeAlignment` | graph-local old/new node-id pair selected by the symmetric GED script |
+| `DiffNode` / `DiffEdge` | complete owned represented payload snapshots |
+| `CpgElement` / `CpgChange` | insertion/deletion or exact node/edge substitution |
+| `NodeChangeField` / `EdgeChangeField` | canonical exact field vocabularies |
+| `ChangeKind` | represented-PDG edge edit (`BehaviorChanging`) or no such edit (`Refactoring`) |
+| `MAX_CPG_DIFF_NODES` | 512-node hard ceiling inherited from Hungarian GED alignment |
+| `MAX_CPG_DIFF_EDGES` / `MAX_CPG_DIFF_EDITS` | 2,000,000 hard ceilings for each input's edge index and complete output |
+
+IDs are coordinates, not semantic identity. Embedded node ids compare through
+the alignment, exact parallel edge multiplicity is preserved, and no partial
+script is returned. `ChangeKind` requires comparable PDGs and is not a proof of
+runtime equivalence or difference. Container language/source/root/CFG side
+tables are outside the structural result.
+
+See the [component guide](../components/graph/cpg-diff.md), [usage
+guide](../usage/28-cpg-diff.md), [Theory
+45](../theory/45-deterministic-cpg-diff.md), and [security
+boundary](../security/20-cpg-diff-boundary.md).
+
 ### Advisory session-protocol sketches (`rholang`)
 
 With `feature = "rholang"`, `session_sketches(&CodePropertyGraph) ->

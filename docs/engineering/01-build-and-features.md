@@ -92,6 +92,11 @@ exact code2vec/code2seq terminal-path contexts. These APIs return ordinary
 vectors and add no tensor-runtime or training dependency; see the
 [ML export component contract](../components/graph/ml-export.md).
 
+It also includes `analysis::diff`: symmetric bounded-GED node alignment,
+complete exact node/typed-edge edit scripts, and represented-PDG change
+classification. It adds no parser feature and returns no partial script; see
+the [CPG diff component contract](../components/graph/cpg-diff.md).
+
 ### Mode-B language toggles
 
 | Feature | Enables (deps) | What it gates |

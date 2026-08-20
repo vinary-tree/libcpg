@@ -46,6 +46,8 @@
 //!   cliques/out-stars
 //! - **Graph Edit Distance**: Compute deterministic bipartite typed edit-script
 //!   upper bounds with an explicit 512-node compatibility boundary
+//! - **CPG Diff**: Align graph versions through bounded GED, retain exact
+//!   node/typed-edge edits, and classify represented PDG dependence changes
 //! - **Structural Clones**: Refine bounded Weisfeiler-Lehman projection labels
 //! - **Function Clones**: Classify Type-1/2 AST, Type-3 multiset, and bounded
 //!   Type-4 PDG WL/VF2 evidence

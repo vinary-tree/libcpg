@@ -96,6 +96,7 @@ function scope.
 | [Jaccard](../GLOSSARY.md#jaccard-similarity) similarity | $`O(V_1 + V_2)`$ | Over the two graphs' node-kind multisets. |
 | Weisfeiler-Lehman similarity | $`O(k(V + E))`$ | $`k = 3`$ label-refinement rounds. |
 | Bipartite GED upper bound | $`O(N^3+E_1+E_2)`$ time, $`O(N^2+E_1+E_2)`$ space | Two deterministic Hungarian solves plus concrete typed-edge script evaluation; each input is capped at 512 nodes, beyond which a flagged linear surrogate is returned. |
+| Deterministic CPG diff | $`O(N^3+M\log M+P)`$ time, $`O(N^2+M+P)`$ temporary/output space | Reuses the two bounded Hungarian assignments, then sorts/indexes exact edge occurrences and snapshots changed payload $`P`$; 512-node, 2,000,000-edge, and 2,000,000-edit hard ceilings. |
 | Projection WL labels / clone classes | $`O(q(V\log V+E+\sum_v d(v)\log d(v)))`$ time, $`O(V+d_{max})`$ temporary space | Directed-degree seeds; sorted incident-label multisets; sorted raw-label ranks each round; clone grouping adds $`O(V\log V)`$ time and $`O(V)`$ space. |
 | Function clone detection | $`O(N+PF+W)`$ before VF2; exponential verifier worst case | $`N`$ is total function AST size, $`P\le100{,}000`$ size-qualified pairs, $`F`$ is compared bag vocabulary, and $`W`$ is bounded WL work. Type-4 PDGs have at most 300 vertices, VF2 stops after one match, and invocation count is explicit. |
 | Multi-file merge | $`O(N\log N+E\log E+R)`$ time, $`O(N+E)`$ temporary space | Sorts source identities, translates $`R`$ embedded references, and appends fresh nodes/edges plus CFG metadata. |
@@ -337,9 +338,9 @@ cargo bench --no-default-features --features algorithm-detection \
 ```
 
 Effect summaries, Martin metrics, CK/LCOM and function metrics, reflexion conformance,
-architectural layering, and architectural-smell detection do not yet have
-dedicated Criterion targets. DFG/PDG construction, whole-corpus analysis, and
-GNN propagation remain the broader runnable-benchmark gaps. Every other
+architectural layering, architectural-smell detection, and deterministic CPG
+differencing do not yet have dedicated Criterion targets. DFG/PDG construction,
+whole-corpus analysis, and GNN propagation remain the broader runnable-benchmark gaps. Every other
 implemented architecture-analysis operation in this epic has an oracle-guarded
 target before optimization work begins.
 

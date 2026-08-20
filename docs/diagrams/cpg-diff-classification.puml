@@ -1,0 +1,31 @@
+@startuml
+title Dependence-aware CPG diff classification
+
+skinparam backgroundColor #FAFAFA
+skinparam shadowing false
+skinparam defaultFontName DejaVu Sans
+skinparam ArrowColor #334155
+skinparam activity {
+  BorderColor #334155
+  FontColor #0F172A
+  StartColor #0F766E
+  EndColor #0F766E
+  DiamondBackgroundColor #FEF3C7
+  DiamondBorderColor #92400E
+}
+
+start
+:Inspect the complete edit script; <<#DBEAFE>>
+if (Any added, removed, or substituted edge\nwhose old or new kind is\nControlDependence or DataDependence?) then (yes)
+  :BehaviorChanging; <<#FECACA>>
+else (no)
+  :Refactoring; <<#DCFCE7>>
+endif
+stop
+
+legend bottom
+  Requires comparable PDGs on both inputs.
+  Refactoring is not a behavioral-equivalence proof.
+  BehaviorChanging is represented dependence evidence.
+endlegend
+@enduml

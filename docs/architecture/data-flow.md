@@ -3,7 +3,7 @@
 This page traces how information moves through libcpg in two phases:
 
 1. the **construction pipeline** — source text becomes a [Code Property Graph](../GLOSSARY.md#code-property-graph-cpg) (Yamaguchi et al. [[1]](#references)) with AST, [CFG](../GLOSSARY.md#control-flow-graph-cfg), and [DFG](../GLOSSARY.md#data-flow-graph-dfg) overlays; and
-2. the **analysis pipeline** — a constructed CPG is queried by exact [dominator/post-dominator](../components/graph/dominator-analysis.md), [natural-loop](../components/graph/loop-analysis.md), [loop-induction](../components/graph/induction-analysis.md), [liveness](../components/graph/liveness-analysis.md), [available/very-busy expression](../components/graph/expression-analysis.md), [SCCP](../components/graph/sccp-analysis.md), [interval value-range](../components/graph/interval-analysis.md), [SCC](../GLOSSARY.md#strongly-connected-component-scc), [condensation/layering](../components/graph/layering-analysis.md), [DSM visibility](../components/graph/dsm-analysis.md), [Martin package-metric](../components/graph/martin-metrics.md), [code-metric](../components/graph/code-metrics.md), [architectural-smell](../components/graph/architecture-smells.md), [reflexion-model](../components/graph/reflexion-model.md), [WL structural-clone](../components/graph/wl-analysis.md), [centrality](../components/graph/centrality-analysis.md), [community](../components/graph/community-detection.md), [cohesion/robustness](../components/graph/cohesion-analysis.md), [spectral connectivity](../components/graph/spectral-analysis.md), [bounded simple-cycle](../components/graph/cycle-analysis.md), and [directed-motif](../components/graph/motif-analysis.md) analyses, the [PDG](../GLOSSARY.md#program-dependence-graph-pdg)/slicer, [function clone detector](../components/patterns/clone-detection.md), [VF2](../GLOSSARY.md#vf2), bounded bipartite [GED](../components/patterns/ged-analysis.md), and [GoF](../GLOSSARY.md#gang-of-four-gof) detectors, the algorithm/complexity heuristics, and the [GNN](../GLOSSARY.md#graph-neural-network-gnn).
+2. the **analysis pipeline** — a constructed CPG is queried by exact [dominator/post-dominator](../components/graph/dominator-analysis.md), [natural-loop](../components/graph/loop-analysis.md), [loop-induction](../components/graph/induction-analysis.md), [liveness](../components/graph/liveness-analysis.md), [available/very-busy expression](../components/graph/expression-analysis.md), [SCCP](../components/graph/sccp-analysis.md), [interval value-range](../components/graph/interval-analysis.md), [SCC](../GLOSSARY.md#strongly-connected-component-scc), [condensation/layering](../components/graph/layering-analysis.md), [DSM visibility](../components/graph/dsm-analysis.md), [Martin package-metric](../components/graph/martin-metrics.md), [code-metric](../components/graph/code-metrics.md), [architectural-smell](../components/graph/architecture-smells.md), [reflexion-model](../components/graph/reflexion-model.md), [WL structural-clone](../components/graph/wl-analysis.md), [centrality](../components/graph/centrality-analysis.md), [community](../components/graph/community-detection.md), [cohesion/robustness](../components/graph/cohesion-analysis.md), [spectral connectivity](../components/graph/spectral-analysis.md), [bounded simple-cycle](../components/graph/cycle-analysis.md), [directed-motif](../components/graph/motif-analysis.md), and [deterministic CPG-diff](../components/graph/cpg-diff.md) analyses, the [PDG](../GLOSSARY.md#program-dependence-graph-pdg)/slicer, [function clone detector](../components/patterns/clone-detection.md), [VF2](../GLOSSARY.md#vf2), bounded bipartite [GED](../components/patterns/ged-analysis.md), and [GoF](../GLOSSARY.md#gang-of-four-gof) detectors, the algorithm/complexity heuristics, and the [GNN](../GLOSSARY.md#graph-neural-network-gnn).
 
 "Data flow" here means both the program's own data-flow overlay *and* the flow of data through libcpg's stages. This is a rewrite of an earlier draft that invented `BranchTrue`/`UseUse`/`Phi` edge kinds, an SSA-based DFG, a parse/embedding cache, and a whole-graph bincode format — none of which exist. The real edge model is [`CpgEdgeKind::ControlFlow(CfgEdgeKind)`](../GLOSSARY.md#control-flow-graph-cfg) / [`DataFlow(DfgEdgeKind)`](../GLOSSARY.md#data-flow-graph-dfg), the DFG is [AST-ordered reaching definitions](../GLOSSARY.md#ast-ordered-reaching-definitions), and the caller chooses the outer Serde format. Logical recursion inside `PropertyValue` uses the versioned flat CPV1 inner representation described in [ADR-0040](../design/0040-flat-property-value-arena.md); standalone structural `ExprKey` values use the shared-arena/CEK1 boundary in [ADR-0041](../design/0041-shared-flat-expression-facts.md).
 
@@ -591,6 +591,32 @@ untrained structural embedder; it is not the canonical interchange path.
 See the [component guide](../components/graph/ml-export.md), [Theory
 44](../theory/44-deterministic-cpg-ml-representations.md), and [Usage
 27](../usage/27-ml-export-and-ast-paths.md).
+
+### Deterministic CPG version diff (feature-free)
+
+`cpg_diff` admits two immutable CPGs under independent node/edge limits, reuses
+the bounded forward/reverse/delete-all GED assignment, and exposes the retained
+canonical old-to-new node correspondence. It translates embedded node ids
+through that map, compares complete node payloads, and consumes exact directed
+typed/labelled edge occurrences before pairing same-endpoint leftovers as
+substitutions.
+
+![Deterministic CPG alignment and exact edit pipeline](../diagrams/cpg-diff-pipeline.svg)
+
+The output budget covers every addition, deletion, and substitution. Exceeding
+it fails the whole operation, so an omitted suffix cannot hide the PDG edge
+that decides `ChangeKind`.
+
+![Dependence-aware edit classification boundary](../diagrams/cpg-diff-classification.svg)
+
+Build comparable PDGs on both inputs before interpreting the classification.
+`Refactoring` means only that the complete script changed no represented
+control/data-dependence edge; it does not prove runtime equivalence.
+Container metadata is outside the node/edge structural flow.
+
+See the [component guide](../components/graph/cpg-diff.md), [Theory
+45](../theory/45-deterministic-cpg-diff.md), and [Usage
+28](../usage/28-cpg-diff.md).
 
 ### Session-protocol sketches (`rholang`)
 

@@ -910,7 +910,7 @@ mod tests {
                 is_mutable: false,
             },
         );
-        add_node(
+        let old_identifier = add_node(
             &mut old,
             8,
             CpgNodeKind::Identifier {
@@ -918,6 +918,28 @@ mod tests {
                 definition: Some(old_definition),
             },
         );
+        let old_call = add_node(
+            &mut old,
+            9,
+            CpgNodeKind::Call {
+                target: Some(old_definition),
+                is_method: false,
+            },
+        );
+        let old_lambda = add_node(
+            &mut old,
+            10,
+            CpgNodeKind::Lambda {
+                captures: smallvec::smallvec![old_definition, old_identifier],
+            },
+        );
+        old.node_mut(old_definition)
+            .expect("old definition")
+            .children
+            .extend([old_identifier, old_call, old_lambda]);
+        for child in [old_identifier, old_call, old_lambda] {
+            old.node_mut(child).expect("old child").parent = Some(old_definition);
+        }
 
         let mut new = CodePropertyGraph::new(Language::Rust);
         let new_definition = add_node(
@@ -930,7 +952,7 @@ mod tests {
                 is_mutable: false,
             },
         );
-        add_node(
+        let new_identifier = add_node(
             &mut new,
             80,
             CpgNodeKind::Identifier {
@@ -938,6 +960,28 @@ mod tests {
                 definition: Some(new_definition),
             },
         );
+        let new_call = add_node(
+            &mut new,
+            90,
+            CpgNodeKind::Call {
+                target: Some(new_definition),
+                is_method: false,
+            },
+        );
+        let new_lambda = add_node(
+            &mut new,
+            100,
+            CpgNodeKind::Lambda {
+                captures: smallvec::smallvec![new_definition, new_identifier],
+            },
+        );
+        new.node_mut(new_definition)
+            .expect("new definition")
+            .children
+            .extend([new_identifier, new_call, new_lambda]);
+        for child in [new_identifier, new_call, new_lambda] {
+            new.node_mut(child).expect("new child").parent = Some(new_definition);
+        }
 
         let diff = cpg_diff(&old, &new, &CpgDiffOptions::default()).expect("renumbered refs");
         assert!(diff.added.is_empty());
