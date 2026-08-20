@@ -267,6 +267,10 @@ name = "advisory_bugs"
 harness = false
 
 [[bench]]
+name = "api_usage_mining"
+harness = false
+
+[[bench]]
 name = "program_merge"
 harness = false
 
