@@ -29,6 +29,7 @@ mod projection;
 mod reachability;
 mod reflexion;
 mod resolve;
+mod resolve_types;
 mod scc;
 mod sdg;
 pub mod security;
@@ -176,6 +177,8 @@ pub use resolve::{
     build_symbol_table, resolve_calls, CallGraphResolution, CallResolution, Confidence,
     ResolveConfig, SymbolCandidates, SymbolTable,
 };
+
+pub use resolve_types::{devirtualize, DevirtualizationMode};
 
 pub use security::{
     analyze_builtin_authz, analyze_builtin_crypto, analyze_builtin_cwes, analyze_builtin_secrets,

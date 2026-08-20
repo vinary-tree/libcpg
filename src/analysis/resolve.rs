@@ -22,6 +22,12 @@ pub enum Confidence {
     ExactViaImport,
     /// The input CPG already carried a valid target binding.
     ExactViaBinding,
+    /// Variable-type analysis identified the represented runtime targets.
+    VariableType,
+    /// Rapid-type analysis identified the represented allocated targets.
+    RapidType,
+    /// Class-hierarchy analysis identified the represented subtype targets.
+    ClassHierarchy,
     /// Exactly one in-graph function has the reconstructed bare name.
     BareNameUnique,
     /// Multiple in-graph functions share the reconstructed bare name.
@@ -39,6 +45,9 @@ impl Confidence {
             Self::ExactInFile => 1.0,
             Self::ExactViaImport => 0.95,
             Self::ExactViaBinding => 0.9,
+            Self::VariableType => 0.85,
+            Self::RapidType => 0.8,
+            Self::ClassHierarchy => 0.75,
             Self::BareNameUnique => 0.7,
             Self::BareNameAmbiguous => 0.3,
             Self::External | Self::Unresolved => 0.0,
@@ -49,7 +58,13 @@ impl Confidence {
     pub const fn creates_topology(self) -> bool {
         matches!(
             self,
-            Self::ExactInFile | Self::ExactViaImport | Self::ExactViaBinding | Self::BareNameUnique
+            Self::ExactInFile
+                | Self::ExactViaImport
+                | Self::ExactViaBinding
+                | Self::VariableType
+                | Self::RapidType
+                | Self::ClassHierarchy
+                | Self::BareNameUnique
         )
     }
 
@@ -59,6 +74,9 @@ impl Confidence {
             Self::ExactInFile => "exact_in_file",
             Self::ExactViaImport => "exact_via_import",
             Self::ExactViaBinding => "exact_via_binding",
+            Self::VariableType => "variable_type",
+            Self::RapidType => "rapid_type",
+            Self::ClassHierarchy => "class_hierarchy",
             Self::BareNameUnique => "bare_name_unique",
             Self::BareNameAmbiguous => "bare_name_ambiguous",
             Self::External => "external",
@@ -71,6 +89,9 @@ impl Confidence {
             "exact_in_file" => Some(Self::ExactInFile),
             "exact_via_import" => Some(Self::ExactViaImport),
             "exact_via_binding" => Some(Self::ExactViaBinding),
+            "variable_type" => Some(Self::VariableType),
+            "rapid_type" => Some(Self::RapidType),
+            "class_hierarchy" => Some(Self::ClassHierarchy),
             "bare_name_unique" => Some(Self::BareNameUnique),
             "bare_name_ambiguous" => Some(Self::BareNameAmbiguous),
             "external" => Some(Self::External),
@@ -81,9 +102,12 @@ impl Confidence {
 
     const fn rank(self) -> u8 {
         match self {
-            Self::ExactInFile => 6,
-            Self::ExactViaImport => 5,
-            Self::ExactViaBinding => 4,
+            Self::ExactInFile => 9,
+            Self::ExactViaImport => 8,
+            Self::ExactViaBinding => 7,
+            Self::VariableType => 6,
+            Self::RapidType => 5,
+            Self::ClassHierarchy => 4,
             Self::BareNameUnique => 3,
             Self::BareNameAmbiguous => 2,
             Self::External => 1,
@@ -915,21 +939,24 @@ mod tests {
     #[test]
     fn confidence_scores_and_topology_boundary_are_exact() {
         let expected = [
-            (Confidence::ExactInFile, 1.0, true, "exact_in_file", 6),
+            (Confidence::ExactInFile, 1.0, true, "exact_in_file", 9),
             (
                 Confidence::ExactViaImport,
                 0.95,
                 true,
                 "exact_via_import",
-                5,
+                8,
             ),
             (
                 Confidence::ExactViaBinding,
                 0.9,
                 true,
                 "exact_via_binding",
-                4,
+                7,
             ),
+            (Confidence::VariableType, 0.85, true, "variable_type", 6),
+            (Confidence::RapidType, 0.8, true, "rapid_type", 5),
+            (Confidence::ClassHierarchy, 0.75, true, "class_hierarchy", 4),
             (Confidence::BareNameUnique, 0.7, true, "bare_name_unique", 3),
             (
                 Confidence::BareNameAmbiguous,
