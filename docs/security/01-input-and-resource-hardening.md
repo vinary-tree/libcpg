@@ -29,6 +29,7 @@ Source: [`diagrams/resource-bounds.puml`](../diagrams/resource-bounds.puml).*
 | Effect-domain local machines | inherit `IfdsCaps::{max_call_depth,max_worklist_steps}` | `analyze_effects`; return-dependency and constant evaluation | typed heap frames keep native depth constant; active-path cycles terminate; logical depth/work or allocation exhaustion widens conservatively, records the function as capped, and prevents a false completeness claim |
 | Taint/nullflow traversal and retention bounds | inherit `IfdsCaps` | `analyze_taint_report`; `analyze_null_flows_report` | typed call-path/value walks terminate by depth and visited sets; parameter masks visibly truncate after 64 positions; solver fact/work/SCC caps and domain-local cap evidence prevent false absence claims |
 | Secret/access-policy bounds | `100_000` literals, `10_000` binding-context nodes, inherited missing-check `100_000` fingerprint nodes / `128` callee depth | `analyze_secret_flows`; `analyze_missing_authz` | literal/context hard ceilings are both `1_000_000`; typed cap/policy/population issues prevent a false clean result; all depth state is heap-resident |
+| Vulnerability-extrapolation bounds | `10_000` functions, `300` PDG vertices, `10_000` VF2 invocations, `1_000` results, 3 WL rounds | `analyze_vulnerability_extrapolation` | hard ceilings are `100_000`, `10_000`, `100_000`, `100_000`, and 16; typed issues qualify every truncation and all depth/search state is heap-resident |
 | Typestate and resource-leak bounds | inherit `IfdsCaps::{max_functions,max_facts_per_node,max_worklist_steps,max_call_depth}` | `analyze_typestate`; `analyze_resource_leaks` | ordered object/value-flow and CFG fact worklists stop visibly; invalid policies, missing events/placement, and absent leak accepting states prevent false completeness |
 | Exception-flow bounds | inherit `IfdsCaps::{max_functions,max_facts_per_node,max_worklist_steps,max_scc_iters}` | `analyze_exception_flow` | finite exception-type summaries stop visibly at solver caps; unknown types, ambiguous calls, malformed catch entry, and missing witnesses prevent false completeness; call depth is inapplicable because SCC summaries replace path expansion |
 | Uninitialized-use traversal guards | always on | `analyze_uninitialized_uses` | finite function/use/definition scans and cycle-safe heap traversals; results describe only the represented binding and reaching-definition relation |
@@ -277,6 +278,23 @@ AST issues are translated without loss. Bound mutation/guard rule counts and
 pattern bytes at ingress when policy is untrusted; compile-time graph ceilings
 do not bound caller policy allocation. See the dedicated
 [secret/access-policy security boundary](15-secret-and-access-policy-analysis.md).
+
+### Vulnerability-extrapolation cap evidence
+
+`ExtrapolationOptions` validates finite unit-interval thresholds and rejects
+requests above compile-time ceilings. Stable function enumeration retains a
+prefix and records `FunctionsCapped`; an oversized seed stops comparison and an
+oversized candidate is skipped with `PdgNodesCapped`. Eligible candidates after
+the VF2 invocation budget keep their WL-only score and add
+`Vf2InvocationsCapped`. The sorted result prefix is retained with
+`ResultsCapped`, including a zero cap when any candidate qualified.
+
+Function-scope traversal, sparse joint-WL refinement, and VF2 search all store
+depth-dependent state in heap worklists, vectors, and explicit continuation
+frames. No boundary is implemented by native recursion, a larger worker stack,
+or silent truncation. Require the detailed aggregate report and an empty issue
+set before interpreting candidate absence. See the
+[vulnerability-extrapolation security boundary](16-vulnerability-extrapolation.md).
 
 ### Typestate and advisory bug-detector evidence
 
@@ -988,5 +1006,7 @@ over each one — see
   advisory findings, witnesses, confidence, and absence claims.
 - [Secret/access-policy security boundary](15-secret-and-access-policy-analysis.md)
   — secret minimization, heuristic limits, peer-policy trust, and clean claims.
+- [Vulnerability-extrapolation security boundary](16-vulnerability-extrapolation.md)
+  — seed trust, similarity limits, bounded search, ranking manipulation, and clean claims.
 - [`usage/04-program-slicing.md`](../usage/04-program-slicing.md) — using slices in
   anger.

@@ -78,7 +78,8 @@ For two equal feature bags whose ordered Type-2 fingerprints differ, libcpg:
 
 1. constructs each function's `pdg_projection`;
 2. rejects unequal vertex or edge counts;
-3. computes bounded Weisfeiler–Lehman (WL) label multisets;
+3. computes bounded Weisfeiler–Lehman (WL) label multisets by jointly
+   canonicalizing both PDGs' raw signatures into one comparison vocabulary;
 4. compares those multisets by cosine similarity; and
 5. invokes the existing relaxed `Vf2Matcher` with one-match termination.
 

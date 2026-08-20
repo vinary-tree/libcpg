@@ -699,6 +699,25 @@ See the [component guide](../components/graph/security-policy-analysis.md),
 [Theory 40](../theory/40-secret-flow-and-access-policy-inference.md), and
 [Usage 23](../usage/23-secret-and-access-policy-analysis.md).
 
+### Vulnerability extrapolation (feature-free)
+
+`analyze_vulnerability_extrapolation` follows `CodePropertyGraph + labeled
+function seed + ExtrapolationOptions → seed/candidate PDGs → jointly
+canonicalized WL-label histograms → bounded relaxed VF2 → ranked aggregate
+report`. Joint canonicalization is required because numeric WL ranks produced
+for separate projections are graph-local names.
+
+The path borrows the CPG immutably. Stable function enumeration, sparse WL
+loops, and defunctionalized VF2 frames keep depth-dependent state on the heap.
+Function, projection, VF2-invocation, and retained-result limits produce typed
+issues, so partial output cannot silently support a clean claim.
+
+![Vulnerability extrapolation composes sparse structural screening and bounded confirmation](../diagrams/vulnerability-extrapolation-pipeline.svg)
+
+See the [component guide](../components/graph/vulnerability-extrapolation.md),
+[Theory 41](../theory/41-vulnerability-extrapolation.md), and
+[Usage 24](../usage/24-vulnerability-extrapolation.md).
+
 ### Pattern detection
 
 Two layers, at two feature levels:

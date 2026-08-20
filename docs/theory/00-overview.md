@@ -300,6 +300,10 @@ development, or jump to the layer you need:
     Shannon-entropy and typed binding qualification compose with shared taint;
     exact missing-check populations specialize to typed authentication and
     authorization guards.
+41. **[41 — Evidence-bounded vulnerability extrapolation](41-vulnerability-extrapolation.md).**
+    Joint-vocabulary PDG WL histograms, bounded relaxed VF2 confirmation,
+    deterministic total ranking, and typed omissions define advisory analogues
+    of one caller-labeled vulnerable function.
 
 The later chapters define deterministic projection structure, architecture
 metrics, inspectable evidence, and their interpretation limits.

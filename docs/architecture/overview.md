@@ -130,6 +130,10 @@ Cryptographic misuse and security-policy analysis are provided by
 `analysis::security::{crypto,secrets,authz}`; they reuse typestate, taint, and
 population missing-check providers while keeping secret qualification and
 typed authN/authZ filtering local, stack-safe, and out of graph.
+Vulnerability extrapolation is provided by
+`analysis::security::extrapolate`; it composes function PDG projection,
+joint-vocabulary WL comparison, and bounded relaxed VF2 into an immutable,
+explicitly qualified ranking.
 Clone and feasibility advisories are provided by
 `analysis::bugs::{clone_bugs,infeasible}` and reuse `pattern::clones`, SCCP,
 and interval providers without moving policy into the graph.

@@ -628,6 +628,28 @@ See the [component guide](../components/graph/security-policy-analysis.md),
 [theory](../theory/40-secret-flow-and-access-policy-inference.md), and
 [security boundary](../security/15-secret-and-access-policy-analysis.md).
 
+### Vulnerability extrapolation
+
+The feature-free J5 API ranks function PDGs against one caller-labeled seed.
+Weisfeiler--Lehman (WL) label histograms are canonicalized in a shared
+seed/candidate vocabulary; equal-size candidates above a threshold can receive
+bounded relaxed VF2 confirmation. Reports are immutable and advisory.
+
+| API/type | Meaning |
+|---|---|
+| `extrapolate` | Compact ranked `(NodeId, f64)` positive-discovery result. |
+| `analyze_vulnerability_extrapolation` | Detailed ranking with analyzed functions, seed dimensions, invocation count, issues, and completeness. |
+| `ExtrapolationOptions` | Admission/VF2 thresholds, WL rounds, and explicit request capacities. |
+| `ExtrapolationCandidate` | Final/WL scores, confirmation flag, and candidate PDG dimensions. |
+| `ExtrapolationIssue` | Invalid seed/options or function, PDG, VF2, and result-cap evidence. |
+| `ExtrapolationAnalysis` | Ordered candidates and issue set; `is_complete()` requires no issue. |
+
+Use the detailed API for every negative or completeness-sensitive
+interpretation. See the [component guide](../components/graph/vulnerability-extrapolation.md),
+[usage guide](../usage/24-vulnerability-extrapolation.md),
+[theory](../theory/41-vulnerability-extrapolation.md), and
+[security boundary](../security/16-vulnerability-extrapolation.md).
+
 ### Deterministic graph projections
 
 `GraphProjection` is the feature-free, payload-free compressed-sparse-row view

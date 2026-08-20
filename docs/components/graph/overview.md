@@ -164,6 +164,11 @@ topology with explicit module assignments and Martin metrics. It validates the
 bundle before reporting multi-node cycles, two-sided hubs, dependencies toward
 less-stable modules, and module-size outliers as immutable advisory evidence.
 
+[Vulnerability extrapolation](vulnerability-extrapolation.md) starts from one
+caller-labeled function, compares function PDGs in a shared WL vocabulary, and
+uses explicitly bounded relaxed VF2 confirmation to produce deterministic
+out-of-graph review leads with typed completeness evidence.
+
 ### Creating a CPG
 
 With **no cargo features enabled** (`default = []`), `libcpg` links no grammars,

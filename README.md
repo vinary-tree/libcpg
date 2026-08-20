@@ -106,6 +106,9 @@ PDG). A query can therefore mix syntax, control flow, and data flow freely.
 - **Cryptographic and security-policy analysis** — feature-free CrySL-style
   crypto misuse, high-entropy/name-hinted secret flow to governed sinks, and
   exact peer-inferred missing authN/authZ guards with typed completeness.
+- **Vulnerability extrapolation** — feature-free ranking from a labeled seed
+  through shared-vocabulary PDG WL cosine and bounded relaxed VF2 confirmation,
+  with deterministic order and explicit incomplete-result evidence.
 - **Projection centrality** — deterministic PageRank variants, vertex/edge
   betweenness, eigenvector, Katz, closeness, harmonic, HITS, and Burt
   structural-hole scores with explicit iteration and traversal budgets.

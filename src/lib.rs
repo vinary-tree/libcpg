@@ -28,6 +28,8 @@
 //! - **Sparse Constant Propagation**: Prove scalar constants and executable CFG edges
 //! - **Interval Value Ranges**: Bound integers with widening and narrowing
 //! - **Loop Induction**: Find invariant computations, induction variables, and counted guards
+//! - **Vulnerability Extrapolation**: Rank function PDGs against one labeled
+//!   seed with shared-vocabulary WL cosine and bounded relaxed VF2 evidence
 //! - **Graph Projections**: Build deterministic forward/reverse CSR views
 //! - **Graph Cohesion**: Compute cores, trusses, cut structure, weighted seams,
 //!   endpoint assortativity, and bounded attack traces

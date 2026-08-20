@@ -108,9 +108,11 @@ otherwise identical signature first at a different stable `NodeId`.
 
 The canonicalization step instead computes every raw digest, sorts the distinct
 values, and uses each value's sorted rank. The resulting labels are stable
-under node and edge storage permutations. They are scoped to one graph and one
-round count; applications should persist stable `NodeId` membership rather
-than interpret the numeric rank globally.
+under node and edge storage permutations. Public labels for one projection are
+scoped to that graph and round count; applications should persist stable
+`NodeId` membership rather than interpret a numeric rank globally. Cross-graph
+similarity jointly canonicalizes both projections' raw signatures at every
+round, creating a comparison-local shared vocabulary before histogram cosine.
 
 ## 6. Bounded refinement and convergence
 

@@ -175,6 +175,18 @@ peer population; it does not prove that the peers implement correct access
 policy [[52]](#references). See
 [`components/graph/security-policy-analysis.md`](components/graph/security-policy-analysis.md).
 
+### Vulnerability extrapolation / joint WL vocabulary
+
+**Vulnerability extrapolation** ranks functions structurally related to one
+caller-labeled vulnerable seed. In libcpg, seed and candidate Program
+Dependence Graphs are refined in a **joint WL vocabulary**: raw
+Weisfeiler--Lehman signatures from both projections are canonicalized together,
+so an equal numeric label denotes an equal signature within that comparison.
+The resulting cosine and optional relaxed VF2 confirmation are advisory
+structural evidence, not vulnerability or behavioral-equivalence proof
+[[63]](#references), [[64]](#references). See
+[`theory/41-vulnerability-extrapolation.md`](theory/41-vulnerability-extrapolation.md).
+
 ### CrySL
 
 **CrySL** is a specification language for cryptographic API usage rules. A rule
@@ -1216,3 +1228,5 @@ strict tree interpretation. See
 60. Lekssays, A., Mouhcine, H., Tran, K., Yu, T., Khalil, I. (2025). *LLMxCPG: Context-Aware Vulnerability Detection Through Code Property Graph-Guided Large Language Models.* DOI: [10.48550/arXiv.2507.16585](https://doi.org/10.48550/arXiv.2507.16585).
 61. Meli, M., McNiece, M. R., Reaves, B. (2019). *How Bad Can It Git? Characterizing Secret Leakage in Public GitHub Repositories.* DOI: [10.14722/ndss.2019.23418](https://doi.org/10.14722/ndss.2019.23418).
 62. Shannon, C. E. (1948). *A Mathematical Theory of Communication.* DOI: [10.1002/j.1538-7305.1948.tb01338](https://doi.org/10.1002/j.1538-7305.1948.tb01338).
+63. Yamaguchi, F., Lindner, F., Rieck, K. (2011). *Vulnerability Extrapolation: Assisted Discovery of Vulnerabilities Using Machine Learning.* [USENIX WOOT '11](https://www.usenix.org/conference/woot11/vulnerability-extrapolation-assisted-discovery-vulnerabilities-using-machine) (no DOI advertised in the proceedings record).
+64. Yamaguchi, F., Lottmann, M., Rieck, K. (2012). *Generalized Vulnerability Extrapolation using Abstract Syntax Trees.* DOI: [10.1145/2420950.2421003](https://doi.org/10.1145/2420950.2421003).

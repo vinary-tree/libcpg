@@ -94,8 +94,9 @@ alternatives is folklore, and a decision without its costs is marketing.
 | [0048 — Declarative qualified CWE templates](0048-declarative-qualified-cwe-templates.md) | Intersect bounded VF2 structural sites with shared taint, null-flow, typestate, interval, and literal evidence while retaining explicit completeness. | Accepted |
 | [0049 — Composed cryptographic API misuse](0049-composed-cryptographic-api-misuse.md) | Compile CrySL-style call order and positional constraints onto shared typestate, literal-source taint, and stack-safe provenance machines. | Accepted |
 | [0050 — Composed secret and access-policy analysis](0050-composed-secret-and-access-policy-analysis.md) | Qualify typed secret literals before shared taint propagation and specialize exact missing-check populations for typed authN/authZ guards. | Accepted |
+| [0051 — Evidence-bounded vulnerability extrapolation](0051-evidence-bounded-vulnerability-extrapolation.md) | Rank seed-related function PDGs with joint-vocabulary WL cosine and explicitly bounded relaxed VF2 confirmation. | Accepted |
 
-These fifty are not independent. ADR-0001 fixes the substrate that all analyses
+These fifty-one are not independent. ADR-0001 fixes the substrate that all analyses
 write onto; ADR-0002 and ADR-0005 together explain how a language reaches that
 substrate and what you must switch on to get there; ADR-0003 and ADR-0004 are
 two analyses *over* the substrate (one always-on, one feature-gated) that each

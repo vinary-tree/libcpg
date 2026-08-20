@@ -108,6 +108,8 @@ Grouped by subject. Each row: the source (its `.svg` sibling is embedded by the 
 | `crypto-evidence-qualification.puml` | activity/decision flow | policy validation → three composed evidence branches → complete/advisory or explicitly incomplete interpretation | design/0049, theory/39, scientific/44, security/14 |
 | `security-policy-pipeline.puml` | two-lane component/evidence flow | entropy/name-qualified literal taint and exact missing-check populations → secret-flow and missing authN/authZ reports | architecture/data-flow, components/graph/security-policy-analysis, design/0050, theory/40 |
 | `security-policy-qualification.puml` | two-lane activity/decision flow | literal qualification and access-guard population inference → complete/advisory or explicitly incomplete interpretation | design/0050, theory/40, scientific/45, security/15 |
+| `vulnerability-extrapolation-pipeline.puml` | component/evidence flow | labeled function + PDG projections → joint-vocabulary WL cosine → bounded relaxed VF2 → ranked report and typed issues | architecture/data-flow, components/graph/vulnerability-extrapolation, design/0051, theory/41 |
+| `vulnerability-extrapolation-ranking.puml` | activity/decision flow | candidate/cap admission → WL/VF2 scoring → deterministic retained prefix → completeness and manual review | design/0051, theory/41, scientific/46, security/16 |
 
 ### Control flow, data flow, dependence
 | Source | Type | Depicts | Embedded by |
