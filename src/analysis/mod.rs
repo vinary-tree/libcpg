@@ -178,14 +178,17 @@ pub use resolve::{
 };
 
 pub use security::{
-    analyze_builtin_crypto, analyze_builtin_cwes, analyze_crypto_misuse, analyze_cwe_templates,
-    builtin_crypto_rules, builtin_cwe_templates, CryptoAnalysis, CryptoAnalysisConfig,
-    CryptoAnalysisIssue, CryptoArgumentRule, CryptoEvidence, CryptoFinding, CryptoMisuseKind,
-    CryptoRuleSet, CweAnalysis, CweAnalysisConfig, CweAnalysisError, CweAnalysisIssue,
-    CweCandidate, CweEvidence, CwePatternEdge, CwePrimitive, CweRole, CweStructuralMatch,
-    CweStructuralPattern, CweTemplate, CweTypestateAnalysis, MAX_CRYPTO_CALLS,
+    analyze_builtin_crypto, analyze_builtin_cwes, analyze_builtin_secrets, analyze_crypto_misuse,
+    analyze_cwe_templates, analyze_secret_flows, builtin_crypto_rules, builtin_cwe_templates,
+    builtin_secret_rules, CryptoAnalysis, CryptoAnalysisConfig, CryptoAnalysisIssue,
+    CryptoArgumentRule, CryptoEvidence, CryptoFinding, CryptoMisuseKind, CryptoRuleSet,
+    CweAnalysis, CweAnalysisConfig, CweAnalysisError, CweAnalysisIssue, CweCandidate, CweEvidence,
+    CwePatternEdge, CwePrimitive, CweRole, CweStructuralMatch, CweStructuralPattern, CweTemplate,
+    CweTypestateAnalysis, SecretAnalysis, SecretAnalysisConfig, SecretAnalysisIssue, SecretFinding,
+    SecretLiteralEvidence, SecretRuleSet, SecretSinkFamily, SecretSinkRule, MAX_CRYPTO_CALLS,
     MAX_CRYPTO_ORIGIN_NODES, MAX_CWE_ARRAY_ORIGIN_NODES, MAX_CWE_MATCHES_PER_PATTERN,
-    MAX_CWE_PATTERNS_PER_TEMPLATE, MAX_CWE_TEMPLATES,
+    MAX_CWE_PATTERNS_PER_TEMPLATE, MAX_CWE_TEMPLATES, MAX_SECRET_LITERALS,
+    MAX_SECRET_NAME_CONTEXT_NODES,
 };
 
 pub use sdg::{

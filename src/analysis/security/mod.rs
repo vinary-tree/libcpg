@@ -7,6 +7,7 @@
 
 mod crypto;
 mod cwe;
+mod secrets;
 
 pub use crypto::{
     analyze_builtin_crypto, analyze_crypto_misuse, builtin_crypto_rules, CryptoAnalysis,
@@ -19,4 +20,9 @@ pub use cwe::{
     CwePatternEdge, CwePrimitive, CweRole, CweStructuralMatch, CweStructuralPattern, CweTemplate,
     CweTypestateAnalysis, MAX_CWE_ARRAY_ORIGIN_NODES, MAX_CWE_MATCHES_PER_PATTERN,
     MAX_CWE_PATTERNS_PER_TEMPLATE, MAX_CWE_TEMPLATES,
+};
+pub use secrets::{
+    analyze_builtin_secrets, analyze_secret_flows, builtin_secret_rules, SecretAnalysis,
+    SecretAnalysisConfig, SecretAnalysisIssue, SecretFinding, SecretLiteralEvidence, SecretRuleSet,
+    SecretSinkFamily, SecretSinkRule, MAX_SECRET_LITERALS, MAX_SECRET_NAME_CONTEXT_NODES,
 };
