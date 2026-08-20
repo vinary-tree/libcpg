@@ -23,6 +23,7 @@ mod layering;
 mod loops;
 mod martin;
 mod metrics;
+pub mod ml;
 mod motifs;
 mod program;
 mod projection;
@@ -163,6 +164,14 @@ pub use metrics::{
     ck_metrics, function_metrics, hierarchy_metrics, method_field_graph, CkOptions, ClassMetrics,
     FunctionMetrics, HalsteadMetrics, HierarchyMetrics, LcomSuite, MethodCall, MethodFieldAccess,
     MethodFieldGraph,
+};
+
+pub use ml::{
+    ast_paths, edge_kind_class, export_pyg, export_pyg_with_options, node_kind_class,
+    AstPathOptions, PathContext, PygExport, PygExportOptions, EDGE_KIND_CLASS_COUNT,
+    MAX_AST_PATH_ANCESTOR_STEPS, MAX_AST_PATH_CONTEXTS, MAX_AST_PATH_LENGTH,
+    MAX_AST_PATH_PAIR_CHECKS, MAX_AST_PATH_TERMINALS, MAX_AST_PATH_TOTAL_NODES,
+    PYG_NODE_FEATURE_COUNT, PYG_NODE_FEATURE_NAMES,
 };
 
 pub use motifs::{
