@@ -623,6 +623,16 @@ pub struct CpgNode {
         serde(default, skip_serializing_if = "Option::is_none")
     )]
     pub lock_kind: Option<LockKind>,
+    /// Normalized nominal type allocated by this expression, when represented.
+    ///
+    /// Frontends attach this metadata to constructor/allocation calls at the
+    /// grammar boundary. Analyses can therefore distinguish an allocation from
+    /// an ordinary call without reparsing source text or matching spellings.
+    #[cfg_attr(
+        feature = "serde",
+        serde(default, skip_serializing_if = "Option::is_none")
+    )]
+    pub allocation_type: Option<TypeInfo>,
     /// Additional properties.
     pub properties: FxHashMap<PropertyKey, PropertyValue>,
     /// AST children (indices into the node array).
@@ -641,6 +651,7 @@ impl CpgNode {
             text: None,
             message_kind: None,
             lock_kind: None,
+            allocation_type: None,
             properties: FxHashMap::default(),
             children: SmallVec::new(),
             parent: None,
@@ -662,6 +673,12 @@ impl CpgNode {
     /// Attaches normalized lock semantics to this node.
     pub fn with_lock_kind(mut self, kind: LockKind) -> Self {
         self.lock_kind = Some(kind);
+        self
+    }
+
+    /// Attaches normalized allocation semantics to this expression node.
+    pub fn with_allocation_type(mut self, type_info: TypeInfo) -> Self {
+        self.allocation_type = Some(type_info);
         self
     }
 
@@ -852,6 +869,16 @@ mod tests {
         })
         .with_lock_kind(LockKind::AcquireWrite);
         assert_eq!(n.lock_kind, Some(LockKind::AcquireWrite));
+    }
+
+    #[test]
+    fn node_builder_attaches_allocation_type() {
+        let n = node(CpgNodeKind::Call {
+            target: None,
+            is_method: true,
+        })
+        .with_allocation_type(TypeInfo::new("Widget"));
+        assert_eq!(n.allocation_type, Some(TypeInfo::new("Widget")));
     }
 
     #[test]
@@ -1311,6 +1338,7 @@ mod serde_tests {
             && a.text == b.text
             && a.message_kind == b.message_kind
             && a.lock_kind == b.lock_kind
+            && a.allocation_type == b.allocation_type
             && a.children == b.children
             && a.parent == b.parent
             && a.properties == b.properties
@@ -1391,6 +1419,7 @@ mod serde_tests {
         .with_text("x")
         .with_message_kind(MsgKind::Peek)
         .with_lock_kind(LockKind::AcquireRead)
+        .with_allocation_type(TypeInfo::new("Widget"))
         .with_child(NodeId::new(6))
         .with_child(NodeId::new(7))
         .with_parent(NodeId::new(4));
@@ -1445,9 +1474,13 @@ mod serde_tests {
         json.as_object_mut()
             .expect("node object")
             .remove("lock_kind");
+        json.as_object_mut()
+            .expect("node object")
+            .remove("allocation_type");
         let round_trip: CpgNode = serde_json::from_value(json).expect("legacy node");
         assert_eq!(round_trip.message_kind, None);
         assert_eq!(round_trip.lock_kind, None);
+        assert_eq!(round_trip.allocation_type, None);
     }
 
     /// The full `arb_node_kind` strategy — no float exclusion. `serde_json` is

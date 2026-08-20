@@ -230,6 +230,7 @@ impl TreeSitterCpgBuilder {
 
                 let mut cpg_node = CpgNode::new(NodeId::new(0), cpg_kind, range);
                 cpg_node.message_kind = mapper.message_kind(ts_kind);
+                cpg_node.allocation_type = mapper.allocation_type(ts_kind, &ts_node, source);
                 let node_id = cpg.add_node(cpg_node);
 
                 // Maintain the AST edge and parent pointer as one invariant.
@@ -286,6 +287,7 @@ mod tests {
         kind: CpgNodeKind,
         range: SourceRange,
         message_kind: Option<crate::MsgKind>,
+        allocation_type: Option<crate::TypeInfo>,
         parent: Option<NodeId>,
     }
 
@@ -313,6 +315,7 @@ mod tests {
                     end.column as u32,
                 ),
                 message_kind: mapper.message_kind(node.kind()),
+                allocation_type: mapper.allocation_type(node.kind(), &node, source),
                 parent,
             });
             Some(id)
@@ -719,6 +722,7 @@ mod tests {
                 assert_eq!(actual.kind, expected_node.kind);
                 assert_eq!(actual.range, expected_node.range);
                 assert_eq!(actual.message_kind, expected_node.message_kind);
+                assert_eq!(actual.allocation_type, expected_node.allocation_type);
                 assert_eq!(actual.parent, expected_node.parent);
 
                 let incoming_ast: Vec<_> = cpg
@@ -963,6 +967,41 @@ mod tests {
             "markdown section/paragraph ⇒ Block"
         );
     }
+
+    #[test]
+    #[cfg(feature = "lang-javascript")]
+    fn javascript_new_expression_retains_allocation_type() {
+        let cpg = TreeSitterCpgBuilder::new()
+            .build("const value = new Widget();", Language::JavaScript)
+            .expect("build JavaScript allocation");
+        let allocation = cpg
+            .calls()
+            .find(|node| node.allocation_type.is_some())
+            .expect("typed allocation call");
+        assert_eq!(
+            allocation.allocation_type,
+            Some(crate::TypeInfo::new("Widget"))
+        );
+    }
+
+    #[test]
+    #[cfg(feature = "lang-java")]
+    fn java_object_creation_retains_allocation_type() {
+        let cpg = TreeSitterCpgBuilder::new()
+            .build(
+                "class Widget {} class Use { void f() { Widget value = new Widget(); } }",
+                Language::Java,
+            )
+            .expect("build Java allocation");
+        let allocation = cpg
+            .calls()
+            .find(|node| node.allocation_type.is_some())
+            .expect("typed allocation call");
+        assert_eq!(
+            allocation.allocation_type,
+            Some(crate::TypeInfo::new("Widget"))
+        );
+    }
 }
 
 #[cfg(all(test, feature = "lang-rust"))]
@@ -1005,6 +1044,7 @@ mod proptests {
                 prop_assert_eq!(&tree_node.kind, &source_node.kind);
                 prop_assert_eq!(tree_node.range, source_node.range);
                 prop_assert_eq!(&tree_node.text, &source_node.text);
+                prop_assert_eq!(&tree_node.allocation_type, &source_node.allocation_type);
                 prop_assert_eq!(&tree_node.properties, &source_node.properties);
                 prop_assert_eq!(&tree_node.children, &source_node.children);
                 prop_assert_eq!(tree_node.parent, source_node.parent);

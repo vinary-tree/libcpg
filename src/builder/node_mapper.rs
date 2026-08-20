@@ -87,6 +87,29 @@ impl NodeMapper {
         }
     }
 
+    /// Returns normalized allocation semantics for a constructor expression.
+    ///
+    /// Allocation syntax is interpreted only at the frontend boundary. The
+    /// returned type name comes from the grammar's typed constructor field;
+    /// downstream analyses never inspect source text or grammar node names.
+    pub(crate) fn allocation_type(
+        &self,
+        ts_kind: &str,
+        node: &tree_sitter::Node,
+        source: &str,
+    ) -> Option<TypeInfo> {
+        let name = match (self.language, ts_kind) {
+            (Language::JavaScript | Language::TypeScript, "new_expression") => {
+                self.extract_child_text(node, "constructor", source)
+            }
+            (Language::Java, "object_creation_expression") => {
+                self.extract_child_text(node, "type", source)
+            }
+            _ => return None,
+        };
+        (!name.is_empty()).then(|| TypeInfo::new(name))
+    }
+
     /// Returns true if this node type should be included in the CPG.
     ///
     /// Some tree-sitter nodes are purely syntactic (punctuation, etc.)
