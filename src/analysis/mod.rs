@@ -91,9 +91,11 @@ pub use community::{
 };
 
 pub use concurrency::{
-    channel_report, communication_deadlocks, extract_events, may_happen_in_parallel, ChannelEvent,
-    ChannelFinding, ChannelFindingKind, ChannelId, DeadlockFinding, DeadlockFindingKind,
-    DeadlockWitness, MhpPair, MhpRelation, MsgKind, MAX_MHP_PAIRS,
+    atomicity_candidates, channel_report, communication_deadlocks, extract_events,
+    may_happen_in_parallel, race_candidates, AtomicityCandidate, AtomicityWitness, ChannelEvent,
+    ChannelFinding, ChannelFindingKind, ChannelId, ConcurrentAccessKind, DeadlockFinding,
+    DeadlockFindingKind, DeadlockWitness, HeldLock, MhpPair, MhpRelation, MsgKind, RaceCandidate,
+    RaceWitness, MAX_MHP_PAIRS,
 };
 
 #[cfg(feature = "rholang")]

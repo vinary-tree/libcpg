@@ -33,7 +33,7 @@ pub struct MhpPair {
 }
 
 impl MhpPair {
-    fn canonical(left: NodeId, right: NodeId) -> Option<Self> {
+    pub(crate) fn canonical(left: NodeId, right: NodeId) -> Option<Self> {
         match left.cmp(&right) {
             std::cmp::Ordering::Less => Some(Self {
                 first: left,
@@ -185,7 +185,7 @@ fn execution_sites(cpg: &CodePropertyGraph, operand: NodeId) -> Vec<NodeId> {
     result.into_iter().collect()
 }
 
-fn is_execution_site(node: &CpgNode) -> bool {
+pub(crate) fn is_execution_site(node: &CpgNode) -> bool {
     node.is_statement()
         || matches!(
             node.kind,
