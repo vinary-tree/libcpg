@@ -9,6 +9,9 @@ For missing-check, call-order, and return-check populations, use the separate
 For inconsistent clones, infeasible branches, redundant guards, and integer
 contradictions, use the separate
 [clone/feasibility guide](19-clone-feasibility-advisories.md).
+For centered API Usage Graphs, strict-majority fragments, and named temporal
+properties, use the separate
+[API-usage protocol guide](20-api-usage-protocol-mining.md).
 
 ![Three detector paths and their completeness boundaries](../diagrams/bug-detector-pipeline.svg)
 

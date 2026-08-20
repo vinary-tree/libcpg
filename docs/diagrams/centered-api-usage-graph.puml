@@ -1,0 +1,46 @@
+@startuml
+!include _libcpg-theme.iuml
+title One centered API Usage Graph and its mined fragment
+
+skinparam backgroundColor #FCFCFC
+skinparam rectangle {
+  BorderColor #495057
+  RoundCorner 12
+}
+skinparam note {
+  BackgroundColor #F1F3F5
+  BorderColor #495057
+}
+
+rectangle "control node\nif predicate" as CONTROL #E5DBFF
+rectangle "receiver data\nIdentifier" as RECEIVER #C3FAE8
+rectangle "argument 0\nString(\"cache\")" as ARGUMENT #FFF3BF
+rectangle "anchor action\nlock" as ANCHOR #74C0FC
+rectangle "following action\nunlock" as FOLLOWING #D3F9D8
+
+CONTROL -[#845EF7]-> ANCHOR : Selection
+RECEIVER -[#2B8A3E]-> ANCHOR : Receiver
+ARGUMENT -[#E67700]-> ANCHOR : Parameter(0)
+ANCHOR -[#C92A2A]-> FOLLOWING : Order
+
+note bottom of ANCHOR
+  The graph is a directed, labeled, acyclic multigraph.
+  Local ApiUsageNodeId values are dense; every node also
+  retains the source CodePropertyGraph NodeId.
+end note
+
+note bottom of FOLLOWING
+  Across twenty centered lock graphs, nineteen contain
+  the lock → unlock fragment. Exact support is <latex>19/20</latex>.
+  The twentieth site receives MissingFollowingCall.
+end note
+
+legend bottom
+|= Colour |= Meaning |
+|<#E5DBFF>| selecting control context |
+|<#C3FAE8>| method receiver data |
+|<#FFF3BF>| positional argument data |
+|<#74C0FC>| centered anchor API call |
+|<#D3F9D8>| CFG-reachable later API call |
+endlegend
+@enduml

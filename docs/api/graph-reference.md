@@ -524,6 +524,33 @@ See the [component guide](../components/graph/clone-feasibility-bug-detectors.md
 [theory](../theory/36-clone-consistency-and-abstract-feasibility.md), and
 [security boundary](../security/11-clone-feasibility-detectors.md).
 
+### API-usage and temporal protocol mining
+
+The feature-free I12 API builds one centered typed API Usage Graph (AUG) per
+complete call site, mines exact strict-majority fragments per anchor API, emits
+advisory deviations, and delegates named temporal properties to typestate.
+
+| API/type | Meaning |
+|---|---|
+| `analyze_api_usage_mining` | Qualified AUG, pattern, deviation, temporal-analysis, temporal-finding, and issue report. |
+| `api_usage_misuses` | Positive-only usage-deviation projection; never use alone for an absence claim. |
+| `ApiUsageMiningConfig` | Exact support/population policy; call, CFG, AUG, callee, property, and delegated typestate caps. |
+| `ApiUsageMiningAnalysis` | Ordered graphs/patterns/findings/temporal evidence/admitted sites/issues; `is_complete()` composes both analysis paths. |
+| `ApiUsageGraph` | Anchor/function/API plus dense typed local nodes and labeled edges; `is_acyclic()` is iterative. |
+| `ApiUsageNodeKind` | Anchor action, following action, normalized data shape, or normalized control context. |
+| `ApiUsageEdgeKind` | Receiver, positional parameter, selection, or represented order. |
+| `ApiUsagePattern` / `ApiUsagePatternKind` | Exact support and supporting sites for following-call, arity, argument, receiver, or control fragments. |
+| `ApiUsageMisuse` / `ApiUsageMisuseKind` | Deviating site with expected/observed evidence, exact peer support, supporting sites, and witness. |
+| `NamedTemporalProperty` | Unique report name paired with a validated `PropertyFsm`. |
+| `TemporalPropertyFindingKind` | Forbidden transition or non-accepting represented exit. |
+| `TemporalPropertyAnalysis` | Complete delegated resource/typestate evidence for one name. |
+| `ApiUsageMiningIssue` | Atomic inventory or site-local owner/identity/CFG/AUG incompleteness. |
+
+See the [component guide](../components/graph/api-usage-protocol-mining.md),
+[usage guide](../usage/20-api-usage-protocol-mining.md),
+[theory](../theory/37-api-usage-graphs-and-temporal-properties.md), and
+[security boundary](../security/12-api-usage-protocol-mining.md).
+
 ### Deterministic graph projections
 
 `GraphProjection` is the feature-free, payload-free compressed-sparse-row view

@@ -4,7 +4,9 @@ This chapter gives the common mathematical model for libcpg's resource,
 definition, and exception detector families. [Theory 35](35-population-anomaly-inference.md)
 defines the separate population-based missing-check and deviant-behavior
 families; [Theory 36](36-clone-consistency-and-abstract-feasibility.md) defines
-the clone-consistency and path-feasibility families. A **candidate** is a
+the clone-consistency and path-feasibility families; [Theory
+37](37-api-usage-graphs-and-temporal-properties.md) defines centered API-usage
+and named temporal evidence. A **candidate** is a
 reproducible consequence of represented Code
 Property Graph (CPG) evidence. It is advisory: it neither proves runtime
 feasibility nor assigns security impact. A report supports a negative claim

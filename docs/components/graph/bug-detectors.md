@@ -14,6 +14,9 @@ missing-check and deviant-behavior surfaces are specified separately in the
 I8 inconsistent-clone and I9 infeasible-path evidence are specified by the
 [clone/feasibility component](clone-feasibility-bug-detectors.md), which
 composes clone/GED, SCCP, and interval providers rather than duplicating them.
+I12 centered API-usage and named temporal evidence are specified by the
+[API-usage protocol-mining component](api-usage-protocol-mining.md), which
+reuses stable call identity, exact population arithmetic, and typestate.
 
 ![Inputs, shared analyses, findings, and completeness evidence](../../diagrams/bug-detector-pipeline.svg)
 

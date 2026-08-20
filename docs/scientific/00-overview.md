@@ -113,6 +113,7 @@ Because `default = []`, many tests are **feature-gated**. The end-to-end reachin
 | [39 — Bug-detector validation](39-bug-detector-validation.md) | Non-accepting leak terminals, empty scoped reaching definitions, finite exception summaries, lexical handler dispatch, root uncaught witnesses, dead catches, typed incompleteness, and constant native call depth | 21 feature-free plus three serde tests; three independent generated oracles; public aggregate/Rust/Java/depth-100,000 integration | feature-free / `serde` / `lang-rust` / `lang-java` |
 | [40 — Population-anomaly validation](40-population-anomaly-validation.md) | Exact missing-check, call-order, and return-check support; semantic fingerprints; peer scopes; typed incompleteness; determinism; and constant native call depth | exact 4/5 and 9/10 examples, two generated population oracles, public aggregate/Rust/depth-100,000 integration, serde regressions | feature-free / `serde` / `lang-rust` |
 | [41 — Clone and feasibility validation](41-clone-feasibility-validation.md) | Exact rename/guard witnesses, pair-local admission, Boolean path partitions, SCCP/interval proof composition, typed incompleteness, determinism, and constant native call depth | 128 alignment/insertion and 256 exhaustive integer-oracle cases, public/parser integration, serde, depth 100,000, Criterion smoke | feature-free / `serde` / `lang-rust` |
+| [42 — API-usage and temporal validation](42-api-usage-temporal-validation.md) | Exact strict-majority AUG fragments, usage deviations, named temporal findings, qualification, determinism, and constant native call depth | fourteen examples, two 128-case properties, public/parser integration, serde, depth 100,000/64 KiB, oracle-guarded Criterion target | feature-free / `serde` / `lang-rust` |
 
 ## 5. What is proven, and what is advisory
 
@@ -196,10 +197,15 @@ Scientific honesty requires separating the two:
   for their admitted pair, AST, CFG, DFG, operator, and resource evidence;
   developer intent, complete runtime semantics, defect impact, and remediation
   safety remain advisory.
+  Centered AUGs, exact fragment support, and deviations are exact for admitted
+  call identity, AST, CFG, DFG, PDG, and configured population evidence; a
+  dominant convention is not a specification. Temporal findings are exact for
+  the caller FSM and represented typestate evidence; neither path authorizes
+  repair or proves all runtime executions.
 - **Empirically bounded.** Performance results apply only to a target's named
   fixture, size, and controlled environment. DFG/PDG
   construction, whole-corpus analysis, and GNN propagation remain measurement gaps; no result
-  from the twenty active targets (or thirty-six enabled operation groups) may be
+  from the twenty-one active targets (or thirty-seven enabled operation groups) may be
   generalized to them. Martin metrics, reflexion conformance, architectural
   layering, and architectural-smell detection have no dedicated targets, so
   their validation supports correctness but makes no

@@ -171,3 +171,5 @@ Grouped by subject. Each row: the source (its `.svg` sibling is embedded by the 
 | `measurement-methodology.puml` | activity | Rigorous benchmarking method (a documented gap) | scientific/04, engineering/03 |
 | `threat-model-dataflow.puml` | activity | Untrusted input flow & trust boundaries | security/00 |
 | `resource-bounds.puml` | mindmap | Construction/analysis caps and validation, including condensation/layering, DSM, Martin metrics, architectural smells, centrality, Louvain, k-truss, minimum-cut, and attack ceilings | security/01 |
+| `api-usage-temporal-pipeline.puml` | component/evidence flow | Typed call admission → centered AUGs → exact fragments/deviations alongside named typestate properties → qualified report | architecture/data-flow, design/0047, components/graph/api-usage-protocol-mining, security/12 |
+| `centered-api-usage-graph.puml` | directed labeled graph | Control/receiver/argument evidence → anchor API → CFG-reachable later API, with exact 19/20 fragment support | theory/37, design/0047, components/graph/api-usage-protocol-mining, usage/20 |

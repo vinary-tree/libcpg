@@ -135,6 +135,10 @@ security guarantees:
   have exact typed witnesses for admitted pair/condition evidence. They do not
   establish developer intent, complete runtime semantics, exploitability, or
   safe automated clone/branch remediation.
+- [API-usage and temporal findings](../GLOSSARY.md#api-usage-graph-aug--api-usage-fragment--temporal-property)
+  have exact support or finite-state witnesses for admitted represented
+  evidence. A dominant convention or caller FSM can be wrong; neither finding
+  establishes exploitability, all runtime paths, or a safe repair.
 
 Use these to *prioritise* human attention, not to *gate* a security decision on
 their own. Exact structural analyses are exact with respect to their input
@@ -168,6 +172,7 @@ and its build pipeline.
 | Oversized or untrusted taint policy; capped negative claim | caller admission for catalog rule/string counts, literal path matching, shared/domain caps, and report-level completeness checks | [taint-analysis boundary](02-taint-analysis.md) |
 | Poisoned or oversized missing-check/deviant population | caller-owned catalog/peer policy, exact rational support, traversal caps, excluded incomplete samples, report-level completeness, and heap worklists | [population-anomaly boundary](10-population-anomaly-detectors.md) |
 | Adversarial clone/condition evidence or over-trusted path proof | exact pair identity, typed guard roots, disjoint regions, SCCP reachability filtering, AST/alignment/GED/node/state/step caps, heap continuations, and report-level completeness | [clone/feasibility boundary](11-clone-feasibility-detectors.md) |
+| Poisoned/oversized API usage or untrusted temporal policy | complete-site admission, exact strict-majority support, supporting-site provenance, call/CFG/AUG/property/typestate caps, heap worklists, and aggregate completeness | [API-usage protocol boundary](12-api-usage-protocol-mining.md) |
 | Unbounded slice | `backward_slice` / `forward_slice` `max_nodes` cap | [hardening §slicing](01-input-and-resource-hardening.md#slicing-max_nodes) |
 | Expensive or divergent centrality | hard iteration ceiling, explicit traversal budgets, finite-option validation, and complete projection validation | [hardening §centrality](01-input-and-resource-hardening.md#centrality-iteration-ceilings-traversal-budgets-and-safe-numerics) |
 | Adversarial community search or weights | 50-pass/10-level ceilings plus complete CSR, resolution, weight, and overflow validation | [hardening §community detection](01-input-and-resource-hardening.md#community-detection-pass-level-and-numeric-bounds) |

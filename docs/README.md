@@ -77,6 +77,9 @@ deviant-behavior evidence),
 **clone and feasibility advisories** (exact Type-2/3 rename/guard divergence,
 SCCP/interval branch infeasibility, redundant guards, and predicate-backed
 integer contradictions),
+**API-usage and temporal protocol mining** (centered typed AUGs, exact
+strict-majority following/argument/receiver/control fragments, advisory
+deviations, and named finite-state lifecycle properties),
 **interval value-range analysis** (branch constraints, loop-header widening,
 bounded narrowing, and immutable block-entry ranges),
 **loop-induction analysis** (DFG-backed invariants, additive/affine induction
@@ -168,6 +171,8 @@ let slice = backward_slice(&cpg, func, 256);         // bounded backward slice
 
 [Clone consistency and abstract feasibility](theory/36-clone-consistency-and-abstract-feasibility.md)
 
+[API-usage graphs and temporal properties](theory/37-api-usage-graphs-and-temporal-properties.md)
+
 ### Architecture — the "what / where"
 [Overview](architecture/overview.md) · [Graph data model](architecture/graph-data-model.md) · [Construction & analysis data flow](architecture/data-flow.md) · [Language frontends](architecture/language-frontends.md)
 
@@ -204,6 +209,8 @@ let slice = backward_slice(&cpg, func, 256);         // bounded backward slice
 
 [0046 Evidence-bounded clone and feasibility advisories](design/0046-evidence-bounded-clone-and-feasibility-advisories.md)
 
+[0047 Evidence-bounded API-usage and temporal mining](design/0047-evidence-bounded-api-usage-and-temporal-mining.md)
+
 ### API reference
 [Graph / analysis reference](api/graph-reference.md) · [Builder reference](api/builder-reference.md) · [Pattern / algorithm / GNN reference](api/pattern-reference.md)
 
@@ -235,6 +242,8 @@ let slice = backward_slice(&cpg, func, 256);         // bounded backward slice
 [Population anomaly detectors](components/graph/population-anomaly-detectors.md)
 
 [Clone-consistency and path-feasibility detectors](components/graph/clone-feasibility-bug-detectors.md)
+
+[API-usage protocol mining](components/graph/api-usage-protocol-mining.md)
 
 #### Builder
 [Overview](components/builder/overview.md) · [CFG extraction](components/builder/cfg.md) · [DFG extraction](components/builder/dfg.md) · [PDG & slicing](components/builder/pdg-and-slicing.md) · [Node mapper](components/builder/node-mapper.md)
@@ -275,6 +284,8 @@ let slice = backward_slice(&cpg, func, 256);         // bounded backward slice
 
 [Clone and path-feasibility advisories](usage/19-clone-feasibility-advisories.md)
 
+[API-usage and temporal protocol mining](usage/20-api-usage-protocol-mining.md)
+
 ### Engineering
 [Overview](engineering/00-overview.md) · [Build & features](engineering/01-build-and-features.md) · [Testing](engineering/02-testing.md) · [Performance](engineering/03-performance.md) · [Contributing](engineering/04-contributing.md)
 
@@ -311,8 +322,10 @@ let slice = backward_slice(&cpg, func, 256);         // bounded backward slice
 
 [Clone and feasibility validation](scientific/41-clone-feasibility-validation.md)
 
+[API-usage and temporal validation](scientific/42-api-usage-temporal-validation.md)
+
 ### Security
-[Threat model](security/00-threat-model.md) · [Input & resource hardening](security/01-input-and-resource-hardening.md) · [Taint-analysis security boundary](security/02-taint-analysis.md) · [Interprocedural-slicing security boundary](security/03-system-dependence-slicing.md) · [Channel-topology security boundary](security/04-channel-topology.md) · [Deadlock-analysis security boundary](security/05-deadlock-analysis.md) · [MHP-analysis security boundary](security/06-mhp-analysis.md) · [Session-analysis security boundary](security/07-session-analysis.md) · [Typestate-analysis security boundary](security/08-typestate-analysis.md) · [Bug-detector security boundary](security/09-bug-detectors.md) · [Population-anomaly security boundary](security/10-population-anomaly-detectors.md) · [Clone/feasibility security boundary](security/11-clone-feasibility-detectors.md)
+[Threat model](security/00-threat-model.md) · [Input & resource hardening](security/01-input-and-resource-hardening.md) · [Taint-analysis security boundary](security/02-taint-analysis.md) · [Interprocedural-slicing security boundary](security/03-system-dependence-slicing.md) · [Channel-topology security boundary](security/04-channel-topology.md) · [Deadlock-analysis security boundary](security/05-deadlock-analysis.md) · [MHP-analysis security boundary](security/06-mhp-analysis.md) · [Session-analysis security boundary](security/07-session-analysis.md) · [Typestate-analysis security boundary](security/08-typestate-analysis.md) · [Bug-detector security boundary](security/09-bug-detectors.md) · [Population-anomaly security boundary](security/10-population-anomaly-detectors.md) · [Clone/feasibility security boundary](security/11-clone-feasibility-detectors.md) · [API-usage protocol-mining security boundary](security/12-api-usage-protocol-mining.md)
 
 ### Reference
 [Glossary](GLOSSARY.md) · [Diagram catalog](diagrams/README.md)

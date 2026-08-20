@@ -1,0 +1,83 @@
+@startuml
+!include _libcpg-theme.iuml
+title API-usage mining and temporal-property pipeline
+
+skinparam backgroundColor #FCFCFC
+skinparam component {
+  BorderColor #495057
+}
+skinparam note {
+  BackgroundColor #F1F3F5
+  BorderColor #495057
+}
+
+component "CodePropertyGraph\ntyped AST · CFG · DFG · PDG · calls" as CPG #DBE4FF
+component "stable call evidence\nfunction owner · ApiIdentity" as CALLS #C3FAE8
+
+package "API Usage Graph mining" #F8F9FA {
+  component "per-function CFG projection\niterative reachability" as REACH #E5DBFF
+  component "centered acyclic multigraph\ndata/control → anchor → later calls" as AUG #FFF3BF
+  component "complete population\npartitioned by anchor API" as POP #C3FAE8
+  component "strict-majority fragments\n<latex>nd \geq ps</latex> and <latex>2s>d</latex>" as SUPPORT #D3F9D8
+  component "ApiUsageMisuse\nsite · exact support · witness" as MISUSE #FFE3E3
+}
+
+package "Named temporal properties" #F8F9FA {
+  component "caller PropertyFsm\nallocation · event · accepting state" as FSM #FFE8CC
+  component "shared typestate worklist\nallocation-site object facts" as TYPESTATE #E5DBFF
+  component "forbidden transition\nor non-accepting exit" as TEMPORAL #FFE3E3
+}
+
+component "typed issues and hard caps\nincomplete sites never enter populations" as ISSUES #FCC2D7
+component "immutable ApiUsageMiningAnalysis\nqualified absence via is_complete()" as REPORT #FFE8CC
+
+CPG --> CALLS : represented target or typed callee path
+CALLS --> REACH : admitted call sites
+CPG --> REACH : canonical CFG
+CPG --> AUG : argument · receiver · controller
+REACH --> AUG : reachable later calls
+AUG --> POP : complete observations only
+POP --> SUPPORT : exact rational census
+SUPPORT --> MISUSE : fragment absent or mismatched
+
+CPG --> TYPESTATE : CFG + DFG/reference + calls
+FSM --> TYPESTATE
+TYPESTATE --> TEMPORAL
+
+CALLS --> ISSUES : missing/capped identity or owner
+REACH --> ISSUES : absent CFG or reachability cap
+AUG --> ISSUES : node/edge cap
+TYPESTATE --> ISSUES : delegated completeness
+MISUSE --> REPORT
+TEMPORAL --> REPORT
+ISSUES --> REPORT
+
+note bottom of SUPPORT
+  Every fragment is single-valued at a site.
+  Requiring a strict majority prevents two
+  contradictory expected values from both winning.
+end note
+
+note bottom of AUG
+  Each source CPG node is referenced, never copied or rewritten.
+  Kahn elimination validates acyclicity with a heap queue.
+end note
+
+note bottom of REPORT
+  Positive findings are advisory.
+  An empty finding vector is an absence claim only when
+  every issue set and delegated temporal report is complete.
+end note
+
+legend bottom
+|= Colour |= Meaning |
+|<#DBE4FF>| normalized graph evidence |
+|<#C3FAE8>| admitted identity or population |
+|<#E5DBFF>| shared graph/worklist analysis |
+|<#FFF3BF>| centered usage representation |
+|<#D3F9D8>| exact semantic decision |
+|<#FFE3E3>| advisory finding |
+|<#FCC2D7>| incomplete-evidence qualification |
+|<#FFE8CC>| caller policy or report boundary |
+endlegend
+@enduml

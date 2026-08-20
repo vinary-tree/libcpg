@@ -653,6 +653,19 @@ CFG. Results are advisory and require a complete report for negative claims.
 See [Theory 33](theory/33-finite-state-typestate-properties.md), Strom–Yemini
 [[48]](#references), and Fink et al. [[49]](#references).
 
+### API Usage Graph (AUG) / API-usage fragment / Temporal property
+
+An **API Usage Graph (AUG)** is libcpg's directed, labeled, acyclic multigraph
+centered on one complete call occurrence. Typed argument, receiver, and control
+nodes point into the anchor; CFG-reachable later calls point out. An
+**API-usage fragment** is one comparable following-call, arity, positional
+shape, receiver-shape, or control-context relation whose exact support reaches
+a strict-majority threshold. A **temporal property** is an explicitly named
+finite-state operation-order policy checked through typestate, independent of
+the learned population. Findings are advisory and qualified by completeness.
+See [Theory 37](theory/37-api-usage-graphs-and-temporal-properties.md),
+ASAP-Repair [[56]](#references), and ProveNFix [[57]](#references).
+
 ### Resource leak
 
 A **resource leak** candidate is an allocation-site object that reaches a
@@ -1144,3 +1157,5 @@ strict tree interpretation. See
 53. Lu, K., Pakki, A., Wu, Q. (2019). *Detecting Missing-Check Bugs via Semantic- and Context-Aware Criticalness and Constraints Inferences.* [USENIX Security 2019](https://www.usenix.org/conference/usenixsecurity19/presentation/lu) (no DOI assigned in the proceedings record).
 54. Engler, D., Chen, D. Y., Hallem, S., Chou, A., Chelf, B. (2001). *Bugs as Deviant Behavior: A General Approach to Inferring Errors in Systems Code.* DOI: [10.1145/502034.502041](https://doi.org/10.1145/502034.502041).
 55. Juergens, E., Deissenboeck, F., Hummel, B., Wagner, S. (2009). *Do Code Clones Matter?* DOI: [10.1109/ICSE.2009.5070547](https://doi.org/10.1109/ICSE.2009.5070547).
+56. Nielebock, S., Blockhaus, P., Krüger, J., Ortmeier, F. (2024). *ASAP-Repair: API-Specific Automated Program Repair Based on API Usage Graphs.* DOI: [10.1145/3643788.3648011](https://doi.org/10.1145/3643788.3648011).
+57. Song, Y., Gao, X., Li, W., Chin, W.-N., Roychoudhury, A. (2024). *ProveNFix: Temporal Property-Guided Program Repair.* DOI: [10.1145/3643737](https://doi.org/10.1145/3643737).

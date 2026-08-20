@@ -12,6 +12,9 @@ poisoning and peer-policy trust.
 Clone-consistency and path-feasibility advisories have a separate
 [security boundary](11-clone-feasibility-detectors.md), including pair/guard
 trust, SCCP/interval limits, and remediation controls.
+Centered API-usage and named temporal findings have a separate
+[security boundary](12-api-usage-protocol-mining.md), including population/FSM
+trust, exact support, resource caps, completeness, and repair separation.
 
 ![Untrusted graph evidence, bounded analysis, and qualified detector reports](../diagrams/bug-detector-pipeline.svg)
 

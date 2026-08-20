@@ -111,6 +111,7 @@ function scope.
 | Deviant-behavior inference | $`O((U+R+D)\log U+B)`$ before output sorting | $`R`$ is aggregate bounded CFG reachability, $`D`$ aggregate forward value reachability, and $`B`$ API/belief population comparisons. Per-call CFG and return-evidence caps qualify excluded samples; queues and visited sets are heap-backed. |
 | Inconsistent-clone advisories | $`O(P(A_LA_R+G))`$ within configured pair/tape/alignment/GED caps | $`P`$ is admitted exact Type-2/3 pairs, $`A_L,A_R`$ are tape sizes for a non-isomorphic alignment, and $`G`$ is bounded pair-local GED. Same-shape alignment is linear; all tapes/matrices are heap-backed. |
 | Infeasible-path advisories | $`O(F(S+I)+V+K)`$ within condition state/step caps | $`F`$ functions, $`S`$ SCCP cost, $`I`$ interval cost, $`V`$ condition-arena nodes, and $`K`$ explicit machine transitions. Boolean alternatives can grow exponentially, so state and transition caps qualify the affected condition. |
+| API-usage and temporal mining | $`O(\sum_{c\in C}(N_{f(c)}+E_{f(c)}+A_c))`$ before ordered-container factors, plus delegated typestate cost | Each admitted anchor walks its function CFG, builds one flat AUG of size $`A_c`$, and contributes constant-family population fragments. Call, per-site CFG, AUG node/edge, property, and typestate caps bound work; every traversal is heap-backed. |
 | PageRank / reverse / personalized | $`O(c(V+E))`$ time, $`O(V)`$ working space | Dense forward/reverse CSR and stable floating reduction; hard 10,000-round ceiling. |
 | Vertex/edge betweenness | $`O(V(V+E))`$ time, $`O(V+E)`$ working space | Directed vertex Brandes or undirected canonical edge Brandes; preflight work budgets; serial source partitions are public. |
 | Eigenvector / Katz / HITS | $`O(c(V+E))`$ time, $`O(V+E)`$ working space | Shifted spectral iteration, sufficient Katz row-sum bound, and paired HITS vectors. |
@@ -137,9 +138,9 @@ once, loop bodies twice, and a path set cuts malformed AST cycles.
 
 ## Benchmark coverage and remaining gaps
 
-Twenty Criterion targets are active. Their thirty-five baseline operation
+Twenty-one Criterion targets are active. Their thirty-six baseline operation
 groups are feature-free; `induction_analysis` also registers one
-`algorithm-detection`-gated operation, making thirty-six in that build. Every
+`algorithm-detection`-gated operation, making thirty-seven in that build. Every
 active group constructs and checks a deterministic oracle
 before Criterion enters the timed loop:
 
@@ -173,6 +174,10 @@ before Criterion enters the timed loop:
 - `advisory_bugs` measures exact Type-2 guard divergence and contradictory
   interval guards over 8- and 32-function corpora. Complete reports, nonempty
   clone findings, and exactly one contradiction per feasibility function are
+  asserted before timing.
+- `api_usage_mining` measures combined centered-AUG inference and named
+  release-after-acquire checking over 20- and 100-peer corpora. Exactly one
+  missing-following-call and one non-accepting exit per twenty peers are
   asserted before timing.
 - `program_merge` measures collision-free merge and import-graph construction
   over 16- and 64-file programs with 16 statement nodes per file. Exact summed
@@ -287,6 +292,10 @@ name = "clones"
 harness = false
 
 [[bench]]
+name = "api_usage_mining"
+harness = false
+
+[[bench]]
 name = "program_merge"
 harness = false
 ```
@@ -312,6 +321,7 @@ cargo bench --bench cycles --no-default-features
 cargo bench --bench motifs --no-default-features
 cargo bench --bench ged --no-default-features
 cargo bench --bench clones --no-default-features
+cargo bench --bench api_usage_mining --no-default-features
 cargo bench --bench program_merge --no-default-features
 cargo bench --bench ifds_taint --no-default-features
 cargo bench --no-default-features --features algorithm-detection \

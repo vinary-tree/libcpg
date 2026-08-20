@@ -621,6 +621,26 @@ See the
 [Theory 36](../theory/36-clone-consistency-and-abstract-feasibility.md), and
 [Usage 19](../usage/19-clone-feasibility-advisories.md).
 
+### API-usage and temporal protocol mining (feature-free)
+
+`analyze_api_usage_mining` follows `CodePropertyGraph → stable call identity +
+owner → per-function CFG reachability → centered typed AUG → complete same-API
+population → exact strict-majority fragment → advisory deviation`. Arguments,
+typed method receivers, and direct PDG controllers point into the anchor;
+CFG-reachable later calls point out. Sites with incomplete/capped evidence do
+not enter a population and remain typed issues.
+
+Named `PropertyFsm` values follow a separate path through the existing
+typestate/resource-leak worklist. Forbidden transitions and non-accepting exits
+are projected into the aggregate report while the complete delegated evidence
+is retained. Both paths are read-only and stack-safe over represented depth.
+
+![Centered AUG mining and named temporal checking share qualified graph evidence](../diagrams/api-usage-temporal-pipeline.svg)
+
+See the [component guide](../components/graph/api-usage-protocol-mining.md),
+[Theory 37](../theory/37-api-usage-graphs-and-temporal-properties.md), and
+[Usage 20](../usage/20-api-usage-protocol-mining.md).
+
 ### Pattern detection
 
 Two layers, at two feature levels:

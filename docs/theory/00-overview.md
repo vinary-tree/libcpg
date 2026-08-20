@@ -284,6 +284,10 @@ development, or jump to the layer you need:
     Exact Type-2/3 pairs, flat AST alignment, dominant rename conventions,
     SCCP executable edges, and path-partitioned interval regions define
     qualified clone-divergence and condition-feasibility evidence.
+37. **[37 — API-usage graphs and temporal properties](37-api-usage-graphs-and-temporal-properties.md).**
+    Centered directed labeled acyclic usage graphs, exact strict-majority
+    fragment support, and caller-defined finite-state properties define
+    qualified API-context and lifecycle evidence.
 
 The later chapters define deterministic projection structure, architecture
 metrics, inspectable evidence, and their interpretation limits.

@@ -90,6 +90,7 @@ alternatives is folklore, and a decision without its costs is marketing.
 | [0044 — Evidence-composed bug detectors](0044-evidence-composed-bug-detectors.md) | Project leak and uninitialized-use evidence from shared facts, normalize typed handler entry, and propagate finite exception summaries through call SCCs without parsing or graph mutation. | Accepted |
 | [0045 — Exact population anomaly detectors](0045-exact-population-anomaly-detectors.md) | Infer missing checks and deviant call behavior from canonical CPG evidence, exact peer fractions, and explicit incomplete-result semantics. | Accepted |
 | [0046 — Evidence-bounded clone and feasibility advisories](0046-evidence-bounded-clone-and-feasibility-advisories.md) | Diagnose typed divergences in exact low-edit clone pairs and compose SCCP with path-partitioned intervals for qualified branch/condition findings. | Accepted |
+| [0047 — Evidence-bounded API-usage and temporal mining](0047-evidence-bounded-api-usage-and-temporal-mining.md) | Build centered typed AUGs, infer exact strict-majority fragments, and reuse typestate for named temporal properties with explicit completeness. | Accepted |
 
 These forty-six are not independent. ADR-0001 fixes the substrate that all analyses
 write onto; ADR-0002 and ADR-0005 together explain how a language reaches that
@@ -215,6 +216,10 @@ ADR-0046 composes ADR-0030's exact clone pairs, ADR-0023's bounded GED,
 ADR-0010's executable-edge facts, and ADR-0011's interval environments. It
 keeps pair/condition recursion in explicit heap machines, preserves disjoint
 comparison regions, and qualifies every unsupported or bounded proof.
+ADR-0047 composes ADR-0006's stable call identity, canonical CFG/DFG/PDG
+evidence, ADR-0045's exact population arithmetic, and ADR-0043's finite-state
+typestate engine. It admits only complete call-site AUGs, enforces
+strict-majority uniqueness, and preserves delegated temporal qualification.
 
 ![Module architecture of libcpg, showing the graph core and the analysis modules layered over it](../diagrams/module-architecture.svg)
 
@@ -226,7 +231,7 @@ comparison regions, and qualifies every unsupported or bounded proof.
   (`0001`…). Numbers are never reused; a reversed decision is marked
   *Superseded* and a new record supersedes it, so history stays legible.
 - **Status lifecycle.** `Proposed → Accepted → (Superseded by NNNN | Deprecated)`.
-  All forty-six current records are **Accepted** and reflect the shipped `v0.1.1`
+  All forty-seven current records are **Accepted** and reflect the shipped `v0.1.1`
   code.
 - **Grounding.** Every claim here is traceable to source: the
   [`Cargo.toml`](../engineering/01-build-and-features.md) feature block, the

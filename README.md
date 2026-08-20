@@ -96,6 +96,9 @@ PDG). A query can therefore mix syntax, control flow, and data flow freely.
 - **Clone and feasibility advisories** — feature-free exact Type-2/3 clone
   divergence evidence plus SCCP/interval proofs for infeasible branches,
   redundant guards, and integer contradictions.
+- **API-usage and temporal protocol mining** — feature-free centered typed API
+  Usage Graphs, exact strict-majority following/argument/receiver/control
+  patterns, advisory deviations, and named finite-state temporal properties.
 - **Projection centrality** — deterministic PageRank variants, vertex/edge
   betweenness, eigenvector, Katz, closeness, harmonic, HITS, and Burt
   structural-hole scores with explicit iteration and traversal budgets.
