@@ -99,7 +99,10 @@ pub fn devirtualize(
                     let candidates: Vec<_> = candidates.into_iter().collect();
 
                     refined.confidence = mode.confidence();
-                    refined.target = (candidates.len() == 1).then_some(candidates[0]);
+                    refined.target = match candidates.as_slice() {
+                        [target] => Some(*target),
+                        _ => None,
+                    };
                     refined.candidate_count = candidates.len();
                     refined.candidates_truncated = false;
                     refined.candidates = candidates;
@@ -827,6 +830,95 @@ mod tests {
             unchanged.resolutions[&fixture.call],
             fixture.resolution.resolutions[&fixture.call]
         );
+    }
+
+    #[test]
+    fn empty_rta_evidence_removes_the_closed_world_target_set() {
+        let mut fixture = hierarchy_fixture();
+        let node_ids: Vec<_> = fixture.cpg.node_ids().collect();
+        for node_id in node_ids {
+            fixture
+                .cpg
+                .node_mut(node_id)
+                .expect("represented node")
+                .allocation_type = None;
+        }
+
+        let rta = devirtualize(&fixture.cpg, &fixture.resolution, DevirtualizationMode::Rta);
+        let record = &rta.resolutions[&fixture.call];
+        assert_eq!(record.confidence, Confidence::RapidType);
+        assert_eq!(record.target, None);
+        assert!(record.candidates.is_empty());
+        assert_eq!(record.candidate_count, 0);
+        assert!(!record.candidates_truncated);
+    }
+
+    #[test]
+    fn explicit_type_of_evidence_can_type_an_unannotated_receiver() {
+        let mut fixture = hierarchy_fixture();
+        let receiver = receiver_of_call(&fixture.cpg, fixture.call).expect("receiver");
+        let definition = match fixture.cpg.node(receiver).map(|node| &node.kind) {
+            Some(CpgNodeKind::Identifier {
+                definition: Some(definition),
+                ..
+            }) => *definition,
+            _ => panic!("typed receiver definition"),
+        };
+        if let Some(CpgNodeKind::Variable { var_type, .. }) =
+            fixture.cpg.node_mut(definition).map(|node| &mut node.kind)
+        {
+            *var_type = None;
+        }
+        let base = fixture
+            .cpg
+            .nodes()
+            .find(|node| {
+                matches!(
+                    &node.kind,
+                    CpgNodeKind::Class { name, .. } if name.as_ref() == "Base"
+                )
+            })
+            .expect("base type")
+            .id;
+        fixture.cpg.connect(definition, base, CpgEdgeKind::TypeOf);
+
+        let cha = devirtualize(&fixture.cpg, &fixture.resolution, DevirtualizationMode::Cha);
+        assert_eq!(cha.resolutions[&fixture.call].candidate_count, 3);
+    }
+
+    #[test]
+    fn malformed_hierarchy_cycles_terminate_deterministically() {
+        let mut fixture = hierarchy_fixture();
+        let mut types: Vec<_> = fixture
+            .cpg
+            .nodes()
+            .filter(|node| matches!(node.kind, CpgNodeKind::Class { .. }))
+            .map(|node| node.id)
+            .collect();
+        types.sort_unstable();
+        fixture
+            .cpg
+            .connect(types[0], types[2], CpgEdgeKind::Inherits);
+
+        let first = devirtualize(&fixture.cpg, &fixture.resolution, DevirtualizationMode::Cha);
+        let second = devirtualize(&fixture.cpg, &fixture.resolution, DevirtualizationMode::Cha);
+        assert_eq!(first, second);
+        assert_eq!(first.resolutions[&fixture.call].candidate_count, 3);
+    }
+
+    #[test]
+    #[cfg(feature = "serde")]
+    fn devirtualization_modes_round_trip_through_serde() {
+        for mode in [
+            DevirtualizationMode::Cha,
+            DevirtualizationMode::Rta,
+            DevirtualizationMode::Vta,
+        ] {
+            let encoded = serde_json::to_string(&mode).expect("serialize mode");
+            let decoded: DevirtualizationMode =
+                serde_json::from_str(&encoded).expect("deserialize mode");
+            assert_eq!(decoded, mode);
+        }
     }
 
     proptest! {

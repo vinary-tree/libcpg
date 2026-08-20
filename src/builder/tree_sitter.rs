@@ -985,6 +985,22 @@ mod tests {
     }
 
     #[test]
+    #[cfg(feature = "lang-typescript")]
+    fn typescript_new_expression_retains_allocation_type() {
+        let cpg = TreeSitterCpgBuilder::new()
+            .build("const value: Widget = new Widget();", Language::TypeScript)
+            .expect("build TypeScript allocation");
+        let allocation = cpg
+            .calls()
+            .find(|node| node.allocation_type.is_some())
+            .expect("typed allocation call");
+        assert_eq!(
+            allocation.allocation_type,
+            Some(crate::TypeInfo::new("Widget"))
+        );
+    }
+
+    #[test]
     #[cfg(feature = "lang-java")]
     fn java_object_creation_retains_allocation_type() {
         let cpg = TreeSitterCpgBuilder::new()
