@@ -1,0 +1,51 @@
+@startuml
+!include _libcpg-theme.iuml
+title Virtual-call refinement lattice and assumptions
+
+skinparam backgroundColor #FCFCFC
+skinparam rectangle {
+  BorderColor #495057
+  RoundCorner 12
+}
+skinparam note {
+  BackgroundColor #F1F3F5
+  BorderColor #495057
+}
+
+rectangle "CHA\nall represented compatible\nconcrete runtime types\nconfidence 0.75" as CHA #74C0FC
+rectangle "RTA\nCHA ∩ represented\nallocated types\nconfidence 0.80" as RTA #FFF3BF
+rectangle "VTA\nRTA ∩ receiver-reaching\nallocation types\nconfidence 0.85" as VTA #FFE8CC
+rectangle "sorted dispatch targets\nown override, otherwise\ninherited/default methods" as TARGET #D3F9D8
+rectangle "out-of-graph record\n0 → none\n1 → singleton target\nmany → ambiguous" as RESULT #D3F9D8
+
+CHA -down-> RTA : add closed-world\nallocation assumption
+RTA -down-> VTA : add receiver DFG\nassignment assumption
+CHA ..> TARGET : <latex>T_{CHA}</latex>
+RTA ..> TARGET : <latex>T_{RTA} \subseteq T_{CHA}</latex>
+VTA ..> TARGET : <latex>T_{VTA} \subseteq T_{RTA}</latex>
+TARGET --> RESULT
+
+note right of CHA
+  Broadest represented target set.
+  Use when allocations are incomplete.
+end note
+
+note right of VTA
+  Narrowest mode here, but not a
+  full points-to or runtime proof.
+end note
+
+note bottom of RESULT
+  No mode adds, removes, or relabels CPG edges.
+  Missing libraries, reflection, and dynamic loading
+  remain outside the represented closed world.
+end note
+
+legend bottom
+|= Colour |= Meaning |
+|<#74C0FC>| hierarchy compatibility |
+|<#FFF3BF>| global allocation evidence |
+|<#FFE8CC>| receiver-reaching assignment evidence |
+|<#D3F9D8>| deterministic immutable target evidence |
+endlegend
+@enduml

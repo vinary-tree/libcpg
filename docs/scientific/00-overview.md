@@ -50,14 +50,14 @@ Two properties of the suite make this rigorous rather than merely suggestive:
 
 ## 3. The evidence base
 
-The all-features Cargo inventory contains **1,114 library tests** and **116
-integration/robustness tests**, for **1,230 executable cases**. The integration
+The all-features Cargo inventory contains **1,188 library tests** and **129
+integration/robustness tests**, for **1,317 executable cases**. The integration
 inventory includes public and parser-backed gates for graph construction,
 optimization, architecture, concurrency, summaries, slicing, persistence, and
 typestate plus resource/definition/exception, population, clone, and path bug detectors,
 including aggregate, Rust, Java dual-build, exact 4/5 and 9/10, and
 depth-100,000 detector targets. These cases combine fixed examples,
-differential oracles, and 84 exact
+differential oracles, and 91 exact
 source-level `proptest!` blocks. The feature-free matrix remains
 independently runnable and exercises the exact graph/data-flow substrate
 without compiling any grammar. Twenty active Criterion targets supplement
@@ -118,6 +118,7 @@ Because `default = []`, many tests are **feature-gated**. The end-to-end reachin
 | [44 — Cryptographic API-misuse validation](44-cryptographic-api-misuse-validation.md) | CrySL-style call order, parameter constraints, literal-origin taint, cap qualification, deterministic aggregation, and stack-safe provenance | eight focused examples including serde and caps, one 128-case property, public/parser integration, depth 100,000/64 KiB | feature-free / `serde` / `lang-rust` |
 | [45 — Secret-flow and access-policy validation](45-security-policy-validation.md) | Entropy/name qualification, positional source-to-sink flow, exact authN/authZ guard populations, qualification, determinism, and constant native call depth | paired examples, three 128-case properties, public/parser integration, serde, two depth-100,000/64 KiB gates | feature-free / `serde` / `lang-rust` |
 | [46 — Vulnerability-extrapolation validation](46-vulnerability-extrapolation-validation.md) | Shared-vocabulary WL cosine, deterministic bounded ranking, relaxed VF2 qualification, complete boundary evidence, and constant native call depth | planted near duplicate, 256/128-case properties, public/parser integration, serde, depth-100,000/64 KiB gate | feature-free / `serde` / `lang-rust` |
+| [47 — Virtual-call type-refinement validation](47-type-refinement-validation.md) | Exact represented CHA/RTA/VTA target lattice, inherited/default dispatch, deterministic insertion behavior, and constant native call depth | exact three-level hierarchy, 128-case property, public C1 integration, three parser allocation frontends, serde, depth-100,000/256 KiB gate | feature-free / `serde` / `lang-javascript` / `lang-typescript` / `lang-java` |
 
 ## 5. What is proven, and what is advisory
 
@@ -210,6 +211,10 @@ Scientific honesty requires separating the two:
   admitted graph, templates, role catalogs, and bounds; exploitability,
   severity, frontend completeness, and unmodeled weakness families remain
   advisory.
+  CHA/RTA/VTA candidate sets are exact for represented nominal, hierarchy,
+  allocation, receiver, and DFG evidence under the selected closed-world mode;
+  runtime loading, reflection, omitted libraries, and full points-to semantics
+  remain outside that result.
 - **Empirically bounded.** Performance results apply only to a target's named
   fixture, size, and controlled environment. DFG/PDG
   construction, whole-corpus analysis, and GNN propagation remain measurement gaps; no result

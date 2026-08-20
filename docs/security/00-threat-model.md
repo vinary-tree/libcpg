@@ -138,6 +138,10 @@ security guarantees:
 - [Vulnerability-extrapolation rankings](16-vulnerability-extrapolation.md)
   are structural neighbors of a caller-labeled seed. They do not establish
   vulnerability, exploitability, probability, or behavioral equivalence.
+- [Virtual-call type refinement](17-type-refinement-boundary.md) is exact only
+  for the selected represented closed world. A narrower RTA/VTA set does not
+  establish runtime unreachability under omitted libraries, loading, or
+  reflection.
 - [Clone and feasibility findings](../GLOSSARY.md#inconsistent-clone--path-feasibility)
   have exact typed witnesses for admitted pair/condition evidence. They do not
   establish developer intent, complete runtime semantics, exploitability, or
@@ -180,6 +184,7 @@ and its build pipeline.
 | Poisoned or oversized missing-check/deviant population | caller-owned catalog/peer policy, exact rational support, traversal caps, excluded incomplete samples, report-level completeness, and heap worklists | [population-anomaly boundary](10-population-anomaly-detectors.md) |
 | Sensitive/adversarial secret or access-policy evidence | value-minimizing findings, integer entropy decisions, typed source-to-sink witnesses, access-only fingerprint filtering, explicit literal/context/population caps, and aggregate completeness | [secret/access-policy boundary](15-secret-and-access-policy-analysis.md) |
 | Adversarial seed, PDGs, or extrapolation population | trusted seed provenance, shared-vocabulary WL screening, equal-size and invocation-gated stack-safe VF2, explicit function/PDG/result caps, typed omissions, and manual review | [vulnerability-extrapolation boundary](16-vulnerability-extrapolation.md) |
+| Poisoned hierarchy/type/allocation evidence or over-trusted devirtualization | exact nominal admission, typed frontend allocations, immutable reports, cycle-safe heap worklists, recorded mode, and closed-world qualification | [virtual-call type-refinement boundary](17-type-refinement-boundary.md) |
 | Adversarial clone/condition evidence or over-trusted path proof | exact pair identity, typed guard roots, disjoint regions, SCCP reachability filtering, AST/alignment/GED/node/state/step caps, heap continuations, and report-level completeness | [clone/feasibility boundary](11-clone-feasibility-detectors.md) |
 | Poisoned/oversized API usage or untrusted temporal policy | complete-site admission, exact strict-majority support, supporting-site provenance, call/CFG/AUG/property/typestate caps, heap worklists, and aggregate completeness | [API-usage protocol boundary](12-api-usage-protocol-mining.md) |
 | Unbounded slice | `backward_slice` / `forward_slice` `max_nodes` cap | [hardening §slicing](01-input-and-resource-hardening.md#slicing-max_nodes) |
@@ -196,7 +201,7 @@ and its build pipeline.
 | Forged or oversized smell evidence bundle | complete projection/options/metric/assignment validation, exact SCC recomputation, fail-closed empty result; caller-side projection cap | [hardening §architectural smells](01-input-and-resource-hardening.md#architectural-smells-validated-bundle-and-ingress-cap) |
 | Oversized or misleading code-metric evidence | finite iterative graph traversals, inheritance-SCC condensation, stable ordered sets, defined arithmetic edge cases; caller-side CPG cap and retained resolver policy | [hardening §code metrics](01-input-and-resource-hardening.md#code-metrics-finite-evidence-and-ingress-cap) |
 | Untrusted serialized graph | Deserialize only trusted bytes | [`usage/05-serialization.md`](../usage/05-serialization.md) |
-| Over-trusting heuristics, taint/nullflow/population/security-policy findings, rankings, partitions, edit bounds, architecture/code metrics, cut/robustness evidence, bounded cycle prefixes, or motif frequencies | Treat taint/nullflow, missing-check/deviant, secret-flow/access-policy, vulnerability-extrapolation, pattern/algorithm/GNN, GED, Martin, CK/LCOM/function metrics, reflexion, layering, smells, centrality, community, cohesion, spectral, truncated-cycle, and motif output as advisory | this page |
+| Over-trusting heuristics, taint/nullflow/population/security-policy findings, rankings, type-refined closed worlds, partitions, edit bounds, architecture/code metrics, cut/robustness evidence, bounded cycle prefixes, or motif frequencies | Treat taint/nullflow, missing-check/deviant, secret-flow/access-policy, vulnerability-extrapolation, CHA/RTA/VTA, pattern/algorithm/GNN, GED, Martin, CK/LCOM/function metrics, reflexion, layering, smells, centrality, community, cohesion, spectral, truncated-cycle, and motif output as advisory outside each represented contract | this page |
 
 ## References
 

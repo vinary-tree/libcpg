@@ -169,6 +169,10 @@ caller-labeled function, compares function PDGs in a shared WL vocabulary, and
 uses explicitly bounded relaxed VF2 confirmation to produce deterministic
 out-of-graph review leads with typed completeness evidence.
 
+[Virtual-call type refinement](type-refinement.md) consumes C1 method records,
+exact nominal/hierarchy evidence, normalized allocations, and receiver-reaching
+definitions to compute immutable monotone CHA/RTA/VTA target sets.
+
 ### Creating a CPG
 
 With **no cargo features enabled** (`default = []`), `libcpg` links no grammars,
@@ -395,6 +399,9 @@ So the safe pattern is: build (single-threaded, `&mut`), then analyse
 - [Evidence-bounded call resolution](call-resolution.md) — deterministic
   lexical symbols, confidence tiers, and the conservative boundary between
   recorded evidence and definite call topology.
+- [Virtual-call type refinement](type-refinement.md) — feature-free immutable
+  CHA/RTA/VTA candidate sets with exact nominal admission, inherited dispatch,
+  and heap-backed hierarchy/definition machines.
 - [Multi-file program composition](program-composition.md) — collision-free
   per-file identity translation, explicit file scopes, and conservative
   import/export linkage that feeds cross-file call resolution.

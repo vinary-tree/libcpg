@@ -157,6 +157,9 @@ So VF2 matching is available with `default = []`; GoF detection requires `--feat
 - `CfgExtractor` / `DfgExtractor` — the CFG and DFG passes; both `extract(&mut cpg)` idempotently.
 - `analysis::resolve_calls` — the opt-in, feature-free lexical/import
   resolver that records every outcome and emits only uniquely supported calls.
+- `analysis::devirtualize` — the immutable, feature-free CHA/RTA/VTA post-pass
+  that refines C1 method candidates from exact nominal, hierarchy, allocation,
+  and receiver-reaching definition evidence.
 - `PdgBuilder` — adds `ControlDependence` + `DataDependence` edges on demand; `backward_slice` / `forward_slice` traverse them.
 - `analysis::sdg` — appends labeled summary dependences and drives the shared
   masked traversal in context-sensitive backward and forward phases.

@@ -24,7 +24,7 @@ live in the [Glossary](../GLOSSARY.md).
 Every type on this page is re-exported from the crate root, so a single `use`
 suffices:
 
-```rust
+```rust,ignore
 use libcpg::{
     CodePropertyGraph, CpgStats,
     CpgNode, CpgNodeKind, LiteralKind,
@@ -230,12 +230,37 @@ and `libcpg::analysis`:
 | `build_symbol_table` | `fn(&mut CodePropertyGraph, &ResolveConfig) -> SymbolTable` | Deterministic lexical, represented-import, and global function index; idempotently emits `EnclosingScope` and `ContainedIn`. |
 | `resolve_calls` | `fn(&mut CodePropertyGraph, &ResolveConfig) -> CallGraphResolution` | Per-call evidence records plus uniquely supported `Reference`, `StaticCall`/`DynamicCall`, and `CallSite` edges. |
 
+### Closed-world virtual-call type refinement
+
+`devirtualize` consumes C1 records without mutating the CPG:
+
+```rust
+pub fn devirtualize(
+    cpg: &CodePropertyGraph,
+    resolution: &CallGraphResolution,
+    mode: DevirtualizationMode,
+) -> CallGraphResolution
+```
+
+| Mode | Evidence | Confidence |
+|---|---|---|
+| `Cha` | represented concrete descendants through `Inherits`/`Implements` | `ClassHierarchy` |
+| `Rta` | CHA types intersected with `CpgNode::allocation_type` | `RapidType` |
+| `Vta` | RTA types intersected with receiver-reaching definition allocations | `VariableType` |
+
+The returned `candidates` are sorted and exact for the represented closed-world
+mode; `target` is set only for a singleton; `topology_edges` is zero. See the
+[component contract](../components/graph/type-refinement.md).
+
 `ResolveConfig` exposes `max_scope_depth`,
 `max_candidates_per_name`, `max_calls`, and `resolve_methods`.
-`Confidence` has seven stable tiers: `ExactInFile`,
-`ExactViaImport`, `ExactViaBinding`, `BareNameUnique`,
-`BareNameAmbiguous`, `External`, and `Unresolved`. Only the first four
-return `true` from `creates_topology()`.
+`Confidence` has ten stable tiers. C1 uses `ExactInFile`, `ExactViaImport`,
+`ExactViaBinding`, `BareNameUnique`, `BareNameAmbiguous`, `External`, and
+`Unresolved`; immutable type refinement adds `ClassHierarchy`, `RapidType`, and
+`VariableType`. `ExactInFile`, `ExactViaImport`, `ExactViaBinding`,
+`ClassHierarchy`, `RapidType`, `VariableType`, and `BareNameUnique` return
+`true` from `creates_topology()`, but only the four C1 tiers are materialized by
+`resolve_calls`; `devirtualize` emits no edges.
 
 `CallResolution` records `callee_name`, `scope`, `confidence`,
 `target`, retained `candidates`, the full `candidate_count`, and
@@ -1318,6 +1343,9 @@ pub struct CpgNode {
     pub kind: CpgNodeKind,
     pub range: SourceRange,
     pub text: Option<Arc<str>>,
+    pub message_kind: Option<MsgKind>,
+    pub lock_kind: Option<LockKind>,
+    pub allocation_type: Option<TypeInfo>,
     pub properties: FxHashMap<PropertyKey, PropertyValue>,
     pub children: SmallVec<[NodeId; 4]>,
     pub parent: Option<NodeId>,
@@ -1330,6 +1358,9 @@ pub struct CpgNode {
 | `kind` | [`CpgNodeKind`](#cpgnodekind) | The node's tagged variant + payload. |
 | `range` | [`SourceRange`](#sourcerange) | Byte/line/column span in source. |
 | `text` | `Option<Arc<str>>` | Verbatim source text (terminals). |
+| `message_kind` | `Option<MsgKind>` | Frontend-normalized channel action, orthogonal to syntax kind. |
+| `lock_kind` | `Option<LockKind>` | Frontend/adapter-normalized lock action, orthogonal to syntax kind. |
+| `allocation_type` | `Option<TypeInfo>` | Frontend-normalized nominal type allocated by this expression. |
 | `properties` | `FxHashMap<PropertyKey, PropertyValue>` | Extra metadata. |
 | `children` | `SmallVec<[NodeId; 4]>` | AST child ids (source order). |
 | `parent` | `Option<NodeId>` | AST parent id. |
@@ -1340,6 +1371,9 @@ pub struct CpgNode {
 |--------|-----------|-------|
 | `new` | `fn new(id: NodeId, kind: CpgNodeKind, range: SourceRange) -> Self` | Constructor. |
 | `with_text` | `fn with_text(self, text: impl Into<Arc<str>>) -> Self` | Builder: set source text. |
+| `with_message_kind` | `fn with_message_kind(self, kind: MsgKind) -> Self` | Builder: set normalized channel semantics. |
+| `with_lock_kind` | `fn with_lock_kind(self, kind: LockKind) -> Self` | Builder: set normalized lock semantics. |
+| `with_allocation_type` | `fn with_allocation_type(self, type_info: TypeInfo) -> Self` | Builder: set normalized constructor type. |
 | `with_property` | `fn with_property(self, key: PropertyKey, value: PropertyValue) -> Self` | Builder: add a property. |
 | `with_child` | `fn with_child(self, child: NodeId) -> Self` | Builder: append a child id. |
 | `with_parent` | `fn with_parent(self, parent: NodeId) -> Self` | Builder: set the parent id. |

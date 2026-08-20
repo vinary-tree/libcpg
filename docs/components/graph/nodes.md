@@ -31,6 +31,8 @@ pub struct CpgNode {
     pub message_kind: Option<MsgKind>,
     /// Typed lock semantics for a synchronization call, if any.
     pub lock_kind: Option<LockKind>,
+    /// Nominal constructor result, when normalized.
+    pub allocation_type: Option<TypeInfo>,
     /// Extra key/value metadata.
     pub properties: FxHashMap<PropertyKey, PropertyValue>,
     /// AST children, in source order.
@@ -41,7 +43,8 @@ pub struct CpgNode {
 ```
 
 Construct nodes with `CpgNode::new(id, kind, range)` and refine them with the
-chainable builders `with_text`, `with_message_kind`, `with_lock_kind`, `with_property`,
+chainable builders `with_text`, `with_message_kind`, `with_lock_kind`,
+`with_allocation_type`, `with_property`,
 `with_child`, and `with_parent`:
 
 ```rust
@@ -63,6 +66,12 @@ analysis consumes it. See the [channel-topology component](channel-topology.md).
 `lock_kind` likewise preserves `Call` structure while a semantic adapter records
 shared/exclusive acquisition or release. See the
 [deadlock-analysis component](deadlock-analysis.md).
+
+`allocation_type` preserves the exact nominal constructor result while the
+syntax remains `Call`. JavaScript/TypeScript `new` and Java object creation are
+normalized from typed grammar fields; downstream CHA/RTA/VTA analysis never
+reparses node text. Legacy or unsupported input leaves the field `None`. See
+[virtual-call type refinement](type-refinement.md).
 
 When you add a node to a graph with `add_node`, the graph assigns the real
 [`NodeId`](#nodeid) and overwrites the placeholder you passed — so `NodeId::new(0)`

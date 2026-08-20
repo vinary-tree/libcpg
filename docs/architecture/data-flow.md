@@ -109,6 +109,27 @@ records. Running this stage before the DFG activates its existing parameter and
 return-value construction without guessing call topology. The option defaults
 to `false`, so prior construction shape is unchanged.
 
+#### Optional post-C1 virtual-call type refinement
+
+After the graph carries nominal ownership, `Inherits`/`Implements`, receiver
+types, and normalized constructor evidence, callers can pass the C1 report to
+[`devirtualize`](../components/graph/type-refinement.md). The immutable
+feature-free pass computes one of three represented closed-world target sets:
+CHA over compatible concrete subtypes, RTA over allocated compatible types, or
+VTA over allocated types found in definitions reaching this receiver.
+
+![Type evidence flows through heap-backed hierarchy, dispatch, and definition machines without changing the CPG.](../diagrams/type-refinement-pipeline.svg)
+
+The result replaces out-of-graph candidates and sets a target only for a
+singleton; it emits no topology. This step is not part of automatic builder
+construction because its closed-world assumption is a caller policy. See
+[ADR-0052](../design/0052-closed-world-type-refinement.md) and
+[Usage 25](../usage/25-virtual-call-type-refinement.md).
+
+This subsection is adjacent to C1 to show the dependency between reports, not
+to place VTA before data flow. CHA/RTA can run once their typed evidence exists;
+VTA requires Stage 4's DFG and is normally invoked after the builder returns.
+
 ### Stage 4 — DFG extraction
 
 `DfgExtractor` adds [`DataFlow`](../GLOSSARY.md#data-flow-graph-dfg) edges. Its strategy is **[AST-ordered reaching definitions](../GLOSSARY.md#ast-ordered-reaching-definitions)** — a single flow-sensitive sweep over AST nodes in source order — **not** [SSA](../GLOSSARY.md#static-single-assignment-ssa) and **not** a classical CFG fixed point. (Two earlier CFG-based approaches remain in the source under `#[cfg(any())]`, never compiled, as an executable record of why they failed: nested-expression identifier uses are not CFG nodes, so a CFG-keyed reaching set never reached them.)

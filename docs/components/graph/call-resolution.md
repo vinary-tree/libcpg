@@ -57,8 +57,8 @@ the standalone table.
 
 ## Evidence tiers
 
-`Confidence` defines the complete evidence classification. The score is a downstream
-ranking signal; `creates_topology` is the authoritative emission boundary.
+The table below defines the C1 evidence classification. The score is a
+downstream ranking signal; C1's unique-target tiers are its emission boundary.
 
 | Tier | Score | Evidence | Creates topology? |
 |---|---:|---|:---:|
@@ -69,6 +69,11 @@ ranking signal; `creates_topology` is the authoritative emission boundary.
 | `BareNameAmbiguous` | $`0.3`$ | At least two in-graph functions have that name. | **no** |
 | `External` | $`0.0`$ | A visible import names a function absent from this CPG. | **no** |
 | `Unresolved` | $`0.0`$ | The AST exposes no supported unique evidence. | **no** |
+
+The successor [virtual-call type-refinement component](type-refinement.md)
+adds `ClassHierarchy` (0.75), `RapidType` (0.80), and `VariableType` (0.85).
+Those tiers can identify a represented closed-world singleton, but the
+immutable `devirtualize` API does not itself materialize topology.
 
 The stable edge labels are the snake-case tier names: `exact_in_file`,
 `exact_via_import`, `exact_via_binding`, and `bare_name_unique`. Ambiguous,

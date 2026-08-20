@@ -193,6 +193,24 @@ recorded or mutated. These controls bound resolver work without weakening the
 evidence boundary: ambiguous, external, and unresolved calls never create
 topology.
 
+### Virtual-call type refinement: finite graph admission
+
+[`devirtualize`](../components/graph/type-refinement.md) deliberately has no
+silent depth or candidate cap: CHA/RTA/VTA return exact sets for the finite
+represented graph. All hierarchy, owner, and definition traversals use heap
+worklists with cycle sets, so deep hostile input cannot exhaust native call
+frames. Ordered indices and dispatch sets can nevertheless grow with admitted
+nodes, edges, method-name multiplicity, and definition subtrees.
+
+At an untrusted hand-built or deserialized boundary, cap aggregate CPG nodes,
+edges, nominal-name bytes, methods per name, and AST/DFG edges before calling
+the analysis. Prefer CHA when allocation completeness cannot be defended; RTA
+and VTA trade broader represented recall for stronger closed-world assumptions,
+not for an intrinsic resource ceiling. The analysis borrows the CPG immutably
+and emits no edges, preventing a poisoned refinement from silently rewriting
+the shared evidence substrate. See the dedicated
+[security boundary](17-type-refinement-boundary.md).
+
 ## IFDS/IDE summaries: whole-program and recursion caps
 
 [`solve_summaries`](../components/graph/ifds-ide-framework.md) validates the

@@ -32,10 +32,12 @@ The `serde` feature expands to `["dep:serde", "petgraph/serde-1"]` — it pulls 
 Analysis result types include `ExprKey` and `ExprFacts`; their expression roots
 serialize through CEK1 rather than a recursive Serde visitor.
 
-`CpgNode.message_kind` and `CpgNode.lock_kind` are optional typed concurrency
-metadata. Both fields deserialize with a `None` default, so snapshots produced
-before either field existed remain readable. When present, the enum value is
-preserved exactly across a serde round trip.
+`CpgNode.message_kind`, `CpgNode.lock_kind`, and `CpgNode.allocation_type` are
+optional typed semantic metadata. All three fields deserialize with a `None`
+default, so snapshots produced before they existed remain readable. When
+present, enum values and the allocation `TypeInfo` are preserved exactly across
+a serde round trip. Allocation metadata supports RTA/VTA but does not imply
+complete hierarchy or library coverage.
 
 ---
 

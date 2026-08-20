@@ -47,15 +47,18 @@ pub struct CpgNode {
     pub text: Option<Arc<str>>,          // original source slice, for terminals
     pub message_kind: Option<MsgKind>,   // typed channel operation, if any
     pub lock_kind: Option<LockKind>,     // typed lock operation, if any
+    pub allocation_type: Option<TypeInfo>, // nominal constructor result, if any
     pub properties: FxHashMap<PropertyKey, PropertyValue>,
     pub children: SmallVec<[NodeId; 4]>, // AST child ids (inline for small arity)
     pub parent: Option<NodeId>,          // AST parent
 }
 ```
 
-`message_kind` and `lock_kind` are orthogonal semantic annotations: a channel
-send or lock acquisition can remain a `Call` while feature-free concurrency
-analyses consume typed evidence without parsing source text. Convenience
+`message_kind`, `lock_kind`, and `allocation_type` are orthogonal semantic
+annotations: a channel send, lock acquisition, or constructor can remain a
+`Call` while feature-free analyses consume typed evidence without parsing
+source text. JavaScript/TypeScript `new` and Java object creation populate the
+nominal allocation field; unsupported frontends leave it `None`. Convenience
 methods layer over the fields: `name() -> Option<&str>` (the bound name for the
 kinds that have one), and the predicates `is_declaration`, `is_statement`,
 `is_expression`, `is_control_flow`, `is_error`.

@@ -109,6 +109,9 @@ PDG). A query can therefore mix syntax, control flow, and data flow freely.
 - **Vulnerability extrapolation** — feature-free ranking from a labeled seed
   through shared-vocabulary PDG WL cosine and bounded relaxed VF2 confirmation,
   with deterministic order and explicit incomplete-result evidence.
+- **Virtual-call type refinement** — feature-free immutable CHA/RTA/VTA target
+  sets over typed receivers, hierarchy edges, normalized allocations, and
+  reaching definitions, with a tested monotone precision lattice.
 - **Projection centrality** — deterministic PageRank variants, vertex/edge
   betweenness, eigenvector, Katz, closeness, harmonic, HITS, and Burt
   structural-hole scores with explicit iteration and traversal budgets.

@@ -99,6 +99,13 @@ normalized to the same shape. Dynamic Python/Ruby attributes remain accesses
 without invented declarations. The resulting language-neutral member topology
 is documented in [DFG extraction](../components/builder/dfg.md#complex-l-values-and-declaration-resolution).
 
+A fourth invariant preserves constructor semantics. JavaScript/TypeScript
+`new_expression` reads the grammar's typed `constructor` child and Java
+`object_creation_expression` reads `type`; the resulting `TypeInfo` is stored in
+`CpgNode::allocation_type` while the node remains `Call`. RTA/VTA therefore
+consume normalized evidence without parsing source text. Other frontends leave
+the optional field absent until they provide a typed grammar mapping.
+
 For Rust specifically, the grammar's `range_expression` becomes semantic
 `BinaryOp("..")` / `BinaryOp("..=")`, and an identifier under a
 `for_expression`'s `pattern` field becomes a `Variable`; iterator and body

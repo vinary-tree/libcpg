@@ -1,0 +1,62 @@
+@startuml
+!include _libcpg-theme.iuml
+title Closed-world virtual-call type refinement
+
+skinparam backgroundColor #FCFCFC
+skinparam component {
+  BorderColor #495057
+}
+skinparam note {
+  BackgroundColor #F1F3F5
+  BorderColor #495057
+}
+
+component "immutable CodePropertyGraph\nAST · DFG · types · hierarchy" as CPG #DBE4FF
+component "C1 CallGraphResolution\ncallee names · scopes · candidates" as C1 #E5DBFF
+component "typed evidence index\nunique nominals · concrete types\nmethods · allocations" as INDEX #C3FAE8
+component "hierarchy worklist\nInherits + Implements\nsubtype closure" as CHA #74C0FC
+component "dispatch worklist\nown override or inherited defaults" as DISPATCH #74C0FC
+component "RTA intersection\nrepresented allocations" as RTA #FFF3BF
+component "VTA definition machine\nDefUse · ReachingDef · UseDef\nallocation subtrees" as VTA #FFE8CC
+component "sorted target set\nzero · singleton · ambiguous" as TARGETS #D3F9D8
+component "immutable CallGraphResolution\ntyped confidence · topology_edges = 0" as REPORT #D3F9D8
+component "unchanged C1 record" as UNCHANGED #FCC2D7
+
+CPG --> INDEX
+CPG --> CHA
+CPG --> VTA
+C1 --> INDEX
+INDEX --> CHA : exact receiver type
+INDEX --> DISPATCH : methods by type + name
+CHA --> RTA : compatible concrete types
+RTA --> VTA : allocated compatible types
+CHA --> TARGETS : CHA mode
+RTA --> TARGETS : RTA mode
+VTA --> TARGETS : VTA mode
+DISPATCH --> TARGETS
+TARGETS --> REPORT
+C1 --> UNCHANGED : non-method or missing/ambiguous type
+UNCHANGED --> REPORT
+
+note bottom of INDEX
+  Grammar knowledge ends at allocation_type.
+  The analysis never reparses source text.
+end note
+
+note bottom of REPORT
+  Singleton evidence is returned out of graph.
+  Edge materialization is a separate caller policy.
+end note
+
+legend bottom
+|= Colour |= Meaning |
+|<#DBE4FF>| immutable graph evidence |
+|<#E5DBFF>| prior C1 resolution evidence |
+|<#C3FAE8>| deterministic typed index |
+|<#74C0FC>| heap-backed hierarchy/dispatch machines |
+|<#FFF3BF>| whole-graph allocation filtering |
+|<#FFE8CC>| receiver-local assignment filtering |
+|<#D3F9D8>| exact represented result |
+|<#FCC2D7>| fail-closed unchanged boundary |
+endlegend
+@enduml

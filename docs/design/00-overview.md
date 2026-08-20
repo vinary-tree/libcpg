@@ -95,8 +95,9 @@ alternatives is folklore, and a decision without its costs is marketing.
 | [0049 — Composed cryptographic API misuse](0049-composed-cryptographic-api-misuse.md) | Compile CrySL-style call order and positional constraints onto shared typestate, literal-source taint, and stack-safe provenance machines. | Accepted |
 | [0050 — Composed secret and access-policy analysis](0050-composed-secret-and-access-policy-analysis.md) | Qualify typed secret literals before shared taint propagation and specialize exact missing-check populations for typed authN/authZ guards. | Accepted |
 | [0051 — Evidence-bounded vulnerability extrapolation](0051-evidence-bounded-vulnerability-extrapolation.md) | Rank seed-related function PDGs with joint-vocabulary WL cosine and explicitly bounded relaxed VF2 confirmation. | Accepted |
+| [0052 — Closed-world virtual-call type refinement](0052-closed-world-type-refinement.md) | Refine C1 method candidates through immutable CHA/RTA/VTA evidence while preserving typed allocations at the frontend boundary. | Accepted |
 
-These fifty-one are not independent. ADR-0001 fixes the substrate that all analyses
+These fifty-two are not independent. ADR-0001 fixes the substrate that all analyses
 write onto; ADR-0002 and ADR-0005 together explain how a language reaches that
 substrate and what you must switch on to get there; ADR-0003 and ADR-0004 are
 two analyses *over* the substrate (one always-on, one feature-gated) that each
@@ -228,6 +229,10 @@ ADR-0048 composes ADR-0004's bounded stack-safe VF2 engine, ADR-0034's
 summary-based taint/null flow, ADR-0043's typestate worklist, and ADR-0011's
 interval domain. It treats templates as data, intersects structural and
 semantic evidence, and preserves every missing, contradictory, or capped fact.
+ADR-0052 extends ADR-0006 without weakening its topology boundary: frontend-
+normalized allocation metadata, exact nominal identity, subtype/implementation
+edges, and reaching definitions feed deterministic heap worklists that return
+monotone closed-world candidate sets without graph mutation.
 
 ![Module architecture of libcpg, showing the graph core and the analysis modules layered over it](../diagrams/module-architecture.svg)
 
@@ -239,7 +244,7 @@ semantic evidence, and preserves every missing, contradictory, or capped fact.
   (`0001`…). Numbers are never reused; a reversed decision is marked
   *Superseded* and a new record supersedes it, so history stays legible.
 - **Status lifecycle.** `Proposed → Accepted → (Superseded by NNNN | Deprecated)`.
-  All forty-seven current records are **Accepted** and reflect the shipped `v0.1.1`
+  All fifty-two current records are **Accepted** and reflect the shipped `v0.1.1`
   code.
 - **Grounding.** Every claim here is traceable to source: the
   [`Cargo.toml`](../engineering/01-build-and-features.md) feature block, the

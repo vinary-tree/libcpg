@@ -304,6 +304,9 @@ development, or jump to the layer you need:
     Joint-vocabulary PDG WL histograms, bounded relaxed VF2 confirmation,
     deterministic total ranking, and typed omissions define advisory analogues
     of one caller-labeled vulnerable function.
+42. **[42 — Closed-world virtual-call type refinement](42-closed-world-type-refinement.md).**
+    Exact nominal identity, represented subtype closure, allocation filtering,
+    and receiver-reaching assignments define monotone CHA/RTA/VTA target sets.
 
 The later chapters define deterministic projection structure, architecture
 metrics, inspectable evidence, and their interpretation limits.

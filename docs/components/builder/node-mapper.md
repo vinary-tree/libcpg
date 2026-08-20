@@ -84,6 +84,12 @@ argument→parameter machinery fires). A mapper may also attach an orthogonal
 without changing those structural anchors. Unrecognised kinds degrade to `Unknown { kind }` rather
 than failing — construction never aborts on an unfamiliar node.
 
+Constructor normalization is also orthogonal. `allocation_type` reads only
+typed grammar fields: `constructor` on JavaScript/TypeScript `new_expression`
+and `type` on Java `object_creation_expression`. The structural result remains
+`CpgNodeKind::Call`; feature-free RTA/VTA consumes the attached `TypeInfo` and
+never reparses source. Unsupported rules and languages return `None`.
+
 ### Rust range and `for`-binding normalization
 
 The Rust grammar represents `0..x` and `0..=x` with the named

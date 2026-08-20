@@ -22,7 +22,7 @@ think to write down.
 
 | Kind | Count | Where |
 | --- | ---: | --- |
-| Maximal-matrix library tests | 1,141 | inline `#[cfg(test)] mod …` next to the code; includes examples and properties |
+| Maximal-matrix library tests | 1,188 | inline `#[cfg(test)] mod …` next to the code; includes examples and properties |
 | Public-API integration tests | 21 | `tests/integration.rs` |
 | Malformed-input robustness tests | 5 | `tests/robustness.rs` |
 | SCCP public/parser integration tests | 3 | `tests/sccp_integration.rs` |
@@ -62,8 +62,10 @@ think to write down.
 | API-usage/temporal public/parser integration tests | 2 | `tests/api_usage_mining_integration.rs` |
 | CWE-template public/parser integration tests | 2 | `tests/cwe_templates_integration.rs` |
 | Crypto-misuse public/parser integration tests | 2 | `tests/crypto_misuse_integration.rs` |
-| **Executable test cases** | **1,274** | measured by the all-features test inventory: 1,152 library and 122 integration/robustness tests; excludes rustdoc examples |
-| `proptest!` blocks (subset of the library/robustness rows) | 87 | exact source-level macro count in `src/` and `tests/` |
+| Virtual-call type-refinement public integration tests | 2 | `tests/devirtualization_integration.rs` |
+| Virtual-call type-refinement stack-safety tests | 1 | `tests/devirtualization_stack_safety.rs` |
+| **Executable test cases** | **1,317** | measured by the all-features test inventory: 1,188 library and 129 integration/robustness tests; excludes rustdoc examples |
+| `proptest!` blocks (subset of the library/robustness rows) | 91 | exact source-level macro count in `src/` and `tests/` |
 
 The maximal-matrix library count is up from **99** inline tests and **zero**
 property tests before this work.
@@ -81,10 +83,10 @@ on the features enabled:
 
 | Command | Lib tests | Notes |
 | --- | ---: | --- |
-| `cargo test` | 778 | `default = []`: the feature-free library surface, including typestate, bug detectors, population anomaly inference, clone/feasibility advisories, API-usage/temporal mining, and declarative CWE templates |
-| `cargo test --features "full rholang metta"` | 1,141 | the maximal library matrix, including the Mode-B mappers, session sketches, typestate, bug detectors, population/clone/feasibility/API-usage/CWE advisories, named temporal properties, and evidence-aware complexity |
+| `cargo test` | 817 | `default = []`: the feature-free library surface, including type refinement, typestate, bug detectors, population anomaly inference, clone/feasibility advisories, API-usage/temporal mining, and declarative CWE templates |
+| `cargo test --features "full rholang metta"` | 1,188 | the maximal library matrix, including the Mode-B mappers, session sketches, type refinement, typestate, bug detectors, population/clone/feasibility/API-usage/CWE advisories, named temporal properties, and evidence-aware complexity |
 
-The feature-free 778 exercise the graph model, deterministic multi-file merge
+The feature-free 817 exercise the graph model, deterministic multi-file merge
 and import linkage, exact dominator/post-dominator,
 natural-loop, monotone data-flow, IFDS/IDE procedure summaries,
 interprocedural effect/constant, taint, and maybe-null summaries, variable-liveness/dead-store,
@@ -184,6 +186,7 @@ The invariants fall into complementary families.
 | **Cryptographic API misuse** | one 128-case property requires complete-report determinism across local cap selections; examples cover MD5, ECB, fixed IV, literal-key taint, secure-random AES-GCM, forbidden post-finalization order, invalid rules, every local cap, serde, graph immutability, parsed Rust evidence, and 100,000 definition levels on 64 KiB |
 | **Secret flow / access policy** | three 128-case properties require bounded entropy and complete-report determinism; paired examples cover high-entropy and binding-hinted flows, positional exclusion, exact 4/5 access-guard support, unrelated-guard rejection, invalid/capped evidence, serde, graph immutability, parsed Rust PDG evidence, and two 100,000-node flat machines on 64 KiB |
 | **Vulnerability extrapolation** | a 256-case shared-WL campaign checks relabeling invariance and symmetry; a 128-case population campaign checks deterministic total rankings and bounded scores; examples cover the cross-graph rank-alias regression, a planted near duplicate, every invalid/capped issue, serde, immutable public/parser-built PDGs, the runnable example, and 100,000 AST nodes on 64 KiB |
+| **Virtual-call type refinement** | a 128-case campaign checks hierarchy-edge insertion determinism and exact $`VTA\subseteq RTA\subseteq CHA`$ candidate sets; examples cover overrides, inherited/default methods, empty allocation sets, `TypeOf`, def-use assignments, ambiguous names, cyclic hierarchies, serde, JavaScript/TypeScript/Java allocations, immutable C1 integration, and 100,000 hierarchy levels on 256 KiB |
 | **Function CFG scope** | the reachable CFG view is invariant under node, edge, and recorded-exit insertion permutations; call edges never enter the view; dense entry/exit identifiers map back to the same stable nodes |
 | **CFG extraction machine** | one comprehensive fixture covers every typed continuation and all eight config combinations; three 192-case campaigns require exact edge-id/order/kind/label and entry/exit equality with the bounded former-recursive equations on well-formed and arbitrarily corrupted ASTs, plus exact invariance under reversed non-AST insertion; examples cover cycles, sharing, terminators, nested loop/try state, idempotency, and degenerate forms; a public parser-built depth-100,000 CFG completes on 256 KiB |
 | **Dominance** | CHK immediate dominators equal `petgraph::algo::dominators::simple_fast` under edge permutations; post-dominators and control edges equal the former PDG oracle; `PdgBuilder` emits exactly `PostDominatorTree::control_dependence_edges`; a 25,000-node path is stack-safe |

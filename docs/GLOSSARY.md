@@ -268,13 +268,27 @@ A score in $`[0, 1]`$ that a detected [design pattern](#design-pattern) attaches
 
 ### Confidence (call resolution)
 
-The evidence tier attached to one `CallResolution`: `ExactInFile`,
-`ExactViaImport`, `ExactViaBinding`, `BareNameUnique`,
-`BareNameAmbiguous`, `External`, or `Unresolved`. Only the first four
-tiers identify one unique in-graph function and therefore create
-[call-graph](#call-graph) topology. The remaining tiers stay in the
-out-of-graph result so ambiguity can never invent recursion or value flow. See
-[`components/graph/call-resolution.md`](components/graph/call-resolution.md).
+The evidence tier attached to one `CallResolution`. C1 produces
+`ExactInFile`, `ExactViaImport`, `ExactViaBinding`, `BareNameUnique`,
+`BareNameAmbiguous`, `External`, or `Unresolved`; only its first four tiers can
+materialize one definite target. Immutable type refinement additionally returns
+`ClassHierarchy`, `RapidType`, or `VariableType`. A singleton typed set is
+strong enough to name one represented closed-world target, but `devirtualize`
+does not itself create [call-graph](#call-graph) topology. Scores order evidence
+and are not probabilities. See
+[`components/graph/call-resolution.md`](components/graph/call-resolution.md)
+and [`components/graph/type-refinement.md`](components/graph/type-refinement.md).
+
+### CHA / RTA / VTA
+
+**Class-hierarchy analysis (CHA)** admits represented concrete subtypes of a
+declared receiver. **Rapid-type analysis (RTA)** intersects that set with
+represented allocated types. **Variable-type analysis (VTA)** further
+intersects allocations in definitions reaching the receiver. libcpg's RTA is
+a closed-world allocation filter rather than whole-program reachable-method
+discovery, and its VTA is assignment-type refinement rather than a full
+points-to analysis. See
+[`theory/42-closed-world-type-refinement.md`](theory/42-closed-world-type-refinement.md).
 
 ### Confidence (complexity evidence)
 

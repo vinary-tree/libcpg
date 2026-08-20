@@ -110,6 +110,8 @@ Grouped by subject. Each row: the source (its `.svg` sibling is embedded by the 
 | `security-policy-qualification.puml` | two-lane activity/decision flow | literal qualification and access-guard population inference → complete/advisory or explicitly incomplete interpretation | design/0050, theory/40, scientific/45, security/15 |
 | `vulnerability-extrapolation-pipeline.puml` | component/evidence flow | labeled function + PDG projections → joint-vocabulary WL cosine → bounded relaxed VF2 → ranked report and typed issues | architecture/data-flow, components/graph/vulnerability-extrapolation, design/0051, theory/41 |
 | `vulnerability-extrapolation-ranking.puml` | activity/decision flow | candidate/cap admission → WL/VF2 scoring → deterministic retained prefix → completeness and manual review | design/0051, theory/41, scientific/46, security/16 |
+| `type-refinement-pipeline.puml` | component/evidence flow | immutable CPG + C1 record → typed index → hierarchy/dispatch/allocation/definition worklists → immutable CHA/RTA/VTA resolution | architecture/data-flow, components/graph/type-refinement, design/0052, theory/42 |
+| `type-refinement-lattice.puml` | precision-lattice flow | CHA compatible types → RTA allocation intersection → VTA receiver-assignment intersection → zero/singleton/ambiguous targets | design/0052, theory/42, scientific/47, security/17 |
 
 ### Control flow, data flow, dependence
 | Source | Type | Depicts | Embedded by |

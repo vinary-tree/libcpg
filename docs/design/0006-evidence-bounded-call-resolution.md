@@ -36,6 +36,10 @@ When enabled, resolution runs after the CFG and before the DFG.
 
 The complete tier scores, emission matrix, caps, and pseudocode are in the
 [call-resolution component guide](../components/graph/call-resolution.md).
+Closed-world hierarchy/allocation/assignment refinement is a separate immutable
+successor decision in
+[ADR-0052](0052-closed-world-type-refinement.md); it does not weaken this C1
+materialization boundary.
 
 ## Consequences
 
