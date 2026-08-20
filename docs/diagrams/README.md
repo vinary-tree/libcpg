@@ -1,6 +1,6 @@
 # Diagram catalog
 
-Every figure in the `libcpg` documentation is a **committed source** (`.puml` for PlantUML, `.dot` for Graphviz) rendered to a **committed `.svg`** that the Markdown pages embed. Sources are version-controlled so figures are reproducible and reviewable; SVGs are committed so they render on GitHub (which does not render PlantUML/Graphviz inline). This directory holds all 98 figures plus the shared theme.
+Every figure in the `libcpg` documentation is a **committed source** (`.puml` for PlantUML, `.dot` for Graphviz) rendered to a **committed `.svg`** that the Markdown pages embed. Sources are version-controlled so figures are reproducible and reviewable; SVGs are committed so they render on GitHub (which does not render PlantUML/Graphviz inline). This directory holds all 100 figures plus the shared theme.
 
 ## Conventions
 
@@ -104,6 +104,8 @@ Grouped by subject. Each row: the source (its `.svg` sibling is embedded by the 
 | `expression-key-flat-arena.puml` | component/storage/identity/codec flow | CPG expressions → explicit postorder extraction → shared node/operand arena → exact structural classes → bounded CEK1/Serde persistence | components/graph/dataflow-framework, components/graph/expression-analysis, design/0041, scientific/36, usage/05, security/01 |
 | `cwe-template-pipeline.puml` | component/evidence flow | declarative roles/shapes → bounded stack-safe VF2 sites plus shared taint/null/typestate/interval/literal evidence → qualified immutable CWE report | architecture/data-flow, components/graph/cwe-template-analysis, design/0048, theory/38, security/13 |
 | `cwe-evidence-qualification.puml` | activity/decision flow | validated request → bounded structural and semantic evidence → candidate/no-match → complete or explicitly incomplete interpretation | design/0048, theory/38, scientific/43, security/13 |
+| `crypto-misuse-pipeline.puml` | component/evidence flow | declarative crypto policy → shared typestate/taint plus explicit argument provenance → canonical advisory findings | architecture/data-flow, components/graph/crypto-misuse-analysis, design/0049, theory/39 |
+| `crypto-evidence-qualification.puml` | activity/decision flow | policy validation → three composed evidence branches → complete/advisory or explicitly incomplete interpretation | design/0049, theory/39, scientific/44, security/14 |
 
 ### Control flow, data flow, dependence
 | Source | Type | Depicts | Embedded by |

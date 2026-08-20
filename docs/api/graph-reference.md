@@ -305,7 +305,9 @@ AST/DFG evidence. They never scan retained source text:
 | `analyze_null_flows_report` | `fn(&CodePropertyGraph, &CallGraphResolution, &IfdsCaps) -> NullAnalysis` | Ordered maybe-null dereference candidates with summaries and completeness evidence. |
 | `analyze_null_flows` | `fn(&CodePropertyGraph, &CallGraphResolution, &IfdsCaps) -> Vec<NullFlow>` | Convenience finding vector with the same positive evidence boundary. |
 
-`TaintCatalog` owns ordered `sources`, `sinks`, `sanitizers`, and `externals`.
+`TaintCatalog` owns ordered call `sources`, categorical `literal_sources`,
+`sinks`, `sanitizers`, and `externals`. `LiteralSourceRule` classifies a typed
+`LiteralKind` category without copying or matching its value.
 Rules select call paths with `Pattern::{Exact, Segment, Suffix, Substring}` and
 use open `Arc<str>` classes; external calls use
 `ExternalModel::{Passthrough, Havoc, Source, Sink, Sanitizer}`. Every finding
@@ -575,6 +577,31 @@ See the [component guide](../components/graph/cwe-template-analysis.md),
 [usage guide](../usage/21-cwe-template-analysis.md),
 [theory](../theory/38-declarative-cwe-query-semantics.md), and
 [security boundary](../security/13-cwe-template-analysis.md).
+
+### Cryptographic API-misuse analysis
+
+The feature-free crypto API composes finite-state call order, typed positional
+constraints, and literal-origin data flow. It does not parse source or mutate
+the graph.
+
+| API/type | Meaning |
+|---|---|
+| `builtin_crypto_rules` | Owned cross-language default policy. |
+| `analyze_builtin_crypto` | Runs the shipped policy. |
+| `analyze_crypto_misuse` | Runs a caller-supplied `CryptoRuleSet`. |
+| `CryptoArgumentRule` | Stable name, typed call patterns, and zero-based argument positions. |
+| `CryptoRuleSet` | Property FSM, weak-hash/mode/IV/key rules, random sources, and forbidden names. |
+| `CryptoAnalysisConfig` | Local call/origin bounds plus delegated `IfdsCaps`. |
+| `CryptoFinding` / `CryptoMisuseKind` | Canonical advisory category, site, rule, optional argument, and qualification. |
+| `CryptoEvidence` | Typed call path, literal origins, taint witness, or typestate witness. |
+| `CryptoAnalysisIssue` | Invalid policy, bounded path/call/origin, or qualification evidence. |
+| `CryptoAnalysis` | Findings plus complete typestate/taint reports and aggregate `is_complete()`. |
+| `LiteralPattern` / `LiteralSourceRule` | General categorical literal provenance for `TaintCatalog`. |
+
+See the [component guide](../components/graph/crypto-misuse-analysis.md),
+[usage guide](../usage/22-cryptographic-api-misuse.md),
+[theory](../theory/39-cryptographic-api-misuse.md), and
+[security boundary](../security/14-cryptographic-api-misuse.md).
 
 ### Deterministic graph projections
 

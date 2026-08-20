@@ -292,6 +292,10 @@ development, or jump to the layer you need:
     Bounded structural embeddings intersect shared taint, null-flow,
     typestate, interval, and literal relations to produce qualified advisory
     weakness candidates.
+39. **[39 — Cryptographic API-misuse analysis](39-cryptographic-api-misuse.md).**
+    CrySL-style finite call protocols, positional value constraints,
+    literal-origin key taint, explicit provenance machines, and aggregate
+    completeness semantics define qualified cryptographic misuse evidence.
 
 The later chapters define deterministic projection structure, architecture
 metrics, inspectable evidence, and their interpretation limits.

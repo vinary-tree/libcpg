@@ -19,7 +19,8 @@ never converts incomplete evidence into a security verdict.
 
 ## Decision
 
-1. Separate policy from transfer with `TaintCatalog`. Source and sink classes
+1. Separate policy from transfer with `TaintCatalog`. Call-source, categorical
+   literal-source, and sink classes
    are open `Arc<str>` values.
 2. Restrict matching to `Exact`, `Segment`, `Suffix`, and `Substring` over a
    callee path reconstructed from typed `Identifier` and `MemberAccess` nodes.

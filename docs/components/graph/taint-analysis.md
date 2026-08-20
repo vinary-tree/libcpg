@@ -64,6 +64,7 @@ fn project_catalog() -> TaintCatalog {
             class: "message_bus".into(),
             cwe: None,
         }],
+        literal_sources: vec![],
         sinks: vec![CatalogRule {
             pattern: Pattern::Exact("shell::run".into()),
             class: "command".into(),
@@ -83,6 +84,12 @@ fn project_catalog() -> TaintCatalog {
 (CWE-89), `eval` (CWE-95), `deserialize` (CWE-502), and `path` (CWE-22).
 Classes remain `Arc<str>` values, so consumers can extend or replace the
 catalog without modifying libcpg or selecting a language feature.
+
+`literal_sources` extends the same open provenance lattice to typed literal
+categories. A `LiteralSourceRule` pairs a `LiteralPattern` with a class and
+optional CWE number; it never matches or copies the literal value. The transfer
+engine seeds the represented literal node and propagates that fact through the
+same AST, DFG, call, and summary machinery as call-origin taint.
 
 Classification precedence is sanitizer, source, sink, then resolved/external
 call behavior. A sanitizer therefore cannot accidentally pass argument taint

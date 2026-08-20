@@ -145,6 +145,24 @@ and [`components/graph/cohesion-analysis.md`](components/graph/cohesion-analysis
 
 A single directed graph that merges several program views onto **one shared node set**: the [AST](#abstract-syntax-tree-ast), the [CFG](#control-flow-graph-cfg), the [DFG](#data-flow-graph-dfg), and — on demand — the [PDG](#program-dependence-graph-pdg). Introduced by Yamaguchi et al. [[1]](#references) to express vulnerability queries that need syntax, control, and data flow simultaneously. In `libcpg` the CPG is the type `CodePropertyGraph`, backed by a [petgraph](#petgraph) `DiGraph<CpgNode, CpgEdge>`. See [`theory/01-code-property-graphs.md`](theory/01-code-property-graphs.md).
 
+### Cryptographic API misuse
+
+A violation of a cryptographic library's required call protocol or parameter
+contract, such as a forbidden call order, weak hash, electronic-codebook mode,
+predictable initialization vector, or embedded key. libcpg reports advisory
+represented evidence by composing typestate, literal-origin taint, and typed
+argument provenance. See
+[`theory/39-cryptographic-api-misuse.md`](theory/39-cryptographic-api-misuse.md).
+
+### CrySL
+
+**CrySL** is a specification language for cryptographic API usage rules. A rule
+combines allowed call sequences with constraints on parameters and related
+objects. libcpg adopts that separation of finite-state protocol and value
+constraints but exposes its own language-agnostic Rust data model rather than
+parsing CrySL source. See
+[`design/0049-composed-cryptographic-api-misuse.md`](design/0049-composed-cryptographic-api-misuse.md).
+
 ### Code metrics
 
 Static numerical summaries of type and function structure. The

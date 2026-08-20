@@ -89,6 +89,7 @@ fn catalog() -> TaintCatalog {
             class: "queue_message".into(),
             cwe: None,
         }],
+        literal_sources: vec![],
         sinks: vec![CatalogRule {
             pattern: Pattern::Exact("template::evaluate".into()),
             class: "template_eval".into(),
@@ -111,6 +112,23 @@ Use `TaintCatalog::empty()` when building a policy from scratch. To extend the
 generic policy, create `TaintCatalog::builtin_generic()` and append rules. If
 several rules produce the same class/CWE pair, the most specific match supplies
 confidence. A sanitizer match takes precedence over all other roles.
+
+To model typed embedded material as provenance without matching its contents,
+append a categorical literal source:
+
+```rust
+use libcpg::{LiteralPattern, LiteralSourceRule, TaintCatalog};
+
+let mut catalog = TaintCatalog::empty();
+catalog.literal_sources.push(LiteralSourceRule {
+    pattern: LiteralPattern::String,
+    class: "embedded-material".into(),
+    cwe: Some(798),
+});
+```
+
+The source is the literal node itself. Its value is not copied into
+`TaintFlow`; the canonical witness retains only graph identifiers.
 
 ## 5. Model opaque calls deliberately
 

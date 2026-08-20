@@ -1,0 +1,54 @@
+@startuml
+!include _libcpg-theme.iuml
+title Qualified interpretation of a crypto-misuse report
+
+skinparam backgroundColor #FCFCFC
+skinparam activity {
+  BorderColor #495057
+  DiamondBackgroundColor #FFF3BF
+  DiamondBorderColor #F08C00
+}
+
+start
+:Validate finite policy and\ncanonical resource bounds; <<#DBE4FF>>
+if (Policy structurally valid?) then (yes)
+  fork
+    :Run call-order PropertyFsm\nthrough typestate; <<#D3F9D8>>
+  fork again
+    :Run categorical literal-source\ntaint to governed key sinks; <<#FFF3BF>>
+  fork again
+    :Trace governed arguments with\nexplicit heap provenance queues; <<#E5DBFF>>
+  end fork
+  :Merge weak-hash, ECB, predictable-IV,\nhardcoded-key, and call-order evidence; <<#74C0FC>>
+  if (Any branch capped or issued?) then (yes)
+    :Retain findings and every typed issue; <<#FCC2D7>>
+    :Mark aggregate report incomplete; <<#FFE3E3>>
+    :Forbid a clean-scan interpretation; <<#FFE3E3>>
+  else (no)
+    :Mark aggregate report complete; <<#D3F9D8>>
+    if (Findings present?) then (yes)
+      :Return advisory candidates\nfor contextual review; <<#FFE8CC>>
+    else (no)
+      :Permit only a represented-policy\nno-candidate statement; <<#C3FAE8>>
+    endif
+  endif
+else (no)
+  :Retain policy issues and\nmark report incomplete; <<#FCC2D7>>
+endif
+:Leave literal contents out of findings\nand leave the input CPG unchanged; <<#F1F3F5>>
+stop
+
+legend bottom
+|= Colour |= Meaning |
+|<#DBE4FF>| validated normalized input |
+|<#D3F9D8>| typestate or complete outcome |
+|<#FFF3BF>| taint/data-flow analysis |
+|<#E5DBFF>| explicit stack-safe provenance |
+|<#74C0FC>| composed parameter evidence |
+|<#FCC2D7>| incomplete or invalid evidence |
+|<#FFE3E3>| prohibited negative interpretation |
+|<#FFE8CC>| advisory positive evidence |
+|<#C3FAE8>| qualified no-candidate result |
+|<#F1F3F5>| immutable/confidentiality boundary |
+endlegend
+@enduml

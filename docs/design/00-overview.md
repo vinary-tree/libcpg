@@ -92,6 +92,7 @@ alternatives is folklore, and a decision without its costs is marketing.
 | [0046 — Evidence-bounded clone and feasibility advisories](0046-evidence-bounded-clone-and-feasibility-advisories.md) | Diagnose typed divergences in exact low-edit clone pairs and compose SCCP with path-partitioned intervals for qualified branch/condition findings. | Accepted |
 | [0047 — Evidence-bounded API-usage and temporal mining](0047-evidence-bounded-api-usage-and-temporal-mining.md) | Build centered typed AUGs, infer exact strict-majority fragments, and reuse typestate for named temporal properties with explicit completeness. | Accepted |
 | [0048 — Declarative qualified CWE templates](0048-declarative-qualified-cwe-templates.md) | Intersect bounded VF2 structural sites with shared taint, null-flow, typestate, interval, and literal evidence while retaining explicit completeness. | Accepted |
+| [0049 — Composed cryptographic API misuse](0049-composed-cryptographic-api-misuse.md) | Compile CrySL-style call order and positional constraints onto shared typestate, literal-source taint, and stack-safe provenance machines. | Accepted |
 
 These forty-eight are not independent. ADR-0001 fixes the substrate that all analyses
 write onto; ADR-0002 and ADR-0005 together explain how a language reaches that

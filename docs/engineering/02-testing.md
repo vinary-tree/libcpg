@@ -61,8 +61,9 @@ think to write down.
 | Clone/feasibility public/parser integration tests | 2 | `tests/clone_feasibility_bug_detectors_integration.rs` |
 | API-usage/temporal public/parser integration tests | 2 | `tests/api_usage_mining_integration.rs` |
 | CWE-template public/parser integration tests | 2 | `tests/cwe_templates_integration.rs` |
-| **Executable test cases** | **1,261** | measured by the all-features test inventory: 1,141 library and 120 integration/robustness tests; excludes rustdoc examples |
-| `proptest!` blocks (subset of the library/robustness rows) | 86 | exact source-level macro count in `src/` and `tests/` |
+| Crypto-misuse public/parser integration tests | 2 | `tests/crypto_misuse_integration.rs` |
+| **Executable test cases** | **1,274** | measured by the all-features test inventory: 1,152 library and 122 integration/robustness tests; excludes rustdoc examples |
+| `proptest!` blocks (subset of the library/robustness rows) | 87 | exact source-level macro count in `src/` and `tests/` |
 
 The maximal-matrix library count is up from **99** inline tests and **zero**
 property tests before this work.
@@ -180,6 +181,7 @@ The invariants fall into complementary families.
 | **Clone/feasibility advisories** | independent generated alignment/insertion and exhaustive integer-domain oracles check exact rename/guard evidence and Boolean path partitions; examples cover Type-2/3 pair identity, `9/10` rename support, guard flips, SCCP/interval proof composition, equality/disequality/extrema, every AST/alignment/GED/condition cap and issue, serde, graph immutability, parsed Rust evidence, and 100,000 nodes on 64 KiB |
 | **API-usage/temporal mining** | two 128-case generated oracles check exact strict-majority missing-following-call sites and report equality under CFG insertion permutations; examples cover 19/20 support, argument/receiver/control fragments, graph acyclicity, forbidden transitions, non-accepting exits, every call/identity/CFG/AUG/property boundary, serde, graph immutability, parsed Rust evidence, and 100,000 CFG nodes on 64 KiB |
 | **Declarative CWE templates** | one 128-case property compares complete reports under template and graph-relation insertion permutations; examples cover all ten shipped CWE families and clean counterparts, contradictory integer types, structural caps, serde, graph immutability, parsed Rust vulnerable/sanitized SQL evidence, and 100,000 expression levels on 64 KiB |
+| **Cryptographic API misuse** | one 128-case property requires complete-report determinism across local cap selections; examples cover MD5, ECB, fixed IV, literal-key taint, secure-random AES-GCM, forbidden post-finalization order, invalid rules, every local cap, serde, graph immutability, parsed Rust evidence, and 100,000 definition levels on 64 KiB |
 | **Function CFG scope** | the reachable CFG view is invariant under node, edge, and recorded-exit insertion permutations; call edges never enter the view; dense entry/exit identifiers map back to the same stable nodes |
 | **CFG extraction machine** | one comprehensive fixture covers every typed continuation and all eight config combinations; three 192-case campaigns require exact edge-id/order/kind/label and entry/exit equality with the bounded former-recursive equations on well-formed and arbitrarily corrupted ASTs, plus exact invariance under reversed non-AST insertion; examples cover cycles, sharing, terminators, nested loop/try state, idempotency, and degenerate forms; a public parser-built depth-100,000 CFG completes on 256 KiB |
 | **Dominance** | CHK immediate dominators equal `petgraph::algo::dominators::simple_fast` under edge permutations; post-dominators and control edges equal the former PDG oracle; `PdgBuilder` emits exactly `PostDominatorTree::control_dependence_edges`; a 25,000-node path is stack-safe |

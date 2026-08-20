@@ -661,6 +661,24 @@ See the [component guide](../components/graph/cwe-template-analysis.md),
 [Theory 38](../theory/38-declarative-cwe-query-semantics.md), and
 [Usage 21](../usage/21-cwe-template-analysis.md).
 
+### Cryptographic API-misuse analysis (feature-free)
+
+`analyze_crypto_misuse` follows `CodePropertyGraph + CryptoRuleSet → shared
+typestate + categorical literal-source taint + explicit argument provenance →
+canonical CryptoFinding values`. Call-order semantics remain in `PropertyFsm`;
+hardcoded-key propagation remains in the IFDS-style taint engine; the local
+queue inspects only governed mode, IV/nonce, and algorithm positions.
+
+The aggregate result retains both delegated reports. Policy, call-site, origin,
+and delegated resource boundaries remain explicit, so a partial empty vector
+cannot be interpreted as clean. The path is read-only and feature-free.
+
+![Declarative crypto policy composes three typed evidence paths](../diagrams/crypto-misuse-pipeline.svg)
+
+See the [component guide](../components/graph/crypto-misuse-analysis.md),
+[Theory 39](../theory/39-cryptographic-api-misuse.md), and
+[Usage 22](../usage/22-cryptographic-api-misuse.md).
+
 ### Pattern detection
 
 Two layers, at two feature levels:

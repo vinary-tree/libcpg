@@ -73,6 +73,9 @@
 //! - **API-Usage and Temporal Protocol Mining**: Build centered typed usage
 //!   graphs, infer exact strict-majority fragments, and check named finite-state
 //!   properties through the shared stack-safe typestate engine
+//! - **Cryptographic API Misuse**: Compose CrySL-style call-order properties,
+//!   typed parameter constraints, and literal-origin taint into qualified
+//!   advisory weak-hash, ECB, predictable-IV, and hardcoded-key evidence
 //! - **Pattern Detection**: Detect design patterns using subgraph isomorphism (VF2/VF3)
 //! - **Algorithm Analysis**: Extract algorithm signatures and estimate complexity
 //! - **GNN Support**: Graph neural network message passing for semantic embeddings

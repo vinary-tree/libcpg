@@ -1,0 +1,74 @@
+@startuml
+!include _libcpg-theme.iuml
+title Composed cryptographic API-misuse pipeline
+
+skinparam backgroundColor #FCFCFC
+skinparam component {
+  BorderColor #495057
+}
+skinparam note {
+  BackgroundColor #F1F3F5
+  BorderColor #495057
+}
+
+component "CodePropertyGraph\ntyped AST · CFG · DFG · calls · literals" as CPG #DBE4FF
+component "CryptoRuleSet\nFSM · positional rules · catalogs" as RULES #FFE8CC
+
+package "Delegated engines" #F8F9FA {
+  component "PropertyFsm typestate\nallocation-site call order" as TYPE #D3F9D8
+  component "literal-source taint\nkey argument flow + summaries" as TAINT #FFF3BF
+}
+
+package "Local explicit machines" #F8F9FA {
+  component "callee reconstruction\ntyped syntax + resolution" as PATH #C3FAE8
+  component "heap provenance queue\ndefinitions · AST · DFG" as ORIGIN #E5DBFF
+  component "parameter predicates\nweak hash · ECB · fixed IV/nonce" as PARAM #74C0FC
+}
+
+component "canonical merge\n(site, kind, argument, rule)" as MERGE #D3F9D8
+component "CryptoAnalysisIssue\npolicy · path · calls · origins" as ISSUE #FCC2D7
+component "immutable CryptoAnalysis\nfindings · typestate · taint · issues" as REPORT #FFE3E3
+
+RULES --> TYPE : call-order property
+RULES --> TAINT : literal sources + key sinks
+RULES --> PATH : call patterns
+CPG --> TYPE : CFG + DFG + receiver events
+CPG --> TAINT : AST + DFG + calls + summaries
+CPG --> PATH : callee syntax
+PATH --> ORIGIN : governed call arguments
+CPG --> ORIGIN : definitions + typed predecessors
+ORIGIN --> PARAM : ordered literal/call origins
+RULES --> PARAM : forbidden names + random sources
+TYPE --> MERGE : forbidden transitions
+TAINT --> MERGE : hardcoded-key witnesses
+PARAM --> MERGE : local parameter findings
+PATH --> ISSUE : bounded/cyclic reconstruction
+ORIGIN --> ISSUE : explicit origin cap
+TYPE --> ISSUE : delegated completeness
+TAINT --> ISSUE : delegated completeness
+MERGE --> REPORT
+ISSUE --> REPORT
+
+note bottom of RULES
+  Policy is data. No source parser, regular expression,
+  graph mutation, or duplicate semantic solver is introduced.
+end note
+
+note bottom of REPORT
+  Findings are advisory. A negative represented-domain
+  claim additionally requires is_complete() = true.
+end note
+
+legend bottom
+|= Colour |= Meaning |
+|<#DBE4FF>| normalized CPG evidence |
+|<#FFE8CC>| caller-owned policy |
+|<#D3F9D8>| typestate or canonical composition |
+|<#FFF3BF>| taint/data-flow evidence |
+|<#C3FAE8>| typed call identity |
+|<#E5DBFF>| explicit stack-safe provenance machine |
+|<#74C0FC>| positional parameter semantics |
+|<#FCC2D7>| incomplete or invalid evidence |
+|<#FFE3E3>| immutable advisory report |
+endlegend
+@enduml
