@@ -5,10 +5,15 @@
 //! each complete report and check its [`is_complete`](CweAnalysis::is_complete)
 //! predicate.
 
+mod authz;
 mod crypto;
 mod cwe;
 mod secrets;
 
+pub use authz::{
+    analyze_builtin_authz, analyze_missing_authz, builtin_authz_rules, AuthzAnalysis,
+    AuthzAnalysisConfig, AuthzAnalysisIssue, AuthzFinding, AuthzMutationRule, AuthzRuleSet,
+};
 pub use crypto::{
     analyze_builtin_crypto, analyze_crypto_misuse, builtin_crypto_rules, CryptoAnalysis,
     CryptoAnalysisConfig, CryptoAnalysisIssue, CryptoArgumentRule, CryptoEvidence, CryptoFinding,
