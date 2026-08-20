@@ -14,6 +14,7 @@ pub mod concurrency;
 mod condensation;
 mod cycles;
 pub mod dataflow;
+mod diff;
 mod dominators;
 mod dsm;
 mod effects;
@@ -111,6 +112,12 @@ pub use condensation::{
 };
 
 pub use cycles::{simple_cycles, CycleOptions, CycleSet, MAX_CYCLE_LENGTH, MAX_SIMPLE_CYCLES};
+
+pub use diff::{
+    cpg_diff, ChangeKind, CpgChange, CpgDiff, CpgDiffOptions, CpgElement, DiffEdge, DiffNode,
+    EdgeChangeField, NodeAlignment, NodeChangeField, NodePropertyRecord, MAX_CPG_DIFF_EDGES,
+    MAX_CPG_DIFF_EDITS, MAX_CPG_DIFF_NODES,
+};
 
 pub use dataflow::{
     available_expressions, dead_stores, expression_facts, expression_facts_with_limits, liveness,

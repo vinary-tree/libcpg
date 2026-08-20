@@ -61,6 +61,25 @@ pub struct GedBound {
     pub capped: bool,
 }
 
+/// One exact node correspondence induced by the bipartite GED script.
+///
+/// This remains crate-private because the public GED contract is the symmetric
+/// upper bound. Analyses that need a concrete edit script reuse this assignment
+/// instead of implementing a second aligner.
+#[derive(Debug, Clone, PartialEq)]
+pub(crate) struct GedAlignment {
+    /// Matched `(source, target)` nodes, sorted by source then target id.
+    pub(crate) pairs: Vec<(NodeId, NodeId)>,
+    /// Concrete cost of the retained script.
+    pub(crate) cost: f64,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+struct AssignmentScript {
+    cost: f64,
+    pairs: Vec<(NodeId, NodeId)>,
+}
+
 /// Computes a deterministic bipartite upper bound on graph edit distance.
 ///
 /// Nodes are ordered by stable [`NodeId`]. Assignment costs combine node-kind
@@ -108,14 +127,80 @@ pub fn ged_upper_bound(
         });
     }
 
-    let forward = assignment_script_cost(first, second, options, normalization)?;
-    let reverse = assignment_script_cost(second, first, options, normalization)?;
-    let upper = forward.min(reverse).min(normalization);
+    let forward = assignment_script(first, second, options, normalization)?;
+    let reverse = assignment_script(second, first, options, normalization)?;
+    let upper = forward.cost.min(reverse.cost).min(normalization);
     Ok(GedBound {
         upper,
         normalized: (upper / normalization).clamp(0.0, 1.0),
         capped: false,
     })
+}
+
+/// Returns the deterministic concrete correspondence used by the symmetric
+/// bipartite GED upper bound.
+///
+/// Unlike [`ged_upper_bound`], this operation cannot substitute the legacy
+/// capped surrogate because a scalar similarity contains no correspondence.
+/// The cheaper assignment orientation is normalized to `(source, target)`
+/// pairs; equal-cost scripts use lexicographic pair order. A strictly cheaper
+/// delete-all/insert-all script has no pairs.
+pub(crate) fn ged_alignment(
+    source: &CodePropertyGraph,
+    target: &CodePropertyGraph,
+    options: &GedOptions,
+) -> Result<GedAlignment, AnalysisError> {
+    validate_options(options)?;
+    let cap = options.max_nodes.min(MAX_GED_NODES);
+    let needed = source.node_count().max(target.node_count());
+    if needed > cap {
+        return Err(AnalysisError::BudgetExceeded {
+            analysis: "cpg_diff",
+            unit: "nodes per graph",
+            needed: u64::try_from(needed).unwrap_or(u64::MAX),
+            cap: u64::try_from(cap).unwrap_or(u64::MAX),
+        });
+    }
+
+    let delete_all = delete_all_cost(source, target, options)?;
+    if source.node_count() + target.node_count() == 0 {
+        return Ok(GedAlignment {
+            pairs: Vec::new(),
+            cost: 0.0,
+        });
+    }
+
+    let forward = assignment_script(source, target, options, delete_all)?;
+    let reverse = assignment_script(target, source, options, delete_all)?;
+    let mut reverse_pairs = reverse
+        .pairs
+        .into_iter()
+        .map(|(target_node, source_node)| (source_node, target_node))
+        .collect::<Vec<_>>();
+    reverse_pairs.sort_unstable();
+    let reverse = AssignmentScript {
+        cost: reverse.cost,
+        pairs: reverse_pairs,
+    };
+    let retained = if forward.cost < reverse.cost
+        || (forward.cost == reverse.cost && forward.pairs <= reverse.pairs)
+    {
+        forward
+    } else {
+        reverse
+    };
+
+    if delete_all < retained.cost {
+        Ok(GedAlignment {
+            pairs: Vec::new(),
+            cost: delete_all,
+        })
+    } else {
+        Ok(GedAlignment {
+            pairs: retained.pairs,
+            cost: retained.cost,
+        })
+    }
 }
 
 pub(super) fn legacy_graph_edit_similarity(
@@ -174,12 +259,22 @@ fn delete_all_cost(
     }
 }
 
+#[cfg(test)]
 fn assignment_script_cost(
     source: &CodePropertyGraph,
     target: &CodePropertyGraph,
     options: &GedOptions,
     deletion_upper: f64,
 ) -> Result<f64, AnalysisError> {
+    Ok(assignment_script(source, target, options, deletion_upper)?.cost)
+}
+
+fn assignment_script(
+    source: &CodePropertyGraph,
+    target: &CodePropertyGraph,
+    options: &GedOptions,
+    deletion_upper: f64,
+) -> Result<AssignmentScript, AnalysisError> {
     let mut source_nodes: Vec<_> = source.nodes().collect();
     let mut target_nodes: Vec<_> = target.nodes().collect();
     source_nodes.sort_by_key(|node| node.id);
@@ -196,7 +291,10 @@ fn assignment_script_cost(
 
     let dimension = source_nodes.len() + target_nodes.len();
     if dimension == 0 {
-        return Ok(0.0);
+        return Ok(AssignmentScript {
+            cost: 0.0,
+            pairs: Vec::new(),
+        });
     }
     let max_degree = source_degrees
         .iter()
@@ -254,14 +352,23 @@ fn assignment_script_cost(
             (target_index < target_count).then_some(target_index)
         })
         .collect::<Vec<_>>();
-    Ok(concrete_script_cost(
+    let cost = concrete_script_cost(
         source,
         target,
         &source_nodes,
         &target_nodes,
         &mapping,
         options,
-    ))
+    );
+    let pairs = mapping
+        .iter()
+        .enumerate()
+        .filter_map(|(source_index, target_index)| {
+            target_index
+                .map(|target_index| (source_nodes[source_index].id, target_nodes[target_index].id))
+        })
+        .collect();
+    Ok(AssignmentScript { cost, pairs })
 }
 
 fn total_degree(graph: &CodePropertyGraph, node: NodeId) -> usize {

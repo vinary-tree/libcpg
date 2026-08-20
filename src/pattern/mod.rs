@@ -13,6 +13,7 @@ pub use clones::{
     detect_clones, CloneClass, CloneOptions, CloneType, MAX_CLONE_PAIRS, MAX_CLONE_PDG_NODES,
     MAX_CLONE_VF2_INVOCATIONS,
 };
+pub(crate) use ged::ged_alignment;
 pub use ged::{ged_upper_bound, GedBound, GedOptions, MAX_GED_NODES};
 pub use similarity::{GraphSimilarity, SimilarityMetric};
 pub use vf2::{Vf2Matcher, Vf2State};
