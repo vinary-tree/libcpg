@@ -4,6 +4,7 @@
 //! evidence. Graph-shaped traversal is performed with heap-backed worklists so
 //! source depth and graph depth never consume native call-stack depth.
 
+mod api_mining;
 mod clone_bugs;
 mod deviant;
 mod evidence;
@@ -13,6 +14,15 @@ mod leaks;
 mod missing_check;
 mod uninit;
 
+pub use api_mining::{
+    analyze_api_usage_mining, api_usage_misuses, ApiDataShape, ApiLiteralShape, ApiUsageEdge,
+    ApiUsageEdgeKind, ApiUsageGraph, ApiUsageMiningAnalysis, ApiUsageMiningConfig,
+    ApiUsageMiningIssue, ApiUsageMisuse, ApiUsageMisuseKind, ApiUsageNode, ApiUsageNodeId,
+    ApiUsageNodeKind, ApiUsagePattern, ApiUsagePatternKind, ControlContext, NamedTemporalProperty,
+    TemporalPropertyAnalysis, TemporalPropertyFinding, TemporalPropertyFindingKind,
+    MAX_API_USAGE_CALL_SITES, MAX_API_USAGE_CFG_NODES_PER_SITE, MAX_API_USAGE_GRAPH_EDGES,
+    MAX_API_USAGE_GRAPH_NODES, MAX_TEMPORAL_PROPERTIES,
+};
 pub use clone_bugs::{
     analyze_inconsistent_clones, inconsistent_clone_bugs, CloneBugAnalysis, CloneBugConfig,
     CloneBugIssue, CloneGuardValue, ClonePairEvidence, InconsistentCloneBug, InconsistentCloneKind,
