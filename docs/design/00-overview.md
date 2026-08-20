@@ -97,8 +97,9 @@ alternatives is folklore, and a decision without its costs is marketing.
 | [0051 — Evidence-bounded vulnerability extrapolation](0051-evidence-bounded-vulnerability-extrapolation.md) | Rank seed-related function PDGs with joint-vocabulary WL cosine and explicitly bounded relaxed VF2 confirmation. | Accepted |
 | [0052 — Closed-world virtual-call type refinement](0052-closed-world-type-refinement.md) | Refine C1 method candidates through immutable CHA/RTA/VTA evidence while preserving typed allocations at the frontend boundary. | Accepted |
 | [0053 — Evidence-bounded concurrency bug candidates](0053-evidence-bounded-concurrency-bug-candidates.md) | Compose exact access identity, canonical MHP, and typed locksets into immutable race and RMW-gap witnesses. | Accepted |
+| [0054 — Deterministic CPG ML exports](0054-deterministic-cpg-ml-exports.md) | Canonicalize typed CPG tensors and exact AST terminal paths without an ML runtime, source reparsing, graph mutation, or source-depth recursion. | Accepted |
 
-These fifty-three are not independent. ADR-0001 fixes the substrate that all analyses
+These fifty-four are not independent. ADR-0001 fixes the substrate that all analyses
 write onto; ADR-0002 and ADR-0005 together explain how a language reaches that
 substrate and what you must switch on to get there; ADR-0003 and ADR-0004 are
 two analyses *over* the substrate (one always-on, one feature-gated) that each
@@ -238,6 +239,11 @@ ADR-0053 composes ADR-0038's MHP relation with ADR-0028's exact member-field
 identity and ADR-0037's typed lock-resource discipline. The resulting race and
 RMW-gap witnesses remain immutable and advisory because the inputs do not prove
 a runtime schedule or complete memory model.
+ADR-0054 composes ADR-0001's typed identity, ADR-0017's bounded deterministic
+centrality, ADR-0004's stack-safe graph discipline, and ADR-0035's dependence
+slicing boundary. It retains a frozen numerical schema and exact AST paths for
+external ML consumers while keeping training, tensor runtimes, and labels out
+of libcpg.
 
 ![Module architecture of libcpg, showing the graph core and the analysis modules layered over it](../diagrams/module-architecture.svg)
 
@@ -249,7 +255,7 @@ a runtime schedule or complete memory model.
   (`0001`…). Numbers are never reused; a reversed decision is marked
   *Superseded* and a new record supersedes it, so history stays legible.
 - **Status lifecycle.** `Proposed → Accepted → (Superseded by NNNN | Deprecated)`.
-  All fifty-three current records are **Accepted** and reflect the shipped `v0.1.1`
+  All fifty-four current records are **Accepted** and reflect the shipped `v0.1.1`
   code.
 - **Grounding.** Every claim here is traceable to source: the
   [`Cargo.toml`](../engineering/01-build-and-features.md) feature block, the

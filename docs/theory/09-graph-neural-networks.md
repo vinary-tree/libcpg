@@ -4,6 +4,11 @@
 
 The earlier theory files reason about code **symbolically**: exact [subgraph isomorphism](05-subgraph-isomorphism-vf2.md), hand‑written similarity metrics, structural pattern templates. A **[graph neural network](../GLOSSARY.md#graph-neural-network-gnn)** (GNN) offers a complementary, **vectorial** view: it maps every node to a dense real vector — an [embedding](../GLOSSARY.md#embedding) — such that structurally and semantically related code lands nearby in vector space. Embeddings turn "is this code like that code?" into a distance computation, and they are the natural front‑end for downstream machine learning (vulnerability detection, clustering, retrieval). This page develops the message‑passing theory, its lineage, and `libcpg`'s concrete realisation.
 
+This optional runtime is distinct from the feature-free deterministic
+[`analysis::ml` interchange](44-deterministic-cpg-ml-representations.md).
+`CpgGnn` starts from random values and performs no training; canonical external
+ML data should use `PygExport` or `PathContext` instead.
+
 GNNs for graphs were pioneered by Scarselli et al. [[1]](#references); the application to program analysis over CPG‑like multi‑edge graphs was crystallised by **Devign** (Zhou et al. [[2]](#references)), whose architecture directly inspires `libcpg`'s. The functionality lives in the `gnn` module, gated behind the `gnn` feature, as the `CpgGnn` type.
 
 ![CpgGnn architecture: one‑hot + random node initialisation feeds message‑passing layers that aggregate AST, CFG, and DFG neighbourhoods, producing node embeddings and pooled subgraph embeddings.](../diagrams/gnn-architecture.svg)

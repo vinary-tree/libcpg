@@ -196,7 +196,7 @@ same graph. Errors are the crate's own [`libcpg::Error`](../api/graph-reference.
 
 ## 6. Map of the theory pillar
 
-This overview sits above thirty-five formal chapters. Read them in order for a ground-up
+This overview sits above forty-four formal chapters. Read them in order for a ground-up
 development, or jump to the layer you need:
 
 1. **[01 — Code Property Graphs](01-code-property-graphs.md).** The formal model:
@@ -310,6 +310,10 @@ development, or jump to the layer you need:
 43. **[43 — Evidence-bounded race and atomicity candidates](43-evidence-bounded-race-and-atomicity.md).**
     Exact access identity, canonical MHP membership, typed exclusion locksets,
     and witnessed RMW lock gaps define deterministic concurrency advisories.
+44. **[44 — Deterministic CPG representations for external ML](44-deterministic-cpg-ml-representations.md).**
+    Stable dense identity, typed edge classes, aligned structural features,
+    complete PDG localization, and exact terminal AST paths define a
+    feature-free machine-learning interchange boundary.
 
 The later chapters define deterministic projection structure, architecture
 metrics, inspectable evidence, and their interpretation limits.

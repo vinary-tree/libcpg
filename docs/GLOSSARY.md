@@ -145,6 +145,20 @@ and [`components/graph/cohesion-analysis.md`](components/graph/cohesion-analysis
 
 A single directed graph that merges several program views onto **one shared node set**: the [AST](#abstract-syntax-tree-ast), the [CFG](#control-flow-graph-cfg), the [DFG](#data-flow-graph-dfg), and — on demand — the [PDG](#program-dependence-graph-pdg). Introduced by Yamaguchi et al. [[1]](#references) to express vulnerability queries that need syntax, control, and data flow simultaneously. In `libcpg` the CPG is the type `CodePropertyGraph`, backed by a [petgraph](#petgraph) `DiGraph<CpgNode, CpgEdge>`. See [`theory/01-code-property-graphs.md`](theory/01-code-property-graphs.md).
 
+### CPG ML export / PyG edge index / AST path context
+
+A **CPG machine-learning (ML) export** is libcpg's deterministic feature-free
+numerical view: 69 named node columns aligned with ascending stable ids/source
+ranges, plus typed dense edge tuples covering all 47 relation classes. **PyG**
+abbreviates PyTorch Geometric; libcpg's `edge_index` is an ordinary sorted
+`(source_dense, target_dense, relation_class)` vector that a caller may
+transpose for PyG, not a PyG runtime object. An **AST path context** retains two
+source-ordered terminals, their exact terminal-to-lowest-common-ancestor-to-
+terminal path, aligned node-kind classes/tokens, and the ancestor position,
+following the path-representation lineage of code2vec [[67]](#references).
+See [Theory 44](theory/44-deterministic-cpg-ml-representations.md) and the
+[component contract](components/graph/ml-export.md).
+
 ### Cryptographic API misuse
 
 A violation of a cryptographic library's required call protocol or parameter
@@ -1262,3 +1276,6 @@ strict tree interpretation. See
 64. Yamaguchi, F., Lottmann, M., Rieck, K. (2012). *Generalized Vulnerability Extrapolation using Abstract Syntax Trees.* DOI: [10.1145/2420950.2421003](https://doi.org/10.1145/2420950.2421003).
 65. Blackshear, S., Gorogiannis, N., O'Hearn, P. W., Sergey, I. (2018). *RacerD: Compositional Static Race Detection.* DOI: [10.1145/3276514](https://doi.org/10.1145/3276514).
 66. Engler, D., Ashcraft, K. (2003). *RacerX: Effective, Static Detection of Race Conditions and Deadlocks.* DOI: [10.1145/945445.945468](https://doi.org/10.1145/945445.945468).
+67. Alon, U., Zilberstein, M., Levy, O., Yahav, E. (2019). *code2vec: Learning Distributed Representations of Code.* DOI: [10.1145/3290353](https://doi.org/10.1145/3290353).
+68. Hin, D., Kan, A., Chen, H., Babar, M. A. (2022). *LineVD: Statement-level Vulnerability Detection using Graph Neural Networks.* DOI: [10.1145/3524842.3527949](https://doi.org/10.1145/3524842.3527949).
+69. Li, Y., Wang, S., Nguyen, T. N. (2021). *Vulnerability Detection with Fine-grained Interpretations.* DOI: [10.1145/3468264.3468597](https://doi.org/10.1145/3468264.3468597).

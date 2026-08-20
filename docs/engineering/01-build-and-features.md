@@ -86,6 +86,12 @@ distinction between `pattern` (VF2 / similarity / GED) and
 the feature-gated `patterns` module (Gang-of-Four detection) — they are different
 modules, not a typo.
 
+The same feature-free `analysis` surface includes `analysis::ml`: canonical
+PyG-style node/edge exports, optional complete backward-PDG localization, and
+exact code2vec/code2seq terminal-path contexts. These APIs return ordinary
+vectors and add no tensor-runtime or training dependency; see the
+[ML export component contract](../components/graph/ml-export.md).
+
 ### Mode-B language toggles
 
 | Feature | Enables (deps) | What it gates |

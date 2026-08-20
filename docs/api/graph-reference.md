@@ -460,6 +460,52 @@ See the [component guide](../components/graph/concurrency-bug-detection.md),
 43](../theory/43-evidence-bounded-race-and-atomicity.md), and [security
 boundary](../security/18-concurrency-bug-detection.md).
 
+### Deterministic ML export (feature-free)
+
+The graph export surface returns ordinary vectors and exact stable identities;
+it has no PyTorch, PyG, `ndarray`, random, parser, or `gnn` dependency.
+
+```rust,ignore
+pub fn export_pyg(cpg: &CodePropertyGraph) -> PygExport;
+
+pub fn export_pyg_with_options(
+    cpg: &CodePropertyGraph,
+    options: PygExportOptions,
+) -> Result<PygExport, AnalysisError>;
+
+pub fn ast_paths(
+    cpg: &CodePropertyGraph,
+    function: NodeId,
+    options: AstPathOptions,
+) -> Result<Vec<PathContext>, AnalysisError>;
+```
+
+| Type or registry | Stable contract |
+|---|---|
+| `PygExport::node_features` | 69 finite `f32` columns per canonical node row |
+| `PygExport::edge_index` | sorted `(source_dense, target_dense, relation_class)` tuples with parallel multiplicity |
+| `PygExport::node_ids` / `source_ranges` | ascending stable ids and ranges aligned with every row |
+| `PygExport::slice_node_ids` | sorted complete backward-PDG slice, empty without a criterion |
+| `pagerank_converged` / `reverse_pagerank_converged` | convergence qualification for the two structural columns |
+| `PygExport::dense_index` | stable-id lookup into aligned rows |
+| `PygExport::feature_index` | exact schema-name lookup |
+| `PYG_NODE_FEATURE_NAMES` | canonical 69-name registry |
+| `edge_kind_class` / `EDGE_KIND_CLASS_COUNT` | exhaustive 47-relation map and bound |
+| `node_kind_class` | exhaustive 45-node-kind map |
+| `PathContext` | exact terminal ids/tokens, complete AST node path, aligned kind classes, ancestor id/index |
+| `AstPathOptions` | length/width filters plus terminal, pair, context, retained-node, and ancestor-step caps |
+
+`export_pyg_with_options` computes a complete slice before comparing it with
+`max_slice_nodes`; over-budget localization is an error, not truncation.
+`ast_paths` suppresses missing, ambiguous, or cyclic terminal parent chains,
+and returns an error before any partial vector on a cap violation. Every
+source-depth traversal uses heap state, and neither API mutates the CPG.
+
+See the [component guide](../components/graph/ml-export.md), [usage
+guide](../usage/27-ml-export-and-ast-paths.md), [Theory
+44](../theory/44-deterministic-cpg-ml-representations.md), and [security
+boundary](../security/19-ml-export-boundary.md).
+
 ### Advisory session-protocol sketches (`rholang`)
 
 With `feature = "rholang"`, `session_sketches(&CodePropertyGraph) ->

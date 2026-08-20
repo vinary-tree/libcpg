@@ -1,0 +1,61 @@
+@startuml
+!include _libcpg-theme.iuml
+title Exact source-ordered AST path context
+
+skinparam backgroundColor #FCFCFC
+skinparam rectangle {
+  BorderColor #495057
+  RoundCorner 12
+}
+skinparam note {
+  BackgroundColor #F1F3F5
+  BorderColor #495057
+}
+
+rectangle "Function f\nvalidated scope root" as F #DBE4FF
+rectangle "Block\nunique parent" as B #D0EBFF
+rectangle "BinaryOp +\nlowest common ancestor\nancestor_index = 1" as LCA #C3FAE8
+rectangle "Identifier left\nterminal a\ntoken = lhs" as LEFT #FFF3BF
+rectangle "Literal 7\nterminal b\ntoken = 7" as RIGHT #FFE8CC
+
+F -down-> B : AstChild
+B -down-> LCA : AstChild
+LCA -down-> LEFT : child slot 0
+LCA -down-> RIGHT : child slot 1
+
+rectangle "source-order terminal heap\n(range, NodeId)" as HEAP #E5DBFF
+rectangle "iterative parent chains\ngeneration marks\nunique + cycle-free" as CHAINS #C5F6FA
+rectangle "shared-suffix LCA\nlength = 2, width = 1" as JOIN #FFD8A8
+rectangle "PathContext\npath = [left, +, 7]\nkinds aligned one-for-one" as OUT #D3F9D8
+
+LEFT ..> HEAP
+RIGHT ..> HEAP
+HEAP -down-> CHAINS
+CHAINS -down-> JOIN
+JOIN -down-> OUT
+
+note right of CHAINS
+  Missing, multiple, or cyclic
+  parent chains are suppressed.
+  Source depth stays on the heap.
+end note
+
+note right of OUT
+  Every adjacent path pair is one
+  exact AstChild edge in either direction.
+  The CPG remains unchanged.
+end note
+
+legend bottom
+|= Colour |= Meaning |
+|<#DBE4FF>| selected function boundary |
+|<#D0EBFF>| represented syntax ancestor |
+|<#C3FAE8>| exact lowest common ancestor |
+|<#FFF3BF>| first source-ordered terminal |
+|<#FFE8CC>| second source-ordered terminal |
+|<#E5DBFF>| canonical terminal ordering |
+|<#C5F6FA>| heap-backed parent machine |
+|<#FFD8A8>| exact pair/path filters |
+|<#D3F9D8>| reconstructable output evidence |
+endlegend
+@enduml

@@ -11,6 +11,12 @@ A **[Graph Neural Network (GNN)](../../GLOSSARY.md#graph-neural-network-gnn)** l
 >
 > To build a CPG from source in the same program you additionally need a grammar feature such as `lang-rust`.
 
+> **Canonical export is separate.** For deterministic node rows, typed dense
+> edges, complete PDG localization, or code2vec-style AST paths, use the
+> feature-free [`analysis::ml` export](../graph/ml-export.md). `CpgGnn` is a
+> randomly initialized, untrained propagation experiment; its vectors are not
+> the stable interchange schema.
+
 ## Why a GNN for code?
 
 Classic code metrics — line counts, [cyclomatic complexity](../../GLOSSARY.md#cyclomatic-complexity) — summarise a function with a scalar. A GNN instead gives every node a vector shaped by its *context*: a variable use is pulled toward its definitions along [data-flow](../../GLOSSARY.md#data-flow-graph-dfg) edges, a statement toward its predecessors along [control-flow](../../GLOSSARY.md#control-flow-graph-cfg) edges, and every node toward its syntactic parent and children along [AST](../../GLOSSARY.md#abstract-syntax-tree-ast) edges. After a few rounds, structurally similar code lands near similar code in vector space, which is exactly what clone detection, code search, and ML-feature extraction want.
@@ -174,6 +180,8 @@ Let $`N`$ be the node count, $`E`$ the edge count over the three overlays, $`d`$
 - [Embeddings](embeddings.md) — `NodeEmbedding`/`SubgraphEmbedding`, cosine similarity, aggregation methods, serde behaviour.
 - [Theory: graph neural networks](../../theory/09-graph-neural-networks.md) — the formal model and lineage.
 - [API: pattern & analysis reference](../../api/pattern-reference.md) — exact signatures for the `gnn` surface.
+- [Deterministic ML export](../graph/ml-export.md) — feature-free canonical
+  tensors and reconstructable AST path contexts for external trained models.
 
 ## References
 

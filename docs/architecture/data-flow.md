@@ -563,6 +563,35 @@ See the [component guide](../components/graph/concurrency-bug-detection.md),
 [Theory 43](../theory/43-evidence-bounded-race-and-atomicity.md), and [Usage
 26](../usage/26-concurrency-bug-candidates.md).
 
+### Deterministic external-ML representations (feature-free)
+
+`export_pyg` reads the immutable whole CPG and first replaces internal graph
+order with ascending stable `NodeId` coordinates. One typed edge pass produces
+nine-layer in/out degrees and a complete relation-class edge list. Independent
+heap-backed passes compute AST depth/knownness/loop depth and canonical
+forward/reverse PageRank. Optional localization traverses the complete backward
+PDG slice before its caller cap is checked. The row assembler then aligns 69
+named values with stable ids and source ranges.
+
+`ast_paths` takes a separate function-local route. It collects AST descendants
+without entering nested functions, normalizes exact `AstChild` parents and
+source-ordered child slots, and walks every terminal parent chain with heap
+vectors and generation marks. Shared chain suffixes identify the lowest common
+ancestor; admitted terminal pairs retain their entire upward/downward path,
+aligned kind classes, exact endpoints, and tokens.
+
+![Canonical CPG evidence exported for external ML consumers](../diagrams/ml-export-pipeline.svg)
+
+![Exact terminal-to-terminal AST path reconstruction](../diagrams/ast-path-context.svg)
+
+Both outputs remain out of graph and contain no learned weights or tensor-
+runtime objects. The optional `gnn` module is a distinct randomly initialized,
+untrained structural embedder; it is not the canonical interchange path.
+
+See the [component guide](../components/graph/ml-export.md), [Theory
+44](../theory/44-deterministic-cpg-ml-representations.md), and [Usage
+27](../usage/27-ml-export-and-ast-paths.md).
+
 ### Session-protocol sketches (`rholang`)
 
 `session_sketches` reuses the ordered, definition-resolved events above. It

@@ -429,6 +429,9 @@ So the safe pattern is: build (single-threaded, `&mut`), then analyse
 - [Race and atomicity candidate detection](concurrency-bug-detection.md) — exact
   field/index/channel identity, statement lifting, canonical MHP conflicts,
   source-ordered typed locksets, and RMW release/reacquire witnesses.
+- [Deterministic ML export](ml-export.md) — feature-free canonical node rows,
+  typed dense edges, complete PDG localization, and reconstructable
+  source-ordered AST path contexts with heap-backed depth state.
 - [Advisory session-protocol analysis](session-analysis.md) — definition-
   resolved per-channel endpoint traces, shallow payload types, and conservative
   three-valued binary linear-duality evidence under the `rholang` feature.

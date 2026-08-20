@@ -977,6 +977,7 @@ correctness**: an analysis may return a meaningless answer, but it must
 | DFG member-to-field resolution | one immutable declaration index; every owner/scope walk uses cycle-bounded `ast_ancestors`; exact lexical/type/field names and uniqueness are required, so malformed, missing, or ambiguous evidence emits no `Reference` |
 | `method_field_graph` / `ck_metrics` / `function_metrics` | iterative visited function/member walks, declaration uniqueness, typed field/call evidence, inheritance SCC condensation, ordered sets, saturating counts, and finite arithmetic edge cases; nested functions remain separate scopes |
 | `race_candidates` / `atomicity_candidates` | breadth-first heap parent/strand machines with visited sets, finite source-ordered lock replay, canonical hostile MHP normalization, per-site location merge, and same-location interference index; a 100,000-level parent chain is regression-tested on 256 KiB |
+| `export_pyg` / `export_pyg_with_options` / `ast_paths` | heap canonicalization, breadth-first depth state, bounded centrality, complete-before-admission PDG localization, cycle-marked parent chains, caller caps plus compile-time ceilings, and a 100,000-node 256 KiB stack regression |
 
 A *path* set rather than a global visited set is used in both extractors so that
 a node legitimately reachable from two disjoint branches is still processed on
@@ -1037,6 +1038,10 @@ over each one — see
 17. **Cap both CPG and supplied MHP size before concurrency bug detection**,
     reject capped MHP for complete-coverage workflows, and treat race/atomicity
     absence as inconclusive when typed identity evidence is missing.
+18. **Cap the CPG before whole-graph ML export and set every AST-path budget**,
+    reject incomplete localization instead of substituting a partial label,
+    preserve knownness/convergence qualifiers, and split data before global
+    centrality when cross-sample leakage matters.
 
 ## Related pages
 
@@ -1052,5 +1057,7 @@ over each one — see
   — seed trust, similarity limits, bounded search, ranking manipulation, and clean claims.
 - [Race/atomicity security boundary](18-concurrency-bug-detection.md) — exact
   identity, hostile MHP normalization, lock uncertainty, and advisory claims.
+- [ML-export security boundary](19-ml-export-boundary.md) — schema integrity,
+  hostile AST behavior, resource caps, source confidentiality, and data leakage.
 - [`usage/04-program-slicing.md`](../usage/04-program-slicing.md) — using slices in
   anger.
