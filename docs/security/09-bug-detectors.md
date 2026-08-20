@@ -9,6 +9,9 @@ evidence, and runtime impact.
 Missing-check and deviant-behavior populations have a separate
 [security boundary](10-population-anomaly-detectors.md), including population
 poisoning and peer-policy trust.
+Clone-consistency and path-feasibility advisories have a separate
+[security boundary](11-clone-feasibility-detectors.md), including pair/guard
+trust, SCCP/interval limits, and remediation controls.
 
 ![Untrusted graph evidence, bounded analysis, and qualified detector reports](../diagrams/bug-detector-pipeline.svg)
 

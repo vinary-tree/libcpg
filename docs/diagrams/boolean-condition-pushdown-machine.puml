@@ -1,0 +1,61 @@
+@startuml
+!include _libcpg-theme.iuml
+title Boolean condition feasibility — heap-resident pushdown machine
+
+skinparam backgroundColor #FCFCFC
+skinparam state {
+  BorderColor #495057
+  BackgroundColor #DBE4FF
+  StartColor #2B8A3E
+  EndColor #C92A2A
+}
+skinparam note {
+  BackgroundColor #FFF3BF
+  BorderColor #495057
+}
+
+[*] --> Enter : root · required truth · entry intervals
+state Enter #DBE4FF
+state "Expand logical node" as Expand #C3FAE8
+state "Evaluate comparison region" as Compare #E5DBFF
+state "Apply one interval meet" as Meet #D3F9D8
+state "Emit live alternative" as Live #B2F2BB
+state "Emit contradiction evidence" as Empty #FFE3E3
+state "Emit typed issue" as Issue #FCC2D7
+state "Advance explicit continuation" as Continue #FFE8CC
+
+Enter --> Expand : ! · && · ||
+Enter --> Compare : < · <= · > · >= · == · !=
+Enter --> Live : Boolean literal matches request
+Enter --> Empty : Boolean literal contradicts request
+Enter --> Issue : missing · cycle · unsupported · cap
+
+Expand --> Enter : push operand frame(s)
+Compare --> Meet : each disjoint integer region
+Compare --> Empty : supported predicate has no region
+Meet --> Live : non-empty intersection
+Meet --> Empty : empty intersection
+Live --> Continue
+Empty --> Continue
+Issue --> [*]
+Continue --> Enter : pending frame
+Continue --> [*] : frame stack empty
+
+note right of Expand
+  true(A && B): A=true, then B=true
+  false(A && B): A=false OR A=true then B=false
+  false(A || B): A=false, then B=false
+  true(A || B): A=true OR A=false then B=true
+end note
+
+note right of Compare
+  Equality yields one singleton region.
+  Disequality yields two disjoint regions.
+  Integer extrema may yield zero regions.
+end note
+
+note bottom of Continue
+  Frames, active-node marks, alternatives, and predicate witnesses
+  live on the heap. Source nesting never becomes native call depth.
+end note
+@enduml

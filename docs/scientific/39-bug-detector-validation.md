@@ -7,6 +7,8 @@ evidence, not runtime path feasibility or exploitability.
 
 Population-based missing-check and deviant-behavior evidence has its own
 [validation ledger](40-population-anomaly-validation.md).
+Clone-consistency and path-feasibility evidence has its own
+[validation ledger](41-clone-feasibility-validation.md).
 
 ## 1. Hypotheses
 

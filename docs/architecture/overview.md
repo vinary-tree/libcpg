@@ -81,6 +81,9 @@ evidence-bounded call resolution before DFG). There is no
 The always-on analysis surface also includes exact missing-check, call-order,
 and return-check population reports. These compose existing catalog,
 call-resolution, CFG, DFG, and PDG evidence without adding a grammar feature.
+It also includes clone-consistency and path-feasibility advisories, which
+compose exact Type-2/3/GED evidence with SCCP and interval results through
+bounded heap-resident machines.
 
 ### 5. Thread-safety, honestly
 
@@ -88,7 +91,7 @@ The public types are built for concurrency but do **not** silently parallelize:
 
 - `CodePropertyGraph` is a plain owned value: it is **mutable** during construction (`add_node`, `connect`, and the extractors all mutate it) and implements `Clone`. It is *not* "immutable after construction".
 - The matcher and detector traits are `Send + Sync` (`SubgraphMatcher`, `PatternDetector`, `AlgorithmDetector`, `CpgBuilder`), so a caller can run them across files or functions with its own thread pool.
-- `rayon` is a declared dependency and the crate is written to be parallelizable, but the current extractors and detectors iterate functions **sequentially** — no `par_iter` is wired in `src/` yet. There are **no** atomic progress counters and **no** SIMD paths; the `gpu` feature is reserved with no code behind it. Nineteen Criterion targets currently measure SCC analysis, condensation analytics, CPG construction, pattern matching, variable liveness, loop induction, DSM, WL, centrality, community detection/refinement, cohesion/robustness, spectral connectivity, bounded cycle enumeration, directed motif census, bounded bipartite GED, function-clone detection, program composition, IFDS/IDE summaries, and taint-summary propagation. Remaining benchmark gaps are tracked in [`../engineering/03-performance.md`](../engineering/03-performance.md).
+- `rayon` is a declared dependency and the crate is written to be parallelizable, but the current extractors and detectors iterate functions **sequentially** — no `par_iter` is wired in `src/` yet. There are **no** atomic progress counters and **no** SIMD paths; the `gpu` feature is reserved with no code behind it. Twenty Criterion targets currently measure SCC analysis, condensation analytics, CPG construction, pattern matching, variable liveness, loop induction, DSM, WL, centrality, community detection/refinement, cohesion/robustness, spectral connectivity, bounded cycle enumeration, directed motif census, bounded bipartite GED, function-clone detection, clone/feasibility advisories, program composition, IFDS/IDE summaries, and taint-summary propagation. Remaining benchmark gaps are tracked in [`../engineering/03-performance.md`](../engineering/03-performance.md).
 
 ## Module map
 
@@ -111,6 +114,9 @@ libcpg is a small set of modules; four are always compiled, the rest are feature
 Within the always-on `analysis` row, population anomaly inference is provided
 by `analysis::bugs::{missing_check,deviant}` and exposes exact support plus
 typed completeness evidence through the crate root.
+Clone and feasibility advisories are provided by
+`analysis::bugs::{clone_bugs,infeasible}` and reuse `pattern::clones`, SCCP,
+and interval providers without moving policy into the graph.
 
 ### `pattern` versus `patterns` — do not conflate
 

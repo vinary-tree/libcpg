@@ -109,6 +109,8 @@ function scope.
 | Exception-flow analysis | $`O(I(F+C)(T+H)\log T)`$ bounded summary/dispatch work | $`I`$ is SCC rounds, $`F`$ functions, $`C`$ call sites, $`T`$ admitted exception types, and $`H`$ handler/type-hierarchy evidence. Finite sets, SCC scheduling, inheritance closure, and witnesses are heap-backed; `IfdsCaps` bounds functions, facts, work, and recursive rounds. |
 | Missing-check population inference | $`O((U+A+E_c)\log U+P)`$ before output sorting | $`U`$ is calls, $`A`$ admitted guard-AST evidence, $`E_c`$ call-neighborhood evidence, and $`P`$ same-API site/fingerprint comparisons. `max_check_nodes` and `max_callee_depth` qualify local traversals; flat postorder frames keep native stack independent of source depth. |
 | Deviant-behavior inference | $`O((U+R+D)\log U+B)`$ before output sorting | $`R`$ is aggregate bounded CFG reachability, $`D`$ aggregate forward value reachability, and $`B`$ API/belief population comparisons. Per-call CFG and return-evidence caps qualify excluded samples; queues and visited sets are heap-backed. |
+| Inconsistent-clone advisories | $`O(P(A_LA_R+G))`$ within configured pair/tape/alignment/GED caps | $`P`$ is admitted exact Type-2/3 pairs, $`A_L,A_R`$ are tape sizes for a non-isomorphic alignment, and $`G`$ is bounded pair-local GED. Same-shape alignment is linear; all tapes/matrices are heap-backed. |
+| Infeasible-path advisories | $`O(F(S+I)+V+K)`$ within condition state/step caps | $`F`$ functions, $`S`$ SCCP cost, $`I`$ interval cost, $`V`$ condition-arena nodes, and $`K`$ explicit machine transitions. Boolean alternatives can grow exponentially, so state and transition caps qualify the affected condition. |
 | PageRank / reverse / personalized | $`O(c(V+E))`$ time, $`O(V)`$ working space | Dense forward/reverse CSR and stable floating reduction; hard 10,000-round ceiling. |
 | Vertex/edge betweenness | $`O(V(V+E))`$ time, $`O(V+E)`$ working space | Directed vertex Brandes or undirected canonical edge Brandes; preflight work budgets; serial source partitions are public. |
 | Eigenvector / Katz / HITS | $`O(c(V+E))`$ time, $`O(V+E)`$ working space | Shifted spectral iteration, sufficient Katz row-sum bound, and paired HITS vectors. |
@@ -135,9 +137,10 @@ once, loop bodies twice, and a path set cuts malformed AST cycles.
 
 ## Benchmark coverage and remaining gaps
 
-Nineteen Criterion targets are active. Their thirty-one baseline operation groups are
-feature-free; `induction_analysis` also registers a thirty-second,
-`algorithm-detection`-gated operation, making thirty-two in that build. Every active group constructs and checks a deterministic oracle
+Twenty Criterion targets are active. Their thirty-five baseline operation
+groups are feature-free; `induction_analysis` also registers one
+`algorithm-detection`-gated operation, making thirty-six in that build. Every
+active group constructs and checks a deterministic oracle
 before Criterion enters the timed loop:
 
 - `scc_analysis` measures public call-graph decomposition over 1,000- and
@@ -167,6 +170,10 @@ before Criterion enters the timed loop:
 - `clones` measures Type-1 equality, Type-3 statement insertion, and Type-4
   PDG-preserving reordering over 16- and 64-function corpora; exact taxonomy,
   membership, and similarity oracles run before timing.
+- `advisory_bugs` measures exact Type-2 guard divergence and contradictory
+  interval guards over 8- and 32-function corpora. Complete reports, nonempty
+  clone findings, and exactly one contradiction per feasibility function are
+  asserted before timing.
 - `program_merge` measures collision-free merge and import-graph construction
   over 16- and 64-file programs with 16 statement nodes per file. Exact summed
   counts, contiguous ids, embedded-reference totality, file scopes, resolution

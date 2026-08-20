@@ -93,6 +93,9 @@ PDG). A query can therefore mix syntax, control flow, and data flow freely.
 - **Population anomaly detectors** — feature-free taint-selected missing-check
   inference plus call-order and return-check beliefs with exact rational support,
   canonical evidence, and explicit incomplete-result qualification.
+- **Clone and feasibility advisories** — feature-free exact Type-2/3 clone
+  divergence evidence plus SCCP/interval proofs for infeasible branches,
+  redundant guards, and integer contradictions.
 - **Projection centrality** — deterministic PageRank variants, vertex/edge
   betweenness, eigenvector, Katz, closeness, harmonic, HITS, and Burt
   structural-hole scores with explicit iteration and traversal budgets.
@@ -185,6 +188,16 @@ cargo run --example population_anomalies --no-default-features
 
 See the [I6/I7 usage guide](docs/usage/18-population-anomaly-detectors.md) for
 catalog policy, peer scopes, exact thresholds, reports, and completeness.
+
+The feature-free I8/I9 example exercises both clone and path advisories:
+
+```sh
+cargo run --example clone_feasibility_advisories --no-default-features
+```
+
+See the [I8/I9 usage guide](docs/usage/19-clone-feasibility-advisories.md) for
+typed witnesses, SCCP/interval proof sources, resource bounds, and report
+qualification.
 
 ## Features
 

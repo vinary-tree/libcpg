@@ -131,6 +131,10 @@ security guarantees:
   have exact support for the represented peers, but a dominant convention can
   be wrong or poisoned and a rare behavior can be correct. They prioritize
   review; they do not establish a vulnerability or clean population.
+- [Clone and feasibility findings](../GLOSSARY.md#inconsistent-clone--path-feasibility)
+  have exact typed witnesses for admitted pair/condition evidence. They do not
+  establish developer intent, complete runtime semantics, exploitability, or
+  safe automated clone/branch remediation.
 
 Use these to *prioritise* human attention, not to *gate* a security decision on
 their own. Exact structural analyses are exact with respect to their input
@@ -163,6 +167,7 @@ and its build pipeline.
 | Non-terminating data flow | Structural AST sweep, two loop passes, and a malformed-cycle path guard | [hardening §DFG](01-input-and-resource-hardening.md#data-flow-structural-sweep-bounds) |
 | Oversized or untrusted taint policy; capped negative claim | caller admission for catalog rule/string counts, literal path matching, shared/domain caps, and report-level completeness checks | [taint-analysis boundary](02-taint-analysis.md) |
 | Poisoned or oversized missing-check/deviant population | caller-owned catalog/peer policy, exact rational support, traversal caps, excluded incomplete samples, report-level completeness, and heap worklists | [population-anomaly boundary](10-population-anomaly-detectors.md) |
+| Adversarial clone/condition evidence or over-trusted path proof | exact pair identity, typed guard roots, disjoint regions, SCCP reachability filtering, AST/alignment/GED/node/state/step caps, heap continuations, and report-level completeness | [clone/feasibility boundary](11-clone-feasibility-detectors.md) |
 | Unbounded slice | `backward_slice` / `forward_slice` `max_nodes` cap | [hardening §slicing](01-input-and-resource-hardening.md#slicing-max_nodes) |
 | Expensive or divergent centrality | hard iteration ceiling, explicit traversal budgets, finite-option validation, and complete projection validation | [hardening §centrality](01-input-and-resource-hardening.md#centrality-iteration-ceilings-traversal-budgets-and-safe-numerics) |
 | Adversarial community search or weights | 50-pass/10-level ceilings plus complete CSR, resolution, weight, and overflow validation | [hardening §community detection](01-input-and-resource-hardening.md#community-detection-pass-level-and-numeric-bounds) |

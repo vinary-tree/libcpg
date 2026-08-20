@@ -1042,6 +1042,24 @@ forward DFG/PDG value evidence. These relations are exact for the modeled graph
 and policy but remain advisory about semantic correctness or security impact.
 See [`theory/35-population-anomaly-inference.md`](theory/35-population-anomaly-inference.md).
 
+### Inconsistent clone / Path feasibility
+
+An **inconsistent clone** is libcpg's advisory finding for a typed semantic
+divergence inside an exact low-edit Type-2 or Type-3 function pair. The
+divergence is either an aligned identifier that violates a dominant exact
+rename convention or an aligned guard operator/literal payload that differs.
+Low edit distance alone is only candidate evidence. This follows the
+inconsistent-change motivation studied by Juergens et al. [[55]](#references).
+
+**Path feasibility** asks whether a represented Boolean CFG outcome has any
+abstract program state. libcpg combines sparse conditional constant propagation
+(SCCP) executable edges with path-partitioned integer intervals. An
+**infeasible branch** has no represented executable outcome; a **redundant
+condition** has exactly one possible Boolean value; a **contradictory
+condition** has no true interval alternative and retains predicate evidence.
+See
+[`theory/36-clone-consistency-and-abstract-feasibility.md`](theory/36-clone-consistency-and-abstract-feasibility.md).
+
 ### Pushdown automaton (PDA) / explicit continuation machine
 
 A **pushdown automaton** (PDA) is a finite-control machine augmented by a stack.
@@ -1125,3 +1143,4 @@ strict tree interpretation. See
 52. Yamaguchi, F., Wressnegger, C., Gascon, H., Rieck, K. (2013). *Chucky: Exposing Missing Checks in Source Code for Vulnerability Discovery.* DOI: [10.1145/2508859.2516665](https://doi.org/10.1145/2508859.2516665).
 53. Lu, K., Pakki, A., Wu, Q. (2019). *Detecting Missing-Check Bugs via Semantic- and Context-Aware Criticalness and Constraints Inferences.* [USENIX Security 2019](https://www.usenix.org/conference/usenixsecurity19/presentation/lu) (no DOI assigned in the proceedings record).
 54. Engler, D., Chen, D. Y., Hallem, S., Chou, A., Chelf, B. (2001). *Bugs as Deviant Behavior: A General Approach to Inferring Errors in Systems Code.* DOI: [10.1145/502034.502041](https://doi.org/10.1145/502034.502041).
+55. Juergens, E., Deissenboeck, F., Hummel, B., Wagner, S. (2009). *Do Code Clones Matter?* DOI: [10.1109/ICSE.2009.5070547](https://doi.org/10.1109/ICSE.2009.5070547).

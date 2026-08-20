@@ -280,6 +280,10 @@ development, or jump to the layer you need:
     Taint-selected sensitive calls, normalized checks, call/value reachability,
     and exact peer fractions define qualified missing-check and deviant-behavior
     evidence.
+36. **[36 — Clone consistency and abstract feasibility](36-clone-consistency-and-abstract-feasibility.md).**
+    Exact Type-2/3 pairs, flat AST alignment, dominant rename conventions,
+    SCCP executable edges, and path-partitioned interval regions define
+    qualified clone-divergence and condition-feasibility evidence.
 
 The later chapters define deterministic projection structure, architecture
 metrics, inspectable evidence, and their interpretation limits.

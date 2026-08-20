@@ -89,8 +89,9 @@ alternatives is folklore, and a decision without its costs is marketing.
 | [0043 — Deterministic typestate analysis](0043-deterministic-typestate-analysis.md) | Validate caller-defined finite-state properties, propagate allocation-site object/state facts over typed CPG evidence, and expose forbidden transitions with bounded canonical witnesses. | Accepted |
 | [0044 — Evidence-composed bug detectors](0044-evidence-composed-bug-detectors.md) | Project leak and uninitialized-use evidence from shared facts, normalize typed handler entry, and propagate finite exception summaries through call SCCs without parsing or graph mutation. | Accepted |
 | [0045 — Exact population anomaly detectors](0045-exact-population-anomaly-detectors.md) | Infer missing checks and deviant call behavior from canonical CPG evidence, exact peer fractions, and explicit incomplete-result semantics. | Accepted |
+| [0046 — Evidence-bounded clone and feasibility advisories](0046-evidence-bounded-clone-and-feasibility-advisories.md) | Diagnose typed divergences in exact low-edit clone pairs and compose SCCP with path-partitioned intervals for qualified branch/condition findings. | Accepted |
 
-These forty-five are not independent. ADR-0001 fixes the substrate that all analyses
+These forty-six are not independent. ADR-0001 fixes the substrate that all analyses
 write onto; ADR-0002 and ADR-0005 together explain how a language reaches that
 substrate and what you must switch on to get there; ADR-0003 and ADR-0004 are
 two analyses *over* the substrate (one always-on, one feature-gated) that each
@@ -210,6 +211,10 @@ ADR-0045 reuses ADR-0034's caller-owned taint catalog and dependence evidence,
 ADR-0006's call identity, and deterministic call/CFG projections. It makes
 population support an exact rational relation, normalizes checks into flat
 postorder tapes, and qualifies every excluded occurrence.
+ADR-0046 composes ADR-0030's exact clone pairs, ADR-0023's bounded GED,
+ADR-0010's executable-edge facts, and ADR-0011's interval environments. It
+keeps pair/condition recursion in explicit heap machines, preserves disjoint
+comparison regions, and qualifies every unsupported or bounded proof.
 
 ![Module architecture of libcpg, showing the graph core and the analysis modules layered over it](../diagrams/module-architecture.svg)
 
@@ -221,7 +226,7 @@ postorder tapes, and qualifies every excluded occurrence.
   (`0001`…). Numbers are never reused; a reversed decision is marked
   *Superseded* and a new record supersedes it, so history stays legible.
 - **Status lifecycle.** `Proposed → Accepted → (Superseded by NNNN | Deprecated)`.
-  All forty-five current records are **Accepted** and reflect the shipped `v0.1.1`
+  All forty-six current records are **Accepted** and reflect the shipped `v0.1.1`
   code.
 - **Grounding.** Every claim here is traceable to source: the
   [`Cargo.toml`](../engineering/01-build-and-features.md) feature block, the

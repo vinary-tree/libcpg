@@ -1,0 +1,86 @@
+@startuml
+!include _libcpg-theme.iuml
+title Clone-consistency and path-feasibility advisory pipeline
+
+skinparam backgroundColor #FCFCFC
+skinparam component {
+  BorderColor #495057
+}
+skinparam note {
+  BackgroundColor #F1F3F5
+  BorderColor #495057
+}
+
+component "CodePropertyGraph\ntyped AST · CFG · DFG" as CPG #DBE4FF
+
+package "I8 — inconsistent clones" #F8F9FA {
+  component "exact Type-2/3 pair relation" as PAIRS #C3FAE8
+  component "flat typed AST tapes\nand exact alignment" as TAPES #FFF3BF
+  component "bounded bipartite GED\nupper-bound evidence" as GED #E5DBFF
+  component "dominant rename mapping\nor aligned guard payload" as CLONE_RULE #D3F9D8
+  component "InconsistentCloneBug\nconcrete paired witnesses" as CLONE_FINDING #FFE3E3
+}
+
+package "I9 — infeasible paths" #F8F9FA {
+  component "shared typed guard root" as GUARD #C3FAE8
+  component "SCCP\nconstant + executable edges" as SCCP #E5DBFF
+  component "guard-local interval state" as INTERVALS #FFF3BF
+  component "heap pushdown machine\nshort-circuit path partitions" as PDA #D3F9D8
+  component "InfeasiblePathFinding\nbranch · redundancy · contradiction" as PATH_FINDING #FFE3E3
+}
+
+component "typed issues + explicit caps\nno incomplete negative claims" as ISSUES #FCC2D7
+component "ordered immutable reports\npositive-only projections are advisory" as REPORT #FFE8CC
+
+CPG --> PAIRS : clone detector
+PAIRS --> TAPES : exact pair, not transitive class
+CPG --> TAPES : iterative AST traversal
+CPG --> GED : induced typed AST graphs
+TAPES --> CLONE_RULE : aligned node pairs
+GED --> CLONE_RULE : complete low-edit evidence
+CLONE_RULE --> CLONE_FINDING
+
+CPG --> GUARD : conditional CFG source
+GUARD --> SCCP
+CPG --> INTERVALS : exact state before source
+GUARD --> PDA : typed Boolean AST
+SCCP --> PATH_FINDING : dead edge / constant guard
+INTERVALS --> PDA : initial variable ranges
+PDA --> PATH_FINDING : empty truth alternatives
+
+TAPES --> ISSUES : missing · cycle · node/alignment cap
+GED --> ISSUES : capped surrogate
+GUARD --> ISSUES : missing condition
+PDA --> ISSUES : unsupported · cycle · state/step cap
+CLONE_FINDING --> REPORT
+PATH_FINDING --> REPORT
+ISSUES --> REPORT
+
+note bottom of CLONE_RULE
+  A low edit count is only a candidate filter.
+  Findings require typed identifier or guard evidence.
+end note
+
+note bottom of PDA
+  For conjunction true, both operands constrain one path.
+  For conjunction false, alternatives encode short-circuit flow.
+  Disjunction is the Boolean dual.
+end note
+
+note bottom of REPORT
+  The analyzers do not mutate the CPG.
+  Empty findings prove absence only when issues are empty.
+end note
+
+legend bottom
+|= Colour |= Meaning |
+|<#DBE4FF>| normalized graph evidence |
+|<#C3FAE8>| exact candidate or guard identity |
+|<#FFF3BF>| retained structural or interval state |
+|<#E5DBFF>| supporting graph analysis |
+|<#D3F9D8>| semantic decision machine |
+|<#FFE3E3>| advisory finding |
+|<#FCC2D7>| incomplete-evidence qualification |
+|<#FFE8CC>| public report boundary |
+endlegend
+@enduml

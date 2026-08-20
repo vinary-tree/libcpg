@@ -498,6 +498,32 @@ Incomplete occurrences do not vote and remain visible as issues. See the
 guide](../usage/18-population-anomaly-detectors.md), [theory](../theory/35-population-anomaly-inference.md),
 and [security boundary](../security/10-population-anomaly-detectors.md).
 
+### Clone-consistency and path-feasibility advisories
+
+The feature-free I8/I9 APIs consume normalized graph evidence and return
+read-only, canonically ordered reports. A positive-only convenience projection
+discards issues; use the qualified analyzer and `is_complete()` for an absence
+claim.
+
+| API/type | Meaning |
+|---|---|
+| `analyze_inconsistent_clones` / `inconsistent_clone_bugs` | Qualified I8 report / positive finding projection. |
+| `CloneBugConfig` | Clone/GED options, exact edit/rename thresholds, occurrence minimum, AST/alignment caps. |
+| `CloneBugAnalysis` | Findings, evaluated exact pairs, typed issues, `is_complete()`. |
+| `InconsistentCloneBug` / `InconsistentCloneKind` | Pair-local clone/GED/edit evidence and exact rename or guard witness. |
+| `ClonePairEvidence` / `CloneBugIssue` | Evaluated pair admission and explicit evidence gaps. |
+| `analyze_infeasible_paths` / `infeasible_paths` | Qualified I9 report / positive finding projection. |
+| `InfeasiblePathConfig` | Condition-node, alternative-state, and machine-step caps. |
+| `InfeasiblePathAnalysis` | Findings, analyzed functions/conditions, typed issues, `is_complete()`. |
+| `InfeasiblePathFinding` / `InfeasiblePathKind` | Function/source/guard, branch/redundancy/contradiction kind, proof, and witnesses. |
+| `FeasibilityProofSource` | SCCP, intervals, or their combined evidence. |
+| `IntervalContradiction` / `IntervalPredicateEvidence` | Ordered empty-alternative proof and exact normalized predicates/regions. |
+
+See the [component guide](../components/graph/clone-feasibility-bug-detectors.md),
+[usage guide](../usage/19-clone-feasibility-advisories.md),
+[theory](../theory/36-clone-consistency-and-abstract-feasibility.md), and
+[security boundary](../security/11-clone-feasibility-detectors.md).
+
 ### Deterministic graph projections
 
 `GraphProjection` is the feature-free, payload-free compressed-sparse-row view

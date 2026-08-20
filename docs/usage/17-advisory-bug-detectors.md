@@ -6,6 +6,9 @@ searches. The analyzers do not parse source strings and never mutate the graph.
 
 For missing-check, call-order, and return-check populations, use the separate
 [population anomaly guide](18-population-anomaly-detectors.md).
+For inconsistent clones, infeasible branches, redundant guards, and integer
+contradictions, use the separate
+[clone/feasibility guide](19-clone-feasibility-advisories.md).
 
 ![Three detector paths and their completeness boundaries](../diagrams/bug-detector-pipeline.svg)
 

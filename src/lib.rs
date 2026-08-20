@@ -67,6 +67,9 @@
 //! - **Population Anomaly Detectors**: Infer taint-selected missing checks,
 //!   call-order conventions, and return-check conventions from exact peer
 //!   fractions with qualified advisory evidence
+//! - **Clone and Feasibility Advisories**: Diagnose typed divergences in exact
+//!   low-edit Type-2/3 clone pairs and prove infeasible branches, redundant
+//!   guards, and integer contradictions with SCCP and interval evidence
 //! - **Pattern Detection**: Detect design patterns using subgraph isomorphism (VF2/VF3)
 //! - **Algorithm Analysis**: Extract algorithm signatures and estimate complexity
 //! - **GNN Support**: Graph neural network message passing for semantic embeddings

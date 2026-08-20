@@ -11,6 +11,9 @@ and bounded summary scheduling remain in their shared analysis components.
 This page covers those evidence-composed detector families. The same module's
 missing-check and deviant-behavior surfaces are specified separately in the
 [population anomaly component](population-anomaly-detectors.md).
+I8 inconsistent-clone and I9 infeasible-path evidence are specified by the
+[clone/feasibility component](clone-feasibility-bug-detectors.md), which
+composes clone/GED, SCCP, and interval providers rather than duplicating them.
 
 ![Inputs, shared analyses, findings, and completeness evidence](../../diagrams/bug-detector-pipeline.svg)
 

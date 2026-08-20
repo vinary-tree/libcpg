@@ -599,6 +599,28 @@ See the [component guide](../components/graph/population-anomaly-detectors.md),
 [Theory 35](../theory/35-population-anomaly-inference.md), and [Usage
 18](../usage/18-population-anomaly-detectors.md).
 
+### Clone and path-feasibility advisories (feature-free)
+
+I8 follows `CodePropertyGraph → exact Type-2/3 pairs → flat typed AST tapes →
+bounded alignment + GED → dominant rename/aligned guard evidence → qualified
+findings`. I9 follows `CodePropertyGraph → typed guard root + SCCP + exact
+guard-local interval state → heap Boolean continuation machine → qualified
+branch/redundancy/contradiction findings`. Both paths are out-of-graph and keep
+supporting providers independent.
+
+![Clone and feasibility evidence composition](../diagrams/clone-feasibility-advisory-pipeline.svg)
+
+The condition evaluator preserves short-circuit order and disjoint integer
+regions through explicit heap frames; it does not recursively interpret source
+syntax or mutate SCCP/interval results.
+
+![Heap-resident Boolean condition evaluator](../diagrams/boolean-condition-pushdown-machine.svg)
+
+See the
+[component guide](../components/graph/clone-feasibility-bug-detectors.md),
+[Theory 36](../theory/36-clone-consistency-and-abstract-feasibility.md), and
+[Usage 19](../usage/19-clone-feasibility-advisories.md).
+
 ### Pattern detection
 
 Two layers, at two feature levels:

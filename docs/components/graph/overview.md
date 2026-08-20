@@ -426,6 +426,9 @@ So the safe pattern is: build (single-threaded, `&mut`), then analyse
 - [Population anomaly detectors](population-anomaly-detectors.md) — feature-free
   missing-check, call-order, and return-check population beliefs with exact
   support and explicit incomplete-result evidence.
+- [Clone-consistency and path-feasibility detectors](clone-feasibility-bug-detectors.md)
+  — feature-free exact Type-2/3 rename/guard divergence plus SCCP/interval
+  proofs for infeasible branches, redundant guards, and contradictions.
 - [`api/graph-reference.md`](../../api/graph-reference.md) — the precise,
   method-by-method API reference for `CodePropertyGraph`.
 - [`theory/01-code-property-graphs.md`](../../theory/01-code-property-graphs.md)

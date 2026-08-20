@@ -1,6 +1,6 @@
 # Measurement methodology
 
-`libcpg` ships nineteen runnable Criterion targets. Their baseline groups are
+`libcpg` ships twenty runnable Criterion targets. Their baseline groups are
 feature-free; the `induction_analysis` target also registers an
 `algorithm-detection`-gated complexity-evidence group. Each active group
 asserts a deterministic correctness oracle **before** entering the timed loop.
@@ -19,7 +19,7 @@ the source transformation under study does not [[1]](#references).
 
 ## 1. Current evidence
 
-All nineteen targets use `harness = false`, which hands execution to Criterion
+All twenty targets use `harness = false`, which hands execution to Criterion
 rather than Rust's test harness:
 
 ```toml
@@ -91,6 +91,10 @@ name = "clones"
 harness = false
 
 [[bench]]
+name = "advisory_bugs"
+harness = false
+
+[[bench]]
 name = "program_merge"
 harness = false
 
@@ -122,6 +126,7 @@ harness = false
 | `motifs` | `motif_census` | paths and out-stars at 24/50 vertices; complete bidirected graphs at 16/30 vertices | exact class/graphlet binomial counts, conservation, and repeatability |
 | `ged` | `ged_upper_bound` | identical paths, relabeled isolates, and retyped paths at 16/48 vertices | exact edit costs $`0`$, $`n`$, and $`n-1`$, uncapped result |
 | `clones` | `detect_clones` | dense Type-1 equality, Type-3 insertion, and Type-4 reordering corpora at 16/64 functions | exact class taxonomy, complete membership, and similarity score |
+| `advisory_bugs` | `analyze_inconsistent_clones` / `analyze_infeasible_paths` | Type-2 guard-divergence and contradictory-condition corpora at 8/32 functions | complete reports, nonempty typed clone findings, and exactly one contradiction per feasibility function |
 | `program_merge` | `merge_programs`, `build_import_graph` | 16/64 files with 16 statement nodes per file; represented import chains | summed counts, contiguous identities, embedded-reference totality, file scopes, exact resolutions, and dependency counts |
 | `ifds_summaries` | `solve_summaries` | acyclic and recursive call graphs at 256/1,024 functions | exact first-function transitive closure, complete reports, and nonempty per-function summaries |
 | `ifds_taint` | `analyze_taint_report` | call-graph paths, rings, and cyclic clusters at 32/128 workers | exact source-to-sink pair, valid witness endpoints, and complete reports before timing; SCC construction remains outside the timed closure |
@@ -313,6 +318,8 @@ $`d`$ is embedding dimension.
 | directed motif census | $`O(V^3+V^4)`$ within 512/50-node family caps | active path/out-star/bidirected-clique target |
 | bipartite GED upper bound | $`O(N^3+E_1+E_2)`$ for $`N=V_1+V_2`$ | active identical/relabel/retype target within 512 nodes per input |
 | function clone detection | $`O(P+q(V+E)+I\cdot\operatorname{VF2})`$ for $`P`$ size-qualified pairs, $`q`$ WL rounds, and $`I`$ bounded verifier calls | active equality/insertion/reordering target with 16/64 functions |
+| inconsistent-clone advisories | $`O(P(A_LA_R+G))`$ inside pair/tape/alignment/GED caps | active Type-2 guard-divergence target with 8/32 functions |
+| infeasible-path advisories | per-function SCCP + intervals + bounded condition-arena state/step work | active contradictory-condition target with 8/32 functions |
 | DFG/PDG construction | analysis-specific; must separate extraction from slicing | benchmark gap |
 | GNN propagation | $`O(\text{layers}\cdot(V+E)\cdot d)`$ | benchmark gap |
 
