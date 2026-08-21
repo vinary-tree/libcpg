@@ -241,7 +241,9 @@ impl TreeSitterCpgBuilder {
 
                 let mut cpg_node = CpgNode::new(NodeId::new(0), cpg_kind, range);
                 cpg_node.message_kind = mapper.message_kind(ts_kind);
-                cpg_node.allocation_type = mapper.allocation_type(ts_kind, &ts_node, source);
+                cpg_node.allocation_type = mapper
+                    .allocation_type(ts_kind, &ts_node, source)
+                    .map(Box::new);
                 let node_id = cpg.add_node(cpg_node);
 
                 // Maintain the AST edge and parent pointer as one invariant.
@@ -730,7 +732,10 @@ mod tests {
                 assert_eq!(actual.kind, expected_node.kind);
                 assert_eq!(actual.range, expected_node.range);
                 assert_eq!(actual.message_kind, expected_node.message_kind);
-                assert_eq!(actual.allocation_type, expected_node.allocation_type);
+                assert_eq!(
+                    actual.allocation_type.as_deref(),
+                    expected_node.allocation_type.as_ref()
+                );
                 assert_eq!(actual.parent, expected_node.parent);
 
                 let incoming_ast: Vec<_> = cpg
@@ -987,8 +992,8 @@ mod tests {
             .find(|node| node.allocation_type.is_some())
             .expect("typed allocation call");
         assert_eq!(
-            allocation.allocation_type,
-            Some(crate::TypeInfo::new("Widget"))
+            allocation.allocation_type.as_deref(),
+            Some(&crate::TypeInfo::new("Widget"))
         );
     }
 
@@ -1003,8 +1008,8 @@ mod tests {
             .find(|node| node.allocation_type.is_some())
             .expect("typed allocation call");
         assert_eq!(
-            allocation.allocation_type,
-            Some(crate::TypeInfo::new("Widget"))
+            allocation.allocation_type.as_deref(),
+            Some(&crate::TypeInfo::new("Widget"))
         );
     }
 
@@ -1022,8 +1027,8 @@ mod tests {
             .find(|node| node.allocation_type.is_some())
             .expect("typed allocation call");
         assert_eq!(
-            allocation.allocation_type,
-            Some(crate::TypeInfo::new("Widget"))
+            allocation.allocation_type.as_deref(),
+            Some(&crate::TypeInfo::new("Widget"))
         );
     }
 }

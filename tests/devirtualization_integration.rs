@@ -23,14 +23,14 @@ fn method(cpg: &mut CodePropertyGraph, owner: NodeId, name: &str) -> NodeId {
         cpg,
         owner,
         CpgNodeKind::Function {
-            signature: MethodSignature {
+            signature: Box::new(MethodSignature {
                 name: name.into(),
                 params: Default::default(),
                 return_type: None,
                 is_static: false,
                 is_async: false,
                 visibility: Visibility::Public,
-            },
+            }),
         },
     )
 }
@@ -64,7 +64,7 @@ fn public_c1_resolution_refines_monotonically_without_mutating_topology() {
         root,
         CpgNodeKind::Variable {
             name: "service".into(),
-            var_type: Some(TypeInfo::new("Base")),
+            var_type: Some(Box::new(TypeInfo::new("Base"))),
             scope: ScopeId::GLOBAL,
             is_mutable: true,
         },
@@ -79,7 +79,7 @@ fn public_c1_resolution_refines_monotonically_without_mutating_topology() {
     );
     cpg.node_mut(leaf_allocation)
         .expect("leaf allocation")
-        .allocation_type = Some(TypeInfo::new("Leaf"));
+        .allocation_type = Some(Box::new(TypeInfo::new("Leaf")));
     let mid_allocation = child(
         &mut cpg,
         root,
@@ -90,7 +90,7 @@ fn public_c1_resolution_refines_monotonically_without_mutating_topology() {
     );
     cpg.node_mut(mid_allocation)
         .expect("mid allocation")
-        .allocation_type = Some(TypeInfo::new("Mid"));
+        .allocation_type = Some(Box::new(TypeInfo::new("Mid")));
 
     let call = child(
         &mut cpg,
@@ -159,7 +159,7 @@ fn implements_edges_support_default_method_dispatch() {
         root,
         CpgNodeKind::Variable {
             name: "runner".into(),
-            var_type: Some(TypeInfo::new("Runner")),
+            var_type: Some(Box::new(TypeInfo::new("Runner"))),
             scope: ScopeId::GLOBAL,
             is_mutable: false,
         },
@@ -174,7 +174,7 @@ fn implements_edges_support_default_method_dispatch() {
     );
     cpg.node_mut(allocation)
         .expect("allocation")
-        .allocation_type = Some(TypeInfo::new("Worker"));
+        .allocation_type = Some(Box::new(TypeInfo::new("Worker")));
     let call = child(
         &mut cpg,
         root,

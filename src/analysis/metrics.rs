@@ -1159,14 +1159,14 @@ mod tests {
 
     fn function(name: &str) -> CpgNodeKind {
         CpgNodeKind::Function {
-            signature: MethodSignature {
+            signature: Box::new(MethodSignature {
                 name: name.into(),
                 params: Default::default(),
                 return_type: None,
                 is_static: false,
                 is_async: false,
                 visibility: Visibility::Public,
-            },
+            }),
         }
     }
 
@@ -1647,7 +1647,7 @@ mod tests {
             field("f"),
             CpgNodeKind::GenericParam { name: "G".into() },
             CpgNodeKind::TypeAnnotation {
-                type_info: TypeInfo::new("T"),
+                type_info: Box::new(TypeInfo::new("T")),
             },
             CpgNodeKind::Literal {
                 kind: LiteralKind::Integer(-1),

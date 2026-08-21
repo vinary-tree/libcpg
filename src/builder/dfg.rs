@@ -1270,14 +1270,14 @@ mod tests {
         let func = cpg.add_node(CpgNode::new(
             NodeId::new(0),
             CpgNodeKind::Function {
-                signature: MethodSignature {
+                signature: Box::new(MethodSignature {
                     name: "test".into(),
                     params: Default::default(),
                     return_type: None,
                     is_static: false,
                     is_async: false,
                     visibility: Visibility::Public,
-                },
+                }),
             },
             SourceRange::default(),
         ));
@@ -1613,14 +1613,14 @@ mod tests {
         cpg.add_node(CpgNode::new(
             NodeId::new(0),
             CpgNodeKind::Function {
-                signature: MethodSignature {
+                signature: Box::new(MethodSignature {
                     name: name.into(),
                     params: Default::default(),
                     return_type: None,
                     is_static: false,
                     is_async: false,
                     visibility: Visibility::Public,
-                },
+                }),
             },
             SourceRange::default(),
         ))
@@ -1635,14 +1635,14 @@ mod tests {
 
     fn function_kind(name: &str) -> CpgNodeKind {
         CpgNodeKind::Function {
-            signature: MethodSignature {
+            signature: Box::new(MethodSignature {
                 name: name.into(),
                 params: Default::default(),
                 return_type: None,
                 is_static: false,
                 is_async: false,
                 visibility: Visibility::Public,
-            },
+            }),
         }
     }
 
@@ -1775,14 +1775,14 @@ mod tests {
             &mut cpg,
             implementation,
             CpgNodeKind::Function {
-                signature: MethodSignature {
+                signature: Box::new(MethodSignature {
                     name: "set".into(),
                     params: Default::default(),
                     return_type: None,
                     is_static: false,
                     is_async: false,
                     visibility: Visibility::Public,
-                },
+                }),
             },
         );
         let body = dfg_child(
@@ -1949,14 +1949,14 @@ mod tests {
             &mut cpg,
             wrapper,
             CpgNodeKind::Function {
-                signature: MethodSignature {
+                signature: Box::new(MethodSignature {
                     name: "m".into(),
                     params: Default::default(),
                     return_type: None,
                     is_static: false,
                     is_async: false,
                     visibility: Visibility::Public,
-                },
+                }),
             },
         );
         let body = dfg_child(
@@ -2077,14 +2077,14 @@ mod tests {
             &mut cpg,
             implementation,
             CpgNodeKind::Function {
-                signature: MethodSignature {
+                signature: Box::new(MethodSignature {
                     name: "method".into(),
                     params: Default::default(),
                     return_type: None,
                     is_static: false,
                     is_async: false,
                     visibility: Visibility::Private,
-                },
+                }),
             },
         );
         let access = dfg_child(
@@ -2098,14 +2098,14 @@ mod tests {
             &mut cpg,
             method,
             CpgNodeKind::Function {
-                signature: MethodSignature {
+                signature: Box::new(MethodSignature {
                     name: "nested".into(),
                     params: Default::default(),
                     return_type: None,
                     is_static: false,
                     is_async: false,
                     visibility: Visibility::Private,
-                },
+                }),
             },
         );
         let nested_access = dfg_child(
@@ -2194,14 +2194,14 @@ mod tests {
             &mut cpg,
             root,
             CpgNodeKind::Function {
-                signature: MethodSignature {
+                signature: Box::new(MethodSignature {
                     name: "free".into(),
                     params: Default::default(),
                     return_type: None,
                     is_static: false,
                     is_async: false,
                     visibility: Visibility::Private,
-                },
+                }),
             },
         );
         dfg_child(
@@ -2256,14 +2256,14 @@ mod tests {
             &mut cpg,
             implementation,
             CpgNodeKind::Function {
-                signature: MethodSignature {
+                signature: Box::new(MethodSignature {
                     name: "method".into(),
                     params: Default::default(),
                     return_type: None,
                     is_static: false,
                     is_async: false,
                     visibility: Visibility::Private,
-                },
+                }),
             },
         );
         let unknown_type = dfg_child(
@@ -2596,14 +2596,14 @@ mod config_flags {
         let func = cpg.add_node(CpgNode::new(
             NodeId::new(0),
             CpgNodeKind::Function {
-                signature: MethodSignature {
+                signature: Box::new(MethodSignature {
                     name: "f".into(),
                     params: Default::default(),
                     return_type: None,
                     is_static: false,
                     is_async: false,
                     visibility: Visibility::Public,
-                },
+                }),
             },
             SourceRange::default(),
         ));
@@ -2770,14 +2770,14 @@ mod cyclic_ast_regression {
         let func = cpg.add_node(CpgNode::new(
             NodeId::new(0),
             CpgNodeKind::Function {
-                signature: MethodSignature {
+                signature: Box::new(MethodSignature {
                     name: "f".into(),
                     params: Default::default(),
                     return_type: None,
                     is_static: false,
                     is_async: false,
                     visibility: Visibility::Public,
-                },
+                }),
             },
             SourceRange::default(),
         ));
@@ -3002,7 +3002,9 @@ mod proptests {
             .with_parent(NodeId::new(0)),
             CpgNode::new(
                 NodeId::new(5),
-                CpgNodeKind::Function { signature: method },
+                CpgNodeKind::Function {
+                    signature: Box::new(method),
+                },
                 SourceRange::default(),
             )
             .with_parent(NodeId::new(4)),
@@ -3240,14 +3242,14 @@ mod proptests {
             let callee = cpg.add_node(CpgNode::new(
                 NodeId::new(0),
                 CpgNodeKind::Function {
-                    signature: MethodSignature {
+                    signature: Box::new(MethodSignature {
                         name: "callee".into(),
                         params: Default::default(),
                         return_type: None,
                         is_static: false,
                         is_async: false,
                         visibility: Visibility::Private,
-                    },
+                    }),
                 },
                 SourceRange::default(),
             ));
@@ -3275,14 +3277,14 @@ mod proptests {
                 &mut cpg,
                 callee,
                 CpgNodeKind::Function {
-                    signature: MethodSignature {
+                    signature: Box::new(MethodSignature {
                         name: "nested".into(),
                         params: Default::default(),
                         return_type: None,
                         is_static: false,
                         is_async: false,
                         visibility: Visibility::Private,
-                    },
+                    }),
                 },
             );
             let excluded_parameter = wf_child(

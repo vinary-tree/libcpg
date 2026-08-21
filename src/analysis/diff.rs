@@ -602,7 +602,7 @@ fn snapshot_node(node: &CpgNode) -> DiffNode {
         text: node.text.clone(),
         message_kind: node.message_kind,
         lock_kind: node.lock_kind,
-        allocation_type: node.allocation_type.clone(),
+        allocation_type: node.allocation_type.as_deref().cloned(),
         properties,
         children: node.children.to_vec(),
         parent: node.parent,

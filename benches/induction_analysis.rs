@@ -26,14 +26,14 @@ fn node(kind: CpgNodeKind) -> CpgNode {
 
 fn function() -> CpgNodeKind {
     CpgNodeKind::Function {
-        signature: MethodSignature {
+        signature: Box::new(MethodSignature {
             name: "benchmark_induction".into(),
             params: Default::default(),
             return_type: None,
             is_static: false,
             is_async: false,
             visibility: Visibility::Private,
-        },
+        }),
     }
 }
 

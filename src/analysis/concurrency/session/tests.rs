@@ -21,14 +21,14 @@ fn function(id: u32, name: &str) -> CpgNode {
     node(
         id,
         CpgNodeKind::Function {
-            signature: MethodSignature {
+            signature: Box::new(MethodSignature {
                 name: name.into(),
                 params: Default::default(),
                 return_type: None,
                 is_static: false,
                 is_async: false,
                 visibility: Visibility::Public,
-            },
+            }),
         },
     )
 }
@@ -94,7 +94,7 @@ fn payload_node(id: u32, payload: &SessionPayloadType) -> CpgNode {
         },
         SessionPayloadType::Named(name) => CpgNodeKind::Parameter {
             name: "payload".into(),
-            param_type: Some(TypeInfo::new(name.clone())),
+            param_type: Some(Box::new(TypeInfo::new(name.clone()))),
             is_variadic: false,
         },
         SessionPayloadType::Unknown => CpgNodeKind::Parameter {
@@ -347,7 +347,7 @@ fn typed_identifier_payload_uses_definition_evidence() {
         50,
         CpgNodeKind::Variable {
             name: "account".into(),
-            var_type: Some(TypeInfo::new("Account")),
+            var_type: Some(Box::new(TypeInfo::new("Account"))),
             scope: ScopeId::GLOBAL,
             is_mutable: false,
         },

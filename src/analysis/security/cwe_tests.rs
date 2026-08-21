@@ -23,14 +23,14 @@ fn function(cpg: &mut CodePropertyGraph, name: &str) -> NodeId {
     add(
         cpg,
         CpgNodeKind::Function {
-            signature: MethodSignature {
+            signature: Box::new(MethodSignature {
                 name: name.into(),
                 params: Default::default(),
                 return_type: None,
                 is_static: false,
                 is_async: false,
                 visibility: Visibility::Private,
-            },
+            }),
         },
     )
 }
@@ -192,7 +192,7 @@ fn overflow_fixture(left: i64, right: i64) -> CodePropertyGraph {
         function,
         CpgNodeKind::Variable {
             name: "value".into(),
-            var_type: Some(TypeInfo::new("i8")),
+            var_type: Some(Box::new(TypeInfo::new("i8"))),
             scope: ScopeId::GLOBAL,
             is_mutable: false,
         },
@@ -263,7 +263,7 @@ fn cwe_190_reports_contradictory_represented_integer_types() {
         &mut cpg,
         CpgNodeKind::Variable {
             name: "other".into(),
-            var_type: Some(TypeInfo::new("i16")),
+            var_type: Some(Box::new(TypeInfo::new("i16"))),
             scope: ScopeId::GLOBAL,
             is_mutable: false,
         },
@@ -491,14 +491,14 @@ fn permutation_fixture(reverse_relations: bool) -> CodePropertyGraph {
         &mut cpg,
         1,
         CpgNodeKind::Function {
-            signature: MethodSignature {
+            signature: Box::new(MethodSignature {
                 name: "permutation".into(),
                 params: Default::default(),
                 return_type: None,
                 is_static: false,
                 is_async: false,
                 visibility: Visibility::Private,
-            },
+            }),
         },
     );
     let source = add_with_id(
@@ -603,7 +603,7 @@ fn depth_100_000_interval_template_is_safe_on_64_kib_stack() {
                 function,
                 CpgNodeKind::Variable {
                     name: "value".into(),
-                    var_type: Some(TypeInfo::new("i64")),
+                    var_type: Some(Box::new(TypeInfo::new("i64"))),
                     scope: ScopeId::GLOBAL,
                     is_mutable: false,
                 },

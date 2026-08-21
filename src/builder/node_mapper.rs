@@ -255,14 +255,14 @@ impl NodeMapper {
 
             // Functions
             "function_item" | "function_signature_item" => CpgNodeKind::Function {
-                signature: self.extract_rust_function_signature(node, source),
+                signature: Box::new(self.extract_rust_function_signature(node, source)),
             },
             "closure_expression" => CpgNodeKind::Lambda {
                 captures: SmallVec::new(),
             },
             "parameter" => CpgNodeKind::Parameter {
                 name: self.extract_pattern_name(node, source),
-                param_type: self.extract_type_from_node(node, source),
+                param_type: self.extract_type_from_node(node, source).map(Box::new),
                 is_variadic: false,
             },
             "block" => CpgNodeKind::Block {
@@ -272,20 +272,20 @@ impl NodeMapper {
             // Variables
             "let_declaration" => CpgNodeKind::Variable {
                 name: self.extract_pattern_name(node, source),
-                var_type: self.extract_type_from_node(node, source),
+                var_type: self.extract_type_from_node(node, source).map(Box::new),
                 scope: ScopeId::GLOBAL,
                 is_mutable: self.has_child_kind(node, "mutable_specifier"),
             },
             "const_item" | "static_item" => CpgNodeKind::Variable {
                 name: self.extract_child_text(node, "name", source),
-                var_type: self.extract_type_from_node(node, source),
+                var_type: self.extract_type_from_node(node, source).map(Box::new),
                 scope: ScopeId::GLOBAL,
                 is_mutable: ts_kind == "static_item"
                     && self.has_child_kind(node, "mutable_specifier"),
             },
             "field_declaration" => CpgNodeKind::Field {
                 name: self.extract_child_text(node, "name", source),
-                field_type: self.extract_type_from_node(node, source),
+                field_type: self.extract_type_from_node(node, source).map(Box::new),
                 visibility: self.extract_rust_visibility(node),
             },
 
@@ -386,7 +386,7 @@ impl NodeMapper {
                     || self.node_text(node, source).starts_with("//!"),
             },
             "type_item" => CpgNodeKind::TypeAnnotation {
-                type_info: TypeInfo::new(self.extract_child_text(node, "name", source)),
+                type_info: Box::new(TypeInfo::new(self.extract_child_text(node, "name", source))),
             },
             "generic_type" | "type_parameters" => CpgNodeKind::GenericParam {
                 name: Arc::from(self.node_text(node, source)),
@@ -412,7 +412,7 @@ impl NodeMapper {
 
             // Functions
             "function_definition" => CpgNodeKind::Function {
-                signature: self.extract_python_function_signature(node, source),
+                signature: Box::new(self.extract_python_function_signature(node, source)),
             },
             "lambda" => CpgNodeKind::Lambda {
                 captures: SmallVec::new(),
@@ -539,10 +539,10 @@ impl NodeMapper {
             | "function_expression"
             | "generator_function_declaration"
             | "generator_function" => CpgNodeKind::Function {
-                signature: self.extract_js_function_signature(node, source),
+                signature: Box::new(self.extract_js_function_signature(node, source)),
             },
             "method_definition" => CpgNodeKind::Function {
-                signature: self.extract_js_function_signature(node, source),
+                signature: Box::new(self.extract_js_function_signature(node, source)),
             },
             "arrow_function" => CpgNodeKind::Lambda {
                 captures: SmallVec::new(),
@@ -684,7 +684,7 @@ impl NodeMapper {
                 name: Arc::from(self.node_text(node, source)),
             },
             "function_declaration" | "method_declaration" => CpgNodeKind::Function {
-                signature: self.extract_go_function_signature(node, source),
+                signature: Box::new(self.extract_go_function_signature(node, source)),
             },
             "func_literal" => CpgNodeKind::Lambda {
                 captures: SmallVec::new(),
@@ -711,7 +711,7 @@ impl NodeMapper {
             },
             "field_declaration" => CpgNodeKind::Field {
                 name: self.extract_field_name(node, source),
-                field_type: self.extract_type_from_node(node, source),
+                field_type: self.extract_type_from_node(node, source).map(Box::new),
                 visibility: Visibility::Public,
             },
             "if_statement" => CpgNodeKind::If,
@@ -798,7 +798,7 @@ impl NodeMapper {
                 name: self.extract_child_text(node, "name", source),
             },
             "method_declaration" | "constructor_declaration" => CpgNodeKind::Function {
-                signature: self.extract_java_function_signature(node, source),
+                signature: Box::new(self.extract_java_function_signature(node, source)),
             },
             "lambda_expression" => CpgNodeKind::Lambda {
                 captures: SmallVec::new(),
@@ -806,7 +806,7 @@ impl NodeMapper {
             "formal_parameter" | "spread_parameter" | "catch_formal_parameter" => {
                 CpgNodeKind::Parameter {
                     name: self.extract_child_text(node, "name", source),
-                    param_type: self.extract_java_parameter_type(node, source),
+                    param_type: self.extract_java_parameter_type(node, source).map(Box::new),
                     is_variadic: ts_kind == "spread_parameter",
                 }
             }
@@ -821,7 +821,7 @@ impl NodeMapper {
             },
             "field_declaration" => CpgNodeKind::Field {
                 name: self.extract_field_name(node, source),
-                field_type: self.extract_type_from_node(node, source),
+                field_type: self.extract_type_from_node(node, source).map(Box::new),
                 visibility: self.extract_java_visibility(node),
             },
             "if_statement" => CpgNodeKind::If,
@@ -919,7 +919,7 @@ impl NodeMapper {
                 name: self.extract_child_text(node, "name", source),
             },
             "function_definition" | "function_declarator" => CpgNodeKind::Function {
-                signature: self.extract_c_function_signature(node, source),
+                signature: Box::new(self.extract_c_function_signature(node, source)),
             },
             "lambda_expression" => CpgNodeKind::Lambda {
                 captures: SmallVec::new(),
@@ -940,7 +940,7 @@ impl NodeMapper {
             },
             "field_declaration" => CpgNodeKind::Field {
                 name: self.extract_field_name(node, source),
-                field_type: self.extract_type_from_node(node, source),
+                field_type: self.extract_type_from_node(node, source).map(Box::new),
                 visibility: Visibility::Public,
             },
             "if_statement" => CpgNodeKind::If,
@@ -1028,7 +1028,7 @@ impl NodeMapper {
                 is_abstract: false,
             },
             "method" | "singleton_method" => CpgNodeKind::Function {
-                signature: self.extract_ruby_function_signature(node, source),
+                signature: Box::new(self.extract_ruby_function_signature(node, source)),
             },
             "lambda" | "block" | "do_block" => CpgNodeKind::Lambda {
                 captures: SmallVec::new(),
@@ -1217,7 +1217,7 @@ impl NodeMapper {
         match ts_kind {
             "program" => CpgNodeKind::Root,
             "function_definition" => CpgNodeKind::Function {
-                signature: self.extract_bash_function_signature(node, source),
+                signature: Box::new(self.extract_bash_function_signature(node, source)),
             },
             "compound_statement" => CpgNodeKind::Block {
                 scope: ScopeId::GLOBAL,
@@ -1369,16 +1369,16 @@ impl NodeMapper {
             // `block` is the LAST AST child, matching the CFG builder's
             // body = last-child rule (`cfg.rs:76-77`).
             "contract" => CpgNodeKind::Function {
-                signature: self.rholang_signature(node, source, "contract"),
+                signature: Box::new(self.rholang_signature(node, source, "contract")),
             },
             "constructor_decl" => CpgNodeKind::Function {
-                signature: self.rholang_signature(node, source, "constructor"),
+                signature: Box::new(self.rholang_signature(node, source, "constructor")),
             },
             "method_decl" => CpgNodeKind::Function {
-                signature: self.rholang_signature(node, source, "method"),
+                signature: Box::new(self.rholang_signature(node, source, "method")),
             },
             "default_decl" => CpgNodeKind::Function {
-                signature: self.rholang_signature(node, source, "default"),
+                signature: Box::new(self.rholang_signature(node, source, "default")),
             },
             // Agent = object-like grouping of a constructor + methods.
             "agent_block" => CpgNodeKind::Class {
@@ -1481,7 +1481,7 @@ impl NodeMapper {
 
             // --- Types ---
             "simple_type" => CpgNodeKind::TypeAnnotation {
-                type_info: TypeInfo::new(self.node_text(node, source)),
+                type_info: Box::new(TypeInfo::new(self.node_text(node, source))),
             },
 
             // --- Literals ---
@@ -1805,18 +1805,18 @@ impl NodeMapper {
             // `(= LHS RHS)` / `(:= LHS RHS)` rule definition → Function (CFG
             // entry); body = RHS = last AST child.
             "assignment_operator" | "rule_definition_operator" => CpgNodeKind::Function {
-                signature: MethodSignature {
+                signature: Box::new(MethodSignature {
                     name: self.metta_rule_name(node, source),
                     params: SmallVec::new(),
                     return_type: None,
                     is_static: false,
                     is_async: false,
                     visibility: Visibility::Public,
-                },
+                }),
             },
             // `(: name Type)` annotation / `(-> A B R)` function-type.
             "type_annotation_operator" | "arrow_operator" => CpgNodeKind::TypeAnnotation {
-                type_info: TypeInfo::new(self.node_text(node, source)),
+                type_info: Box::new(TypeInfo::new(self.node_text(node, source))),
             },
             // A user/built-in identifier head: a handful of built-ins have
             // control/structural meaning; everything else is a function

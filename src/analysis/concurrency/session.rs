@@ -456,10 +456,12 @@ fn payload_type(cpg: &CodePropertyGraph, node: NodeId) -> Option<SessionPayloadT
     let kind = &cpg.node(node)?.kind;
     match kind {
         CpgNodeKind::Literal { kind } => Some(literal_payload_type(kind)),
-        CpgNodeKind::Variable { var_type, .. } => Some(named_or_unknown(var_type.as_ref())),
-        CpgNodeKind::Parameter { param_type, .. } => Some(named_or_unknown(param_type.as_ref())),
-        CpgNodeKind::Field { field_type, .. } => Some(named_or_unknown(field_type.as_ref())),
-        CpgNodeKind::TypeAnnotation { type_info } => Some(type_info_payload_type(type_info)),
+        CpgNodeKind::Variable { var_type, .. } => Some(named_or_unknown(var_type.as_deref())),
+        CpgNodeKind::Parameter { param_type, .. } => Some(named_or_unknown(param_type.as_deref())),
+        CpgNodeKind::Field { field_type, .. } => Some(named_or_unknown(field_type.as_deref())),
+        CpgNodeKind::TypeAnnotation { type_info } => {
+            Some(type_info_payload_type(type_info.as_ref()))
+        }
         CpgNodeKind::Identifier { .. } => Some(
             referenced_type(cpg, node)
                 .map(type_info_payload_type)
@@ -567,10 +569,10 @@ fn referenced_type(cpg: &CodePropertyGraph, identifier: NodeId) -> Option<&TypeI
     definitions.into_iter().find_map(|definition| {
         let definition = cpg.node(definition)?;
         match &definition.kind {
-            CpgNodeKind::Variable { var_type, .. } => var_type.as_ref(),
-            CpgNodeKind::Parameter { param_type, .. } => param_type.as_ref(),
-            CpgNodeKind::Field { field_type, .. } => field_type.as_ref(),
-            CpgNodeKind::TypeAnnotation { type_info } => Some(type_info),
+            CpgNodeKind::Variable { var_type, .. } => var_type.as_deref(),
+            CpgNodeKind::Parameter { param_type, .. } => param_type.as_deref(),
+            CpgNodeKind::Field { field_type, .. } => field_type.as_deref(),
+            CpgNodeKind::TypeAnnotation { type_info } => Some(type_info.as_ref()),
             _ => None,
         }
     })

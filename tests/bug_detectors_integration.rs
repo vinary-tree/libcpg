@@ -15,14 +15,14 @@ fn node(kind: CpgNodeKind) -> CpgNode {
 
 fn function_kind(name: &str) -> CpgNodeKind {
     CpgNodeKind::Function {
-        signature: MethodSignature {
+        signature: Box::new(MethodSignature {
             name: name.into(),
             params: Default::default(),
             return_type: None,
             is_static: false,
             is_async: false,
             visibility: Visibility::Private,
-        },
+        }),
     }
 }
 
@@ -80,7 +80,7 @@ fn public_detectors_report_all_three_bug_classes_without_mutating_the_cpg() {
         &mut cpg,
         throw,
         CpgNodeKind::TypeAnnotation {
-            type_info: TypeInfo::new("Failure"),
+            type_info: Box::new(TypeInfo::new("Failure")),
         },
     );
     for (source, target) in [(function, open), (open, throw)] {
@@ -251,7 +251,7 @@ fn public_detectors_cross_ast_depth_100_000_on_a_small_stack() {
                 &mut cpg,
                 throw,
                 CpgNodeKind::TypeAnnotation {
-                    type_info: TypeInfo::new("Failure"),
+                    type_info: Box::new(TypeInfo::new("Failure")),
                 },
             );
             let catch = child(&mut cpg, try_node, CpgNodeKind::Catch);
@@ -260,7 +260,7 @@ fn public_detectors_cross_ast_depth_100_000_on_a_small_stack() {
                 catch,
                 CpgNodeKind::Parameter {
                     name: "error".into(),
-                    param_type: Some(TypeInfo::new("Failure")),
+                    param_type: Some(Box::new(TypeInfo::new("Failure"))),
                     is_variadic: false,
                 },
             );

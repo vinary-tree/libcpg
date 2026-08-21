@@ -722,14 +722,14 @@ mod tests {
 
     fn function() -> CpgNodeKind {
         CpgNodeKind::Function {
-            signature: MethodSignature {
+            signature: Box::new(MethodSignature {
                 name: "sccp_fixture".into(),
                 params: Default::default(),
                 return_type: None,
                 is_static: false,
                 is_async: false,
                 visibility: Visibility::Private,
-            },
+            }),
         }
     }
 

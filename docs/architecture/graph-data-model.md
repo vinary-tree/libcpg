@@ -47,7 +47,7 @@ pub struct CpgNode {
     pub text: Option<Arc<str>>,          // original source slice, for terminals
     pub message_kind: Option<MsgKind>,   // typed channel operation, if any
     pub lock_kind: Option<LockKind>,     // typed lock operation, if any
-    pub allocation_type: Option<TypeInfo>, // nominal constructor result, if any
+    pub allocation_type: Option<Box<TypeInfo>>, // nominal constructor result, if any
     pub properties: FxHashMap<PropertyKey, PropertyValue>,
     pub children: SmallVec<[NodeId; 4]>, // AST child ids (inline for small arity)
     pub parent: Option<NodeId>,          // AST parent
@@ -62,6 +62,13 @@ nominal allocation field; unsupported frontends leave it `None`. Convenience
 methods layer over the fields: `name() -> Option<&str>` (the bound name for the
 kinds that have one), and the predicates `is_declaration`, `is_statement`,
 `is_expression`, `is_control_flow`, `is_error`.
+
+Large, cold payloads use owned heap indirection: `Function.signature` is
+`Box<MethodSignature>`; optional parameter, variable, field, and allocation
+types are `Option<Box<TypeInfo>>`; and `TypeAnnotation.type_info` is
+`Box<TypeInfo>`. This makes common nodes dense without introducing shared
+ownership or lifetimes. The indirection is transparent to Serde's data model
+and to field reads through `Deref`; it affects Rust construction syntax only.
 
 ### The 45 `CpgNodeKind` variants
 

@@ -275,14 +275,14 @@ impl NodeKindTag {
                 trait_name: None,
             },
             Self::Function => CpgNodeKind::Function {
-                signature: MethodSignature {
+                signature: Box::new(MethodSignature {
                     name,
                     params: Default::default(),
                     return_type: None,
                     is_static: false,
                     is_async: false,
                     visibility: Visibility::Public,
-                },
+                }),
             },
             Self::Parameter => CpgNodeKind::Parameter {
                 name,
@@ -788,7 +788,7 @@ mod tests {
             ),
             (
                 CpgNodeKind::Function {
-                    signature: func_sig("f"),
+                    signature: Box::new(func_sig("f")),
                 },
                 NodeKindTag::Function,
             ),
@@ -933,7 +933,7 @@ mod tests {
             is_abstract: false,
         };
         let func = CpgNodeKind::Function {
-            signature: func_sig("f"),
+            signature: Box::new(func_sig("f")),
         };
         let var = CpgNodeKind::Variable {
             name: Arc::from("v"),

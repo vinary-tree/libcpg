@@ -18,14 +18,14 @@ mod scc_analysis {
 
     fn function(name: &str) -> CpgNodeKind {
         CpgNodeKind::Function {
-            signature: MethodSignature {
+            signature: Box::new(MethodSignature {
                 name: name.into(),
                 params: Default::default(),
                 return_type: None,
                 is_static: false,
                 is_async: false,
                 visibility: Visibility::Private,
-            },
+            }),
         }
     }
 
@@ -114,14 +114,14 @@ mod reachability_analysis {
         let function = cpg.add_node_with_id(node(
             10,
             CpgNodeKind::Function {
-                signature: MethodSignature {
+                signature: Box::new(MethodSignature {
                     name: "f".into(),
                     params: Default::default(),
                     return_type: None,
                     is_static: false,
                     is_async: false,
                     visibility: Visibility::Private,
-                },
+                }),
             },
         ));
         let live = cpg.add_node_with_id(node(
@@ -171,14 +171,14 @@ mod basic_block_analysis {
         let function = cpg.add_node_with_id(node(
             10,
             CpgNodeKind::Function {
-                signature: MethodSignature {
+                signature: Box::new(MethodSignature {
                     name: "blocks".into(),
                     params: Default::default(),
                     return_type: None,
                     is_static: false,
                     is_async: false,
                     visibility: Visibility::Private,
-                },
+                }),
             },
         ));
         let guard = cpg.add_node_with_id(node(20, CpgNodeKind::If));
@@ -253,14 +253,14 @@ mod dataflow_framework {
         let function = cpg.add_node_with_id(node(
             10,
             CpgNodeKind::Function {
-                signature: MethodSignature {
+                signature: Box::new(MethodSignature {
                     name: "flow".into(),
                     params: Default::default(),
                     return_type: None,
                     is_static: false,
                     is_async: false,
                     visibility: Visibility::Private,
-                },
+                }),
             },
         ));
         let branch = cpg.add_node_with_id(node(20, CpgNodeKind::If));
@@ -295,14 +295,14 @@ mod dataflow_framework {
         let function = cpg.add_node_with_id(node(
             10,
             CpgNodeKind::Function {
-                signature: MethodSignature {
+                signature: Box::new(MethodSignature {
                     name: "stores".into(),
                     params: Default::default(),
                     return_type: None,
                     is_static: false,
                     is_async: false,
                     visibility: Visibility::Private,
-                },
+                }),
             },
         ));
         let parameter = cpg.add_node_with_id(node(
@@ -662,14 +662,14 @@ mod expression_dataflow_analysis {
         let function = cpg.add_node_with_id(node(
             0,
             CpgNodeKind::Function {
-                signature: MethodSignature {
+                signature: Box::new(MethodSignature {
                     name: "expressions".into(),
                     params: Default::default(),
                     return_type: None,
                     is_static: false,
                     is_async: false,
                     visibility: Visibility::Private,
-                },
+                }),
             },
         ));
         let first = cpg.add_node_with_id(node(
@@ -737,14 +737,14 @@ mod expression_dataflow_analysis {
                 let function = cpg.add_node_with_id(node(
                     0,
                     CpgNodeKind::Function {
-                        signature: MethodSignature {
+                        signature: Box::new(MethodSignature {
                             name: "deep".into(),
                             params: Default::default(),
                             return_type: None,
                             is_static: false,
                             is_async: false,
                             visibility: Visibility::Private,
-                        },
+                        }),
                     },
                 ));
                 let mut parent = function;

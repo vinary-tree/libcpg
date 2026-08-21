@@ -42,14 +42,14 @@ fn fixture(population: usize) -> CodePropertyGraph {
     let mut cpg = CodePropertyGraph::new(Language::Rust);
     for index in 0..population {
         let owner = cpg.add_node(node(CpgNodeKind::Function {
-            signature: MethodSignature {
+            signature: Box::new(MethodSignature {
                 name: format!("endpoint_{index}").into(),
                 params: Default::default(),
                 return_type: None,
                 is_static: false,
                 is_async: false,
                 visibility: Visibility::Private,
-            },
+            }),
         }));
         let source = call(&mut cpg, owner, "request.body");
         let sink = call(&mut cpg, owner, "sqlx::query");

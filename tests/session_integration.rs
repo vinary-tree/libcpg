@@ -20,14 +20,14 @@ fn function(id: u32, name: &str) -> CpgNode {
     node(
         id,
         CpgNodeKind::Function {
-            signature: MethodSignature {
+            signature: Box::new(MethodSignature {
                 name: name.into(),
                 params: Default::default(),
                 return_type: None,
                 is_static: false,
                 is_async: false,
                 visibility: Visibility::Public,
-            },
+            }),
         },
     )
 }
@@ -104,7 +104,7 @@ fn root_api_proves_a_typed_binary_oracle_conformant() {
             202,
             CpgNodeKind::Parameter {
                 name: "value".into(),
-                param_type: Some(TypeInfo::new("Int")),
+                param_type: Some(Box::new(TypeInfo::new("Int"))),
                 is_variadic: false,
             },
         ),

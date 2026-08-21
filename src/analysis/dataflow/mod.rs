@@ -896,14 +896,14 @@ mod tests {
 
     fn function() -> CpgNodeKind {
         CpgNodeKind::Function {
-            signature: MethodSignature {
+            signature: Box::new(MethodSignature {
                 name: "flow".into(),
                 params: Default::default(),
                 return_type: None,
                 is_static: false,
                 is_async: false,
                 visibility: Visibility::Private,
-            },
+            }),
         }
     }
 

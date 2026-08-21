@@ -418,10 +418,10 @@ fn value_types(cpg: &CodePropertyGraph, value: NodeId) -> BTreeSet<ExceptionType
 fn type_names(kind: &CpgNodeKind) -> BTreeSet<ExceptionType> {
     let mut names = BTreeSet::new();
     let type_info = match kind {
-        CpgNodeKind::Variable { var_type, .. } => var_type.as_ref(),
-        CpgNodeKind::Parameter { param_type, .. } => param_type.as_ref(),
-        CpgNodeKind::Field { field_type, .. } => field_type.as_ref(),
-        CpgNodeKind::TypeAnnotation { type_info } => Some(type_info),
+        CpgNodeKind::Variable { var_type, .. } => var_type.as_deref(),
+        CpgNodeKind::Parameter { param_type, .. } => param_type.as_deref(),
+        CpgNodeKind::Field { field_type, .. } => field_type.as_deref(),
+        CpgNodeKind::TypeAnnotation { type_info } => Some(type_info.as_ref()),
         CpgNodeKind::Function { signature } => signature.return_type.as_ref(),
         CpgNodeKind::Class { name, .. }
         | CpgNodeKind::Struct { name }

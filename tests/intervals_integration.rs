@@ -24,14 +24,14 @@ fn public_value_range_pipeline_refines_both_integer_comparison_edges() {
     let function = cpg.add_node_with_id(node(
         10,
         CpgNodeKind::Function {
-            signature: MethodSignature {
+            signature: Box::new(MethodSignature {
                 name: "classify".into(),
                 params: Default::default(),
                 return_type: None,
                 is_static: false,
                 is_async: false,
                 visibility: Visibility::Private,
-            },
+            }),
         },
     ));
     let parameter = cpg.add_node_with_id(node(
@@ -131,14 +131,14 @@ fn public_value_ranges_evaluate_depth_100_000_on_a_small_stack() {
             let function = cpg.add_node_with_id(node(
                 0,
                 CpgNodeKind::Function {
-                    signature: MethodSignature {
+                    signature: Box::new(MethodSignature {
                         name: "deep_interval".into(),
                         params: Default::default(),
                         return_type: None,
                         is_static: false,
                         is_async: false,
                         visibility: Visibility::Private,
-                    },
+                    }),
                 },
             ));
             let declaration = cpg.add_node_with_id(node(

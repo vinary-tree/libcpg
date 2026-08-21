@@ -30,13 +30,15 @@ unreliable workaround.
 
 ### 1. Preserve allocation semantics at the frontend boundary
 
-`CpgNode::allocation_type: Option<TypeInfo>` records the normalized nominal
+`CpgNode::allocation_type: Option<Box<TypeInfo>>` records the normalized nominal
 type allocated by a constructor expression. JavaScript and TypeScript
 `new_expression` nodes read the grammar's `constructor` field; Java
 `object_creation_expression` nodes read its `type` field. Other syntax remains
 `None` until its frontend supplies an equally typed mapping.
 
-The field is orthogonal to `CpgNodeKind::Call`, just as `message_kind` and
+The box bounds the inline size of every node and is transparent to Serde's wire
+shape; callers use `allocation_type.as_deref()` for `Option<&TypeInfo>`. The
+field is orthogonal to `CpgNodeKind::Call`, just as `message_kind` and
 `lock_kind` preserve semantic roles without destroying shared call structure.
 It defaults to `None` in legacy serde input.
 

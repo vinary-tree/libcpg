@@ -32,7 +32,7 @@ pub struct CpgNode {
     /// Typed lock semantics for a synchronization call, if any.
     pub lock_kind: Option<LockKind>,
     /// Nominal constructor result, when normalized.
-    pub allocation_type: Option<TypeInfo>,
+    pub allocation_type: Option<Box<TypeInfo>>,
     /// Extra key/value metadata.
     pub properties: FxHashMap<PropertyKey, PropertyValue>,
     /// AST children, in source order.
@@ -107,8 +107,8 @@ The top-level shape of a compilation unit.
 
 | Variant | Fields | Example |
 |---------|--------|---------|
-| `Function` | `signature: MethodSignature` | `fn foo(x: i32) -> i32` |
-| `Parameter` | `name: Arc<str>`, `param_type: Option<TypeInfo>`, `is_variadic: bool` | `x: i32`, `*args` |
+| `Function` | `signature: Box<MethodSignature>` | `fn foo(x: i32) -> i32` |
+| `Parameter` | `name: Arc<str>`, `param_type: Option<Box<TypeInfo>>`, `is_variadic: bool` | `x: i32`, `*args` |
 | `Block` | `scope: ScopeId` | `{ stmt1; stmt2; }` |
 
 Both free functions and methods use the single `Function` variant; the
@@ -119,8 +119,8 @@ and `is_static`).
 
 | Variant | Fields | Example |
 |---------|--------|---------|
-| `Variable` | `name: Arc<str>`, `var_type: Option<TypeInfo>`, `scope: ScopeId`, `is_mutable: bool` | `let x = 5` |
-| `Field` | `name: Arc<str>`, `field_type: Option<TypeInfo>`, `visibility: Visibility` | `struct S { x: i32 }` |
+| `Variable` | `name: Arc<str>`, `var_type: Option<Box<TypeInfo>>`, `scope: ScopeId`, `is_mutable: bool` | `let x = 5` |
+| `Field` | `name: Arc<str>`, `field_type: Option<Box<TypeInfo>>`, `visibility: Visibility` | `struct S { x: i32 }` |
 
 ### Statement nodes (14)
 
@@ -159,8 +159,42 @@ definition or from a call site to its callee.
 
 | Variant | Fields | Example |
 |---------|--------|---------|
-| `TypeAnnotation` | `type_info: TypeInfo` | `: i32` |
+| `TypeAnnotation` | `type_info: Box<TypeInfo>` | `: i32` |
 | `GenericParam` | `name: Arc<str>` | `<T>` |
+
+### Payload indirection
+
+Function signatures and node-owned type information are boxed because they are
+rare and substantially larger than the common unit or name-bearing variants.
+Without indirection, Rust sizes every `CpgNodeKind` for its largest variant and
+every graph node pays for that space. Boxing these cold payloads keeps the
+language-feature benchmark layout at 168 bytes per `CpgNode`, down from 592,
+while preserving ownership and exact semantics.
+
+The box is visible in constructors but transparent to ordinary reads:
+
+```rust
+use libcpg::{CpgNodeKind, MethodSignature, TypeInfo, Visibility};
+
+let function = CpgNodeKind::Function {
+    signature: Box::new(MethodSignature {
+        name: "parse".into(),
+        params: Default::default(),
+        return_type: Some(TypeInfo::new("Ast")),
+        is_static: false,
+        is_async: false,
+        visibility: Visibility::Public,
+    }),
+};
+
+if let CpgNodeKind::Function { signature } = &function {
+    assert_eq!(signature.name.as_ref(), "parse");
+}
+```
+
+For optional node types, `var_type.as_deref()` produces
+`Option<&TypeInfo>`. Serde serializes `Box<T>` exactly like `T`; persisted JSON
+does not gain an extra wrapper level.
 
 ### Special nodes (6)
 

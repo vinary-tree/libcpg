@@ -450,14 +450,14 @@ mod tests {
         cpg.add_node_with_id(node(
             23,
             CpgNodeKind::Function {
-                signature: crate::MethodSignature {
+                signature: Box::new(crate::MethodSignature {
                     name: "later".into(),
                     params: Default::default(),
                     return_type: None,
                     is_static: false,
                     is_async: false,
                     visibility: crate::Visibility::Private,
-                },
+                }),
             },
         ));
         cpg.add_node_with_id(call(24));

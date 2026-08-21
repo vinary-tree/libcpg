@@ -309,6 +309,67 @@ construction; restricting that scan to explicit-id reconstruction or a
 conflicting pre-populated parent removed the regression while preserving the
 edge-order oracle. The hypothesis is accepted.
 
+### T9.1 H04 — boxed cold node payloads
+
+**Hypothesis.** `CpgNode` was 592 bytes because its closed `CpgNodeKind` union
+stored a complete `MethodSignature` inline and several uncommon fields stored a
+complete `TypeInfo` inline. Moving those cold, variable-size payloads behind
+one heap pointer should reduce arena copy traffic and peak memory enough to
+outweigh the added allocations and pointer indirections.
+
+**Controlled change.** The experiment had two separately measured steps. H04a
+boxed only `Function.signature`. H04b also boxed the node-owned type payloads:
+`Parameter.param_type`, `Variable.var_type`, `Field.field_type`,
+`TypeAnnotation.type_info`, and `CpgNode.allocation_type`. A function's
+parameter and return types remain together inside its single boxed
+`MethodSignature`; they do not incur one allocation per parameter. Existing
+constructors still accept `TypeInfo` by value and perform the storage decision
+internally. Borrowing uses `Deref` or `Option::as_deref`, and Serde preserves
+the existing JSON representation without an object-wrapper layer.
+
+The correctness oracles include an exact JSON example for both boxed payload
+families, an all-variant node-kind serialization property, the independent
+recursive tree-builder oracle on fixed-bounded inputs, and the existing deep
+builder suites on a 256 KiB thread stack. A 64-bit layout regression asserts a
+168-byte upper bound rather than a feature-dependent exact value; the node was
+160 bytes in the all-features debug test and 168 bytes in the release
+language-feature profile. Rust layout is not a stable application binary
+interface, so the bound protects the intended compactness without asserting an
+unsupported byte-for-byte contract.
+
+**Controlled construction result against pre-H04 H02.** Criterion measured 20
+samples after a one-second warm-up on performance-governed CPUs 0–1:
+
+| Case | Before H04 | H04 | Median time change | Throughput change |
+| --- | ---: | ---: | ---: | ---: |
+| construction, 1,000-node linear AST | 81.664 µs | 66.613 µs | -18.41% | +22.56% |
+| construction, 10,000-node linear AST | 959.160 µs | 864.570 µs | -9.92% | +11.01% |
+| construction, 49-line parser corpus | 333.660 µs | 332.930 µs | -0.27% (within noise threshold) | +0.27% |
+| construction, 514-line parser corpus | 6.098 ms | 6.036 ms | -1.03% (within noise threshold) | +1.04% |
+
+H04a alone reduced the node to 288 bytes, total DHAT bytes by 24.81%, and peak
+live DHAT bytes by 36.97%. The completed H04b node is 168 bytes in the release
+profile, a 71.62% inline-size reduction. Headless DHAT measured 33,906,117
+allocated bytes, down 34.54%, and a 1,687,524-byte peak, down 51.46%. Massif's
+page-accounting peak fell 12.26%, from 13,492,224 to 11,837,440 bytes.
+
+The storage trade-off is explicit: boxing created 175,416 allocations, 780
+more than the 174,636 pre-H04 count (+0.45%), and perf's data translation
+lookaside buffer (dTLB) load misses rose from 24,120 to 31,819 (+31.92%). In the
+same aggregate profile, cycles fell 2.19%, instructions fell 0.66%, page faults
+fell 37.20%, dTLB loads fell 6.50%, and elapsed time fell 3.99%. Cache-reference
+and cache-miss samples moved downward but had 8.05% and 13.12% variation, so
+they are directional evidence only. Peak RSS fell 9.98%, but process-level RSS
+also contains measurement noise and is secondary to the exact layout and DHAT
+results.
+
+Against immutable `main`, the final tree improved the 1,000-node and
+10,000-node synthetic cases by 17.66% and 16.52%, respectively, and the
+49-line and 514-line parser cases by 7.10% and 10.11%. The hypothesis is
+accepted: substantially less inline and peak memory accompanied a net runtime
+improvement, while the documented allocation-count and dTLB-miss costs remain
+visible for future decisions.
+
 ## Reproduce and compare
 
 The benchmark wrapper defaults to CPUs 0 and 1 and stores logs under

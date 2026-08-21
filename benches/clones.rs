@@ -27,14 +27,14 @@ impl Case {
 
 fn function() -> CpgNodeKind {
     CpgNodeKind::Function {
-        signature: MethodSignature {
+        signature: Box::new(MethodSignature {
             name: Arc::from("clone_fixture"),
             params: Default::default(),
             return_type: None,
             is_static: false,
             is_async: false,
             visibility: Visibility::Private,
-        },
+        }),
     }
 }
 

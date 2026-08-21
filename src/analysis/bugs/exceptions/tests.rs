@@ -17,14 +17,14 @@ fn add(cpg: &mut CodePropertyGraph, id: u32, kind: CpgNodeKind) -> NodeId {
 
 fn function_kind(name: &str) -> CpgNodeKind {
     CpgNodeKind::Function {
-        signature: MethodSignature {
+        signature: Box::new(MethodSignature {
             name: name.into(),
             params: Default::default(),
             return_type: None,
             is_static: false,
             is_async: false,
             visibility: Visibility::Private,
-        },
+        }),
     }
 }
 
@@ -59,7 +59,7 @@ fn typed_throw(
             cpg,
             id + 1,
             CpgNodeKind::TypeAnnotation {
-                type_info: TypeInfo::new(exception),
+                type_info: Box::new(TypeInfo::new(exception)),
             },
         );
         ast(cpg, throw, value);
@@ -81,7 +81,7 @@ fn typed_catch(
             id + 1,
             CpgNodeKind::Parameter {
                 name: "error".into(),
-                param_type: Some(TypeInfo::new(exception)),
+                param_type: Some(Box::new(TypeInfo::new(exception))),
                 is_variadic: false,
             },
         );

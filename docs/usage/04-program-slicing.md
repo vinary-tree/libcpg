@@ -90,12 +90,6 @@ use libcpg::{
 fn add_child(cpg: &mut CodePropertyGraph, parent: NodeId, kind: CpgNodeKind) -> NodeId {
     let id = cpg.add_node(CpgNode::new(NodeId::new(0), kind, SourceRange::default()));
     cpg.connect(parent, id, CpgEdgeKind::AstChild);
-    if let Some(node) = cpg.node_mut(id) {
-        node.parent = Some(parent);
-    }
-    if let Some(p) = cpg.node_mut(parent) {
-        p.children.push(id);
-    }
     id
 }
 
@@ -106,14 +100,14 @@ fn main() {
     let func = cpg.add_node(CpgNode::new(
         NodeId::new(0),
         CpgNodeKind::Function {
-            signature: MethodSignature {
+            signature: Box::new(MethodSignature {
                 name: "f".into(),
                 params: Default::default(),
                 return_type: None,
                 is_static: false,
                 is_async: false,
                 visibility: Visibility::Public,
-            },
+            }),
         },
         SourceRange::default(),
     ));

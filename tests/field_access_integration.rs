@@ -48,14 +48,14 @@ fn class_assignment_fixture() -> (CodePropertyGraph, NodeId, NodeId, NodeId, Nod
         &mut cpg,
         class_body,
         CpgNodeKind::Function {
-            signature: MethodSignature {
+            signature: Box::new(MethodSignature {
                 name: "set".into(),
                 params: Default::default(),
                 return_type: None,
                 is_static: false,
                 is_async: false,
                 visibility: Visibility::Public,
-            },
+            }),
         },
     );
     let body = child(

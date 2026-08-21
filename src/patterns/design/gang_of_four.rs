@@ -388,7 +388,7 @@ mod tests {
         let constructor_id = cpg.add_node(CpgNode::new(
             NodeId::new(2),
             CpgNodeKind::Function {
-                signature: make_method("new", false),
+                signature: Box::new(make_method("new", false)),
             },
             range,
         ));
@@ -396,7 +396,7 @@ mod tests {
         let get_instance_id = cpg.add_node(CpgNode::new(
             NodeId::new(3),
             CpgNodeKind::Function {
-                signature: make_method("getInstance", true),
+                signature: Box::new(make_method("getInstance", true)),
             },
             range,
         ));
@@ -466,7 +466,7 @@ mod tests {
         let execute = cpg.add_node(CpgNode::new(
             NodeId::new(1),
             CpgNodeKind::Function {
-                signature: make_method("pay", false),
+                signature: Box::new(make_method("pay", false)),
             },
             range,
         ));
@@ -496,7 +496,7 @@ mod tests {
         let set_strategy = cpg.add_node(CpgNode::new(
             NodeId::new(4),
             CpgNodeKind::Function {
-                signature: make_method("setPaymentMethod", false),
+                signature: Box::new(make_method("setPaymentMethod", false)),
             },
             range,
         ));

@@ -385,16 +385,16 @@ pub enum CpgNodeKind {
     // === Function-level nodes ===
     /// Function or method definition.
     Function {
-        /// Function signature.
-        signature: MethodSignature,
+        /// Function signature, boxed to bound the enum's inline size.
+        signature: Box<MethodSignature>,
     },
     /// Function parameter.
     Parameter {
         /// Parameter name.
         #[cfg_attr(feature = "serde", serde(with = "arc_str"))]
         name: Arc<str>,
-        /// Parameter type.
-        param_type: Option<TypeInfo>,
+        /// Parameter type, boxed when present to bound the enum's inline size.
+        param_type: Option<Box<TypeInfo>>,
         /// Whether this is a rest/variadic parameter.
         is_variadic: bool,
     },
@@ -410,8 +410,8 @@ pub enum CpgNodeKind {
         /// Variable name.
         #[cfg_attr(feature = "serde", serde(with = "arc_str"))]
         name: Arc<str>,
-        /// Variable type.
-        var_type: Option<TypeInfo>,
+        /// Variable type, boxed when present to bound the enum's inline size.
+        var_type: Option<Box<TypeInfo>>,
         /// Scope where this variable is defined.
         scope: ScopeId,
         /// Whether this is mutable.
@@ -422,8 +422,8 @@ pub enum CpgNodeKind {
         /// Field name.
         #[cfg_attr(feature = "serde", serde(with = "arc_str"))]
         name: Arc<str>,
-        /// Field type.
-        field_type: Option<TypeInfo>,
+        /// Field type, boxed when present to bound the enum's inline size.
+        field_type: Option<Box<TypeInfo>>,
         /// Visibility.
         visibility: Visibility,
     },
@@ -518,8 +518,8 @@ pub enum CpgNodeKind {
     // === Type nodes ===
     /// Type annotation.
     TypeAnnotation {
-        /// The type.
-        type_info: TypeInfo,
+        /// The boxed type information.
+        type_info: Box<TypeInfo>,
     },
     /// Generic type parameter.
     GenericParam {
@@ -784,11 +784,12 @@ pub struct CpgNode {
     /// Frontends attach this metadata to constructor/allocation calls at the
     /// grammar boundary. Analyses can therefore distinguish an allocation from
     /// an ordinary call without reparsing source text or matching spellings.
+    /// The optional payload is boxed to keep every node's inline layout small.
     #[cfg_attr(
         feature = "serde",
         serde(default, skip_serializing_if = "Option::is_none")
     )]
-    pub allocation_type: Option<TypeInfo>,
+    pub allocation_type: Option<Box<TypeInfo>>,
     /// Additional properties.
     pub properties: FxHashMap<PropertyKey, PropertyValue>,
     /// AST children (indices into the node array).
@@ -834,7 +835,7 @@ impl CpgNode {
 
     /// Attaches normalized allocation semantics to this expression node.
     pub fn with_allocation_type(mut self, type_info: TypeInfo) -> Self {
-        self.allocation_type = Some(type_info);
+        self.allocation_type = Some(Box::new(type_info));
         self
     }
 
@@ -990,7 +991,7 @@ mod tests {
         assert_eq!(CpgNodeKind::Await.tag(), CpgNodeKindTag::Await);
         assert_eq!(
             CpgNodeKind::TypeAnnotation {
-                type_info: TypeInfo::new("T"),
+                type_info: Box::new(TypeInfo::new("T")),
             }
             .tag(),
             CpgNodeKindTag::TypeAnnotation,
@@ -999,6 +1000,14 @@ mod tests {
             CpgNodeKind::Unknown { kind: "x".into() }.tag(),
             CpgNodeKindTag::Unknown,
         );
+    }
+
+    #[cfg(target_pointer_width = "64")]
+    #[test]
+    fn boxed_node_payloads_bound_the_64_bit_node_layout() {
+        let node_bytes = std::mem::size_of::<CpgNode>();
+        assert!(node_bytes <= 168, "CpgNode grew to {node_bytes} bytes");
+        assert!(node_bytes < 3 * 64);
     }
 
     #[test]
@@ -1056,7 +1065,7 @@ mod tests {
             is_method: true,
         })
         .with_allocation_type(TypeInfo::new("Widget"));
-        assert_eq!(n.allocation_type, Some(TypeInfo::new("Widget")));
+        assert_eq!(n.allocation_type.as_deref(), Some(&TypeInfo::new("Widget")));
     }
 
     #[test]
@@ -1207,7 +1216,7 @@ mod tests {
         );
         assert_eq!(
             node(CpgNodeKind::Function {
-                signature: sig("f")
+                signature: Box::new(sig("f"))
             })
             .name(),
             Some("f")
@@ -1294,7 +1303,7 @@ mod tests {
     #[test]
     fn is_declaration_predicate() {
         assert!(node(CpgNodeKind::Function {
-            signature: sig("f")
+            signature: Box::new(sig("f"))
         })
         .is_declaration());
         assert!(node(CpgNodeKind::Variable {
@@ -1343,7 +1352,7 @@ mod tests {
             );
         }
         assert!(!node(CpgNodeKind::Function {
-            signature: sig("f")
+            signature: Box::new(sig("f"))
         })
         .is_statement());
         assert!(!node(CpgNodeKind::BinaryOp {
@@ -1388,7 +1397,7 @@ mod tests {
         }
         assert!(!node(CpgNodeKind::If).is_expression());
         assert!(!node(CpgNodeKind::Function {
-            signature: sig("f")
+            signature: Box::new(sig("f"))
         })
         .is_expression());
     }
@@ -1421,7 +1430,7 @@ mod tests {
         })
         .is_control_flow());
         assert!(!node(CpgNodeKind::Function {
-            signature: sig("f")
+            signature: Box::new(sig("f"))
         })
         .is_control_flow());
     }
@@ -1562,14 +1571,14 @@ mod serde_tests {
         let kinds = [
             CpgNodeKind::Root,
             CpgNodeKind::Function {
-                signature: MethodSignature {
+                signature: Box::new(MethodSignature {
                     name: "f".into(),
                     params: Default::default(),
                     return_type: Some(TypeInfo::new("i64")),
                     is_static: true,
                     is_async: false,
                     visibility: Visibility::Public,
-                },
+                }),
             },
             CpgNodeKind::Identifier {
                 name: "x".into(),
@@ -1580,7 +1589,7 @@ mod serde_tests {
             },
             CpgNodeKind::Variable {
                 name: "v".into(),
-                var_type: Some(TypeInfo::new("u8")),
+                var_type: Some(Box::new(TypeInfo::new("u8"))),
                 scope: ScopeId::new(2),
                 is_mutable: true,
             },
@@ -1590,6 +1599,63 @@ mod serde_tests {
             let back: CpgNodeKind = serde_json::from_str(&s).expect("deser kind");
             assert_eq!(k, back);
         }
+    }
+
+    #[test]
+    fn boxed_payloads_preserve_the_json_wire_shape() {
+        let kind = CpgNodeKind::Function {
+            signature: Box::new(MethodSignature {
+                name: "f".into(),
+                params: Default::default(),
+                return_type: Some(TypeInfo::new("i64")),
+                is_static: true,
+                is_async: false,
+                visibility: Visibility::Public,
+            }),
+        };
+        assert_eq!(
+            serde_json::to_value(kind).expect("serialize boxed function kind"),
+            serde_json::json!({
+                "Function": {
+                    "signature": {
+                        "name": "f",
+                        "params": [],
+                        "return_type": {
+                            "name": "i64",
+                            "is_reference": false,
+                            "is_mutable": false,
+                            "generics": []
+                        },
+                        "is_static": true,
+                        "is_async": false,
+                        "visibility": "Public"
+                    }
+                }
+            })
+        );
+
+        let kind = CpgNodeKind::Variable {
+            name: "value".into(),
+            var_type: Some(Box::new(TypeInfo::new("u8"))),
+            scope: ScopeId::new(7),
+            is_mutable: true,
+        };
+        assert_eq!(
+            serde_json::to_value(kind).expect("serialize boxed variable type"),
+            serde_json::json!({
+                "Variable": {
+                    "name": "value",
+                    "var_type": {
+                        "name": "u8",
+                        "is_reference": false,
+                        "is_mutable": false,
+                        "generics": []
+                    },
+                    "scope": 7,
+                    "is_mutable": true
+                }
+            })
+        );
     }
 
     #[test]

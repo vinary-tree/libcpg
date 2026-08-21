@@ -583,14 +583,14 @@ mod tests {
         let node = CpgNode::new(
             NodeId::new(0),
             CpgNodeKind::Function {
-                signature: MethodSignature {
+                signature: Box::new(MethodSignature {
                     name: Arc::from(name),
                     params: smallvec![],
                     return_type: None,
                     is_static,
                     is_async: false,
                     visibility,
-                },
+                }),
             },
             SourceRange::default(),
         );
@@ -736,7 +736,7 @@ mod tests {
             NodeId::new(0),
             CpgNodeKind::Field {
                 name: Arc::from(name),
-                field_type: ty.map(TypeInfo::new),
+                field_type: ty.map(TypeInfo::new).map(Box::new),
                 visibility: Visibility::Private,
             },
             SourceRange::default(),
@@ -942,14 +942,14 @@ mod vocabulary {
         let node = CpgNode::new(
             NodeId::new(0),
             CpgNodeKind::Function {
-                signature: MethodSignature {
+                signature: Box::new(MethodSignature {
                     name: Arc::from(name),
                     params: smallvec![],
                     return_type: None,
                     is_static,
                     is_async: false,
                     visibility,
-                },
+                }),
             },
             SourceRange::default(),
         );
@@ -968,7 +968,7 @@ mod vocabulary {
             NodeId::new(0),
             CpgNodeKind::Field {
                 name: Arc::from(name),
-                field_type: field_type.map(TypeInfo::new),
+                field_type: field_type.map(TypeInfo::new).map(Box::new),
                 visibility: Visibility::Private,
             },
             SourceRange::default(),

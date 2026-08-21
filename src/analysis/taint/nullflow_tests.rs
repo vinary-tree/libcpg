@@ -10,14 +10,14 @@ use crate::{
 
 fn function_kind(name: &str, return_type: Option<&str>) -> CpgNodeKind {
     CpgNodeKind::Function {
-        signature: MethodSignature {
+        signature: Box::new(MethodSignature {
             name: name.into(),
             params: Default::default(),
             return_type: return_type.map(TypeInfo::new),
             is_static: false,
             is_async: false,
             visibility: Visibility::Public,
-        },
+        }),
     }
 }
 

@@ -1433,14 +1433,14 @@ let mut cpg = CodePropertyGraph::new(Language::Rust);
 let func = cpg.add_node(CpgNode::new(
     NodeId::new(0),                      // id is reassigned by add_node
     CpgNodeKind::Function {
-        signature: MethodSignature {
+        signature: Box::new(MethodSignature {
             name: "main".into(),
             params: Default::default(),
             return_type: None,
             is_static: false,
             is_async: false,
             visibility: Visibility::Public,
-        },
+        }),
     },
     SourceRange::default(),
 ));
@@ -1471,7 +1471,7 @@ pub struct CpgNode {
     pub text: Option<Arc<str>>,
     pub message_kind: Option<MsgKind>,
     pub lock_kind: Option<LockKind>,
-    pub allocation_type: Option<TypeInfo>,
+    pub allocation_type: Option<Box<TypeInfo>>,
     pub properties: FxHashMap<PropertyKey, PropertyValue>,
     pub children: SmallVec<[NodeId; 4]>,
     pub parent: Option<NodeId>,
@@ -1486,7 +1486,7 @@ pub struct CpgNode {
 | `text` | `Option<Arc<str>>` | Verbatim source text (terminals). |
 | `message_kind` | `Option<MsgKind>` | Frontend-normalized channel action, orthogonal to syntax kind. |
 | `lock_kind` | `Option<LockKind>` | Frontend/adapter-normalized lock action, orthogonal to syntax kind. |
-| `allocation_type` | `Option<TypeInfo>` | Frontend-normalized nominal type allocated by this expression. |
+| `allocation_type` | `Option<Box<TypeInfo>>` | Frontend-normalized nominal type allocated by this expression. |
 | `properties` | `FxHashMap<PropertyKey, PropertyValue>` | Extra metadata. |
 | `children` | `SmallVec<[NodeId; 4]>` | AST child ids (source order). |
 | `parent` | `Option<NodeId>` | AST parent id. |
@@ -1509,6 +1509,14 @@ pub struct CpgNode {
 | `is_expression` | `fn is_expression(&self) -> bool` | `BinaryOp`/`UnaryOp`/`Assignment`/`Call`/`MemberAccess`/`IndexAccess`/`Identifier`/`Literal`/`Lambda`/`Await`/`Yield`. |
 | `is_control_flow` | `fn is_control_flow(&self) -> bool` | `If`/`While`/`For`/`Loop`/`Match`/`Break`/`Continue`/`Return`/`Throw`/`Try`. |
 | `is_error` | `fn is_error(&self) -> bool` | `Error` (parser recovery). |
+
+`Function` signatures and node-owned `TypeInfo` values use heap indirection so
+rare, large payloads do not determine the inline size of every graph node.
+`Box<T>` implements `Deref<Target = T>`, so ordinary field reads such as
+`signature.name` remain direct. For an optional boxed type, use
+`var_type.as_deref()` when an API expects `Option<&TypeInfo>`. Serde treats the
+box as transparent: JSON and other data-model formats retain their prior wire
+shape and contain no wrapper object.
 
 ---
 
@@ -1539,16 +1547,16 @@ drive every query, pattern, and complexity heuristic.
 
 | Variant | Payload fields | `name()` |
 |---------|----------------|----------|
-| `Function` | `signature: MethodSignature` | ✓ (from `signature.name`) |
-| `Parameter` | `name: Arc<str>`, `param_type: Option<TypeInfo>`, `is_variadic: bool` | ✓ |
+| `Function` | `signature: Box<MethodSignature>` | ✓ (from `signature.name`) |
+| `Parameter` | `name: Arc<str>`, `param_type: Option<Box<TypeInfo>>`, `is_variadic: bool` | ✓ |
 | `Block` | `scope: ScopeId` | — |
 
 ### Variable (2)
 
 | Variant | Payload fields | `name()` |
 |---------|----------------|----------|
-| `Variable` | `name: Arc<str>`, `var_type: Option<TypeInfo>`, `scope: ScopeId`, `is_mutable: bool` | ✓ |
-| `Field` | `name: Arc<str>`, `field_type: Option<TypeInfo>`, `visibility: Visibility` | ✓ |
+| `Variable` | `name: Arc<str>`, `var_type: Option<Box<TypeInfo>>`, `scope: ScopeId`, `is_mutable: bool` | ✓ |
+| `Field` | `name: Arc<str>`, `field_type: Option<Box<TypeInfo>>`, `visibility: Visibility` | ✓ |
 
 ### Statement (14, all unit variants)
 
@@ -1575,7 +1583,7 @@ drive every query, pattern, and complexity heuristic.
 
 | Variant | Payload fields | `name()` |
 |---------|----------------|----------|
-| `TypeAnnotation` | `type_info: TypeInfo` | — |
+| `TypeAnnotation` | `type_info: Box<TypeInfo>` | — |
 | `GenericParam` | `name: Arc<str>` | ✓ |
 
 ### Special (6)

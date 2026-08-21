@@ -336,10 +336,10 @@ fn add_static_type_evidence(
         return;
     };
     let declared = match &node.kind {
-        CpgNodeKind::Variable { var_type, .. } => var_type.as_ref(),
-        CpgNodeKind::Parameter { param_type, .. } => param_type.as_ref(),
-        CpgNodeKind::Field { field_type, .. } => field_type.as_ref(),
-        CpgNodeKind::TypeAnnotation { type_info } => Some(type_info),
+        CpgNodeKind::Variable { var_type, .. } => var_type.as_deref(),
+        CpgNodeKind::Parameter { param_type, .. } => param_type.as_deref(),
+        CpgNodeKind::Field { field_type, .. } => field_type.as_deref(),
+        CpgNodeKind::TypeAnnotation { type_info } => Some(type_info.as_ref()),
         CpgNodeKind::Function { signature } => signature.return_type.as_ref(),
         _ => None,
     };
@@ -348,7 +348,7 @@ fn add_static_type_evidence(
     }
     if let Some(type_id) = node
         .allocation_type
-        .as_ref()
+        .as_deref()
         .and_then(|type_info| unique_type(&index.names, type_info))
     {
         output.insert(type_id);
@@ -528,14 +528,14 @@ mod tests {
             cpg,
             owner,
             CpgNodeKind::Function {
-                signature: MethodSignature {
+                signature: Box::new(MethodSignature {
                     name: name.into(),
                     params: Default::default(),
                     return_type: None,
                     is_static: false,
                     is_async: false,
                     visibility: Visibility::Public,
-                },
+                }),
             },
         )
     }
@@ -595,7 +595,7 @@ mod tests {
             root,
             CpgNodeKind::Variable {
                 name: "service".into(),
-                var_type: Some(TypeInfo::new("Base")),
+                var_type: Some(Box::new(TypeInfo::new("Base"))),
                 scope: ScopeId::GLOBAL,
                 is_mutable: true,
             },
@@ -615,7 +615,7 @@ mod tests {
             .expect("initializer");
         cpg.node_mut(initializer)
             .expect("initializer")
-            .allocation_type = Some(TypeInfo::new("Leaf"));
+            .allocation_type = Some(Box::new(TypeInfo::new("Leaf")));
 
         let mid_allocation = child(
             &mut cpg,
@@ -627,7 +627,7 @@ mod tests {
         );
         cpg.node_mut(mid_allocation)
             .expect("mid allocation")
-            .allocation_type = Some(TypeInfo::new("Mid"));
+            .allocation_type = Some(Box::new(TypeInfo::new("Mid")));
 
         let call = child(
             &mut cpg,
@@ -787,7 +787,7 @@ mod tests {
             .cpg
             .node_mut(allocation)
             .expect("allocation")
-            .allocation_type = Some(TypeInfo::new("Mid"));
+            .allocation_type = Some(Box::new(TypeInfo::new("Mid")));
         fixture.cpg.connect(
             assignment,
             receiver,

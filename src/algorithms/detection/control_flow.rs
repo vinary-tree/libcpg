@@ -435,14 +435,14 @@ mod tests {
         let func = cpg.add_node(CpgNode::new(
             NodeId::new(0),
             CpgNodeKind::Function {
-                signature: MethodSignature {
+                signature: Box::new(MethodSignature {
                     name: "test_func".into(),
                     params: Default::default(),
                     return_type: None,
                     is_static: false,
                     is_async: false,
                     visibility: Visibility::Public,
-                },
+                }),
             },
             SourceRange::default(),
         ));
@@ -472,14 +472,14 @@ mod tests {
         let func = cpg.add_node(CpgNode::new(
             NodeId::new(0),
             CpgNodeKind::Function {
-                signature: MethodSignature {
+                signature: Box::new(MethodSignature {
                     name: "nested_loops".into(),
                     params: Default::default(),
                     return_type: None,
                     is_static: false,
                     is_async: false,
                     visibility: Visibility::Public,
-                },
+                }),
             },
             SourceRange::default(),
         ));
@@ -546,14 +546,14 @@ mod tests {
         let func = cpg.add_node(CpgNode::new(
             NodeId::new(0),
             CpgNodeKind::Function {
-                signature: MethodSignature {
+                signature: Box::new(MethodSignature {
                     name: "no_loops".into(),
                     params: Default::default(),
                     return_type: None,
                     is_static: false,
                     is_async: false,
                     visibility: Visibility::Public,
-                },
+                }),
             },
             SourceRange::default(),
         ));
@@ -591,14 +591,14 @@ mod tests {
         cpg.add_node(CpgNode::new(
             NodeId::new(0),
             CpgNodeKind::Function {
-                signature: MethodSignature {
+                signature: Box::new(MethodSignature {
                     name: name.into(),
                     params: Default::default(),
                     return_type: None,
                     is_static: false,
                     is_async: false,
                     visibility: Visibility::Public,
-                },
+                }),
             },
             SourceRange::default(),
         ))
@@ -796,14 +796,14 @@ mod loop_classification {
         let func = cpg.add_node(CpgNode::new(
             NodeId::new(0),
             CpgNodeKind::Function {
-                signature: MethodSignature {
+                signature: Box::new(MethodSignature {
                     name: "f".into(),
                     params: Default::default(),
                     return_type: None,
                     is_static: false,
                     is_async: false,
                     visibility: Visibility::Public,
-                },
+                }),
             },
             SourceRange::default(),
         ));

@@ -97,7 +97,7 @@ A vertex's kind is what every query, pattern, and heuristic dispatches on, so th
 alphabet is deliberately expressive: 45 [`CpgNodeKind`](../GLOSSARY.md#node-kind--edge-kind)
 variants, a mix of **unit** variants (`Root`, `If`, `Return`, `Await`, …) and
 **data-carrying** variants that attach structured payloads (e.g.
-`Function { signature: MethodSignature }`, `Call { target: Option<NodeId>, is_method: bool }`,
+`Function { signature: Box<MethodSignature> }`, `Call { target: Option<NodeId>, is_method: bool }`,
 `Identifier { name, definition }`, `Literal { kind: LiteralKind }`). They fall into
 seven groups:
 

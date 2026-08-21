@@ -133,7 +133,7 @@ fn corrupt_graph(how: Corruption) -> (CodePropertyGraph, NodeId) {
     let func = add(
         &mut cpg,
         CpgNodeKind::Function {
-            signature: signature("f"),
+            signature: Box::new(signature("f")),
         },
     );
 

@@ -113,18 +113,19 @@ let root = cpg.add_node(CpgNode::new(
     SourceRange::default(),
 ));
 
-// A function node. `Function` carries a `MethodSignature`.
+// A function node. `Function` owns a boxed `MethodSignature` so every
+// non-function node does not pay the signature's inline storage cost.
 let func = cpg.add_node(CpgNode::new(
     NodeId::new(0),
     CpgNodeKind::Function {
-        signature: MethodSignature {
+        signature: Box::new(MethodSignature {
             name: "main".into(),
             params: Default::default(),
             return_type: None,
             is_static: false,
             is_async: false,
             visibility: Visibility::Public,
-        },
+        }),
     },
     SourceRange::default(),
 ));

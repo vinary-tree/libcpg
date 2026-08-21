@@ -16,14 +16,14 @@ fn node(kind: CpgNodeKind) -> CpgNode {
 
 fn function_kind(name: &str) -> CpgNodeKind {
     CpgNodeKind::Function {
-        signature: MethodSignature {
+        signature: Box::new(MethodSignature {
             name: Arc::from(name),
             params: Default::default(),
             return_type: None,
             is_static: false,
             is_async: false,
             visibility: Visibility::Private,
-        },
+        }),
     }
 }
 

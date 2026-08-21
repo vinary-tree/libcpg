@@ -118,7 +118,7 @@ fn build_singleton_pattern() -> CodePropertyGraph {
     let constructor_id = cpg.add_node(CpgNode::new(
         NodeId::new(2),
         CpgNodeKind::Function {
-            signature: make_method("new", false),
+            signature: Box::new(make_method("new", false)),
         },
         range,
     ));
@@ -127,7 +127,7 @@ fn build_singleton_pattern() -> CodePropertyGraph {
     let get_instance_id = cpg.add_node(CpgNode::new(
         NodeId::new(3),
         CpgNodeKind::Function {
-            signature: make_method("getInstance", true),
+            signature: Box::new(make_method("getInstance", true)),
         },
         range,
     ));
@@ -217,7 +217,7 @@ fn build_factory_method_pattern() -> CodePropertyGraph {
     let factory_method_id = cpg.add_node(CpgNode::new(
         NodeId::new(1),
         CpgNodeKind::Function {
-            signature: make_method("createProduct", false),
+            signature: Box::new(make_method("createProduct", false)),
         },
         range,
     ));
@@ -236,7 +236,7 @@ fn build_factory_method_pattern() -> CodePropertyGraph {
     let override_method_id = cpg.add_node(CpgNode::new(
         NodeId::new(3),
         CpgNodeKind::Function {
-            signature: make_method("createProduct", false),
+            signature: Box::new(make_method("createProduct", false)),
         },
         range,
     ));
@@ -301,7 +301,7 @@ fn build_abstract_factory_pattern() -> CodePropertyGraph {
     let create_a = cpg.add_node(CpgNode::new(
         NodeId::new(1),
         CpgNodeKind::Function {
-            signature: make_method("createProductA", false),
+            signature: Box::new(make_method("createProductA", false)),
         },
         range,
     ));
@@ -310,7 +310,7 @@ fn build_abstract_factory_pattern() -> CodePropertyGraph {
     let create_b = cpg.add_node(CpgNode::new(
         NodeId::new(2),
         CpgNodeKind::Function {
-            signature: make_method("createProductB", false),
+            signature: Box::new(make_method("createProductB", false)),
         },
         range,
     ));
@@ -386,7 +386,7 @@ fn build_builder_pattern() -> CodePropertyGraph {
     let set_a = cpg.add_node(CpgNode::new(
         NodeId::new(1),
         CpgNodeKind::Function {
-            signature: make_method("setPartA", false),
+            signature: Box::new(make_method("setPartA", false)),
         },
         range,
     ));
@@ -395,7 +395,7 @@ fn build_builder_pattern() -> CodePropertyGraph {
     let set_b = cpg.add_node(CpgNode::new(
         NodeId::new(2),
         CpgNodeKind::Function {
-            signature: make_method("setPartB", false),
+            signature: Box::new(make_method("setPartB", false)),
         },
         range,
     ));
@@ -404,7 +404,7 @@ fn build_builder_pattern() -> CodePropertyGraph {
     let build = cpg.add_node(CpgNode::new(
         NodeId::new(3),
         CpgNodeKind::Function {
-            signature: make_method("build", false),
+            signature: Box::new(make_method("build", false)),
         },
         range,
     ));
@@ -468,7 +468,7 @@ fn build_prototype_pattern() -> CodePropertyGraph {
     let clone = cpg.add_node(CpgNode::new(
         NodeId::new(1),
         CpgNodeKind::Function {
-            signature: make_method("clone", false),
+            signature: Box::new(make_method("clone", false)),
         },
         range,
     ));
@@ -560,7 +560,7 @@ fn build_adapter_pattern() -> CodePropertyGraph {
     let request = cpg.add_node(CpgNode::new(
         NodeId::new(3),
         CpgNodeKind::Function {
-            signature: make_method("request", false),
+            signature: Box::new(make_method("request", false)),
         },
         range,
     ));
@@ -646,7 +646,7 @@ fn build_bridge_pattern() -> CodePropertyGraph {
     let operation = cpg.add_node(CpgNode::new(
         NodeId::new(3),
         CpgNodeKind::Function {
-            signature: make_method("operation", false),
+            signature: Box::new(make_method("operation", false)),
         },
         range,
     ));
@@ -713,7 +713,7 @@ fn build_composite_pattern() -> CodePropertyGraph {
     let operation = cpg.add_node(CpgNode::new(
         NodeId::new(1),
         CpgNodeKind::Function {
-            signature: make_method("operation", false),
+            signature: Box::new(make_method("operation", false)),
         },
         range,
     ));
@@ -743,7 +743,7 @@ fn build_composite_pattern() -> CodePropertyGraph {
     let add = cpg.add_node(CpgNode::new(
         NodeId::new(4),
         CpgNodeKind::Function {
-            signature: make_method("add", false),
+            signature: Box::new(make_method("add", false)),
         },
         range,
     ));
@@ -839,7 +839,7 @@ fn build_decorator_pattern() -> CodePropertyGraph {
     let operation = cpg.add_node(CpgNode::new(
         NodeId::new(3),
         CpgNodeKind::Function {
-            signature: make_method("operation", false),
+            signature: Box::new(make_method("operation", false)),
         },
         range,
     ));
@@ -933,7 +933,7 @@ fn build_facade_pattern() -> CodePropertyGraph {
     let operation = cpg.add_node(CpgNode::new(
         NodeId::new(3),
         CpgNodeKind::Function {
-            signature: make_method("operation", false),
+            signature: Box::new(make_method("operation", false)),
         },
         range,
     ));
@@ -997,7 +997,7 @@ fn build_flyweight_pattern() -> CodePropertyGraph {
     let operation = cpg.add_node(CpgNode::new(
         NodeId::new(1),
         CpgNodeKind::Function {
-            signature: make_method("operation", false),
+            signature: Box::new(make_method("operation", false)),
         },
         range,
     ));
@@ -1027,7 +1027,7 @@ fn build_flyweight_pattern() -> CodePropertyGraph {
     let get_flyweight = cpg.add_node(CpgNode::new(
         NodeId::new(4),
         CpgNodeKind::Function {
-            signature: make_method("getFlyweight", false),
+            signature: Box::new(make_method("getFlyweight", false)),
         },
         range,
     ));
@@ -1094,7 +1094,7 @@ fn build_proxy_pattern() -> CodePropertyGraph {
     let request = cpg.add_node(CpgNode::new(
         NodeId::new(1),
         CpgNodeKind::Function {
-            signature: make_method("request", false),
+            signature: Box::new(make_method("request", false)),
         },
         range,
     ));
@@ -1180,7 +1180,7 @@ fn build_chain_of_responsibility_pattern() -> CodePropertyGraph {
     let handle = cpg.add_node(CpgNode::new(
         NodeId::new(1),
         CpgNodeKind::Function {
-            signature: make_method("handle", false),
+            signature: Box::new(make_method("handle", false)),
         },
         range,
     ));
@@ -1189,7 +1189,7 @@ fn build_chain_of_responsibility_pattern() -> CodePropertyGraph {
     let set_next = cpg.add_node(CpgNode::new(
         NodeId::new(2),
         CpgNodeKind::Function {
-            signature: make_method("setNext", false),
+            signature: Box::new(make_method("setNext", false)),
         },
         range,
     ));
@@ -1282,7 +1282,7 @@ fn build_command_pattern() -> CodePropertyGraph {
     let execute = cpg.add_node(CpgNode::new(
         NodeId::new(1),
         CpgNodeKind::Function {
-            signature: make_method("execute", false),
+            signature: Box::new(make_method("execute", false)),
         },
         range,
     ));
@@ -1368,7 +1368,7 @@ fn build_interpreter_pattern() -> CodePropertyGraph {
     let interpret = cpg.add_node(CpgNode::new(
         NodeId::new(1),
         CpgNodeKind::Function {
-            signature: make_method("interpret", false),
+            signature: Box::new(make_method("interpret", false)),
         },
         range,
     ));
@@ -1461,7 +1461,7 @@ fn build_iterator_pattern() -> CodePropertyGraph {
     let next = cpg.add_node(CpgNode::new(
         NodeId::new(1),
         CpgNodeKind::Function {
-            signature: make_method("next", false),
+            signature: Box::new(make_method("next", false)),
         },
         range,
     ));
@@ -1470,7 +1470,7 @@ fn build_iterator_pattern() -> CodePropertyGraph {
     let has_next = cpg.add_node(CpgNode::new(
         NodeId::new(2),
         CpgNodeKind::Function {
-            signature: make_method("hasNext", false),
+            signature: Box::new(make_method("hasNext", false)),
         },
         range,
     ));
@@ -1527,7 +1527,7 @@ fn build_mediator_pattern() -> CodePropertyGraph {
     let notify = cpg.add_node(CpgNode::new(
         NodeId::new(1),
         CpgNodeKind::Function {
-            signature: make_method("notify", false),
+            signature: Box::new(make_method("notify", false)),
         },
         range,
     ));
@@ -1625,7 +1625,7 @@ fn build_memento_pattern() -> CodePropertyGraph {
     let save = cpg.add_node(CpgNode::new(
         NodeId::new(2),
         CpgNodeKind::Function {
-            signature: make_method("save", false),
+            signature: Box::new(make_method("save", false)),
         },
         range,
     ));
@@ -1634,7 +1634,7 @@ fn build_memento_pattern() -> CodePropertyGraph {
     let restore = cpg.add_node(CpgNode::new(
         NodeId::new(3),
         CpgNodeKind::Function {
-            signature: make_method("restore", false),
+            signature: Box::new(make_method("restore", false)),
         },
         range,
     ));
@@ -1718,7 +1718,7 @@ fn build_observer_pattern() -> CodePropertyGraph {
     let attach = cpg.add_node(CpgNode::new(
         NodeId::new(2),
         CpgNodeKind::Function {
-            signature: make_method("attach", false),
+            signature: Box::new(make_method("attach", false)),
         },
         range,
     ));
@@ -1727,7 +1727,7 @@ fn build_observer_pattern() -> CodePropertyGraph {
     let notify = cpg.add_node(CpgNode::new(
         NodeId::new(3),
         CpgNodeKind::Function {
-            signature: make_method("notify", false),
+            signature: Box::new(make_method("notify", false)),
         },
         range,
     ));
@@ -1745,7 +1745,7 @@ fn build_observer_pattern() -> CodePropertyGraph {
     let update = cpg.add_node(CpgNode::new(
         NodeId::new(5),
         CpgNodeKind::Function {
-            signature: make_method("update", false),
+            signature: Box::new(make_method("update", false)),
         },
         range,
     ));
@@ -1817,7 +1817,7 @@ fn build_state_pattern() -> CodePropertyGraph {
     let handle = cpg.add_node(CpgNode::new(
         NodeId::new(1),
         CpgNodeKind::Function {
-            signature: make_method("handle", false),
+            signature: Box::new(make_method("handle", false)),
         },
         range,
     ));
@@ -1847,7 +1847,7 @@ fn build_state_pattern() -> CodePropertyGraph {
     let set_state = cpg.add_node(CpgNode::new(
         NodeId::new(4),
         CpgNodeKind::Function {
-            signature: make_method("setState", false),
+            signature: Box::new(make_method("setState", false)),
         },
         range,
     ));
@@ -1919,7 +1919,7 @@ fn build_strategy_pattern() -> CodePropertyGraph {
     let execute = cpg.add_node(CpgNode::new(
         NodeId::new(1),
         CpgNodeKind::Function {
-            signature: make_method("execute", false),
+            signature: Box::new(make_method("execute", false)),
         },
         range,
     ));
@@ -1949,7 +1949,7 @@ fn build_strategy_pattern() -> CodePropertyGraph {
     let set_strategy = cpg.add_node(CpgNode::new(
         NodeId::new(4),
         CpgNodeKind::Function {
-            signature: make_method("setStrategy", false),
+            signature: Box::new(make_method("setStrategy", false)),
         },
         range,
     ));
@@ -2025,7 +2025,7 @@ fn build_template_method_pattern() -> CodePropertyGraph {
     let template_method = cpg.add_node(CpgNode::new(
         NodeId::new(1),
         CpgNodeKind::Function {
-            signature: make_method("templateMethod", false),
+            signature: Box::new(make_method("templateMethod", false)),
         },
         range,
     ));
@@ -2034,7 +2034,7 @@ fn build_template_method_pattern() -> CodePropertyGraph {
     let prim_op1 = cpg.add_node(CpgNode::new(
         NodeId::new(2),
         CpgNodeKind::Function {
-            signature: make_method("primitiveOperation1", false),
+            signature: Box::new(make_method("primitiveOperation1", false)),
         },
         range,
     ));
@@ -2043,7 +2043,7 @@ fn build_template_method_pattern() -> CodePropertyGraph {
     let prim_op2 = cpg.add_node(CpgNode::new(
         NodeId::new(3),
         CpgNodeKind::Function {
-            signature: make_method("primitiveOperation2", false),
+            signature: Box::new(make_method("primitiveOperation2", false)),
         },
         range,
     ));
@@ -2121,7 +2121,7 @@ fn build_visitor_pattern() -> CodePropertyGraph {
     let visit_a = cpg.add_node(CpgNode::new(
         NodeId::new(1),
         CpgNodeKind::Function {
-            signature: make_method("visitConcreteElementA", false),
+            signature: Box::new(make_method("visitConcreteElementA", false)),
         },
         range,
     ));
@@ -2130,7 +2130,7 @@ fn build_visitor_pattern() -> CodePropertyGraph {
     let visit_b = cpg.add_node(CpgNode::new(
         NodeId::new(2),
         CpgNodeKind::Function {
-            signature: make_method("visitConcreteElementB", false),
+            signature: Box::new(make_method("visitConcreteElementB", false)),
         },
         range,
     ));
@@ -2148,7 +2148,7 @@ fn build_visitor_pattern() -> CodePropertyGraph {
     let accept = cpg.add_node(CpgNode::new(
         NodeId::new(4),
         CpgNodeKind::Function {
-            signature: make_method("accept", false),
+            signature: Box::new(make_method("accept", false)),
         },
         range,
     ));

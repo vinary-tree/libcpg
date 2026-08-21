@@ -38,14 +38,14 @@ fn public_cha_crosses_depth_100_000_on_a_small_native_stack() {
                 &mut cpg,
                 base,
                 CpgNodeKind::Function {
-                    signature: MethodSignature {
+                    signature: Box::new(MethodSignature {
                         name: "run".into(),
                         params: Default::default(),
                         return_type: None,
                         is_static: false,
                         is_async: false,
                         visibility: Visibility::Public,
-                    },
+                    }),
                 },
             );
             let mut parent = base;
@@ -67,7 +67,7 @@ fn public_cha_crosses_depth_100_000_on_a_small_native_stack() {
                 root,
                 CpgNodeKind::Variable {
                     name: "receiver".into(),
-                    var_type: Some(TypeInfo::new("Type0")),
+                    var_type: Some(Box::new(TypeInfo::new("Type0"))),
                     scope: ScopeId::GLOBAL,
                     is_mutable: false,
                 },

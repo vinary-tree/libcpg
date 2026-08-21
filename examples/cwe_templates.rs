@@ -40,14 +40,14 @@ fn call(cpg: &mut CodePropertyGraph, parent: NodeId, path: &str) -> NodeId {
 fn main() {
     let mut cpg = CodePropertyGraph::new(Language::Rust);
     let owner = cpg.add_node(node(CpgNodeKind::Function {
-        signature: MethodSignature {
+        signature: Box::new(MethodSignature {
             name: "endpoint".into(),
             params: Default::default(),
             return_type: None,
             is_static: false,
             is_async: false,
             visibility: Visibility::Private,
-        },
+        }),
     }));
     let source = call(&mut cpg, owner, "request.body");
     let sink = call(&mut cpg, owner, "sqlx::query");

@@ -319,14 +319,14 @@ mod tests {
         cpg.add_node(CpgNode::new(
             NodeId::new(0),
             CpgNodeKind::Function {
-                signature: MethodSignature {
+                signature: Box::new(MethodSignature {
                     name: name.into(),
                     params: Default::default(),
                     return_type: None,
                     is_static: false,
                     is_async: false,
                     visibility: Visibility::Public,
-                },
+                }),
             },
             SourceRange::default(),
         ))

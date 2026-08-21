@@ -95,7 +95,9 @@ pub(crate) fn arb_node_kind() -> impl Strategy<Value = CpgNodeKind> {
                 trait_name: trait_name.map(Into::into),
             }
         ),
-        arb_method_signature().prop_map(|signature| CpgNodeKind::Function { signature }),
+        arb_method_signature().prop_map(|signature| CpgNodeKind::Function {
+            signature: Box::new(signature)
+        }),
         (arb_name(), any::<bool>()).prop_map(|(name, is_variadic)| CpgNodeKind::Parameter {
             name: name.into(),
             param_type: None,
@@ -150,7 +152,7 @@ pub(crate) fn arb_node_kind() -> impl Strategy<Value = CpgNodeKind> {
         Just(CpgNodeKind::Await),
         Just(CpgNodeKind::Yield),
         arb_name().prop_map(|name| CpgNodeKind::TypeAnnotation {
-            type_info: TypeInfo::new(name)
+            type_info: Box::new(TypeInfo::new(name))
         }),
         arb_name().prop_map(|name| CpgNodeKind::GenericParam { name: name.into() }),
         Just(CpgNodeKind::IndexAccess),
@@ -443,14 +445,14 @@ pub(crate) fn build_well_formed(stmts: Vec<StmtSpec>) -> CodePropertyGraph {
     let func = cpg.add_node(CpgNode::new(
         NodeId::new(0),
         CpgNodeKind::Function {
-            signature: MethodSignature {
+            signature: Box::new(MethodSignature {
                 name: "f".into(),
                 params: Default::default(),
                 return_type: None,
                 is_static: false,
                 is_async: false,
                 visibility: Visibility::Public,
-            },
+            }),
         },
         SourceRange::default(),
     ));

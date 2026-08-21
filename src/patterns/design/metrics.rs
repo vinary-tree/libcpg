@@ -524,7 +524,7 @@ mod tests {
             NodeId::new(0),
             CpgNodeKind::Field {
                 name: Arc::from(name),
-                field_type: ty.map(TypeInfo::new),
+                field_type: ty.map(TypeInfo::new).map(Box::new),
                 visibility: Visibility::Private,
             },
             SourceRange::default(),
@@ -538,14 +538,14 @@ mod tests {
         cpg.add_node(CpgNode::new(
             NodeId::new(0),
             CpgNodeKind::Function {
-                signature: MethodSignature {
+                signature: Box::new(MethodSignature {
                     name: Arc::from(name),
                     params: SmallVec::new(),
                     return_type: None,
                     is_static: false,
                     is_async: false,
                     visibility: Visibility::Public,
-                },
+                }),
             },
             SourceRange::default(),
         ))
@@ -696,14 +696,14 @@ mod cohesion_and_coupling {
             cpg,
             Some(class_id),
             CpgNodeKind::Function {
-                signature: MethodSignature {
+                signature: Box::new(MethodSignature {
                     name: Arc::from(name),
                     params: Default::default(),
                     return_type: None,
                     is_static: false,
                     is_async: false,
                     visibility: Visibility::Public,
-                },
+                }),
             },
         )
     }
@@ -829,22 +829,22 @@ mod cohesion_and_coupling {
 
         let typed_field = |t: &str| CpgNodeKind::Field {
             name: Arc::from("f"),
-            field_type: Some(TypeInfo::new(t)),
+            field_type: Some(Box::new(TypeInfo::new(t))),
             visibility: Visibility::Private,
         };
         let typed_var = |t: &str| CpgNodeKind::Variable {
             name: Arc::from("v"),
-            var_type: Some(TypeInfo::new(t)),
+            var_type: Some(Box::new(TypeInfo::new(t))),
             scope: ScopeId::GLOBAL,
             is_mutable: false,
         };
         let typed_param = |t: &str| CpgNodeKind::Parameter {
             name: Arc::from("p"),
-            param_type: Some(TypeInfo::new(t)),
+            param_type: Some(Box::new(TypeInfo::new(t))),
             is_variadic: false,
         };
         let annotation = |t: &str| CpgNodeKind::TypeAnnotation {
-            type_info: TypeInfo::new(t),
+            type_info: Box::new(TypeInfo::new(t)),
         };
 
         // No type references at all.
