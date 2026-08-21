@@ -139,9 +139,11 @@ once, loop bodies twice, and a path set cuts malformed AST cycles.
 
 ## Benchmark coverage and remaining gaps
 
-Twenty-two Criterion targets are active. Their thirty-seven baseline operation
-groups are feature-free; `induction_analysis` also registers one
-`algorithm-detection`-gated operation, making thirty-eight in that build. Every
+Twenty-eight explicitly declared Criterion targets are active. Forty operation
+groups are feature-free; three more require the parser-language features used
+by DFG, PDG, and corpus measurement; `induction_analysis` registers one
+additional `algorithm-detection`-gated operation. A full-feature measurement
+therefore exposes forty-four groups. Every
 active group constructs and checks a deterministic oracle
 before Criterion enters the timed loop:
 
@@ -152,9 +154,19 @@ before Criterion enters the timed loop:
   each fixture checks exact levels, critical path, height, width, coverage, and
   edge orientation before timing;
 - `cpg_construction` measures deterministic graph-arena construction over
-  1,000- and 10,000-node paths;
+  1,000- and 10,000-node paths and, with `lang-rust`, complete parser-backed
+  construction over committed 49- and 514-line Rust modules;
+- `traversal_primitives` measures `node`, `ast_children`, `cfg_successors`,
+  `dfg_successors`, and `edges_between` over exact three-overlay paths at 1,024
+  and 8,192 nodes;
+- `dfg_extraction` measures DFG extraction over parser-built, DFG-free Rust
+  templates after requiring represented data-flow evidence;
+- `pdg_construction` measures PDG construction for every function in those
+  parser-built Rust templates after requiring represented dependence evidence;
 - `pattern_matching` measures bounded VF2 matching over 256- and 4,096-node
   paths;
+- `pattern_vf2` is the T9 canonical VF2 baseline over the same size classes,
+  with an exact one-match cap oracle;
 - `dataflow_liveness` measures backward-May liveness over 512- and 4,096-node
   chains, 64- and 512-rung diamond ladders, and 128- and 1,024-node nested-loop
   families;
@@ -169,6 +181,11 @@ before Criterion enters the timed loop:
 - `wl` measures four-round labels and clone grouping over 1,024- and
   8,192-vertex rings and outward stars, with exact symmetry, distinction,
   membership, and ordering oracles.
+- `similarity_wl` is the T9 canonical similarity baseline for labels and clone
+  classes over 1,024- and 8,192-node rings;
+- `analyze_corpus` measures parser/build, call resolution, call projection,
+  SCC, and WL end to end over committed Rust modules in approximately 50,
+  500, and 5,000-line classes plus Python, JavaScript, Go, and C;
 - `clones` measures Type-1 equality, Type-3 statement insertion, and Type-4
   PDG-preserving reordering over 16- and 64-function corpora; exact taxonomy,
   membership, and similarity oracles run before timing.
@@ -306,6 +323,33 @@ harness = false
 [[bench]]
 name = "program_merge"
 harness = false
+
+[[bench]]
+name = "traversal_primitives"
+harness = false
+
+[[bench]]
+name = "dfg_extraction"
+harness = false
+required-features = ["lang-rust"]
+
+[[bench]]
+name = "pdg_construction"
+harness = false
+required-features = ["lang-rust"]
+
+[[bench]]
+name = "pattern_vf2"
+harness = false
+
+[[bench]]
+name = "similarity_wl"
+harness = false
+
+[[bench]]
+name = "analyze_corpus"
+harness = false
+required-features = ["lang-rust", "lang-python", "lang-javascript", "lang-go", "lang-c"]
 ```
 
 Run it directly, or save and compare named baselines:
@@ -333,16 +377,26 @@ cargo bench --bench api_usage_mining --no-default-features
 cargo bench --bench cwe_templates --no-default-features
 cargo bench --bench program_merge --no-default-features
 cargo bench --bench ifds_taint --no-default-features
+cargo bench --bench traversal_primitives --no-default-features
+cargo bench --bench pattern_vf2 --no-default-features
+cargo bench --bench similarity_wl --no-default-features
+cargo bench --bench dfg_extraction --features lang-rust
+cargo bench --bench pdg_construction --features lang-rust
+cargo bench --bench analyze_corpus \
+  --features lang-rust,lang-python,lang-javascript,lang-go,lang-c
 cargo bench --no-default-features --features algorithm-detection \
   --bench induction_analysis -- --test
 ```
 
 Effect summaries, Martin metrics, CK/LCOM and function metrics, reflexion conformance,
 architectural layering, architectural-smell detection, and deterministic CPG
-differencing do not yet have dedicated Criterion targets. DFG/PDG construction,
-whole-corpus analysis, and GNN propagation remain the broader runnable-benchmark gaps. Every other
+differencing do not yet have dedicated Criterion targets. GNN propagation remains
+a broader runnable-benchmark gap. Every other
 implemented architecture-analysis operation in this epic has an oracle-guarded
 target before optimization work begins.
+
+The complete pre-optimization timing, RSS, allocation, counter, and hot-path
+record is the [optimization ledger](optimization-ledger.md).
 
 ### Liveness replay finding
 
@@ -398,25 +452,34 @@ the report in parallel. Source:
 Concretely:
 
 ```sh
-# Pin to an isolated core and record a call-graph profile in one pass.
-taskset -c 2 perf record --call-graph lbr -- \
-  cargo bench --features lang-rust 2>&1 | tee bench-run.log
+# Pin to two physical cores on one CCD and write captures under ignored target/.
+mkdir -p target/verification
+taskset -c 0,1 perf record --call-graph lbr \
+  -o target/verification/perf.data -- \
+  cargo bench --features lang-rust \
+  > target/verification/bench-run.log 2>&1
 
 # Analyze the recorded profile without re-running the workload.
-perf report --stdio | tee perf-report.txt
+perf report --stdio -i target/verification/perf.data \
+  > target/verification/perf-report.txt
 ```
 
 Guidelines that apply specifically to `libcpg` measurements:
 
-- **Isolate and fix the clock.** Pin the benchmark to a dedicated core
-  (`taskset`/CPU affinity) and hold the cores at maximum frequency so results are
-  reproducible.
+- **Isolate and fix the clock.** Pin the benchmark to known physical cores in
+  one cache/CCD domain (`taskset`/CPU affinity) and hold those cores at maximum
+  frequency so results are reproducible.
 - **Record once, analyze many.** `tee` the run to a file and derive every figure
   from that single capture instead of re-running the workload for each number;
   generate and read the `perf` report in parallel with other analysis.
 - **Baseline before optimizing.** Establish a criterion baseline, change one thing,
   and compare — the discipline the rayon/preallocation opportunities above are
   waiting on.
+- **Keep temporary output off memory-backed filesystems.** The wrappers write
+  benchmark logs and profiler captures beneath `target/verification`, never
+  `/tmp`.
+- **Stay headless.** `./scripts/profile.sh` uses perf, DHAT, Massif, `ms_print`,
+  and the VTune command-line interface; it never starts a profiler GUI.
 
 The same methodology, framed as a scientific protocol, is in
 [`scientific/04-measurement-methodology.md`](../scientific/04-measurement-methodology.md).

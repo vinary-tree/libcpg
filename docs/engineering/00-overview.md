@@ -54,7 +54,7 @@ analytics](../GLOSSARY.md#condensation-graph--condensation-metrics),
 [missing-check and deviant-behavior population detectors](../GLOSSARY.md#missing-check-analysis--check-fingerprint),
 [architectural-smell analysis](../GLOSSARY.md#architectural-smell),
 [reflexion-model conformance](../GLOSSARY.md#reflexion-model),
-[WL structural-clone analysis](../GLOSSARY.md#weisfeilerleman-wl-refinement),
+[WL structural-clone analysis](../GLOSSARY.md#weisfeilerlehman-wl-refinement),
 [projection centrality](../GLOSSARY.md#centrality),
 [community detection](../GLOSSARY.md#community-detection),
 [cohesion and structural-robustness analysis](../GLOSSARY.md#cohesion--structural-robustness),
@@ -90,7 +90,8 @@ directly from that relationship, and both are visible in `Cargo.toml`:
 | --- | --- |
 | [01 — Build and features](01-build-and-features.md) | The full feature matrix: 16 `lang-*` grammars, the language groups, the analysis features, the Mode-B toggles, `serde`, the reserved `gpu` flag, and the `full` umbrella; the pgmcp grammar-pin table; how to enable a language. |
 | [02 — Testing](02-testing.md) | The example-based and `proptest` suite plus the general, robustness, SCCP, interval, loop-induction, complexity-evidence, condensation, layering, architectural-smell, DSM, Martin, reflexion, WL, centrality, community, cohesion, spectral, cycle, motif, GED, deterministic CPG-diff, function-clone, clone-feasibility, API-usage/temporal, CWE-template, deterministic ML-export, concurrency-bug, program-composition, IFDS/IDE, effect-summary, taint, maybe-null, typestate, bug-detector, and population-anomaly public-API/stack suites; the `arb_*` generators; how to run each feature subset; measured coverage; the defects the suite found; and the active Criterion benchmark substrate. |
-| [03 — Performance](03-performance.md) | The data-structure rationale, asymptotic costs including typestate, bug detectors, population anomaly inference, clone/feasibility advisories, API-usage/temporal mining, declarative CWE templates, and CPG differencing, twenty-two active oracle-guarded Criterion targets, controlled-measurement protocol, and explicit remaining benchmark gaps. |
+| [03 — Performance](03-performance.md) | The data-structure rationale, asymptotic costs including typestate, bug detectors, population anomaly inference, clone/feasibility advisories, API-usage/temporal mining, declarative CWE templates, and CPG differencing, twenty-eight active oracle-guarded Criterion targets, controlled-measurement protocol, and explicit remaining benchmark gaps. |
+| [Optimization ledger](optimization-ledger.md) | The reproducible T9.0 `main` baseline: 34 Criterion cases, per-workload RSS and DHAT allocations, Massif and type-size snapshots, perf counters and ranked hot paths, profiler availability boundaries, and the evidence-ranked experiment queue. |
 | [04 — Contributing](04-contributing.md) | Step-by-step recipes: add a language mapper, add a Gang-of-Four template, add a similarity metric; plus the coding conventions the crate follows. |
 
 ## Map of the security pillar
@@ -122,7 +123,7 @@ maturity than exists. The most consequential items:
 | --- | --- | --- |
 | Default build | `default = []`; `build` fails without a `lang-*` feature | [01](01-build-and-features.md) |
 | `examples/` directory | contains feature-free runnable `population_anomalies` (I6/I7), `clone_feasibility_advisories` (I8/I9), `api_usage_protocols` (I12), and `cwe_templates` exact-oracle examples; `tests/` holds integration and robustness suites | [02](02-testing.md), [Usage 18](../usage/18-population-anomaly-detectors.md), [Usage 19](../usage/19-clone-feasibility-advisories.md), [Usage 20](../usage/20-api-usage-protocol-mining.md), [Usage 21](../usage/21-cwe-template-analysis.md) |
-| Benchmarks | twenty-two oracle-guarded Criterion targets are active; thirty-seven operation groups are feature-free and the thirty-eighth, complexity evidence, is `algorithm-detection`-gated; effect summaries, DFG/PDG construction, whole-corpus analysis, and GNN propagation remain broader gaps | [02](02-testing.md), [03](03-performance.md) |
+| Benchmarks | twenty-eight oracle-guarded Criterion targets are active; the T9.0 baseline covers construction, traversal, DFG, PDG, SCC, VF2, WL, and whole-corpus analysis; effect summaries, graph metrics, and GNN propagation remain broader gaps | [02](02-testing.md), [03](03-performance.md), [ledger](optimization-ledger.md) |
 | `rayon`, `ahash`, `string_cache`, `regex` | declared in `Cargo.toml` but **not yet wired** into `src/` (`proptest` is now used throughout the test suite) | [02](02-testing.md), [03](03-performance.md) |
 | `gpu` feature | **reserved** — enables `wgpu`/`pollster` but no GPU code is written | [01](01-build-and-features.md) |
 | Detection results | pattern/algorithm/complexity outputs are **heuristics**, not proofs | [`security/00`](../security/00-threat-model.md) |

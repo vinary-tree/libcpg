@@ -582,6 +582,8 @@ registry. Run it with
 
 - [Build and features](01-build-and-features.md) — the feature subsets used above.
 - [Performance](03-performance.md) — current oracle-guarded targets and the remaining benchmarking gaps.
+- [Optimization ledger](optimization-ledger.md) — the T9.0 timing, RSS,
+  allocation, hardware-counter, and ranked-hot-path baseline.
 - [`scientific/00-overview.md`](../scientific/00-overview.md) — how these tests
   are read as validation evidence.
 - [`security/01-input-and-resource-hardening.md`](../security/01-input-and-resource-hardening.md)
