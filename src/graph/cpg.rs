@@ -759,40 +759,88 @@ impl CodePropertyGraph {
 
     /// Returns the depth of the AST (longest path from root).
     ///
-    /// The recursion tracks the current root-to-node path in `visited` so a
-    /// cyclic `AstChild` edge cannot cause unbounded recursion (stack overflow);
-    /// a node already on the path is treated as a leaf. For a well-formed tree
-    /// this is exactly the longest root-to-leaf path.
+    /// A typed heap continuation machine tracks the current root-to-node path,
+    /// the next child to evaluate, and the greatest completed child depth. A
+    /// cyclic `AstChild` edge is cut when its target is already on the active
+    /// path. For a well-formed tree this is exactly the longest root-to-leaf
+    /// path, and native stack use is independent of represented AST depth.
     pub fn ast_depth(&self) -> usize {
         let root = match self.root {
             Some(r) => r,
             None => return 0,
         };
 
-        fn depth_from(
-            cpg: &CodePropertyGraph,
-            id: NodeId,
-            visited: &mut rustc_hash::FxHashSet<NodeId>,
-        ) -> usize {
-            if !visited.insert(id) {
-                return 0; // already on the current path: cycle, stop descending
-            }
-            let children = cpg.ast_children(id);
-            let depth = if children.is_empty() {
-                1
-            } else {
-                1 + children
-                    .iter()
-                    .map(|&c| depth_from(cpg, c, visited))
-                    .max()
-                    .unwrap_or(0)
-            };
-            visited.remove(&id);
-            depth
+        enum DepthFrame {
+            Enter(NodeId),
+            Resume {
+                node: NodeId,
+                children: Vec<NodeId>,
+                next_child: usize,
+                maximum_child_depth: usize,
+            },
         }
 
-        let mut visited: rustc_hash::FxHashSet<NodeId> = rustc_hash::FxHashSet::default();
-        depth_from(self, root, &mut visited)
+        let node_count = self.node_count();
+        let mut frames = Vec::with_capacity(node_count);
+        let mut values = Vec::with_capacity(node_count);
+        let mut on_path =
+            rustc_hash::FxHashSet::with_capacity_and_hasher(node_count, Default::default());
+        frames.push(DepthFrame::Enter(root));
+
+        while let Some(frame) = frames.pop() {
+            match frame {
+                DepthFrame::Enter(node) => {
+                    if !on_path.insert(node) {
+                        values.push(0);
+                        continue;
+                    }
+
+                    let children = self.ast_children(node);
+                    match children.first().copied() {
+                        Some(first_child) => {
+                            frames.push(DepthFrame::Resume {
+                                node,
+                                children,
+                                next_child: 1,
+                                maximum_child_depth: 0,
+                            });
+                            frames.push(DepthFrame::Enter(first_child));
+                        }
+                        None => {
+                            on_path.remove(&node);
+                            values.push(1);
+                        }
+                    }
+                }
+                DepthFrame::Resume {
+                    node,
+                    children,
+                    next_child,
+                    maximum_child_depth,
+                } => {
+                    let child_depth = values
+                        .pop()
+                        .expect("every resumed AST-depth frame has one child value");
+                    let maximum_child_depth = maximum_child_depth.max(child_depth);
+                    if let Some(next) = children.get(next_child).copied() {
+                        frames.push(DepthFrame::Resume {
+                            node,
+                            children,
+                            next_child: next_child + 1,
+                            maximum_child_depth,
+                        });
+                        frames.push(DepthFrame::Enter(next));
+                    } else {
+                        on_path.remove(&node);
+                        values.push(1usize.saturating_add(maximum_child_depth));
+                    }
+                }
+            }
+        }
+
+        values
+            .pop()
+            .expect("the AST-depth root produces exactly one value")
     }
 
     /// Returns the cyclomatic complexity (number of linearly independent paths).
@@ -1624,6 +1672,30 @@ mod ext_tests {
     }
 
     #[test]
+    fn ast_depth_crosses_one_hundred_thousand_nodes_on_a_small_stack() {
+        const DEPTH: usize = 100_000;
+        let mut graph = CodePropertyGraph::new(Language::Rust);
+        let mut parent = graph.add_node(mk(CpgNodeKind::Root));
+        for _ in 1..DEPTH {
+            let child = graph.add_node(mk(CpgNodeKind::Return));
+            ast_edge(&mut graph, parent, child);
+            parent = child;
+        }
+        let graph = std::sync::Arc::new(graph);
+        let worker_graph = std::sync::Arc::clone(&graph);
+
+        let depth = std::thread::Builder::new()
+            .name("ast-depth-small-stack".into())
+            .stack_size(256 * 1024)
+            .spawn(move || worker_graph.ast_depth())
+            .expect("spawn AST-depth small-stack worker")
+            .join()
+            .expect("AST-depth small-stack worker completes");
+
+        assert_eq!(depth, DEPTH);
+    }
+
+    #[test]
     fn node_at_offset_picks_smallest_enclosing() {
         let mut g = CodePropertyGraph::new(Language::Rust);
         let big = g.add_node(mk_r(CpgNodeKind::Root, 0, 100));
@@ -1930,6 +2002,24 @@ mod proptests {
     use crate::CfgExtractor;
     use proptest::prelude::*;
 
+    fn recursive_ast_depth_oracle(
+        cpg: &CodePropertyGraph,
+        node: NodeId,
+        on_path: &mut rustc_hash::FxHashSet<NodeId>,
+    ) -> usize {
+        if !on_path.insert(node) {
+            return 0;
+        }
+        let children = cpg.ast_children(node);
+        let depth = children
+            .iter()
+            .map(|&child| recursive_ast_depth_oracle(cpg, child, on_path))
+            .max()
+            .map_or(1, |maximum| 1usize.saturating_add(maximum));
+        on_path.remove(&node);
+        depth
+    }
+
     proptest! {
         #![proptest_config(ProptestConfig::with_cases(256))]
 
@@ -1985,6 +2075,13 @@ mod proptests {
             let d = g.ast_depth();
             prop_assert!(d >= 1);
             prop_assert!(d <= g.node_count());
+            let mut on_path = rustc_hash::FxHashSet::default();
+            let expected = recursive_ast_depth_oracle(
+                &g,
+                g.root().expect("generated graph has a root"),
+                &mut on_path,
+            );
+            prop_assert_eq!(d, expected);
         }
 
         #[test]
