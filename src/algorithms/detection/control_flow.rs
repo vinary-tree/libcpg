@@ -176,7 +176,7 @@ impl ControlFlowAnalyzer {
                 // For loops are typically counted unless they iterate over unbounded collections
                 // Check if it has a range-like pattern
                 let children = cpg.ast_children(loop_node);
-                for child_id in children {
+                for &child_id in children {
                     if let Some(child) = cpg.node(child_id) {
                         // Look for range patterns (e.g., 0..n, iter.enumerate())
                         if self.is_range_expression(&child.kind) {
@@ -244,7 +244,7 @@ impl ControlFlowAnalyzer {
     fn is_counting_iterator_call(&self, cpg: &CodePropertyGraph, call_node: NodeId) -> bool {
         // Look for iterator methods that suggest counting: enumerate, zip, take, etc.
         let children = cpg.ast_children(call_node);
-        for child_id in children {
+        for &child_id in children {
             if let Some(child) = cpg.node(child_id) {
                 if let CpgNodeKind::Identifier { name, .. }
                 | CpgNodeKind::MemberAccess { member: name } = &child.kind
@@ -297,7 +297,7 @@ impl ControlFlowAnalyzer {
         target_name: &Arc<str>,
     ) -> bool {
         let children = cpg.ast_children(call_node);
-        for child_id in children {
+        for &child_id in children {
             if let Some(child) = cpg.node(child_id) {
                 match &child.kind {
                     CpgNodeKind::Identifier { name, .. } => {
@@ -484,26 +484,23 @@ mod tests {
             SourceRange::default(),
         ));
 
-        let mut block_node = CpgNode::new(
+        let block_node = CpgNode::new(
             NodeId::new(0),
             CpgNodeKind::Block {
                 scope: ScopeId::GLOBAL,
             },
             SourceRange::default(),
         );
-        block_node.parent = Some(func);
         let block = cpg.add_node(block_node);
         cpg.connect(func, block, CpgEdgeKind::AstChild);
 
-        let mut outer_loop_node =
+        let outer_loop_node =
             CpgNode::new(NodeId::new(0), CpgNodeKind::For, SourceRange::default());
-        outer_loop_node.parent = Some(block);
         let outer_loop = cpg.add_node(outer_loop_node);
         cpg.connect(block, outer_loop, CpgEdgeKind::AstChild);
 
-        let mut inner_loop_node =
+        let inner_loop_node =
             CpgNode::new(NodeId::new(0), CpgNodeKind::While, SourceRange::default());
-        inner_loop_node.parent = Some(outer_loop);
         let inner_loop = cpg.add_node(inner_loop_node);
         cpg.connect(outer_loop, inner_loop, CpgEdgeKind::AstChild);
 

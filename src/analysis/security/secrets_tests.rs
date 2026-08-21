@@ -17,13 +17,6 @@ fn add(cpg: &mut CodePropertyGraph, kind: CpgNodeKind) -> NodeId {
 fn ast(cpg: &mut CodePropertyGraph, parent: NodeId, child: NodeId) {
     cpg.connect(parent, child, CpgEdgeKind::AstChild)
         .expect("secret fixture AST endpoints exist");
-    cpg.node_mut(parent)
-        .expect("secret fixture parent exists")
-        .children
-        .push(child);
-    cpg.node_mut(child)
-        .expect("secret fixture child exists")
-        .parent = Some(parent);
 }
 
 fn function(cpg: &mut CodePropertyGraph, name: &str) -> NodeId {

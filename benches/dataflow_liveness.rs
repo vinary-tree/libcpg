@@ -42,11 +42,6 @@ fn identifier(name: &str) -> CpgNodeKind {
 
 fn connect_ast(cpg: &mut CodePropertyGraph, parent: NodeId, child: NodeId) {
     cpg.connect(parent, child, CpgEdgeKind::AstChild);
-    cpg.node_mut(parent)
-        .expect("AST parent")
-        .children
-        .push(child);
-    cpg.node_mut(child).expect("AST child").parent = Some(parent);
 }
 
 fn add_child(cpg: &mut CodePropertyGraph, function: NodeId, kind: CpgNodeKind) -> NodeId {

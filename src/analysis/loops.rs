@@ -444,7 +444,6 @@ mod tests {
         for id in 1..node_count {
             cpg.add_node_with_id(node_with_id(id, block()));
             cpg.connect(NodeId::new(0), NodeId::new(id), CpgEdgeKind::AstChild);
-            cpg.node_mut(NodeId::new(id)).expect("node").parent = Some(NodeId::new(0));
         }
         for &(source, target, kind) in edges {
             add_cfg(&mut cpg, source, target, kind);
@@ -614,7 +613,6 @@ mod tests {
                 NodeId::new(child),
                 CpgEdgeKind::AstChild,
             );
-            cpg.node_mut(NodeId::new(child)).expect("child").parent = Some(NodeId::new(parent));
         }
 
         for (source, target, kind) in [
@@ -646,7 +644,6 @@ mod tests {
         for id in 1..=LAST {
             cpg.add_node_with_id(node_with_id(id, block()));
             cpg.connect(NodeId::new(0), NodeId::new(id), CpgEdgeKind::AstChild);
-            cpg.node_mut(NodeId::new(id)).expect("node").parent = Some(NodeId::new(0));
             add_cfg(
                 &mut cpg,
                 id - 1,
@@ -694,7 +691,6 @@ mod tests {
                 NodeId::new(id as u32),
                 CpgEdgeKind::AstChild,
             );
-            cpg.node_mut(NodeId::new(id as u32)).expect("node").parent = Some(NodeId::new(0));
         }
 
         let mut edges = edges.to_vec();

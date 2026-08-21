@@ -65,7 +65,6 @@ fn ast(cpg: &mut CodePropertyGraph, parent: u32, child: u32) {
     let child = NodeId::new(child);
     cpg.connect(parent, child, CpgEdgeKind::AstChild)
         .expect("AST endpoints exist");
-    cpg.node_mut(child).expect("child exists").parent = Some(parent);
 }
 
 fn cfg(cpg: &mut CodePropertyGraph, source: u32, target: u32, kind: CfgEdgeKind) {
@@ -401,7 +400,8 @@ fn parser_generated_rust_range_loop_satisfies_the_acceptance_oracle() {
         .expect("range belongs to for header");
     let binder = cpg
         .ast_children(for_header)
-        .into_iter()
+        .iter()
+        .copied()
         .find(|node| matches!(cpg.node(*node).map(|node| &node.kind), Some(CpgNodeKind::Variable { name, .. }) if &**name == "i"))
         .expect("semantic for binding");
     assert_eq!(iv.init_defs, vec![binder]);

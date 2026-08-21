@@ -155,11 +155,6 @@ fn counted_nested_fixture(depth: usize, reverse_storage: bool) -> CountedFixture
         };
         cpg.connect(parent, spec.id, CpgEdgeKind::AstChild)
             .expect("fixture AST endpoints");
-        cpg.node_mut(spec.id).expect("fixture AST child").parent = Some(parent);
-        cpg.node_mut(parent)
-            .expect("fixture AST parent")
-            .children
-            .push(spec.id);
     }
     let cfg_order: Box<dyn Iterator<Item = &CfgSpec>> = if reverse_storage {
         Box::new(cfg.iter().rev())
@@ -192,11 +187,6 @@ fn add_node(cpg: &mut CodePropertyGraph, kind: CpgNodeKind) -> NodeId {
 fn connect_ast(cpg: &mut CodePropertyGraph, parent: NodeId, child: NodeId) {
     cpg.connect(parent, child, CpgEdgeKind::AstChild)
         .expect("fixture AST endpoints");
-    cpg.node_mut(child).expect("fixture child").parent = Some(parent);
-    cpg.node_mut(parent)
-        .expect("fixture parent")
-        .children
-        .push(child);
 }
 
 fn connect_cfg(cpg: &mut CodePropertyGraph, source: NodeId, target: NodeId, kind: CfgEdgeKind) {
@@ -357,7 +347,8 @@ fn dominant_recursion_retains_subordinate_loop_evidence() {
     let body = fixture
         .cpg
         .ast_children(fixture.headers[0])
-        .into_iter()
+        .iter()
+        .copied()
         .find(|node| {
             matches!(
                 fixture.cpg.node(*node).map(|node| &node.kind),

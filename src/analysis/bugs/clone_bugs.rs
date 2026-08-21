@@ -533,7 +533,7 @@ fn ast_tape(cpg: &CodePropertyGraph, function: NodeId, cap: usize) -> Result<Ast
                 };
                 active.insert(node);
                 let mut children = Vec::new();
-                for child in cpg.ast_children(node) {
+                for &child in cpg.ast_children(node) {
                     let retained = match cpg.node(child) {
                         Some(child_node) => {
                             !matches!(child_node.kind, CpgNodeKind::Comment { .. })
@@ -906,7 +906,7 @@ fn guard_nodes(cpg: &CodePropertyGraph, function: NodeId) -> BTreeSet<NodeId> {
             if !scope.contains(&node) || !guards.insert(node) {
                 continue;
             }
-            let mut children = cpg.ast_children(node);
+            let mut children = cpg.ast_children(node).to_vec();
             children.reverse();
             pending.extend(children);
         }

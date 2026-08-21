@@ -72,9 +72,6 @@ fn add(cpg: &mut CodePropertyGraph, kind: CpgNodeKind) -> NodeId {
 fn connect_ast(cpg: &mut CodePropertyGraph, parent: NodeId, child: NodeId) {
     cpg.connect(parent, child, CpgEdgeKind::AstChild)
         .expect("benchmark AST endpoints exist");
-    cpg.node_mut(child)
-        .expect("benchmark AST child exists")
-        .parent = Some(parent);
 }
 
 fn connect_cfg(cpg: &mut CodePropertyGraph, source: NodeId, target: NodeId, kind: CfgEdgeKind) {

@@ -482,13 +482,13 @@ fn compute_nulls(
                 }
                 Some(CpgNodeKind::Parameter { .. } | CpgNodeKind::Function { .. }) => {}
                 Some(CpgNodeKind::Assignment { .. }) => {
-                    for child in cpg.ast_children(node).into_iter().skip(1) {
+                    for &child in cpg.ast_children(node).iter().skip(1) {
                         changed |=
                             copy_value_nulls(cpg, &mut nulls, child, node, ctx.caps, &mut capped);
                     }
                 }
                 Some(_) => {
-                    for child in cpg.ast_children(node) {
+                    for &child in cpg.ast_children(node) {
                         changed |=
                             copy_nulls(&mut nulls, child, node, 1_000, ctx.caps, &mut capped);
                     }
@@ -664,7 +664,8 @@ fn variable_initializer_nodes(
     name: &str,
 ) -> Vec<NodeId> {
     cpg.ast_children(variable)
-        .into_iter()
+        .iter()
+        .copied()
         .filter(|&child| {
             !matches!(
                 cpg.node(child).map(|node| &node.kind),

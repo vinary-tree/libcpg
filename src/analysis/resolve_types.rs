@@ -285,14 +285,14 @@ fn is_method_call(cpg: &CodePropertyGraph, call: NodeId) -> bool {
 }
 
 fn receiver_of_call(cpg: &CodePropertyGraph, call: NodeId) -> Option<NodeId> {
-    let callee = cpg.ast_children(call).into_iter().next()?;
+    let callee = cpg.ast_children(call).first().copied()?;
     if !matches!(
         cpg.node(callee).map(|node| &node.kind),
         Some(CpgNodeKind::MemberAccess { .. })
     ) {
         return None;
     }
-    cpg.ast_children(callee).into_iter().next()
+    cpg.ast_children(callee).first().copied()
 }
 
 fn receiver_static_types(
@@ -488,7 +488,7 @@ fn receiver_assigned_types(
         if current != receiver && matches!(node.kind, CpgNodeKind::Function { .. }) {
             continue;
         }
-        let mut children = cpg.ast_children(current);
+        let mut children = cpg.ast_children(current).to_vec();
         children.reverse();
         work.extend(children);
     }
@@ -520,8 +520,6 @@ mod tests {
     fn child(cpg: &mut CodePropertyGraph, parent: NodeId, kind: CpgNodeKind) -> NodeId {
         let child = cpg.add_node(node(kind));
         cpg.connect(parent, child, CpgEdgeKind::AstChild);
-        cpg.node_mut(parent).expect("parent").children.push(child);
-        cpg.node_mut(child).expect("child").parent = Some(parent);
         child
     }
 
@@ -612,8 +610,8 @@ mod tests {
         );
         let initializer = cpg
             .ast_children(receiver_definition)
-            .into_iter()
-            .next()
+            .first()
+            .copied()
             .expect("initializer");
         cpg.node_mut(initializer)
             .expect("initializer")

@@ -580,7 +580,7 @@ mod tests {
     ) -> NodeId {
         use smallvec::smallvec;
 
-        let mut node = CpgNode::new(
+        let node = CpgNode::new(
             NodeId::new(0),
             CpgNodeKind::Function {
                 signature: MethodSignature {
@@ -594,7 +594,6 @@ mod tests {
             },
             SourceRange::default(),
         );
-        node.parent = Some(class_id);
         let method_id = cpg.add_node(node);
         cpg.connect(class_id, method_id, CpgEdgeKind::AstChild);
         method_id
@@ -733,7 +732,7 @@ mod tests {
         ty: Option<&str>,
     ) -> NodeId {
         use crate::TypeInfo;
-        let mut node = CpgNode::new(
+        let node = CpgNode::new(
             NodeId::new(0),
             CpgNodeKind::Field {
                 name: Arc::from(name),
@@ -742,7 +741,6 @@ mod tests {
             },
             SourceRange::default(),
         );
-        node.parent = Some(class_id);
         let id = cpg.add_node(node);
         cpg.connect(class_id, id, CpgEdgeKind::AstChild);
         id
@@ -941,7 +939,7 @@ mod vocabulary {
         is_static: bool,
         visibility: Visibility,
     ) -> NodeId {
-        let mut node = CpgNode::new(
+        let node = CpgNode::new(
             NodeId::new(0),
             CpgNodeKind::Function {
                 signature: MethodSignature {
@@ -955,12 +953,8 @@ mod vocabulary {
             },
             SourceRange::default(),
         );
-        node.parent = Some(class_id);
         let id = cpg.add_node(node);
         cpg.connect(class_id, id, CpgEdgeKind::AstChild);
-        if let Some(c) = cpg.node_mut(class_id) {
-            c.children.push(id);
-        }
         id
     }
 
@@ -970,7 +964,7 @@ mod vocabulary {
         name: &str,
         field_type: Option<&str>,
     ) -> NodeId {
-        let mut node = CpgNode::new(
+        let node = CpgNode::new(
             NodeId::new(0),
             CpgNodeKind::Field {
                 name: Arc::from(name),
@@ -979,12 +973,8 @@ mod vocabulary {
             },
             SourceRange::default(),
         );
-        node.parent = Some(class_id);
         let id = cpg.add_node(node);
         cpg.connect(class_id, id, CpgEdgeKind::AstChild);
-        if let Some(c) = cpg.node_mut(class_id) {
-            c.children.push(id);
-        }
         id
     }
 

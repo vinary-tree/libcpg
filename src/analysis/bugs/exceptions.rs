@@ -347,7 +347,7 @@ fn direct_throws(cpg: &CodePropertyGraph, function: NodeId) -> Vec<NodeId> {
 
 fn throw_types(cpg: &CodePropertyGraph, throw_site: NodeId) -> BTreeSet<ExceptionType> {
     let mut types = BTreeSet::new();
-    for value in cpg.ast_children(throw_site) {
+    for &value in cpg.ast_children(throw_site) {
         types.extend(value_types(cpg, value));
     }
     if types.is_empty() {
@@ -528,7 +528,8 @@ fn handler_layers(cpg: &CodePropertyGraph, function: NodeId, site: NodeId) -> Ve
             });
             if protected == Some(child) {
                 let catches = children
-                    .into_iter()
+                    .iter()
+                    .copied()
                     .filter(|&node| {
                         cpg.node(node)
                             .is_some_and(|node| matches!(node.kind, CpgNodeKind::Catch))
@@ -689,7 +690,7 @@ fn collect_input_issues(
                     }
                 }
                 Some(CpgNodeKind::Catch) => {
-                    let body = cpg.ast_children(node).into_iter().find(|&child| {
+                    let body = cpg.ast_children(node).iter().copied().find(|&child| {
                         cpg.node(child)
                             .is_some_and(|node| matches!(node.kind, CpgNodeKind::Block { .. }))
                     });

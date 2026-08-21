@@ -244,7 +244,7 @@ fn loop_region_nodes(
         {
             continue;
         }
-        let mut children = cpg.ast_children(node);
+        let mut children = cpg.ast_children(node).to_vec();
         children.reverse();
         pending.extend(children);
     }
@@ -356,7 +356,7 @@ fn candidate_uses(
                 {
                     Vec::new()
                 } else {
-                    cpg.ast_children(node)
+                    cpg.ast_children(node).to_vec()
                 };
                 frames.push(CandidateUseFrame::Exit {
                     node,
@@ -414,7 +414,7 @@ fn candidate_uses(
         {
             continue;
         }
-        let mut children = cpg.ast_children(node);
+        let mut children = cpg.ast_children(node).to_vec();
         children.reverse();
         pending.extend(children);
     }
@@ -583,7 +583,7 @@ fn basic_update_shape(
                 return None;
             };
             let operands = cpg.ast_children(rhs);
-            let [left, right, ..] = operands.as_slice() else {
+            let [left, right, ..] = operands else {
                 return None;
             };
             match &**operator {
@@ -737,7 +737,7 @@ fn affine_in_basic(
                     }
                     Some(CpgNodeKind::BinaryOp { operator }) => {
                         let children = cpg.ast_children(node);
-                        let [left, right, ..] = children.as_slice() else {
+                        let [left, right, ..] = children else {
                             seen.remove(&node);
                             values.push(None);
                             continue;
@@ -914,7 +914,7 @@ fn counted_trip_evidence(
             continue;
         };
         let operands = cpg.ast_children(comparison);
-        let [left, right, ..] = operands.as_slice() else {
+        let [left, right, ..] = operands else {
             continue;
         };
         for iv in &loop_ivs {
@@ -956,7 +956,7 @@ fn comparison_expression(cpg: &CodePropertyGraph, source: NodeId) -> Option<Node
         ) {
             return Some(node);
         }
-        let mut children = cpg.ast_children(node);
+        let mut children = cpg.ast_children(node).to_vec();
         children.reverse();
         pending.extend(children);
     }
@@ -1003,7 +1003,7 @@ fn for_range_parts(
         )
     })?;
     let operands = cpg.ast_children(range);
-    let [start, bound, ..] = operands.as_slice() else {
+    let [start, bound, ..] = operands else {
         return None;
     };
     Some((binder, range, *start, *bound))
@@ -1107,7 +1107,8 @@ fn definition_rhs(cpg: &CodePropertyGraph, node: NodeId) -> Option<NodeId> {
                 .copied()
                 .find(|&child| identifier_is(cpg, child, name));
             children
-                .into_iter()
+                .iter()
+                .copied()
                 .rev()
                 .find(|child| Some(*child) != binder)
         }
@@ -1146,7 +1147,7 @@ fn initial_definitions(
                 }
             }
         }
-        let mut children = cpg.ast_children(node);
+        let mut children = cpg.ast_children(node).to_vec();
         children.reverse();
         pending.extend(children);
     }

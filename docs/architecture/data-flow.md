@@ -43,10 +43,17 @@ stack in `build_ast`. For each retained node it:
 2. maps the grammar's node-kind string to a `CpgNodeKind` (`map_kind`) and,
    where applicable, a language-neutral `MsgKind` (`message_kind`);
 3. records a `SourceRange` from the tree-sitter byte offsets;
-4. adds the node and, if it has a parent, wires an `AstChild` edge **and** sets the child's `parent` pointer; and
+4. adds the node and, if it has a parent, wires an `AstChild` edge; and
 5. marks `Function` nodes as CFG entry points.
 
-The dual bookkeeping in step 4 matters: `ast_children` reads the `AstChild` edges (sorted by monotonic edge id to recover source order), while `ast_parent`/`ast_ancestors` read the parent pointer. Both must be set or ancestor-based analyses (def/use classification, enclosing-statement lookup, slicing) silently break. [`graph-data-model.md`](graph-data-model.md#recovering-source-order) explains the source-order recovery.
+`connect(.., AstChild)` owns all redundant bookkeeping in step 4: it appends to
+the parent's ordered child index and maintains the child's parent pointer while
+inserting the edge. `ast_children` then borrows the index without allocation,
+while `ast_parent`/`ast_ancestors` read the back-pointer. Centralizing this
+invariant prevents parser and fixture builders from drifting apart.
+[`graph-data-model.md`](graph-data-model.md#recovering-source-order) specifies
+source-order recovery, including explicit-id reconstruction and malformed
+multi-parent graphs.
 
 ### Stage 2 — CFG extraction
 

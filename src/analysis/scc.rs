@@ -242,7 +242,7 @@ pub(crate) fn function_scope_nodes(cpg: &CodePropertyGraph, function: NodeId) ->
         if !scope.insert(node) {
             continue;
         }
-        let mut children = cpg.ast_children(node);
+        let mut children = cpg.ast_children(node).to_vec();
         children.reverse();
         for child in children {
             if child != function

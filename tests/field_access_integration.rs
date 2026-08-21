@@ -9,10 +9,6 @@ fn child(cpg: &mut CodePropertyGraph, parent: NodeId, kind: CpgNodeKind) -> Node
     let id = cpg
         .add_node(CpgNode::new(NodeId::new(0), kind, SourceRange::default()).with_parent(parent));
     cpg.connect(parent, id, CpgEdgeKind::AstChild);
-    cpg.node_mut(parent)
-        .expect("parent exists")
-        .children
-        .push(id);
     id
 }
 

@@ -126,7 +126,6 @@ fn fixture(function_count: usize, shape: Shape) -> (CodePropertyGraph, Vec<NodeI
         ));
         cpg.connect(functions[source], call, CpgEdgeKind::AstChild)
             .expect("benchmark AST endpoints exist");
-        cpg.node_mut(call).expect("benchmark call exists").parent = Some(functions[source]);
     }
     (cpg, functions)
 }

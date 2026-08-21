@@ -451,7 +451,7 @@ impl ComplexityAnalyzer {
                         if op == "/" || op == ">>" {
                             // Check if dividing by 2
                             let children = cpg.ast_children(node_id);
-                            for child_id in children {
+                            for &child_id in children {
                                 if let Some(child) = cpg.node(child_id) {
                                     if let CpgNodeKind::Literal { kind } = &child.kind {
                                         if matches!(kind, crate::LiteralKind::Integer(2)) {
@@ -497,7 +497,7 @@ impl ComplexityAnalyzer {
                     CpgNodeKind::Call { .. } => {
                         // Check for allocation-related function names
                         let children = cpg.ast_children(node_id);
-                        for child_id in children {
+                        for &child_id in children {
                             if let Some(child) = cpg.node(child_id) {
                                 if let CpgNodeKind::Identifier { name, .. }
                                 | CpgNodeKind::MemberAccess { member: name } = &child.kind
@@ -602,19 +602,17 @@ mod tests {
         let mut cpg = CodePropertyGraph::new(Language::Rust);
         let func = create_function(&mut cpg, "linear");
 
-        let mut block = CpgNode::new(
+        let block = CpgNode::new(
             NodeId::new(0),
             CpgNodeKind::Block {
                 scope: ScopeId::GLOBAL,
             },
             SourceRange::default(),
         );
-        block.parent = Some(func);
         let block_id = cpg.add_node(block);
         cpg.connect(func, block_id, CpgEdgeKind::AstChild);
 
-        let mut for_loop = CpgNode::new(NodeId::new(0), CpgNodeKind::For, SourceRange::default());
-        for_loop.parent = Some(block_id);
+        let for_loop = CpgNode::new(NodeId::new(0), CpgNodeKind::For, SourceRange::default());
         let loop_id = cpg.add_node(for_loop);
         cpg.connect(block_id, loop_id, CpgEdgeKind::AstChild);
 
@@ -629,24 +627,21 @@ mod tests {
         let mut cpg = CodePropertyGraph::new(Language::Rust);
         let func = create_function(&mut cpg, "quadratic");
 
-        let mut block = CpgNode::new(
+        let block = CpgNode::new(
             NodeId::new(0),
             CpgNodeKind::Block {
                 scope: ScopeId::GLOBAL,
             },
             SourceRange::default(),
         );
-        block.parent = Some(func);
         let block_id = cpg.add_node(block);
         cpg.connect(func, block_id, CpgEdgeKind::AstChild);
 
-        let mut outer = CpgNode::new(NodeId::new(0), CpgNodeKind::For, SourceRange::default());
-        outer.parent = Some(block_id);
+        let outer = CpgNode::new(NodeId::new(0), CpgNodeKind::For, SourceRange::default());
         let outer_id = cpg.add_node(outer);
         cpg.connect(block_id, outer_id, CpgEdgeKind::AstChild);
 
-        let mut inner = CpgNode::new(NodeId::new(0), CpgNodeKind::For, SourceRange::default());
-        inner.parent = Some(outer_id);
+        let inner = CpgNode::new(NodeId::new(0), CpgNodeKind::For, SourceRange::default());
         let inner_id = cpg.add_node(inner);
         cpg.connect(outer_id, inner_id, CpgEdgeKind::AstChild);
 
@@ -666,11 +661,9 @@ mod tests {
 
     // --- space complexity ---
 
-    /// Adds `parent -> child(kind)` via an `AstChild` edge and sets the child's
-    /// parent pointer (so ancestor walks used by recursion analysis work).
+    /// Adds `parent -> child(kind)` through the invariant-owning edge API.
     fn child(cpg: &mut CodePropertyGraph, parent: NodeId, kind: CpgNodeKind) -> NodeId {
-        let mut node = CpgNode::new(NodeId::new(0), kind, SourceRange::default());
-        node.parent = Some(parent);
+        let node = CpgNode::new(NodeId::new(0), kind, SourceRange::default());
         let id = cpg.add_node(node);
         cpg.connect(parent, id, CpgEdgeKind::AstChild);
         id

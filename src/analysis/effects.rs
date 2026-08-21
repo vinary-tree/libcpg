@@ -898,7 +898,7 @@ fn dependency_children(
             CalleeRef::External(_) | CalleeRef::Unresolved(_) => Some(arguments),
         }
     } else {
-        let mut children = cpg.ast_children(node);
+        let mut children = cpg.ast_children(node).to_vec();
         let definitions = cpg.reaching_definitions(node);
         if children.try_reserve(definitions.len()).is_err() {
             budget.capped = true;
@@ -1114,7 +1114,7 @@ fn evaluate_constant_machine(
                     }
                     Some(CpgNodeKind::BinaryOp { operator }) => {
                         let children = cpg.ast_children(node);
-                        if let [left, right, ..] = children.as_slice() {
+                        if let [left, right, ..] = children {
                             if !push_machine_frame(
                                 &mut frames,
                                 ConstantFrame::BinaryLeft {
@@ -1203,12 +1203,17 @@ fn evaluate_constant_machine(
                         }
                     }
                     Some(CpgNodeKind::Variable { name, .. }) => {
-                        let initializer = cpg.ast_children(node).into_iter().rev().find(|&child| {
+                        let initializer = cpg
+                            .ast_children(node)
+                            .iter()
+                            .copied()
+                            .rev()
+                            .find(|&child| {
                             !matches!(
                                 cpg.node(child).map(|node| &node.kind),
                                 Some(CpgNodeKind::Identifier { name: child_name, .. }) if child_name == name
                             )
-                        });
+                            });
                         if let Some(initializer) = initializer {
                             if !push_machine_frame(
                                 &mut frames,

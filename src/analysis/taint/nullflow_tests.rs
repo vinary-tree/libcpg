@@ -28,13 +28,6 @@ fn add(cpg: &mut CodePropertyGraph, kind: CpgNodeKind) -> NodeId {
 fn connect_ast(cpg: &mut CodePropertyGraph, parent: NodeId, child: NodeId) {
     cpg.connect(parent, child, CpgEdgeKind::AstChild)
         .expect("null fixture AST endpoints exist");
-    cpg.node_mut(child)
-        .expect("null fixture child exists")
-        .parent = Some(parent);
-    cpg.node_mut(parent)
-        .expect("null fixture parent exists")
-        .children
-        .push(child);
 }
 
 fn child(cpg: &mut CodePropertyGraph, parent: NodeId, kind: CpgNodeKind) -> NodeId {

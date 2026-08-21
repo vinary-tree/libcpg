@@ -104,7 +104,7 @@ let ret = cpg.add_node(CpgNode::new(
 cpg.connect(block, ret, CpgEdgeKind::AstChild);
 
 // The AST overlay: children of `block`.
-for child in cpg.ast_children(block) {
+for &child in cpg.ast_children(block) {
     let _kind = &cpg.node(child).expect("node exists").kind; // node() -> Option, not Result
 }
 // Other overlays read the SAME nodes: cfg_successors / dfg_successors / callees …

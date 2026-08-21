@@ -247,10 +247,9 @@ while work is not empty:
         # 3. Create the CPG node over the tree-sitter byte/point range.
         node_id ← cpg.add_node(CpgNode(cpg_kind, SourceRange(ts_node)))
 
-        # 4. Wire the AST edge AND the parent pointer. BOTH are needed.
+        # 4. Wire the AST edge. connect maintains both navigation indices.
         if parent_id is Some(parent):
             cpg.connect(parent, node_id, AstChild)
-            cpg.node_mut(node_id).parent ← parent
 
         # 5. A function is a CFG entry point.
         if cpg_kind is Function { .. }:
@@ -267,11 +266,13 @@ while work is not empty:
 
 Three details are worth emphasising:
 
-- **`AstChild` edge *and* parent pointer.** `cpg.ast_children(id)` recovers children by
-  reading `AstChild` edges (sorted by edge id to restore source order), while
-  `cpg.ast_parent(id)` / `ast_ancestors(id)` read the stored `parent` field. The builder
-  sets both. This dual bookkeeping is what lets the DFG's binder detection, the PDG's
-  enclosing-function test, and the slicer all ask "who is my ancestor?" cheaply.
+- **One invariant-owning insertion.** `cpg.connect(parent, child, AstChild)`
+  appends `child` to the parent's ascending-edge-id child index and maintains
+  the child's parent pointer while it inserts the edge. `cpg.ast_children(id)`
+  borrows the first index; `cpg.ast_parent(id)` / `ast_ancestors(id)` read the
+  second. The builder makes one call, so the DFG's binder detection, the PDG's
+  enclosing-function test, and the slicer can all ask "who is my ancestor?"
+  cheaply without duplicated bookkeeping.
 - **Reparenting of skipped nodes.** When `should_include_node` rejects a node (punctuation,
   a comment, or a transparent grammar wrapper), its frames retain the *current*
   parent. The wrapper disappears and its meaningful contents

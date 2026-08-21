@@ -484,7 +484,7 @@ impl IntervalAnalysis<'_> {
                         }
                         Some(CpgNodeKind::BinaryOp { operator }) => {
                             let children = cpg.ast_children(node);
-                            let [left, right, ..] = children.as_slice() else {
+                            let [left, right, ..] = children else {
                                 if !push_interval_frame(
                                     &mut frames,
                                     IntervalExprFrame::Exit {
@@ -593,7 +593,7 @@ impl IntervalAnalysis<'_> {
             return None;
         };
         let children = cpg.ast_children(comparison);
-        let [left, right, ..] = children.as_slice() else {
+        let [left, right, ..] = children else {
             return None;
         };
         let left_kind = &cpg.node(*left)?.kind;
@@ -919,7 +919,8 @@ fn declaration_initializer(
     name: &str,
 ) -> Option<NodeId> {
     cpg.ast_children(declaration)
-        .into_iter()
+        .iter()
+        .copied()
         .rev()
         .find(|child| {
             !matches!(
@@ -1380,7 +1381,7 @@ mod tests {
                 }),
             Some(CpgNodeKind::BinaryOp { operator }) => {
                 let children = cpg.ast_children(node);
-                match children.as_slice() {
+                match children {
                     [left, right, ..] => {
                         let left = recursive_eval_expr(analysis, cpg, *left, state, on_path);
                         let right = recursive_eval_expr(analysis, cpg, *right, state, on_path);

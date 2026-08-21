@@ -123,7 +123,7 @@ impl PatternMetrics {
         let mut stack = vec![class_id];
 
         while let Some(current) = stack.pop() {
-            for child_id in cpg.ast_children(current) {
+            for &child_id in cpg.ast_children(current) {
                 if !visited.insert(child_id) {
                     // Already seen — a cycle or shared child; do not revisit.
                     continue;
@@ -687,9 +687,6 @@ mod cohesion_and_coupling {
         let id = cpg.add_node(node);
         if let Some(p) = parent {
             cpg.connect(p, id, CpgEdgeKind::AstChild);
-            if let Some(pn) = cpg.node_mut(p) {
-                pn.children.push(id);
-            }
         }
         id
     }

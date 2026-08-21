@@ -276,7 +276,6 @@ mod tests {
             NodeId::new(child),
             CpgEdgeKind::AstChild,
         );
-        cpg.node_mut(NodeId::new(child)).expect("child").parent = Some(NodeId::new(parent));
     }
 
     fn add_lock(cpg: &mut CodePropertyGraph, strand: u32, site: u32, lock: u32, kind: LockKind) {
@@ -387,12 +386,7 @@ mod tests {
             cpg.add_node_with_id(node);
         }
         for (source, target, kind) in edges {
-            let ast = kind == CpgEdgeKind::AstChild;
             cpg.connect(NodeId::new(source), NodeId::new(target), kind);
-            if ast {
-                cpg.node_mut(NodeId::new(target)).expect("AST child").parent =
-                    Some(NodeId::new(source));
-            }
         }
         cpg
     }

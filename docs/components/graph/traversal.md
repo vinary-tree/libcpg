@@ -9,14 +9,15 @@ the recurring analysis patterns — reachability, def-use following, and a
 
 ## Return types at a glance
 
-The single most important thing to internalise: the AST and flow accessors
-return **owned `Vec`s of ids** (or id/edge-kind pairs), *not* iterators of
-`&CpgNode`. You resolve an id to a node with `node(id) -> Option<&CpgNode>`.
+The single most important thing to internalise: accessors return ids (or
+id/edge-kind pairs), *not* `&CpgNode`s. The hot-path `ast_children` accessor
+borrows its maintained index; descendant and flow accessors return owned
+`Vec`s. Resolve an id to a node with `node(id) -> Option<&CpgNode>`.
 
 | Accessor | Returns |
 |----------|---------|
 | `node(id)` | `Option<&CpgNode>` |
-| `ast_children(id)` | `Vec<NodeId>` (source order) |
+| `ast_children(id)` | `&[NodeId]` (source order; empty for unknown id) |
 | `ast_parent(id)` | `Option<NodeId>` |
 | `ast_descendants(id)` | `Vec<NodeId>` (depth-first) |
 | `ast_ancestors(id)` | `Vec<NodeId>` (toward the root) |
@@ -39,10 +40,10 @@ that returns `Option`, or `map_or` / `if let` inline.
 
 ## AST traversal
 
-`ast_children` gives a node's immediate children in source order;
+`ast_children` borrows a node's immediate children in source order;
 `ast_descendants` returns the whole subtree (depth-first); `ast_ancestors` walks
-up to the root. All three return `Vec<NodeId>`, so pair them with `node(id)` to
-read kinds:
+up to the root. The latter two return `Vec<NodeId>`; pair their ids (or the
+borrowed child ids) with `node(id)` to read kinds:
 
 ```rust
 use libcpg::{CodePropertyGraph, CpgNodeKind, NodeId};
@@ -76,7 +77,7 @@ use libcpg::{CodePropertyGraph, NodeId};
 
 fn next_sibling(cpg: &CodePropertyGraph, id: NodeId) -> Option<NodeId> {
     let parent = cpg.ast_parent(id)?;                 // Option<NodeId>
-    let siblings = cpg.ast_children(parent);          // Vec<NodeId>, source order
+    let siblings = cpg.ast_children(parent);          // &[NodeId], source order
     let pos = siblings.iter().position(|&c| c == id)?;
     siblings.get(pos + 1).copied()
 }

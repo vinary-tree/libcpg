@@ -6,7 +6,12 @@ Every method here reads an immutable `&CodePropertyGraph`, so all of it is **fea
 
 A note on return types, because they are consistent and easy to remember:
 
-- Navigation that follows a single overlay returns an **owned `Vec`** (e.g. `ast_children -> Vec<NodeId>`, `cfg_successors -> Vec<(NodeId, CfgEdgeKind)>`). Owning the result ends the borrow immediately, so you can mutate the graph inside the loop if you need to.
+- `ast_children -> &[NodeId]` borrows the maintained source-order child index,
+  avoiding a graph scan and allocation on this frequent path. Iterate with
+  `for &child in cpg.ast_children(node)`; call `.to_vec()` first only when the
+  loop must mutate the graph or an owned worklist must outlive the borrow.
+- Other navigation that follows an overlay returns an **owned `Vec`** (e.g.
+  `cfg_successors -> Vec<(NodeId, CfgEdgeKind)>`).
 - Whole-graph scans return **iterators** (`nodes()`, `functions()`, `nodes_by_kind(..)`).
 - Lookups return **`Option`** (`node(id)`, `node_at_offset(off)`), never `Result`.
 
@@ -49,13 +54,16 @@ fn survey(cpg: &CodePropertyGraph) {
 
 ## AST traversal
 
-The AST is the base layer: every node is an AST node, and the other overlays add edges between the *same* nodes. Four methods walk it, all reconstructing true **source order** (AST child edges are sorted by insertion id, so `[condition, then, else]` on an `if` come back in that order).
+The AST is the base layer: every node is an AST node, and the other overlays add
+edges between the *same* nodes. Inserting an `AstChild` edge maintains a child
+index in ascending edge-id order, so `[condition, then, else]` on an `if` comes
+back in true **source order** without sorting at query time.
 
 ```rust
 use libcpg::{CodePropertyGraph, NodeId};
 
 fn ast_walk(cpg: &CodePropertyGraph, node: NodeId) {
-    let children = cpg.ast_children(node);        // Vec<NodeId>, source order
+    let children = cpg.ast_children(node);        // &[NodeId], source order
     let parent = cpg.ast_parent(node);            // Option<NodeId>
     let descendants = cpg.ast_descendants(node);  // Vec<NodeId>, depth-first
     let ancestors = cpg.ast_ancestors(node);      // Vec<NodeId>, towards root
@@ -66,6 +74,21 @@ fn ast_walk(cpg: &CodePropertyGraph, node: NodeId) {
     );
 }
 ```
+
+The borrowed slice is ideal for read-only traversal:
+
+```rust
+fn print_child_ids(cpg: &CodePropertyGraph, node: NodeId) {
+    for &child in cpg.ast_children(node) {
+        println!("{child:?}");
+    }
+}
+```
+
+When a traversal must add edges or nodes, take ownership deliberately before
+the first mutation: `let children = cpg.ast_children(node).to_vec();`. Unknown
+node ids yield an empty child slice; parent, descendant, and ancestor behavior
+remains represented by `Option`/owned `Vec` as shown above.
 
 `ast_descendants` is the workhorse for "everything inside this function/class", and it underpins `call_sites`, `function_cfg`, and `function_dfg` below.
 

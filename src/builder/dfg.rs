@@ -379,7 +379,7 @@ impl DfgExtractor {
         seed_lexical_environment(cpg, function, &mut env);
         let mut on_path: FxHashSet<NodeId> = FxHashSet::default();
         on_path.insert(function);
-        for child in cpg.ast_children(function) {
+        for &child in cpg.ast_children(function) {
             visit_reaching(cpg, child, &mut env, false, &mut pairs, &mut on_path);
         }
 
@@ -677,7 +677,7 @@ fn enclosing_field_owner(cpg: &CodePropertyGraph, field: NodeId) -> Option<NodeI
 /// arguments directly. Supporting both shapes keeps the interprocedural DFG
 /// language-agnostic.
 pub(crate) fn call_arguments(cpg: &CodePropertyGraph, call: NodeId) -> Vec<NodeId> {
-    let mut children = cpg.ast_children(call);
+    let mut children = cpg.ast_children(call).to_vec();
     if children.is_empty() {
         return Vec::new();
     }
@@ -700,7 +700,7 @@ pub(crate) fn call_arguments(cpg: &CodePropertyGraph, call: NodeId) -> Vec<NodeI
             )
         });
         if is_container {
-            arguments.extend(cpg.ast_children(child));
+            arguments.extend(cpg.ast_children(child).iter().copied());
         } else {
             arguments.push(child);
         }
@@ -762,7 +762,7 @@ fn binder_identifier(cpg: &CodePropertyGraph, node: NodeId, name: &str) -> Optio
     if name.is_empty() {
         return None;
     }
-    cpg.ast_children(node).into_iter().find(|&c| {
+    cpg.ast_children(node).iter().copied().find(|&c| {
         matches!(
             cpg.node(c).map(|n| &n.kind),
             Some(CpgNodeKind::Identifier { name: n, .. }) if &**n == name
@@ -819,7 +819,7 @@ fn seed_lexical_environment(cpg: &CodePropertyGraph, function: NodeId, env: &mut
     for pair in path.windows(2) {
         let parent = pair[0];
         let child_on_path = pair[1];
-        let mut siblings = cpg.ast_children(parent);
+        let mut siblings = cpg.ast_children(parent).to_vec();
         siblings.sort_unstable_by_key(|&node| {
             cpg.node(node)
                 .map(|node| (node.range.start, node.range.end, node.id))
@@ -909,7 +909,7 @@ fn visit_reaching(
                             definition: node,
                             conditional,
                         });
-                        for child in cpg.ast_children(node).into_iter().rev() {
+                        for &child in cpg.ast_children(node).iter().rev() {
                             if Some(child) != binder {
                                 work.push(ReachingFrame::Enter {
                                     node: child,
@@ -943,7 +943,7 @@ fn visit_reaching(
                                 });
                             }
                         }
-                        for child in children.into_iter().rev() {
+                        for &child in children.iter().rev() {
                             if Some(child) != target || !target_is_ident || compound {
                                 work.push(ReachingFrame::Enter {
                                     node: child,
@@ -1289,7 +1289,6 @@ mod tests {
         ));
 
         cpg.connect_unique(func, body, CpgEdgeKind::AstChild);
-        cpg.node_mut(body).unwrap().parent = Some(func);
 
         func
     }
@@ -1605,12 +1604,6 @@ mod tests {
     fn dfg_child(cpg: &mut CodePropertyGraph, parent: NodeId, kind: CpgNodeKind) -> NodeId {
         let id = cpg.add_node(CpgNode::new(NodeId::new(0), kind, SourceRange::default()));
         cpg.connect(parent, id, CpgEdgeKind::AstChild);
-        if let Some(n) = cpg.node_mut(id) {
-            n.parent = Some(parent);
-        }
-        if let Some(p) = cpg.node_mut(parent) {
-            p.children.push(id);
-        }
         id
     }
 
@@ -2813,9 +2806,6 @@ mod cyclic_ast_regression {
         );
         // Close a cycle: the variable claims the body as its own child.
         cpg.connect(var, body, CpgEdgeKind::AstChild);
-        if let Some(n) = cpg.node_mut(var) {
-            n.children.push(body);
-        }
 
         // Termination is the property under test.
         DfgExtractor::new().extract_function_dfg(&mut cpg, func);
@@ -2860,7 +2850,7 @@ mod proptests {
             CpgNodeKind::Function { .. } => {}
             CpgNodeKind::Variable { name, .. } | CpgNodeKind::Parameter { name, .. } => {
                 let binder = binder_identifier(cpg, node, name);
-                for child in cpg.ast_children(node) {
+                for &child in cpg.ast_children(node) {
                     if Some(child) != binder {
                         recursive_visit_reaching_oracle(
                             cpg,
@@ -2884,7 +2874,7 @@ mod proptests {
                         .map(|node| &node.kind),
                     Some(CpgNodeKind::Identifier { .. })
                 );
-                for &child in &children {
+                for &child in children {
                     if Some(child) != target || !target_is_ident || compound {
                         recursive_visit_reaching_oracle(
                             cpg,
@@ -2911,7 +2901,7 @@ mod proptests {
                 let child_conditional = conditional || is_conditional_region(&kind);
                 let passes = usize::from(is_loop_region(&kind)) + 1;
                 for _ in 0..passes {
-                    for child in cpg.ast_children(node) {
+                    for &child in cpg.ast_children(node) {
                         recursive_visit_reaching_oracle(
                             cpg,
                             child,

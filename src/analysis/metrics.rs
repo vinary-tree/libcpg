@@ -522,7 +522,7 @@ fn collect_declared_members(
     fields: &mut BTreeSet<NodeId>,
 ) {
     let mut visited = BTreeSet::from([owner]);
-    let mut stack = cpg.ast_children(owner);
+    let mut stack = cpg.ast_children(owner).to_vec();
     stack.reverse();
     while let Some(node_id) = stack.pop() {
         if !visited.insert(node_id) {
@@ -544,7 +544,7 @@ fn collect_declared_members(
             | CpgNodeKind::Trait { .. }
             | CpgNodeKind::Impl { .. } => {}
             _ => {
-                let mut children = cpg.ast_children(node_id);
+                let mut children = cpg.ast_children(node_id).to_vec();
                 children.reverse();
                 stack.extend(children);
             }
@@ -849,7 +849,8 @@ fn cyclomatic_complexity(
             CpgNodeKind::Match => {
                 let arms = cpg
                     .ast_children(node_id)
-                    .into_iter()
+                    .iter()
+                    .copied()
                     .filter(|&child| {
                         matches!(
                             cpg.node(child).map(|node| &node.kind),
@@ -870,7 +871,8 @@ fn cognitive_complexity(cpg: &CodePropertyGraph, function: NodeId) -> u32 {
     let mut visited = BTreeSet::from([function]);
     let mut stack: Vec<_> = cpg
         .ast_children(function)
-        .into_iter()
+        .iter()
+        .copied()
         .rev()
         .map(|child| (child, 0u32))
         .collect();
@@ -925,7 +927,7 @@ fn cognitive_complexity(cpg: &CodePropertyGraph, function: NodeId) -> u32 {
         } else {
             depth
         };
-        let mut children = cpg.ast_children(node_id);
+        let mut children = cpg.ast_children(node_id).to_vec();
         children.reverse();
         for child in children {
             stack.push((child, child_depth));

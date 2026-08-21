@@ -340,11 +340,6 @@ mod dataflow_framework {
         ));
         for child in [parameter, dead, live, live_use] {
             cpg.connect(function, child, CpgEdgeKind::AstChild);
-            cpg.node_mut(function)
-                .expect("function node")
-                .children
-                .push(child);
-            cpg.node_mut(child).expect("child node").parent = Some(function);
         }
         for (source, target) in [
             (function, parameter),
@@ -659,8 +654,6 @@ mod expression_dataflow_analysis {
 
     fn child(cpg: &mut CodePropertyGraph, parent: NodeId, child: NodeId) {
         cpg.connect(parent, child, CpgEdgeKind::AstChild);
-        cpg.node_mut(parent).expect("parent").children.push(child);
-        cpg.node_mut(child).expect("child").parent = Some(parent);
     }
 
     #[test]

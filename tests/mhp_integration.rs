@@ -37,9 +37,6 @@ fn connect_ast(cpg: &mut CodePropertyGraph, parent: u32, child: u32) {
         NodeId::new(child),
         CpgEdgeKind::AstChild,
     );
-    cpg.node_mut(NodeId::new(child))
-        .expect("child exists")
-        .parent = Some(NodeId::new(parent));
 }
 
 #[test]

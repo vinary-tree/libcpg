@@ -33,7 +33,7 @@ pub(crate) fn guard_expression(cpg: &CodePropertyGraph, source: NodeId) -> Optio
         if matches!(payload.kind, CpgNodeKind::Function { .. }) {
             continue;
         }
-        let mut children = cpg.ast_children(node);
+        let mut children = cpg.ast_children(node).to_vec();
         children.reverse();
         pending.extend(children);
     }

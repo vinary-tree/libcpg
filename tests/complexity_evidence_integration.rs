@@ -39,11 +39,6 @@ fn block() -> CpgNodeKind {
 fn ast(cpg: &mut CodePropertyGraph, parent: NodeId, child: NodeId) {
     cpg.connect(parent, child, CpgEdgeKind::AstChild)
         .expect("integration AST endpoints");
-    cpg.node_mut(child).expect("integration child").parent = Some(parent);
-    cpg.node_mut(parent)
-        .expect("integration parent")
-        .children
-        .push(child);
 }
 
 fn cfg(cpg: &mut CodePropertyGraph, source: NodeId, target: NodeId, kind: CfgEdgeKind) {

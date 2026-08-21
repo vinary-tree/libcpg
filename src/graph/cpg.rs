@@ -236,11 +236,10 @@ impl CodePropertyGraph {
             node.parent = source_node
                 .parent
                 .and_then(|parent| remap.get(&parent).copied());
-            node.children = source_node
-                .children
-                .iter()
-                .filter_map(|child| remap.get(child).copied())
-                .collect();
+            // AST edges are appended below in ascending source EdgeId order.
+            // Rebuilding this cache from those edges avoids duplicating the
+            // child references copied with the node.
+            node.children.clear();
             match &mut node.kind {
                 CpgNodeKind::Call { target, .. } => {
                     *target = target.and_then(|target| remap.get(&target).copied());
@@ -304,32 +303,131 @@ impl CodePropertyGraph {
     // ========== Edge Operations ==========
 
     /// Adds an edge to the graph and returns its ID.
+    ///
+    /// An [`CpgEdgeKind::AstChild`] edge also appends its target to the
+    /// source node's child index and derives the target's parent from the
+    /// lowest-ID incoming AST-child edge. Callers must not repeat that metadata
+    /// update manually.
     pub fn add_edge(&mut self, mut edge: CpgEdge) -> Option<EdgeId> {
-        let source_idx = self.node_index_map.get(&edge.source)?;
-        let target_idx = self.node_index_map.get(&edge.target)?;
+        let source_idx = *self.node_index_map.get(&edge.source)?;
+        let target_idx = *self.node_index_map.get(&edge.target)?;
 
         let id = EdgeId::new(self.next_edge_id);
         self.next_edge_id += 1;
         edge.id = id;
 
-        self.graph.add_edge(*source_idx, *target_idx, edge);
-        self.edge_index_map.insert(id, (*source_idx, *target_idx));
+        let is_ast_child = edge.kind == CpgEdgeKind::AstChild;
+        let source = edge.source;
+        let target = edge.target;
+        let replace_ast_parent =
+            is_ast_child && self.appended_ast_parent_needs_update(target_idx, source);
+        self.graph.add_edge(source_idx, target_idx, edge);
+        self.edge_index_map.insert(id, (source_idx, target_idx));
+
+        if is_ast_child {
+            self.index_appended_ast_child(source, target, replace_ast_parent);
+        }
 
         Some(id)
     }
 
     /// Adds an edge with a specific ID (for reconstruction from serialization).
+    ///
+    /// Explicit identifiers may arrive out of order, so AST-child insertion
+    /// rebuilds the source node's child index in ascending [`EdgeId`] order.
     pub fn add_edge_with_id(&mut self, edge: CpgEdge) -> Option<EdgeId> {
-        let source_idx = self.node_index_map.get(&edge.source)?;
-        let target_idx = self.node_index_map.get(&edge.target)?;
+        let source_idx = *self.node_index_map.get(&edge.source)?;
+        let target_idx = *self.node_index_map.get(&edge.target)?;
 
         let id = edge.id;
+        let is_ast_child = edge.kind == CpgEdgeKind::AstChild;
+        let source = edge.source;
+        let target = edge.target;
         self.next_edge_id = self.next_edge_id.max(id.0 + 1);
 
-        self.graph.add_edge(*source_idx, *target_idx, edge);
-        self.edge_index_map.insert(id, (*source_idx, *target_idx));
+        self.graph.add_edge(source_idx, target_idx, edge);
+        self.edge_index_map.insert(id, (source_idx, target_idx));
+
+        if is_ast_child {
+            self.rebuild_ast_children(source);
+            self.rebuild_ast_parent(target);
+        }
 
         Some(id)
+    }
+
+    /// Appends a monotonically numbered AST edge to the stored source order.
+    fn index_appended_ast_child(&mut self, source: NodeId, target: NodeId, replace_parent: bool) {
+        if let Some(parent) = self.node_mut(source) {
+            parent.children.push(target);
+        }
+        if replace_parent {
+            if let Some(child) = self.node_mut(target) {
+                child.parent = Some(source);
+            }
+        }
+    }
+
+    /// Decides whether a monotonic AST edge supplies the canonical parent.
+    ///
+    /// The common tree case needs no incoming-edge scan: an absent pointer is
+    /// necessarily initialized, and an already matching pointer remains
+    /// correct. Only conflicting pre-populated metadata needs the graph check.
+    fn appended_ast_parent_needs_update(&self, target_idx: NodeIndex, source: NodeId) -> bool {
+        match self
+            .graph
+            .node_weight(target_idx)
+            .and_then(|node| node.parent)
+        {
+            None => true,
+            Some(parent) if parent == source => false,
+            Some(_) => !self
+                .graph
+                .edges_directed(target_idx, Direction::Incoming)
+                .any(|edge| edge.weight().kind == CpgEdgeKind::AstChild),
+        }
+    }
+
+    /// Restores ascending-edge-ID child order after explicit-ID insertion.
+    ///
+    /// Reconstruction may present edges in any order. The transient worklist
+    /// is heap-backed (and inline for small sibling sets), so represented AST
+    /// width cannot consume the native call stack.
+    fn rebuild_ast_children(&mut self, source: NodeId) {
+        let Some(&source_idx) = self.node_index_map.get(&source) else {
+            return;
+        };
+        let mut ordered: SmallVec<[(EdgeId, NodeId); 8]> = self
+            .graph
+            .edges_directed(source_idx, Direction::Outgoing)
+            .filter(|edge| edge.weight().kind == CpgEdgeKind::AstChild)
+            .map(|edge| (edge.weight().id, edge.weight().target))
+            .collect();
+        ordered.sort_unstable_by_key(|(edge_id, _)| edge_id.0);
+
+        if let Some(parent) = self.graph.node_weight_mut(source_idx) {
+            parent.children.clear();
+            parent
+                .children
+                .extend(ordered.into_iter().map(|(_, target)| target));
+        }
+    }
+
+    /// Restores the deterministic parent selected by the lowest AST edge ID.
+    fn rebuild_ast_parent(&mut self, target: NodeId) {
+        let Some(&target_idx) = self.node_index_map.get(&target) else {
+            return;
+        };
+        let parent = self
+            .graph
+            .edges_directed(target_idx, Direction::Incoming)
+            .filter(|edge| edge.weight().kind == CpgEdgeKind::AstChild)
+            .min_by_key(|edge| edge.weight().id.0)
+            .map(|edge| edge.weight().source);
+
+        if let Some(child) = self.graph.node_weight_mut(target_idx) {
+            child.parent = parent;
+        }
     }
 
     /// Creates and adds an edge between two nodes.
@@ -409,22 +507,14 @@ impl CodePropertyGraph {
 
     // ========== AST Traversal ==========
 
-    /// Returns AST children of a node, in source order.
+    /// Borrows the AST children of a node in source order.
     ///
-    /// petgraph iterates a node's outgoing edges newest-first (reverse
-    /// insertion order), but AST child edges are inserted in source order and
-    /// the CFG/DFG builders rely on that order (e.g. an `if`'s children as
-    /// `[condition, then, else]`, an assignment's first child as its LHS).
-    /// Sorting by edge id — assigned monotonically as edges are added — recovers
-    /// the true source order for both parser-built and hand-built graphs.
-    pub fn ast_children(&self, id: NodeId) -> Vec<NodeId> {
-        let mut children: Vec<(EdgeId, NodeId)> = self
-            .outgoing_edges(id)
-            .filter(|e| matches!(e.kind, CpgEdgeKind::AstChild))
-            .map(|e| (e.id, e.target))
-            .collect();
-        children.sort_unstable_by_key(|(edge_id, _)| edge_id.0);
-        children.into_iter().map(|(_, target)| target).collect()
+    /// AST edge insertion maintains this contiguous child index in ascending
+    /// [`EdgeId`] order. Reads therefore require neither a graph-edge scan nor
+    /// a temporary allocation or sort. Missing node identifiers produce an
+    /// empty slice.
+    pub fn ast_children(&self, id: NodeId) -> &[NodeId] {
+        self.node(id).map_or(&[], |node| node.children.as_slice())
     }
 
     /// Returns the AST parent of a node.
@@ -445,7 +535,7 @@ impl CodePropertyGraph {
         let mut stack = vec![id];
 
         while let Some(current) = stack.pop() {
-            for child in self.ast_children(current) {
+            for &child in self.ast_children(current) {
                 if visited.insert(child) {
                     result.push(child);
                     stack.push(child);
@@ -770,11 +860,11 @@ impl CodePropertyGraph {
             None => return 0,
         };
 
-        enum DepthFrame {
+        enum DepthFrame<'a> {
             Enter(NodeId),
             Resume {
                 node: NodeId,
-                children: Vec<NodeId>,
+                children: &'a [NodeId],
                 next_child: usize,
                 maximum_child_depth: usize,
             },
@@ -889,7 +979,10 @@ impl CodePropertyGraph {
         // Add nodes
         for &id in node_ids {
             if let Some(node) = self.node(id) {
-                sub.add_node_with_id(node.clone());
+                let mut node = node.clone();
+                node.children.clear();
+                node.parent = node.parent.filter(|parent| id_set.contains(parent));
+                sub.add_node_with_id(node);
             }
         }
 
@@ -1076,7 +1169,6 @@ mod merge_tests {
             )
             .with_parent(root),
         );
-        source.node_mut(root).expect("root").children.push(lambda);
         source.connect(root, declaration, CpgEdgeKind::AstChild);
         source.connect(root, identifier, CpgEdgeKind::AstChild);
         source.connect(root, call, CpgEdgeKind::AstChild);
@@ -1226,7 +1318,6 @@ mod merge_tests {
         let mut cpg = CodePropertyGraph::new(Language::Rust);
         let root = cpg.add_node(node(0, CpgNodeKind::Root));
         let child = cpg.add_node(node(0, CpgNodeKind::Return).with_parent(root));
-        cpg.node_mut(root).expect("root").children.push(child);
         cpg.connect(root, child, CpgEdgeKind::AstChild);
         let snapshot = cpg.clone();
         let source_shape = shape(&snapshot);
@@ -1861,6 +1952,38 @@ mod ext_tests {
     }
 
     #[test]
+    fn explicit_ast_edge_ids_define_borrowed_child_order() {
+        let mut g = CodePropertyGraph::new(Language::Rust);
+        let root = g.add_node(mk(CpgNodeKind::Root));
+        let first = g.add_node(mk(CpgNodeKind::Return));
+        let second = g.add_node(mk(CpgNodeKind::Break));
+        let third = g.add_node(mk(CpgNodeKind::Continue));
+
+        g.add_edge_with_id(CpgEdge::new(
+            EdgeId::new(30),
+            root,
+            third,
+            CpgEdgeKind::AstChild,
+        ));
+        g.add_edge_with_id(CpgEdge::new(
+            EdgeId::new(10),
+            root,
+            first,
+            CpgEdgeKind::AstChild,
+        ));
+        g.add_edge_with_id(CpgEdge::new(
+            EdgeId::new(20),
+            root,
+            second,
+            CpgEdgeKind::AstChild,
+        ));
+
+        assert_eq!(g.ast_children(root), [first, second, third]);
+        assert_eq!(g.ast_parent(first), Some(root));
+        assert_eq!(g.ast_children(NodeId::new(9_999)), &[]);
+    }
+
+    #[test]
     fn edges_between_returns_all_kinds() {
         let mut g = CodePropertyGraph::new(Language::Rust);
         let a = g.add_node(mk(CpgNodeKind::Root));
@@ -1975,7 +2098,6 @@ mod dangling_parent_regression {
             SourceRange::default(),
         ));
         cpg.connect(root, child, CpgEdgeKind::AstChild);
-        cpg.node_mut(child).expect("child").parent = Some(root);
         // The root's parent points at a node that does not exist.
         let absent = NodeId::new(9_999);
         cpg.node_mut(root).expect("root").parent = Some(absent);
@@ -2001,6 +2123,16 @@ mod proptests {
     use crate::testutil::*;
     use crate::CfgExtractor;
     use proptest::prelude::*;
+
+    fn edge_sorted_ast_children(cpg: &CodePropertyGraph, node: NodeId) -> Vec<NodeId> {
+        let mut edges: Vec<_> = cpg
+            .outgoing_edges(node)
+            .filter(|edge| edge.kind == CpgEdgeKind::AstChild)
+            .map(|edge| (edge.id, edge.target))
+            .collect();
+        edges.sort_unstable_by_key(|(edge_id, _)| edge_id.0);
+        edges.into_iter().map(|(_, target)| target).collect()
+    }
 
     fn recursive_ast_depth_oracle(
         cpg: &CodePropertyGraph,
@@ -2046,14 +2178,47 @@ mod proptests {
         }
 
         #[test]
-        fn prop_ast_children_match_child_list(g in arb_well_formed_cpg()) {
-            // `wf_child` appends to `children` and inserts the AstChild edge in
-            // the same order, so the edge-id-ordered `ast_children` reproduces
-            // the stored child list exactly.
+        fn prop_ast_children_match_edge_sorted_oracle(g in arb_cpg_raw()) {
             for id in g.node_ids() {
-                let listed: Vec<NodeId> = g.node(id).expect("node").children.to_vec();
-                prop_assert_eq!(g.ast_children(id), listed);
+                let expected = edge_sorted_ast_children(&g, id);
+                prop_assert_eq!(g.ast_children(id), expected);
             }
+        }
+
+        #[test]
+        fn prop_explicit_edge_reconstruction_is_insertion_order_invariant(
+            insertion_keys in prop::collection::vec(any::<u32>(), 0..=24),
+        ) {
+            let mut g = CodePropertyGraph::new(Language::Rust);
+            let root = g.add_node(CpgNode::new(
+                NodeId::new(0),
+                CpgNodeKind::Root,
+                SourceRange::default(),
+            ));
+            let children: Vec<_> = insertion_keys
+                .iter()
+                .map(|_| {
+                    g.add_node(CpgNode::new(
+                        NodeId::new(0),
+                        CpgNodeKind::Return,
+                        SourceRange::default(),
+                    ))
+                })
+                .collect();
+            let mut insertion_order: Vec<_> = (0..children.len()).collect();
+            insertion_order.sort_unstable_by_key(|&index| (insertion_keys[index], index));
+
+            for index in insertion_order {
+                g.add_edge_with_id(CpgEdge::new(
+                    EdgeId::new(u32::try_from(index).expect("bounded child index")),
+                    root,
+                    children[index],
+                    CpgEdgeKind::AstChild,
+                ));
+            }
+
+            prop_assert_eq!(g.ast_children(root), children);
+            prop_assert_eq!(g.ast_children(root), edge_sorted_ast_children(&g, root));
         }
 
         #[test]

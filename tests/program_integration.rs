@@ -24,8 +24,6 @@ fn function(name: &str) -> CpgNodeKind {
 fn child(cpg: &mut CodePropertyGraph, parent: NodeId, kind: CpgNodeKind) -> NodeId {
     let child = cpg.add_node(node(kind));
     cpg.connect(parent, child, CpgEdgeKind::AstChild);
-    cpg.node_mut(child).expect("new child").parent = Some(parent);
-    cpg.node_mut(parent).expect("parent").children.push(child);
     child
 }
 

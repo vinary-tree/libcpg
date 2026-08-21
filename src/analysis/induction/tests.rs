@@ -82,7 +82,6 @@ fn assignment(operator: &str) -> CpgNodeKind {
 fn connect_ast(cpg: &mut CodePropertyGraph, parent: NodeId, child: NodeId) {
     cpg.connect(parent, child, CpgEdgeKind::AstChild)
         .expect("fixture AST endpoints exist");
-    cpg.node_mut(child).expect("fixture child exists").parent = Some(parent);
 }
 
 fn connect_cfg(cpg: &mut CodePropertyGraph, source: NodeId, target: NodeId, kind: CfgEdgeKind) {
@@ -606,7 +605,7 @@ fn recursive_affine_oracle(
             }
             Some(CpgNodeKind::BinaryOp { operator }) => {
                 let children = cpg.ast_children(node);
-                let [left, right, ..] = children.as_slice() else {
+                let [left, right, ..] = children else {
                     return None;
                 };
                 recursive_affine_binary_oracle(
@@ -1418,11 +1417,6 @@ fn malformed_selectors_foreign_forests_and_ast_cycles_are_bounded() {
         .cpg
         .connect(NodeId::new(28), BASIC_UPDATE, CpgEdgeKind::AstChild)
         .expect("cycle endpoints exist");
-    fixture
-        .cpg
-        .node_mut(BASIC_UPDATE)
-        .expect("update exists")
-        .parent = Some(NodeId::new(28));
     let cycled = loop_induction(&fixture.cpg, fixture.function, &forest)
         .expect("cycle guards bound every traversal");
     assert_eq!(cycled.function, fixture.function);

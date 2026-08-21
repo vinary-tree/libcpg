@@ -308,18 +308,10 @@ mod tests {
         SourceRange, Visibility,
     };
 
-    /// Adds a node of `kind` as an AST child of `parent`, wiring the AstChild
-    /// edge, the parent pointer, and the parent's child list — the shape the
-    /// CFG/DFG extractors read.
+    /// Adds a node of `kind` through the invariant-owning AST edge API.
     fn add_child(cpg: &mut CodePropertyGraph, parent: NodeId, kind: CpgNodeKind) -> NodeId {
         let id = cpg.add_node(CpgNode::new(NodeId::new(0), kind, SourceRange::default()));
         cpg.connect(parent, id, CpgEdgeKind::AstChild);
-        if let Some(node) = cpg.node_mut(id) {
-            node.parent = Some(parent);
-        }
-        if let Some(parent_node) = cpg.node_mut(parent) {
-            parent_node.children.push(id);
-        }
         id
     }
 

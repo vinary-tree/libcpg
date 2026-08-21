@@ -1307,7 +1307,7 @@ fn represented_array_length(
                 ..
             } => queue.push_back(*definition),
             CpgNodeKind::Variable { .. } | CpgNodeKind::Assignment { .. } => {
-                for child in cpg.ast_children(node) {
+                for &child in cpg.ast_children(node) {
                     queue.push_back(child);
                 }
             }

@@ -306,7 +306,7 @@ fn resolve_lock_resource(cpg: &CodePropertyGraph, site: NodeId) -> Option<NodeId
     }
 
     let mut visited = FxHashSet::default();
-    let mut stack = cpg.ast_children(site);
+    let mut stack = cpg.ast_children(site).to_vec();
     while let Some(candidate) = stack.pop() {
         if !visited.insert(candidate) {
             continue;

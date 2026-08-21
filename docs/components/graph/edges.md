@@ -61,23 +61,24 @@ dependence, call, type, reference, scope, and import families. Source:
 
 AST edges encode the concrete syntax tree. `AstChild` (parent → child) is the
 primary one; `AstParent` is its reverse, and `AstNextSibling` / `AstPrevSibling`
-thread siblings in source order. The child edges are inserted in source order and
-carry monotonically increasing [`EdgeId`](#edge-structure)s, which is how
-`ast_children` recovers true source order even though petgraph iterates a node's
-edges newest-first.
+thread siblings in source order. Normal child edges carry monotonically
+increasing [`EdgeId`](#edge-structure)s. Insertion appends their targets to the
+parent's child index, so `ast_children` can borrow true source order even though
+petgraph itself iterates a node's edges newest-first. Explicit-id reconstruction
+rebuilds that index in ascending edge-id order.
 
 ```rust
-use libcpg::{CodePropertyGraph, CpgEdgeKind, NodeId};
+use libcpg::{CodePropertyGraph, NodeId};
 
-// The AST children of a node, straight from the raw edges.
-// (The built-in `ast_children` accessor does exactly this and sorts by edge id.)
-fn ast_child_targets(cpg: &CodePropertyGraph, id: NodeId) -> Vec<NodeId> {
-    cpg.outgoing_edges(id)
-        .filter(|e| matches!(e.kind, CpgEdgeKind::AstChild))
-        .map(|e| e.target)
-        .collect()
+// The read-optimized index maintained by AstChild insertion.
+fn ast_child_targets(cpg: &CodePropertyGraph, id: NodeId) -> &[NodeId] {
+    cpg.ast_children(id)
 }
 ```
+
+The edge remains the containment relation; the borrowed slice is its maintained
+navigation index. Create containment with `connect(.., CpgEdgeKind::AstChild)`
+instead of mutating `CpgNode.children` or `CpgNode.parent` independently.
 
 ## CFG edges
 

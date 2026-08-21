@@ -119,7 +119,8 @@ fn may_happen_in_parallel_with_limit(cpg: &CodePropertyGraph, max_pairs: usize) 
     for parallel in parallel_blocks {
         let mut operands: Vec<_> = cpg
             .ast_children(parallel)
-            .into_iter()
+            .iter()
+            .copied()
             .filter(|&child| cpg.contains_node(child))
             .collect();
         operands.sort_unstable();
@@ -177,7 +178,7 @@ fn execution_sites(cpg: &CodePropertyGraph, operand: NodeId) -> Vec<NodeId> {
             result.insert(site);
         }
 
-        let mut children = cpg.ast_children(site);
+        let mut children = cpg.ast_children(site).to_vec();
         children.sort_unstable_by(|left, right| right.cmp(left));
         stack.extend(children);
     }
@@ -237,9 +238,6 @@ mod tests {
             NodeId::new(child),
             CpgEdgeKind::AstChild,
         );
-        cpg.node_mut(NodeId::new(child))
-            .expect("child exists")
-            .parent = Some(NodeId::new(parent));
     }
 
     fn basic_fixture(reverse: bool) -> CodePropertyGraph {

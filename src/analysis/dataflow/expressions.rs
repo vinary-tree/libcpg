@@ -481,11 +481,6 @@ mod tests {
 
     fn connect_ast(cpg: &mut CodePropertyGraph, parent: NodeId, child: NodeId) {
         cpg.connect(parent, child, CpgEdgeKind::AstChild);
-        cpg.node_mut(parent)
-            .expect("AST parent")
-            .children
-            .push(child);
-        cpg.node_mut(child).expect("AST child").parent = Some(parent);
     }
 
     fn connect_cfg(cpg: &mut CodePropertyGraph, source: NodeId, target: NodeId, kind: CfgEdgeKind) {

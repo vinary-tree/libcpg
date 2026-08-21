@@ -726,7 +726,7 @@ fn trace_origins(
                 }
                 enqueue_ordered(&mut queue, cpg.reaching_definitions(node));
             }
-            _ => enqueue_ordered(&mut queue, cpg.ast_children(node)),
+            _ => enqueue_ordered(&mut queue, cpg.ast_children(node).to_vec()),
         }
         let mut predecessors = cpg
             .incoming_edges(node)

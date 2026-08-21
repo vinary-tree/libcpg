@@ -698,13 +698,13 @@ fn compute_tokens(
                 }
                 Some(CpgNodeKind::Parameter { .. } | CpgNodeKind::Function { .. }) => {}
                 Some(CpgNodeKind::Assignment { .. }) => {
-                    for child in cpg.ast_children(node).into_iter().skip(1) {
+                    for &child in cpg.ast_children(node).iter().skip(1) {
                         changed |=
                             copy_value_tokens(cpg, &mut tokens, child, node, ctx.caps, &mut capped);
                     }
                 }
                 Some(_) => {
-                    for child in cpg.ast_children(node) {
+                    for &child in cpg.ast_children(node) {
                         changed |=
                             copy_tokens(&mut tokens, child, node, 1_000, ctx.caps, &mut capped);
                     }
@@ -866,10 +866,10 @@ fn opaque_call_inputs(cpg: &CodePropertyGraph, call: NodeId, arguments: &[NodeId
         )
     });
     if is_method {
-        let mut call_children = cpg.ast_children(call);
+        let mut call_children = cpg.ast_children(call).to_vec();
         call_children.sort_unstable_by_key(|&node| source_key(cpg, node));
         if let Some(callee) = call_children.first().copied() {
-            let mut callee_children = cpg.ast_children(callee);
+            let mut callee_children = cpg.ast_children(callee).to_vec();
             callee_children.sort_unstable_by_key(|&node| source_key(cpg, node));
             if let Some(receiver) = callee_children.first().copied() {
                 inputs.push(receiver);
@@ -1028,7 +1028,7 @@ fn tokens_for_value(cpg: &CodePropertyGraph, tokens: &TokenEnv, value: NodeId) -
         return result;
     }
 
-    let mut children = cpg.ast_children(value);
+    let mut children = cpg.ast_children(value).to_vec();
     children.sort_unstable_by_key(|&node| source_key(cpg, node));
     children.reverse();
     let mut stack = children;
@@ -1052,7 +1052,7 @@ fn tokens_for_value(cpg: &CodePropertyGraph, tokens: &TokenEnv, value: NodeId) -
         if matches!(node.kind, CpgNodeKind::Call { .. }) {
             continue;
         }
-        let mut nested = cpg.ast_children(descendant);
+        let mut nested = cpg.ast_children(descendant).to_vec();
         nested.sort_unstable_by_key(|&node| source_key(cpg, node));
         nested.reverse();
         stack.extend(nested);
@@ -1147,7 +1147,7 @@ fn mark_env_capped(tokens: &mut TokenEnv) {
 }
 
 fn return_operands(cpg: &CodePropertyGraph, returned: NodeId) -> Vec<NodeId> {
-    let mut children = cpg.ast_children(returned);
+    let mut children = cpg.ast_children(returned).to_vec();
     children.sort_unstable_by_key(|&node| source_key(cpg, node));
     children
 }
@@ -1158,10 +1158,15 @@ fn returned_values(cpg: &CodePropertyGraph, local: &LocalFunction) -> Vec<NodeId
         .iter()
         .flat_map(|&returned| return_operands(cpg, returned))
         .collect::<Vec<_>>();
-    if let Some(body) = cpg.ast_children(local.function).into_iter().find(|&node| {
-        cpg.node(node)
-            .is_some_and(|node| matches!(node.kind, CpgNodeKind::Block { .. }))
-    }) {
+    if let Some(body) = cpg
+        .ast_children(local.function)
+        .iter()
+        .copied()
+        .find(|&node| {
+            cpg.node(node)
+                .is_some_and(|node| matches!(node.kind, CpgNodeKind::Block { .. }))
+        })
+    {
         if let Some(tail) = cpg.ast_children(body).last().copied() {
             if value_like(cpg, tail) {
                 values.push(tail);

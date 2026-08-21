@@ -48,11 +48,6 @@ fn identifier(name: &str, definition: Option<NodeId>) -> CpgNodeKind {
 fn ast(cpg: &mut CodePropertyGraph, parent: NodeId, child: NodeId) {
     cpg.connect(parent, child, CpgEdgeKind::AstChild)
         .expect("fixture AST endpoints exist");
-    cpg.node_mut(parent)
-        .expect("fixture parent exists")
-        .children
-        .push(child);
-    cpg.node_mut(child).expect("fixture child exists").parent = Some(parent);
 }
 
 #[test]

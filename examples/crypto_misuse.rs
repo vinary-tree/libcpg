@@ -57,10 +57,6 @@ fn main() {
     for (parent, child) in [(function, call), (call, callee), (call, key)] {
         cpg.connect(parent, child, CpgEdgeKind::AstChild)
             .expect("example AST endpoints exist");
-        cpg.node_mut(parent)
-            .expect("example parent exists")
-            .children
-            .push(child);
     }
 
     let analysis = analyze_builtin_crypto(

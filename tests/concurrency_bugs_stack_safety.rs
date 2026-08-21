@@ -42,7 +42,6 @@ fn add_ast(cpg: &mut CodePropertyGraph, parent: u32, child: u32) {
         NodeId::new(child),
         CpgEdgeKind::AstChild,
     );
-    cpg.node_mut(NodeId::new(child)).expect("child").parent = Some(NodeId::new(parent));
 }
 
 fn add_lock(cpg: &mut CodePropertyGraph, strand: u32, site: u32, kind: LockKind) {

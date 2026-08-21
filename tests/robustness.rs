@@ -52,12 +52,6 @@ fn add(cpg: &mut CodePropertyGraph, kind: CpgNodeKind) -> NodeId {
 fn child(cpg: &mut CodePropertyGraph, parent: NodeId, kind: CpgNodeKind) -> NodeId {
     let id = add(cpg, kind);
     cpg.connect(parent, id, CpgEdgeKind::AstChild);
-    if let Some(n) = cpg.node_mut(id) {
-        n.parent = Some(parent);
-    }
-    if let Some(p) = cpg.node_mut(parent) {
-        p.children.push(id);
-    }
     id
 }
 
@@ -221,7 +215,6 @@ fn corrupt_graph(how: Corruption) -> (CodePropertyGraph, NodeId) {
         }
         Corruption::SelfParent => {
             cpg.node_mut(var).expect("var").parent = Some(var);
-            cpg.node_mut(var).expect("var").children.push(var);
             cpg.connect(var, var, CpgEdgeKind::AstChild);
         }
         Corruption::ParentCycle => {
@@ -231,10 +224,6 @@ fn corrupt_graph(how: Corruption) -> (CodePropertyGraph, NodeId) {
         Corruption::AstChildCycle => {
             // The innermost block claims the function as its child.
             cpg.connect(loop_body, func, CpgEdgeKind::AstChild);
-            cpg.node_mut(loop_body)
-                .expect("loop body")
-                .children
-                .push(func);
         }
         Corruption::ChildWithoutEdge => {
             let orphan = add(&mut cpg, CpgNodeKind::Return);
@@ -243,6 +232,11 @@ fn corrupt_graph(how: Corruption) -> (CodePropertyGraph, NodeId) {
         Corruption::EdgeWithoutPointers => {
             let floating = add(&mut cpg, CpgNodeKind::Return);
             cpg.connect(body, floating, CpgEdgeKind::AstChild);
+            cpg.node_mut(body)
+                .expect("body")
+                .children
+                .retain(|child| *child != floating);
+            cpg.node_mut(floating).expect("floating").parent = None;
         }
         Corruption::BodylessFunction => unreachable!("handled above"),
     }

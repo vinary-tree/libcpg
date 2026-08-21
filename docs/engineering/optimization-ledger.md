@@ -229,7 +229,7 @@ the named `main` baseline.
 | ---: | --- | --- |
 | 1 | 25.34% in tree-sitter descendant traversal plus 3.28% parent lookup | Count repeated mapper ancestry/descendant queries by node kind; test a per-build, arena-indexed ancestry cache without changing mapper semantics. |
 | 2 | 5.16% in indexed DFG extraction and 3.06% in reaching visitation | Profile DFG alone on deep, wide, and loop-heavy fixtures; attribute allocations by DHAT program point before changing its heap machine. |
-| 3 | 2.82% in `ast_children` vector collection, another 2.00% in the method, and 90,169 traversal-driver allocations | Compare a borrowing/iterator traversal primitive with the existing order-preserving `Vec` API while retaining compatibility and exact edge-id order. |
+| 3 | 2.82% in `ast_children` vector collection, another 2.00% in the method, and 90,169 traversal-driver allocations | **Accepted (T9.1 H03):** maintain the source-order child index during insertion and return a borrowed slice. See the controlled result below. |
 | 4 | 2.43% in symbol-table construction | Separate call-resolution indexing from parser construction and measure whether one reusable immutable index removes repeated scans. |
 | 5 | 1.41% in call-graph edge normalization plus visible hash-table rehash samples | Measure exact edge cardinalities and reserve requirements on sparse and dense call graphs before adding capacity hints. |
 
@@ -238,6 +238,40 @@ capacity changes must preserve the explicit heap worklists, pushdown machines,
 and bounded arenas already used by deep traversals. Performance profiles are
 not stack-safety proofs; the dedicated 256 KiB-stack regression suites remain
 the gate.
+
+### T9.1 H03 — maintained AST child index
+
+**Hypothesis.** The traversal profile attributed 4.82% of aggregate samples to
+`ast_children` and its result-vector collection. Maintaining the already
+modeled `CpgNode.children` index at `AstChild` insertion should remove the graph
+scan, sort, and allocation without changing ascending-`EdgeId` source order.
+
+**Controlled change.** `connect` now appends monotonic edges to the index in
+constant time; explicit-id reconstruction rebuilds it in edge-id order.
+`ast_children` returns `&[NodeId]`. Exact examples and property tests compare
+that slice with an edge-sorted oracle, permute explicit-edge storage order, and
+exercise malformed multi-parent graphs. Existing deep-AST tests continue to
+run on a 256 KiB thread stack.
+
+**Result against immutable `main`.** Criterion measured 20 samples after a
+one-second warm-up on performance-governed CPUs 0–1:
+
+| Case | `main` | H03 | Median time change | Throughput change |
+| --- | ---: | ---: | ---: | ---: |
+| `ast_children/1024` | 31.957 µs | 3.246 µs | -89.84% | +884.29% |
+| `ast_children/8192` | 266.440 µs | 37.562 µs | -85.91% | +609.66% |
+| construction, 1,000-node linear AST | 82.061 µs | 82.032 µs | -0.03% (no significant change) | +0.03% |
+| construction, 10,000-node linear AST | 1.009 ms | 0.988 ms | -2.07% | +2.12% |
+| construction, 49-line parser corpus | 359.249 µs | 345.500 µs | -3.91% | +4.07% |
+| construction, 514-line parser corpus | 6.733 ms | 6.369 ms | -5.38% | +5.69% |
+
+The headless DHAT traversal workload fell from 90,169 to 73,787 allocations
+(-18.17%) and from 16,942,267 to 16,418,030 allocated bytes (-3.09%). Peak RSS
+fell from 10,136 to 9,928 KiB (-2.05%). The first implementation scanned every
+target's incoming edges to canonicalize its parent and regressed synthetic
+construction; restricting that scan to explicit-id reconstruction or a
+conflicting pre-populated parent removed the regression while preserving the
+edge-order oracle. The hypothesis is accepted.
 
 ## Reproduce and compare
 

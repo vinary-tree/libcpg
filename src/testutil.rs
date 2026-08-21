@@ -298,12 +298,6 @@ pub(crate) fn arb_well_formed_cpg() -> impl Strategy<Value = CodePropertyGraph> 
 pub(crate) fn wf_child(cpg: &mut CodePropertyGraph, parent: NodeId, kind: CpgNodeKind) -> NodeId {
     let id = cpg.add_node(CpgNode::new(NodeId::new(0), kind, SourceRange::default()));
     cpg.connect(parent, id, CpgEdgeKind::AstChild);
-    if let Some(n) = cpg.node_mut(id) {
-        n.parent = Some(parent);
-    }
-    if let Some(p) = cpg.node_mut(parent) {
-        p.children.push(id);
-    }
     id
 }
 

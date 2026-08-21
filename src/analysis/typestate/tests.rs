@@ -42,11 +42,6 @@ fn add_with_id(cpg: &mut CodePropertyGraph, id: u32, kind: CpgNodeKind) -> NodeI
 fn connect_ast(cpg: &mut CodePropertyGraph, parent: NodeId, child: NodeId) {
     cpg.connect(parent, child, CpgEdgeKind::AstChild)
         .expect("fixture endpoints exist");
-    cpg.node_mut(parent)
-        .expect("fixture parent exists")
-        .children
-        .push(child);
-    cpg.node_mut(child).expect("fixture child exists").parent = Some(parent);
 }
 
 #[derive(Debug)]
@@ -587,7 +582,8 @@ fn allocation_binds_through_variable_and_alias_evidence() {
     let argument = fixture
         .cpg
         .ast_children(fixture.calls[1])
-        .into_iter()
+        .iter()
+        .copied()
         .nth(1)
         .expect("close argument");
     fixture

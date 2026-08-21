@@ -418,7 +418,7 @@ fn payload_types(cpg: &CodePropertyGraph, site: NodeId) -> Vec<SessionPayloadTyp
     let channel_operand = resolve_event_channel_operand(cpg, site).map(|(_, operand)| operand);
     let mut visited = FxHashSet::default();
     visited.insert(site);
-    let mut stack = cpg.ast_children(site);
+    let mut stack = cpg.ast_children(site).to_vec();
     let mut candidates = Vec::new();
 
     while let Some(candidate) = stack.pop() {
@@ -440,7 +440,7 @@ fn payload_types(cpg: &CodePropertyGraph, site: NodeId) -> Vec<SessionPayloadTyp
             continue;
         }
 
-        let mut children = cpg.ast_children(candidate);
+        let mut children = cpg.ast_children(candidate).to_vec();
         children.reverse();
         stack.extend(children);
     }

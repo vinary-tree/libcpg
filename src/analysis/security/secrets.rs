@@ -470,7 +470,7 @@ fn name_hint_evidence(
         };
         match cpg.node(parent).map(|node| &node.kind) {
             Some(CpgNodeKind::Assignment { .. }) => {
-                let lhs = cpg.ast_children(parent).into_iter().next();
+                let lhs = cpg.ast_children(parent).first().copied();
                 if let Some(lhs) = lhs {
                     let result = search_named_subtree(cpg, lhs, hints, cap, &mut examined);
                     if result.matched.is_some() || result.capped {

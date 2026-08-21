@@ -526,7 +526,8 @@ fn default_callee_ref(cpg: &CodePropertyGraph, call_site: NodeId, caps: &IfdsCap
 fn call_label(cpg: &CodePropertyGraph, call_site: NodeId, caps: &IfdsCaps) -> Arc<str> {
     let mut stack: Vec<_> = cpg
         .ast_children(call_site)
-        .into_iter()
+        .iter()
+        .copied()
         .rev()
         .map(|node| (node, 1u32))
         .collect();
@@ -546,7 +547,7 @@ fn call_label(cpg: &CodePropertyGraph, call_site: NodeId, caps: &IfdsCaps) -> Ar
                 return Arc::from(text);
             }
             let next_depth = depth.saturating_add(1);
-            let mut children = cpg.ast_children(node.id);
+            let mut children = cpg.ast_children(node.id).to_vec();
             children.reverse();
             stack.extend(children.into_iter().map(|child| (child, next_depth)));
         }

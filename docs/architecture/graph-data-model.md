@@ -139,7 +139,10 @@ The payoff of the shared $`V`$ is that the overlays *co-locate*: the same `Call`
 
 *Figure — one node set with the AST, CFG, and DFG overlays drawn as distinct edge colors; a query hops between them without leaving the graph. Source: [`diagrams/cpg-overlay.dot`](../diagrams/cpg-overlay.dot).*
 
-Each overlay is queried through its own traversal family, all returning owned `Vec`s so the borrow ends before the caller mutates:
+Each overlay is queried through its own traversal family. Most multi-value
+queries return an owned `Vec`; the hot-path `ast_children` query instead borrows
+the node's maintained child index as `&[NodeId]`. Call `.to_vec()` when a caller
+must retain the children while mutating the graph.
 
 | Overlay | Edges | Queries |
 |---------|-------|---------|
@@ -158,12 +161,32 @@ Positional and kind queries round out the surface: `node_at_offset`, `nodes_in_r
 
 ## Recovering source order
 
-petgraph iterates a node's outgoing edges **newest-first** (reverse insertion order), but many analyses need AST children in *source* order — an `if`'s children as `[condition, then, else]`, an assignment's first child as its l-value. libcpg guarantees source order two ways at once:
+petgraph iterates a node's outgoing edges **newest-first** (reverse insertion
+order), but many analyses need AST children in *source* order — an `if`'s
+children as `[condition, then, else]`, an assignment's first child as its
+l-value. libcpg therefore maintains a redundant AST navigation index on each
+node:
 
-1. `ast_children(id)` collects the outgoing `AstChild` edges and **sorts them by edge id**, which is assigned monotonically as edges are added — so the true insertion (source) order is recovered for both parser-built and hand-built graphs.
-2. Each node also stores its `parent` pointer directly, so `ast_parent`/`ast_ancestors` never depend on edge iteration order.
+1. `connect(source, target, AstChild)` appends `target` to `source.children` as
+   it inserts the monotonically numbered edge. The common parser and hand-built
+   paths are consequently constant-time and already in ascending `EdgeId`
+   order.
+2. `ast_children(source)` borrows that stored slice directly. It performs no
+   graph scan, allocation, or sort; an unknown source returns the empty slice.
+3. `add_edge_with_id`, used for reconstruction, admits explicit edge ids in any
+   storage order. It rebuilds the affected child list in ascending `EdgeId`
+   order, so deserialization and insertion order cannot change traversal.
+4. The same insertion API maintains each child's `parent` pointer, so
+   `ast_parent` and `ast_ancestors` do not depend on petgraph iteration order.
+   A malformed graph with several incoming `AstChild` edges deterministically
+   chooses the source of the lowest-id edge as the parent.
 
-Both are set during construction (the AST-building walk wires an `AstChild` edge *and* assigns `node.parent`). If you build a graph by hand and want ancestor queries to work, set the parent pointer as well as the edge — the CFG and DFG extractors, and the def/use classifier, read the parent pointer.
+The edge is the containment relation; `children` and `parent` are its
+read-optimized navigation indices. Callers should therefore create AST
+containment through `connect`/`add_edge`, not repeat the bookkeeping by mutating
+the public fields. Direct field mutation remains possible for deliberately
+malformed robustness fixtures, but it can make the indices disagree with the
+edge set.
 
 ## Mutability, identity, and serialization
 

@@ -72,8 +72,8 @@ other way.
 
 The "last child is the body" convention is deliberate and load-bearing: across grammars, a
 function's signature/parameters/return-type precede its block in source order, so the block
-is the final child. `cpg.ast_children` returns children in source order (it sorts by edge
-id), which makes "last child" well defined. The Rholang and MeTTa mappers are written to
+is the final child. `cpg.ast_children` borrows the child index maintained in ascending edge-id
+order, which makes "last child" well defined without a query-time sort. The Rholang and MeTTa mappers are written to
 uphold the same convention so this single rule works for them too (see
 [`node-mapper.md`](node-mapper.md)).
 

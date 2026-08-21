@@ -42,7 +42,6 @@ fn add(cpg: &mut CodePropertyGraph, id: u32, kind: CpgNodeKind) -> NodeId {
 fn connect_ast(cpg: &mut CodePropertyGraph, parent: NodeId, child: NodeId) {
     cpg.connect(parent, child, CpgEdgeKind::AstChild)
         .expect("fixture AST endpoints exist");
-    cpg.node_mut(child).expect("fixture child exists").parent = Some(parent);
 }
 
 fn child(cpg: &mut CodePropertyGraph, parent: NodeId, id: u32, kind: CpgNodeKind) -> NodeId {
@@ -526,7 +525,7 @@ fn recursive_parameter_dependencies(
             }
         }
     } else {
-        for child in cpg.ast_children(node) {
+        for &child in cpg.ast_children(node) {
             mask |= recursive_parameter_dependencies(
                 cpg,
                 child,
@@ -609,7 +608,7 @@ fn recursive_evaluate_constant(
             }
             Some(CpgNodeKind::BinaryOp { operator }) => {
                 let children = cpg.ast_children(node);
-                match children.as_slice() {
+                match children {
                     [left, right, ..] => {
                         let left = recursive_evaluate_constant(
                             cpg,
@@ -664,7 +663,8 @@ fn recursive_evaluate_constant(
             }
             Some(CpgNodeKind::Variable { name, .. }) => cpg
                 .ast_children(node)
-                .into_iter()
+                .iter()
+                .copied()
                 .rev()
                 .find(|&child| {
                     !matches!(

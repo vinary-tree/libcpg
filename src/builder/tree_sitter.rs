@@ -247,9 +247,6 @@ impl TreeSitterCpgBuilder {
                 // Maintain the AST edge and parent pointer as one invariant.
                 if let Some(parent) = parent_id {
                     cpg.connect(parent, node_id, CpgEdgeKind::AstChild);
-                    if let Some(node) = cpg.node_mut(node_id) {
-                        node.parent = Some(parent);
-                    }
                 }
 
                 if is_function {

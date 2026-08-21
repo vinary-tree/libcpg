@@ -76,9 +76,6 @@ fn child(cpg: &mut CodePropertyGraph, parent: NodeId, kind: CpgNodeKind) -> Node
     let child = add(cpg, kind);
     cpg.connect(parent, child, CpgEdgeKind::AstChild)
         .expect("public fixture AST endpoints exist");
-    cpg.node_mut(child)
-        .expect("public fixture child exists")
-        .parent = Some(parent);
     child
 }
 

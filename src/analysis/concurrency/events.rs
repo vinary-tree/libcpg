@@ -116,7 +116,7 @@ pub(crate) fn resolve_event_channel_operand(
     site: NodeId,
 ) -> Option<(NodeId, NodeId)> {
     let mut visited = FxHashSet::default();
-    let mut stack = cpg.ast_children(site);
+    let mut stack = cpg.ast_children(site).to_vec();
     stack.reverse();
     let mut candidates = Vec::new();
 
@@ -135,7 +135,7 @@ pub(crate) fn resolve_event_channel_operand(
                 candidates.push((node.range.start, node.range.end, candidate, definition));
             }
         }
-        let mut children = cpg.ast_children(candidate);
+        let mut children = cpg.ast_children(candidate).to_vec();
         children.reverse();
         stack.extend(children);
     }

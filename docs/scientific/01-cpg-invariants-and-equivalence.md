@@ -76,12 +76,19 @@ assert!(
 
 **Hypothesis.** For every syntactic containment, the builder maintains an `AstChild` edge *and* a parent back-pointer in lockstep, so the child-edge traversal (`ast_children`, `ast_descendants`) and the parent chain (`ast_parent`, `ast_ancestors`) describe the same tree.
 
-**Mechanism.** Construction sets both halves together, as the DFG test fixture `create_test_function` shows:
+**Mechanism.** `connect` owns the redundant navigation indices. Every
+`AstChild` insertion updates the parent's source-order `children` index and the
+child's `parent` pointer together, so parser, fixture, and consumer code cannot
+forget one half:
 
 ```rust
 cpg.connect(func, body, CpgEdgeKind::AstChild);
-cpg.node_mut(body).unwrap().parent = Some(func);
 ```
+
+Normal monotonic insertion appends in constant time. Explicit-id
+reconstruction sorts the maintained index by `EdgeId`; if deliberately
+malformed input gives one child several parents, the lowest-id incoming
+`AstChild` edge selects the deterministic parent.
 
 **Experiment.** `parsed_nested_use_resolves_and_chains` (in `src/builder/dfg.rs`) uses the *descendant* traversal as an oracle: the nested `buf` identifier inside `decode(buf)` must be reported as living inside the `let out = …` statement's subtree.
 
@@ -92,7 +99,12 @@ assert!(
 );
 ```
 
-**Result.** `ast_descendants` (a walk over `AstChild` edges) agrees with the actual nesting the source expresses, so the child-edge overlay faithfully encodes the parse tree. Because the same node also carries a `parent` field set at construction, both navigation directions are consistent — I2 holds. (This same containment fact is load-bearing for reaching-defs; see [02](02-reaching-defs-validation.md).)
+**Result.** `ast_descendants` (a walk over the maintained `AstChild` index)
+agrees with the actual nesting the source expresses, so the child overlay
+faithfully encodes the parse tree. The same insertion also maintains the
+`parent` field, so both navigation directions are consistent — I2 holds. (This
+same containment fact is load-bearing for reaching-defs; see
+[02](02-reaching-defs-validation.md).)
 
 ## 3. Invariant I3 — idempotent extractors
 

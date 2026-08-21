@@ -87,7 +87,6 @@ fn node(id: u32, kind: CpgNodeKind) -> CpgNode {
 fn connect_ast(cpg: &mut CodePropertyGraph, parent: NodeId, child: NodeId) {
     cpg.connect(parent, child, CpgEdgeKind::AstChild)
         .expect("fixture AST endpoints exist");
-    cpg.node_mut(child).expect("fixture child exists").parent = Some(parent);
 }
 
 fn graph_fixture(function_count: usize, edges: &[(usize, usize)]) -> CodePropertyGraph {

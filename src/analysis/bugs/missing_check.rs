@@ -536,7 +536,8 @@ fn fingerprint(
                 }
                 let mut children: Vec<_> = cpg
                     .ast_children(node)
-                    .into_iter()
+                    .iter()
+                    .copied()
                     .filter(|child| {
                         cpg.node(*child)
                             .is_some_and(|node| !matches!(node.kind, CpgNodeKind::Comment { .. }))

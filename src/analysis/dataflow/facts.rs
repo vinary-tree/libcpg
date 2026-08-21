@@ -322,7 +322,7 @@ fn binder_identifier(cpg: &CodePropertyGraph, parent: NodeId, name: &str) -> Opt
     if name.is_empty() {
         return None;
     }
-    cpg.ast_children(parent).into_iter().find(|&child| {
+    cpg.ast_children(parent).iter().copied().find(|&child| {
         matches!(
             cpg.node(child).map(|node| &node.kind),
             Some(CpgNodeKind::Identifier { name: child_name, .. }) if &**child_name == name
@@ -509,7 +509,7 @@ fn build_expression_arena(
                 })
             }
         };
-        let children = cpg.ast_children(node);
+        let children = cpg.ast_children(node).to_vec();
         let mut operands = Vec::new();
         operands
             .try_reserve(children.len())
@@ -692,8 +692,6 @@ mod tests {
 
     fn connect_ast(cpg: &mut CodePropertyGraph, parent: NodeId, child: NodeId) {
         cpg.connect(parent, child, CpgEdgeKind::AstChild);
-        cpg.node_mut(parent).expect("parent").children.push(child);
-        cpg.node_mut(child).expect("child").parent = Some(parent);
     }
 
     #[test]

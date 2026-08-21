@@ -156,7 +156,7 @@ impl GraphNeuralNetwork for CpgGnn {
 
                     // Aggregate from AST neighbors
                     for child_id in self.cpg.ast_children(node.id) {
-                        if let Some(child_emb) = embeddings.get(&child_id) {
+                        if let Some(child_emb) = embeddings.get(child_id) {
                             aggregated += child_emb;
                             neighbor_count += 1;
                         }

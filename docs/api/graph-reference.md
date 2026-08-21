@@ -106,14 +106,17 @@ There is no `edge(id)` accessor; look edges up by endpoint with `edges_between`,
 
 ### AST traversal
 
-Because petgraph iterates a node's outgoing edges newest-first, `ast_children`
-sorts `AstChild` edges by `EdgeId` (assigned monotonically) to recover true
+Because petgraph iterates outgoing edges newest-first, insertion maintains a
+separate child index in ascending `EdgeId` order. `ast_children` borrows that
+index directly, with no scan, allocation, or sort. This preserves true
 **source order** — analyses rely on, e.g., an `If`'s children being
-`[condition, then, else]`.
+`[condition, then, else]` — and returns `&[]` for an unknown node. Explicit-id
+reconstruction reorders the index by `EdgeId`, independent of edge storage
+order.
 
 | Method | Signature | Notes |
 |--------|-----------|-------|
-| `ast_children` | `fn ast_children(&self, id: NodeId) -> Vec<NodeId>` | Children in source order. |
+| `ast_children` | `fn ast_children(&self, id: NodeId) -> &[NodeId]` | Borrowed children in source order; empty for an unknown node. |
 | `ast_parent` | `fn ast_parent(&self, id: NodeId) -> Option<NodeId>` | Reads the node's `parent` pointer. |
 | `ast_descendants` | `fn ast_descendants(&self, id: NodeId) -> Vec<NodeId>` | Depth-first descendants. |
 | `ast_ancestors` | `fn ast_ancestors(&self, id: NodeId) -> Vec<NodeId>` | Chain toward the root. |

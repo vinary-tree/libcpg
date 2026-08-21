@@ -32,9 +32,6 @@ fn ast(cpg: &mut CodePropertyGraph, parent: NodeId, kind: CpgNodeKind) -> NodeId
     let child = node(cpg, kind);
     cpg.connect(parent, child, CpgEdgeKind::AstChild)
         .expect("taint benchmark AST endpoints exist");
-    cpg.node_mut(child)
-        .expect("taint benchmark child exists")
-        .parent = Some(parent);
     child
 }
 

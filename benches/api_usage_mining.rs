@@ -29,10 +29,6 @@ fn child(cpg: &mut CodePropertyGraph, parent: NodeId, kind: CpgNodeKind) -> Node
     let id = cpg.add_node(node(kind).with_parent(parent));
     cpg.connect(parent, id, CpgEdgeKind::AstChild)
         .expect("benchmark AST endpoints exist");
-    cpg.node_mut(parent)
-        .expect("benchmark parent exists")
-        .children
-        .push(id);
     id
 }
 

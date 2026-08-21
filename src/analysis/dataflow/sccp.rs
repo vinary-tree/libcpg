@@ -495,7 +495,7 @@ fn evaluate_cell(
             }
         }
         CpgNodeKind::Variable { name, .. } => {
-            let initializer = cpg.ast_children(node).into_iter().rev().find(|child| {
+            let initializer = cpg.ast_children(node).iter().copied().rev().find(|child| {
                 !matches!(
                     cpg.node(*child).map(|node| &node.kind),
                     Some(CpgNodeKind::Identifier { name: child_name, .. }) if child_name == name
@@ -518,7 +518,8 @@ fn evaluate_cell(
 
 fn value_children(cpg: &CodePropertyGraph, node: NodeId) -> Vec<NodeId> {
     cpg.ast_children(node)
-        .into_iter()
+        .iter()
+        .copied()
         .filter(|&child| is_value_cell(cpg, child))
         .collect()
 }

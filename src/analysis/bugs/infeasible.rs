@@ -730,7 +730,7 @@ fn semantic_children(cpg: &CodePropertyGraph, node: NodeId, kind: &CpgNodeKind) 
             children.first().copied().into_iter().collect()
         }
         CpgNodeKind::BinaryOp { operator } if matches!(&**operator, "&&" | "and" | "||" | "or") => {
-            children.into_iter().take(2).collect()
+            children.iter().copied().take(2).collect()
         }
         _ => Vec::new(),
     }
@@ -751,7 +751,7 @@ fn condition_expr(cpg: &CodePropertyGraph, node: NodeId) -> ConditionExpr {
             .map_or(ConditionExpr::Unsupported, ConditionExpr::Not),
         CpgNodeKind::BinaryOp { operator } if matches!(&**operator, "&&" | "and" | "||" | "or") => {
             let children = cpg.ast_children(node);
-            let [left, right, ..] = children.as_slice() else {
+            let [left, right, ..] = children else {
                 return ConditionExpr::Unsupported;
             };
             if matches!(&**operator, "&&" | "and") {
@@ -775,7 +775,7 @@ fn normalized_predicate(
         return None;
     }
     let children = cpg.ast_children(node);
-    let [left, right, ..] = children.as_slice() else {
+    let [left, right, ..] = children else {
         return None;
     };
     match (&cpg.node(*left)?.kind, &cpg.node(*right)?.kind) {

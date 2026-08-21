@@ -203,11 +203,6 @@ mod tests {
     fn child(cpg: &mut CodePropertyGraph, parent: NodeId, kind: CpgNodeKind) -> NodeId {
         let id = node(cpg, kind);
         cpg.connect(parent, id, CpgEdgeKind::AstChild);
-        cpg.node_mut(id).expect("child node exists").parent = Some(parent);
-        cpg.node_mut(parent)
-            .expect("parent node exists")
-            .children
-            .push(id);
         id
     }
 

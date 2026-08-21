@@ -433,7 +433,8 @@ fn merkle_fingerprints(
 
 fn clone_children(cpg: &CodePropertyGraph, node: NodeId, scope: &FxHashSet<NodeId>) -> Vec<NodeId> {
     cpg.ast_children(node)
-        .into_iter()
+        .iter()
+        .copied()
         .filter(|child| scope.contains(child))
         .filter(|child| {
             cpg.node(*child)
