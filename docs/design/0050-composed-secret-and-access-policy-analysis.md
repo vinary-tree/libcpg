@@ -168,8 +168,10 @@ context/fingerprint nodes are exercised on 64-KiB test stacks.
 2. Yamaguchi, F., Wressnegger, C., Gascon, H., Rieck, K. (2013). *Chucky:
    Exposing Missing Checks in Source Code for Vulnerability Discovery.* DOI:
    [10.1145/2508859.2516665](https://doi.org/10.1145/2508859.2516665).
-3. Shannon, C. E. (1948). *A Mathematical Theory of Communication.* DOI:
-   [10.1002/j.1538-7305.1948.tb01338](https://doi.org/10.1002/j.1538-7305.1948.tb01338).
+3. Shannon, C. E. (1948). *A Mathematical Theory of Communication.* Part I DOI:
+   [10.1002/j.1538-7305.1948.tb01338.x](https://doi.org/10.1002/j.1538-7305.1948.tb01338.x);
+   Part II DOI:
+   [10.1002/j.1538-7305.1948.tb00917.x](https://doi.org/10.1002/j.1538-7305.1948.tb00917.x).
 4. Yamaguchi, F., Golde, N., Arp, D., Rieck, K. (2014). *Modeling and
    Discovering Vulnerabilities with Code Property Graphs.* DOI:
    [10.1109/SP.2014.44](https://doi.org/10.1109/SP.2014.44).

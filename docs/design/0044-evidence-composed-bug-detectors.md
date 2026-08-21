@@ -31,7 +31,7 @@ call-stack use independent of source and graph depth.
    variable fact universe and represented reaching-definition edges. Exclude
    declaration-signature and unbound callee syntax because neither is an
    executable variable read.
-4. Normalize exception constructs in the frontend as reserved `Throw` and
+4. Normalize exception constructs in the frontend as typed `Throw` and
    `Catch` nodes. Emit `CfgEdgeKind::Catch` from every represented catch clause
    to its handler body so handler entry is distinguishable from ordinary
    sequencing.
@@ -68,7 +68,7 @@ boundary.
 
 Rejected. Parallel topology would drift from the public CPG and make witnesses
 unrelatable to caller node identifiers. The detectors consume the canonical CFG
-view and reserved edge kinds already present in the graph.
+view and typed edge kinds already present in the graph.
 
 ### Treat every identifier with no incoming DFG edge as uninitialized
 

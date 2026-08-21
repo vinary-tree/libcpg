@@ -1,14 +1,9 @@
 @startuml
+!include _libcpg-theme.iuml
 title Read-modify-write split across a lock gap
 
-skinparam backgroundColor #FCFCFC
-skinparam shadowing false
-skinparam defaultFontName "DejaVu Sans"
 skinparam sequence {
-  ArrowColor #495057
-  LifeLineBorderColor #495057
   LifeLineBackgroundColor #F8F9FA
-  ParticipantBorderColor #495057
 }
 
 participant "update strand" as U #DBE4FF

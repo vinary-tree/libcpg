@@ -1,6 +1,6 @@
 # Querying and Traversal
 
-A [`CodePropertyGraph`](../GLOSSARY.md#code-property-graph-cpg) is only as useful as the questions you can ask it. This guide is a cookbook of traversal recipes over the four overlays — [AST](../GLOSSARY.md#abstract-syntax-tree-ast), [CFG](../GLOSSARY.md#control-flow-graph-cfg), [DFG](../GLOSSARY.md#data-flow-graph-dfg), and the call graph — plus positional lookup, kind queries, the built-in metrics, and subgraph extraction. It finishes with a worked [taint](../GLOSSARY.md#taint-analysis)-style data-flow walk, the query shape that motivated CPGs in the first place [[1]](#references).
+A [`CodePropertyGraph`](../GLOSSARY.md#code-property-graph-cpg) is only as useful as the questions you can ask it. This guide is a cookbook of traversal recipes over the four overlays — [AST](../GLOSSARY.md#abstract-syntax-tree-ast), [CFG](../GLOSSARY.md#control-flow-graph-cfg), [DFG](../GLOSSARY.md#data-flow-graph-dfg), and the call graph — plus positional lookup, kind queries, the built-in metrics, and subgraph extraction. It finishes with a worked [taint](../GLOSSARY.md#taint-catalog--taint-witness)-style data-flow walk, the query shape that motivated CPGs in the first place [[1]](#references).
 
 Every method here reads an immutable `&CodePropertyGraph`, so all of it is **feature-free** — it works on any CPG, however you built it. The examples assume you already have a `cpg` in hand (see [Building CPGs](01-building-cpgs.md)).
 
@@ -349,7 +349,7 @@ fn subgraphs(cpg: &CodePropertyGraph, function: NodeId, ids: &[NodeId]) {
 
 ## Worked example: a taint-style data-flow walk
 
-[Taint analysis](../GLOSSARY.md#taint-analysis) asks whether a value from an *untrusted source* can reach a *sensitive sink* without sanitisation. In a CPG this is a reachability query over DFG edges — precisely the cross-layer question Yamaguchi et al. introduced CPGs to answer [[1]](#references). Here is the reachability core, written feature-free with only the standard library:
+[Taint analysis](../GLOSSARY.md#taint-catalog--taint-witness) asks whether a value from an *untrusted source* can reach a *sensitive sink* without sanitisation. In a CPG this is a reachability query over DFG edges — precisely the cross-layer question Yamaguchi et al. introduced CPGs to answer [[1]](#references). Here is the reachability core, written feature-free with only the standard library:
 
 ```rust
 use std::collections::{HashSet, VecDeque};

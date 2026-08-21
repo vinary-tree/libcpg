@@ -99,4 +99,4 @@ clone detection of Baxter et al.
 dependence-based detection of Zou et al.
 ([DOI 10.1145/3324884.3416541](https://doi.org/10.1145/3324884.3416541)) and
 Komondoor–Horwitz
-([DOI 10.1007/3-540-47764-0_33](https://doi.org/10.1007/3-540-47764-0_33)).
+([DOI 10.1007/3-540-47764-0_3](https://doi.org/10.1007/3-540-47764-0_3)).

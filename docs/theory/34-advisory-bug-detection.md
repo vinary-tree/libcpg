@@ -138,7 +138,7 @@ shortest call/throw witness. A catch absent from the reached-handler map yields
 
 Sinha and Harrold show why exception constructs must participate explicitly in
 control-flow and interprocedural program representations [[4]](#references).
-libcpg accordingly emits reserved `Throw`/`Catch` nodes and a typed `Catch`
+libcpg accordingly emits normalized `Throw`/`Catch` nodes and a typed `Catch`
 handler-entry CFG edge rather than reconstructing exception syntax in the
 analysis.
 

@@ -1,7 +1,7 @@
 @startuml
+!include _libcpg-theme.iuml
 title Directed motif census — complete taxonomy with explicit budgets
 
-skinparam backgroundColor #FCFCFC
 skinparam activity {
   BackgroundColor #E8F1FB
   BorderColor #28527A

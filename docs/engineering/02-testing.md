@@ -70,8 +70,8 @@ think to write down.
 | ML-export stack-safety tests | 1 | `tests/ml_export_stack_safety.rs` |
 | CPG-diff public/parser integration tests | 2 | `tests/cpg_diff_integration.rs` |
 | CPG-diff stack-safety tests | 1 | `tests/cpg_diff_stack_safety.rs` |
-| **Executable test cases** | **1,356** | measured by the all-features test inventory: 1,220 library and 136 integration/robustness tests; excludes rustdoc examples |
-| `proptest!` blocks (subset of the library/robustness rows) | 95 | exact source-level macro count in `src/` and `tests/` |
+| **Executable test cases** | **1,364** | measured by the all-features test inventory: 1,220 library, 141 integration/robustness, and 3 rustdoc examples |
+| `proptest!` blocks (subset of the library/robustness rows) | 96 | exact source-level macro count in `src/` and `tests/` |
 
 The maximal-matrix library count is up from **99** inline tests and **zero**
 property tests before this work.
@@ -552,12 +552,12 @@ can reach — `tests/robustness.rs` reaches it.
 `ml-linfa` and `gpu` are excluded from the matrix: they pull heavy optional
 dependencies and are not part of the `full` feature set.
 
-## What is deliberately absent
+## Additional verification surfaces
 
 | Surface | State |
 | --- | --- |
-| Doctests | none run — every code fence in a doc comment is marked `ignore` / `rust,ignore`, so `cargo test --doc` executes nothing. Feature-gating individual doctests in a `default = []` crate is awkward; the snippets are instead validated by the documentation snippet-check harness. |
-| Benchmarks | Twenty-two active Criterion targets cover SCC paths/rings/clusters, condensation paths/independent chains with and without CG layering, graph-arena paths, bounded VF2 paths, liveness chains/diamond ladders/nested loops, counted-loop induction regions, DSM paths/rings, WL rings/stars, centrality paths/rings/clusters, Louvain rings of cliques, disconnected-community refinement, cohesion lattices/clique chains/weighted seams/star attacks, spectral stars/complete-bipartite/disconnected-star families, bounded cycles over acyclic paths/disjoint triangles/dense digraphs, motif censuses over paths/bidirected cliques/out-stars, GED over identical/relabelled/retyped graphs, function clones, clone/feasibility advisories, API-usage/temporal populations, declarative CWE registries, program merge/import linkage, IFDS/IDE summaries, and taint summaries over path/ring/clustered call graphs, plus—under `algorithm-detection`—complexity evidence on counted-loop fixtures. Each active group asserts a deterministic oracle before timing. See [performance](03-performance.md). |
+| Doctests | Three examples compile under both default and all-feature configurations with rustdoc warnings denied. The feature-free crate-root example executes against a real typed CPG; the two parser snippets are `no_run` because the empty default feature set intentionally has no built-in grammar. |
+| Benchmarks | Twenty-eight explicit Criterion targets cover construction, traversal, DFG, PDG, SCC, VF2, liveness, induction, graph metrics, clones, advisory/security analyses, exports, and CPG differencing across 34 canonical cases. Each active group asserts a deterministic oracle before timing. See [performance](03-performance.md) and the [optimization ledger](optimization-ledger.md). |
 | `ml-linfa`, `gpu` | not exercised: optional heavy dependencies outside the `full` feature set. |
 
 The feature-free [`population_anomalies`](../../examples/population_anomalies.rs)

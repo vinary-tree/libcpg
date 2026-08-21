@@ -25,7 +25,7 @@ run_gate test-maximal cargo test --features 'full rholang metta'
 run_gate test-all-features cargo test --all-features
 run_gate test-examples cargo test --all-features --examples
 run_gate clippy cargo clippy --all-targets --all-features -- -D warnings
-run_gate rustdoc env RUSTDOCFLAGS=-Dwarnings cargo doc --all-features --no-deps
+run_gate rustdoc ./scripts/verify-rustdoc.sh
 run_gate docs ./scripts/verify-docs.sh
 run_gate diff-check git diff --check
 

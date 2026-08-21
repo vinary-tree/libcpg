@@ -43,7 +43,7 @@ nodes; each overlay contributes a differently-typed set of edges. Source:
 ## Why combine these views?
 
 Many interesting questions about code are not answerable from any single view
-alone. A [taint-analysis](../../GLOSSARY.md#taint-analysis) query — *can an
+alone. A [taint-analysis](../../GLOSSARY.md#taint-catalog--taint-witness) query — *can an
 untrusted value reach a sensitive sink?* — needs syntax (to recognise the source
 and sink), control flow (to know a path exists), and data flow (to know the
 value actually propagates). With three disconnected representations you must run

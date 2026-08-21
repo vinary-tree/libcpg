@@ -23,7 +23,7 @@ trust, exact support, resource caps, completeness, and repair separation.
 | Actor or asset | Security role |
 |---|---|
 | analyzed repository | untrusted source that may be malformed, huge, cyclic, or intentionally misleading |
-| language frontend | trusted normalization boundary for reserved AST/CFG/DFG/type/call evidence |
+| language frontend | trusted normalization boundary for typed AST/CFG/DFG/type/call evidence |
 | resource-policy author | defines acquisitions, releases, legal transitions, and accepting terminal states |
 | detector | read-only bounded transformer from represented evidence to candidates |
 | downstream policy | decides whether findings or incompleteness block release |

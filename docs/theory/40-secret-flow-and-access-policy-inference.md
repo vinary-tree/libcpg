@@ -154,8 +154,10 @@ the [component contract](../components/graph/security-policy-analysis.md), and
 
 ## References
 
-1. Shannon, C. E. (1948). *A Mathematical Theory of Communication.* DOI:
-   [10.1002/j.1538-7305.1948.tb01338](https://doi.org/10.1002/j.1538-7305.1948.tb01338).
+1. Shannon, C. E. (1948). *A Mathematical Theory of Communication.* Part I DOI:
+   [10.1002/j.1538-7305.1948.tb01338.x](https://doi.org/10.1002/j.1538-7305.1948.tb01338.x);
+   Part II DOI:
+   [10.1002/j.1538-7305.1948.tb00917.x](https://doi.org/10.1002/j.1538-7305.1948.tb00917.x).
 2. Meli, M., McNiece, M. R., Reaves, B. (2019). *How Bad Can It Git?
    Characterizing Secret Leakage in Public GitHub Repositories.* DOI:
    [10.14722/ndss.2019.23418](https://doi.org/10.14722/ndss.2019.23418).

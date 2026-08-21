@@ -96,21 +96,32 @@
 //!
 //! ## Example
 //!
-//! ```rust,ignore
-//! use libcpg::{CodePropertyGraph, CpgBuilder, Language};
+//! ```rust
+//! use libcpg::{
+//!     CfgEdgeKind, CodePropertyGraph, CpgEdgeKind, CpgNode, CpgNodeKind,
+//!     Language, NodeId, SourceRange,
+//! };
 //!
-//! // Build a CPG from source code
-//! let builder = TreeSitterCpgBuilder::new();
-//! let cpg = builder.build(source_code, Language::Rust)?;
+//! // Construct a feature-free graph. Enable a `lang-*` feature when the crate
+//! // should parse source text internally instead.
+//! let mut cpg = CodePropertyGraph::new(Language::Rust);
+//! let entry = cpg.add_node(CpgNode::new(
+//!     NodeId::new(0),
+//!     CpgNodeKind::Root,
+//!     SourceRange::default(),
+//! ));
+//! let exit = cpg.add_node(CpgNode::new(
+//!     NodeId::new(0),
+//!     CpgNodeKind::Return,
+//!     SourceRange::default(),
+//! ));
+//! cpg.connect(
+//!     entry,
+//!     exit,
+//!     CpgEdgeKind::ControlFlow(CfgEdgeKind::Sequential),
+//! );
 //!
-//! // Analyze control flow
-//! for node in cpg.cfg_nodes() {
-//!     println!("CFG node: {:?}", node);
-//! }
-//!
-//! // Detect design patterns
-//! let detector = GofPatternDetector::new();
-//! let patterns = detector.detect(&cpg);
+//! assert_eq!(cpg.cfg_nodes().count(), 2);
 //! ```
 
 #![warn(missing_docs)]

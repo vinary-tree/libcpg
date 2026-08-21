@@ -591,7 +591,7 @@ and [security boundary](../security/08-typestate-analysis.md).
 ### Advisory bug detectors
 
 The feature-free bug-detector APIs compose existing typestate, variable-fact,
-reaching-definition, call-SCC, type, inheritance, and reserved exception
+reaching-definition, call-SCC, type, inheritance, and normalized exception
 evidence. Every report is read-only and deterministic.
 
 | Item | Contract |

@@ -121,7 +121,7 @@ occurs. In particular, neither channel read by `call_graph_sccs`—a populated
 Parent pointers determine containment, bounded by `max_scope_depth` and guarded
 against cycles.
 
-It emits two reserved scope relations:
+It emits two typed scope relations:
 
 - `EnclosingScope(scope, parent_scope)` for a nested scope; and
 - `ContainedIn(node, scope)` for a non-scope node.

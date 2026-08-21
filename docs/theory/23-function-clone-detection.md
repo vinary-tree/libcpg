@@ -161,4 +161,4 @@ ceilings are `InvalidInput`; exhausted work budgets are `BudgetExceeded`.
    [DOI 10.1145/3324884.3416541](https://doi.org/10.1145/3324884.3416541).
 4. Komondoor, R., and Horwitz, S. (2001). *Using Slicing to Identify
    Duplication in Source Code.* SAS 2001, 40–56.
-   [DOI 10.1007/3-540-47764-0_33](https://doi.org/10.1007/3-540-47764-0_33).
+   [DOI 10.1007/3-540-47764-0_3](https://doi.org/10.1007/3-540-47764-0_3).

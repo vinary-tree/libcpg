@@ -124,14 +124,16 @@ described in [measurement methodology](04-measurement-methodology.md):
 
 ```bash
 sudo cpupower frequency-set --governor performance
+mkdir -p target/verification
 taskset -c 2 cargo bench --bench centrality --no-default-features 2>&1 \
-  | tee /tmp/libcpg-centrality-bench.log
+  | tee target/verification/libcpg-centrality-bench.log
 ```
 
 Record processor, governor, Rust version, commit, feature set, thermal state,
-and sample configuration with any reported numbers. The committed benchmark
-contains no claimed speedup; it is a reproducible measurement instrument for
-the later optimization tranche.
+and sample configuration with any reported numbers, inspect the captured log,
+and remove that exact file when the investigation is complete. The committed
+benchmark contains no claimed speedup; it is a reproducible measurement
+instrument for the later optimization tranche.
 
 ## Falsification criteria
 

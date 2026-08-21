@@ -1,10 +1,6 @@
 @startuml
+!include _libcpg-theme.iuml
 title Advisory architectural-smell analysis
-skinparam backgroundColor #F8F9FA
-skinparam shadowing false
-skinparam defaultFontName DejaVu Sans
-skinparam ArrowColor #495057
-skinparam ArrowThickness 1.2
 skinparam rectangle {
   RoundCorner 10
   BorderColor #343A40

@@ -1,7 +1,7 @@
 @startuml
+!include _libcpg-theme.iuml
 title Bounded simple-cycle enumeration — validated, canonical, and explicit about truncation
 
-skinparam backgroundColor #FFFFFF
 skinparam activity {
   BackgroundColor #E7F5FF
   BorderColor #1971C2
@@ -16,9 +16,6 @@ skinparam note {
   BorderColor #F59F00
   FontColor #5F3B00
 }
-skinparam ArrowColor #495057
-skinparam ArrowThickness 1.2
-
 start
 :Borrow GraphProjection + CycleOptions; <<#E7F5FF>>
 if (forward/reverse CSR valid?) then (yes)

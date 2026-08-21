@@ -662,7 +662,7 @@ See the [component guide](../components/graph/typestate-analysis.md), [Theory
 `analysis::bugs` fans normalized evidence into three read-only paths. Resource
 leaks project non-accepting `TypestateTerminal` values. Uninitialized uses reuse
 the shared binder-aware variable facts and function-scoped reaching
-definitions. Exception flow reuses the call-graph SCC summary solver, reserved
+definitions. Exception flow reuses the call-graph SCC summary solver, normalized
 `Throw`/`Catch` nodes, typed `Catch` CFG entry, nominal type/inheritance
 evidence, and lexical AST handler nesting.
 
@@ -888,7 +888,7 @@ consumer adds no parser and does not mutate the CPG; see
 
 ### GNN embeddings (feature `gnn`)
 
-`CpgGnn::new(cpg)` **owns** the CPG (it takes it by value, not by `Arc`, and has no separate config object). `propagate(&mut self, iterations)` runs [message passing](../GLOSSARY.md#message-passing) — mean [aggregation](../GLOSSARY.md#aggregation-gnn) over the AST, CFG, and DFG neighbourhoods with a [ReLU](../GLOSSARY.md#relu) nonlinearity — after which node/subgraph [embeddings](../GLOSSARY.md#embedding) can be read and compared by [cosine similarity](../GLOSSARY.md#cosine-similarity).
+`CpgGnn::new(cpg)` **owns** the CPG (it takes it by value, not by `Arc`, and has no separate config object). `propagate(&mut self, iterations)` runs [message passing](../GLOSSARY.md#message-passing-gnn) — mean [aggregation](../GLOSSARY.md#aggregation-gnn) over the AST, CFG, and DFG neighbourhoods with a [ReLU](../GLOSSARY.md#relu) nonlinearity — after which node/subgraph [embeddings](../GLOSSARY.md#embedding) can be read and compared by [cosine similarity](../GLOSSARY.md#cosine-similarity).
 
 ```rust
 // requires: features = ["gnn"]

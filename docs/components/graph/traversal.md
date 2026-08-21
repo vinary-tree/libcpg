@@ -5,7 +5,7 @@ through a set of accessor methods on `CodePropertyGraph`, one family per overlay
 AST, CFG, DFG, the call graph, and positional/subgraph queries. This page
 catalogues those accessors *with their exact return types*, then works through
 the recurring analysis patterns — reachability, def-use following, and a
-[taint](../../GLOSSARY.md#taint-analysis) walk — over the real API.
+[taint](../../GLOSSARY.md#taint-catalog--taint-witness) walk — over the real API.
 
 ## Return types at a glance
 
@@ -149,7 +149,7 @@ chains and the broader one when you want all value flow.
 
 ## Worked example: forward taint / reachability
 
-[Taint analysis](../../GLOSSARY.md#taint-analysis) asks whether a value from an
+[Taint analysis](../../GLOSSARY.md#taint-catalog--taint-witness) asks whether a value from an
 untrusted **source** can reach a sensitive **sink**. Over a CPG this is a graph
 reachability query on the data-flow overlay. The algorithm is a breadth-first
 sweep that follows data-flow successors until the frontier is exhausted:

@@ -721,7 +721,7 @@ and there is no separate `GnnConfig`).
 
 `propagate` initializes each node vector from a 16-dimensional node-kind one-hot
 plus small random noise, then for each iteration
-[aggregates](../GLOSSARY.md#message-passing) the mean of a node's AST
+[aggregates](../GLOSSARY.md#message-passing-gnn) the mean of a node's AST
 (children + parent), CFG (successors + predecessors), and DFG (successors +
 predecessors) neighbours and applies a
 [ReLU](../GLOSSARY.md#relu) nonlinearity:

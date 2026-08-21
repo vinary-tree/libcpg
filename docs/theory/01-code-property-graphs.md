@@ -158,7 +158,7 @@ walked in either direction and let **source order be recovered** even though
 Because overlays share $`V`$, a cross-layer query is a **composition of edge
 relations**, filtered by node kind. Writing $`u \xrightarrow{F} v`$ for "there
 is an edge $`e \in E_F`$ with $`\mathrm{src}(e)=u`$,
-$`\mathrm{tgt}(e)=v`$", a [taint](../GLOSSARY.md#taint-analysis) query is the
+$`\mathrm{tgt}(e)=v`$", a [taint](../GLOSSARY.md#taint-catalog--taint-witness) query is the
 existence of a data-flow path between two vertices selected by their kind:
 
 ```math

@@ -80,4 +80,4 @@ green tests are not substituted for these full-matrix measurements.
 3. Zou et al. study PDG-based clone matching:
    [DOI 10.1145/3324884.3416541](https://doi.org/10.1145/3324884.3416541).
 4. Komondoor and Horwitz connect program slicing and duplication:
-   [DOI 10.1007/3-540-47764-0_33](https://doi.org/10.1007/3-540-47764-0_33).
+   [DOI 10.1007/3-540-47764-0_3](https://doi.org/10.1007/3-540-47764-0_3).

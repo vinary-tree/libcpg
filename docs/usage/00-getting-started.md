@@ -205,7 +205,7 @@ fn describe(cpg: &CodePropertyGraph) {
 You now have a CPG and can read its shape. The rest of the usage guide builds on this foundation:
 
 - **[Building CPGs](01-building-cpgs.md)** — `build` vs `build_from_tree`, `CpgBuilderConfig`, `build_file`, and checking real grammar availability with `ParserRegistry::supports`.
-- **[Querying and Traversal](02-querying-and-traversal.md)** — walking AST/CFG/DFG/call overlays, `nodes_by_kind`, a [taint](../GLOSSARY.md#taint-analysis)-style data-flow walk, and subgraph extraction.
+- **[Querying and Traversal](02-querying-and-traversal.md)** — walking AST/CFG/DFG/call overlays, `nodes_by_kind`, a [taint](../GLOSSARY.md#taint-catalog--taint-witness)-style data-flow walk, and subgraph extraction.
 - **[Pattern Detection](03-pattern-detection.md)** — the always-on VF2 matcher and the feature-gated GoF detector.
 - **[Program Slicing](04-program-slicing.md)** — build a PDG and take backward/forward slices.
 - **[Serialization](05-serialization.md)** — round-trip a CPG through `serde_json`.

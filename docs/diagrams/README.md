@@ -1,6 +1,6 @@
 # Diagram catalog
 
-Every figure in the `libcpg` documentation is a **committed source** (`.puml` for PlantUML, `.dot` for Graphviz) rendered to a **committed `.svg`** that the Markdown pages embed. Sources are version-controlled so figures are reproducible and reviewable; SVGs are committed so they render on GitHub (which does not render PlantUML/Graphviz inline). This directory holds all 100 figures plus the shared theme.
+Every figure in the `libcpg` documentation is a **committed source** (`.puml` for PlantUML, `.dot` for Graphviz) rendered to a **committed `.svg`** that the Markdown pages embed. Sources are version-controlled so figures are reproducible and reviewable; SVGs are committed so they render on GitHub (which does not render PlantUML/Graphviz inline). This directory holds all 124 figures plus the shared theme.
 
 ## Conventions
 
@@ -21,14 +21,23 @@ Every figure in the `libcpg` documentation is a **committed source** (`.puml` fo
 ## Rendering & the render gate
 
 ```bash
-cd docs/diagrams
-plantuml -tsvg -nometadata *.puml            # render all PlantUML sources
-for f in *.dot; do dot -Tsvg "$f" -o "${f%.dot}.svg"; done   # render all Graphviz sources
-# GATE — must print nothing:
-grep -lF -e "contains errors" -e "syntax error" -e "deprecated" -e "Please use CSS" *.svg
+./scripts/verify-diagrams.sh
 ```
 
-Toolchain used: PlantUML (JLaTeXMath-enabled) + Graphviz `dot` 15.1.0. A figure passes the gate when its SVG contains no error/deprecation marker and is not a tiny error card (all committed SVGs are at least 1 KiB).
+The gate sets `JAVA_TOOL_OPTIONS=-Djava.awt.headless=true` and clears `DISPLAY`,
+so PlantUML cannot open a window. It copies all sources and the shared theme to
+two disk-backed directories under `target/verification`, renders both passes
+with mandatory `-nometadata`, and requires pass one, pass two, and the committed
+SVG to be byte-identical. It also renders every `.dot` file with Graphviz and
+removes only its own checked temporary directory.
+
+Toolchain used for the current committed set: the system PlantUML distribution
+(JLaTeXMath-enabled; its package reports placeholder version fields) and
+Graphviz `dot` 15.1.1. Reviewers must record tool versions whenever a renderer
+upgrade changes bytes. `scripts/verify-docs.sh` additionally requires exact
+source/SVG pairing in both directions, one catalog entry per source, the shared
+PlantUML theme, explicit semantic color, no error/deprecation marker, and an SVG
+size of at least 1 KiB.
 
 ## Figure index
 

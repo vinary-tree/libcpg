@@ -17,16 +17,20 @@
 //!
 //! ## Example
 //!
-//! ```ignore
-//! use libcpg::builder::TreeSitterCpgBuilder;
+//! ```rust,no_run
+//! use libcpg::builder::{CpgBuilder, TreeSitterCpgBuilder};
 //! use libcpg::Language;
 //!
+//! # fn main() -> libcpg::Result<()> {
 //! let builder = TreeSitterCpgBuilder::new();
 //! let source = "fn main() { println!(\"Hello, world!\"); }";
 //! let cpg = builder.build(source, Language::Rust)?;
 //!
 //! // The CPG now contains AST nodes with parent-child edges,
 //! // CFG edges for control flow, and DFG edges for data flow.
+//! # assert!(cpg.node_count() > 0);
+//! # Ok(())
+//! # }
 //! ```
 
 use super::{CfgExtractor, CpgBuilder, CpgBuilderConfig, DfgExtractor, NodeMapper, ParserRegistry};

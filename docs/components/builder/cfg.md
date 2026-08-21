@@ -251,8 +251,9 @@ shape the DFG uses for its reaching environment
 
 Every control-flow edge is `CpgEdgeKind::ControlFlow(CfgEdgeKind)`. The `CfgEdgeKind`
 enumeration is the full vocabulary of control transitions; the current `CfgExtractor`
-emits ten of the fourteen, and the rest are reserved for richer producers or downstream
-tools. Being explicit about which are emitted keeps the documentation honest.
+emits eleven of the fourteen. `Return`, `CallReturn`, and `DefaultCase` remain
+vocabulary-only in this extractor. Being explicit about which are emitted keeps the
+documentation honest.
 
 | Variant | Meaning | Emitted by `CfgExtractor`? |
 |---------|---------|:--:|
@@ -265,7 +266,7 @@ tools. Being explicit about which are emitted keeps the documentation honest.
 | `Continue` | `continue` to a loop's continue target | ✓ |
 | `Return` | Return transfer | — (`return` wires its value with `Sequential`; the node is marked a CFG exit) |
 | `Throw` | Exception raise to a handler | ✓ |
-| `Catch` | Entry into a catch handler | — (catch bodies are entered with `Sequential`) |
+| `Catch` | Entry into a catch handler | ✓ |
 | `Call` | Call site to callee | ✓ (when `include_call_edges`) |
 | `CallReturn` | Return from a callee to the call site | — |
 | `Case` | Match/switch arm selection | ✓ |

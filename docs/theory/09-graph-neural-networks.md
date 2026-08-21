@@ -19,7 +19,7 @@ GNNs for graphs were pioneered by Scarselli et al. [[1]](#references); the appli
 
 ## 1. Message passing, intuitively
 
-The core operation is **[message passing](../GLOSSARY.md#message-passing)**: every node repeatedly gathers its neighbours' current vectors, combines them with its own, and updates. It is a structured game of *telephone* — each round, a node hears from everyone one step away, so after $`k`$ rounds a node's vector reflects everything within $`k`$ hops.
+The core operation is **[message passing](../GLOSSARY.md#message-passing-gnn)**: every node repeatedly gathers its neighbours' current vectors, combines them with its own, and updates. It is a structured game of *telephone* — each round, a node hears from everyone one step away, so after $`k`$ rounds a node's vector reflects everything within $`k`$ hops.
 
 ```text
 Round 0            Round 1                     Round 2

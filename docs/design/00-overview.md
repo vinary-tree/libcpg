@@ -213,7 +213,7 @@ evidence into a feature-free finite typestate may-analysis. It retains
 allocation-site identity and graph-depth state in ordered heap structures and
 keeps all policy-dependent facts out of graph.
 ADR-0044 consumes ADR-0043's terminal evidence, ADR-0003's reaching-definition
-relations, ADR-0032's bounded SCC summary solver, and ADR-0042's reserved
+relations, ADR-0032's bounded SCC summary solver, and ADR-0042's emitted
 exception topology. It keeps syntax normalization in the frontend and composes
 three advisory detector families from shared evidence.
 ADR-0045 reuses ADR-0034's caller-owned taint catalog and dependence evidence,

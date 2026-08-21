@@ -1,10 +1,6 @@
 @startuml
+!include _libcpg-theme.iuml
 title libcpg deterministic bounded spectral analysis
-skinparam backgroundColor #FFFFFF
-skinparam shadowing false
-skinparam defaultFontName DejaVu Sans
-skinparam ArrowColor #495057
-skinparam ArrowThickness 1.2
 
 rectangle "GraphProjection\nsorted NodeId + forward/reverse CSR" as INPUT #E7F5FF
 rectangle "Validate full CSR + options\nfinite nonnegative tolerance" as VALIDATE #FFF3BF

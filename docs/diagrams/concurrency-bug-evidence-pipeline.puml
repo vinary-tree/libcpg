@@ -1,11 +1,7 @@
 @startuml
+!include _libcpg-theme.iuml
 title Evidence-bounded race and atomicity candidate pipeline
 
-skinparam backgroundColor #FCFCFC
-skinparam shadowing false
-skinparam defaultFontName "DejaVu Sans"
-skinparam ArrowColor #495057
-skinparam ArrowThickness 1.2
 skinparam componentStyle rectangle
 
 rectangle "Typed CPG evidence" as CPG #DBE4FF {

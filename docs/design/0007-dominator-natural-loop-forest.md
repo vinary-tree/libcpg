@@ -91,7 +91,7 @@ creates parallel competing classifications for one continuation.
   Techniques, and Tools.* Addison-Wesley. ISBN 0-201-10088-6 (no DOI).
 - Havlak, P. (1997). *Nesting of Reducible and Irreducible Loops.* ACM TOPLAS
   19(4), 557–567. DOI:
-  [10.1145/258005.258029](https://doi.org/10.1145/258005.258029).
+  [10.1145/262004.262005](https://doi.org/10.1145/262004.262005).
 - Ramalingam, G. (1999). *Identifying Loops in Almost Linear Time.* ACM TOPLAS
   21(2), 175–188. DOI:
   [10.1145/316686.316687](https://doi.org/10.1145/316686.316687).

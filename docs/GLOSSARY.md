@@ -32,7 +32,7 @@ package metrics](#martin-package-metrics).
 
 ### Aggregation (GNN)
 
-The step in a [Graph Neural Network](#graph-neural-network-gnn) that combines a node's neighbour vectors into one vector. `libcpg`'s `AggregationMethod` enumerates `Mean` (the default and the only one used in message passing), `Sum`, `Max`, `Attention`, and `Hierarchical`; the latter two are **reserved placeholders**, not yet wired. See [Message passing](#message-passing).
+The step in a [Graph Neural Network](#graph-neural-network-gnn) that combines a node's neighbour vectors into one vector. `libcpg`'s `AggregationMethod` enumerates `Mean` (the default and the only one used in message passing), `Sum`, `Max`, `Attention`, and `Hierarchical`; the latter two are **reserved placeholders**, not yet wired. See [Message passing](#message-passing-gnn).
 
 ### Algebraic connectivity / Fiedler vector
 
@@ -535,7 +535,7 @@ See [`components/patterns/ged-analysis.md`](components/patterns/ged-analysis.md)
 
 ### Graph Neural Network (GNN)
 
-A neural network that computes node representations by repeatedly [aggregating](#aggregation-gnn) information from neighbours ([message passing](#message-passing)), pioneered for graphs by Scarselli et al. [[9]](#references) and applied to vulnerability detection by Devign (Zhou et al. [[12]](#references)). `libcpg`'s `CpgGnn` (feature `gnn`) owns a CPG and produces [embeddings](#embedding). See [`components/gnn/overview.md`](components/gnn/overview.md).
+A neural network that computes node representations by repeatedly [aggregating](#aggregation-gnn) information from neighbours ([message passing](#message-passing-gnn)), pioneered for graphs by Scarselli et al. [[9]](#references) and applied to vulnerability detection by Devign (Zhou et al. [[12]](#references)). `libcpg`'s `CpgGnn` (feature `gnn`) owns a CPG and produces [embeddings](#embedding). See [`components/gnn/overview.md`](components/gnn/overview.md).
 
 ### Graph projection
 
@@ -930,7 +930,7 @@ A definition of a variable that reaches a program point with no intervening rede
 
 ### ReLU
 
-The **Rectified Linear Unit** activation $`\mathrm{ReLU}(x) = \max(0, x)`$, applied element-wise after each GNN [aggregation](#aggregation-gnn) to introduce nonlinearity. See [Message passing](#message-passing).
+The **Rectified Linear Unit** activation $`\mathrm{ReLU}(x) = \max(0, x)`$, applied element-wise after each GNN [aggregation](#aggregation-gnn) to introduce nonlinearity. See [Message passing](#message-passing-gnn).
 
 ### Rholang
 
@@ -961,7 +961,7 @@ refine structural reachability without mutating the CPG. See
 ### Structural clone class
 
 A deterministically ordered set of at least two stable `NodeId` values that
-share one final projection-level [WL](#weisfeilerleman-wl-refinement) label.
+share one final projection-level [WL](#weisfeilerlehman-wl-refinement) label.
 It is a bounded topological candidate class, not proof of exact isomorphism,
 source equality, or behavioral equivalence. See
 [`components/graph/wl-analysis.md`](components/graph/wl-analysis.md).
@@ -1240,7 +1240,7 @@ strict tree interpretation. See
 14. Aho, A. V., Lam, M. S., Sethi, R., Ullman, J. D. (2006). *Compilers: Principles, Techniques, and Tools* (2nd ed.). Addison-Wesley. ISBN 978-0321486813 (no DOI). *(Reaching definitions, liveness, data-flow analysis.)*
 15. Chidamber, S. R., Kemerer, C. F. (1994). *A Metrics Suite for Object Oriented Design.* IEEE Transactions on Software Engineering 20(6). DOI: [10.1109/32.295895](https://doi.org/10.1109/32.295895) *(LCOM/CBO, used by `PatternMetrics`.)*
 16. Aho, A. V., Sethi, R., Ullman, J. D. (1986). *Compilers: Principles, Techniques, and Tools.* Addison-Wesley. ISBN 0-201-10088-6 (no DOI). *(Natural loops.)*
-17. Havlak, P. (1997). *Nesting of Reducible and Irreducible Loops.* ACM TOPLAS 19(4), 557–567. DOI: [10.1145/258005.258029](https://doi.org/10.1145/258005.258029)
+17. Havlak, P. (1997). *Nesting of Reducible and Irreducible Loops.* ACM TOPLAS 19(4), 557–567. DOI: [10.1145/262004.262005](https://doi.org/10.1145/262004.262005)
 18. Ramalingam, G. (1999). *Identifying Loops in Almost Linear Time.* ACM TOPLAS 21(2), 175–188. DOI: [10.1145/316686.316687](https://doi.org/10.1145/316686.316687)
 19. Kam, J. B., Ullman, J. D. (1977). *Monotone Data Flow Analysis Frameworks.* Acta Informatica 7, 305–317. DOI: [10.1007/BF00290339](https://doi.org/10.1007/BF00290339)
 20. Cousot, P., Cousot, R. (1977). *Abstract Interpretation: A Unified Lattice Model for Static Analysis of Programs by Construction or Approximation of Fixpoints.* POPL '77, 238–252. DOI: [10.1145/512950.512973](https://doi.org/10.1145/512950.512973)
@@ -1285,7 +1285,7 @@ strict tree interpretation. See
 59. Li, P., Yao, S., Korich, J. S., Luo, C., Yu, J., Cao, Y., Yang, J. (2025). *Neuro-symbolic Static Analysis with LLM-generated Vulnerability Patterns.* DOI: [10.48550/arXiv.2504.16057](https://doi.org/10.48550/arXiv.2504.16057).
 60. Lekssays, A., Mouhcine, H., Tran, K., Yu, T., Khalil, I. (2025). *LLMxCPG: Context-Aware Vulnerability Detection Through Code Property Graph-Guided Large Language Models.* DOI: [10.48550/arXiv.2507.16585](https://doi.org/10.48550/arXiv.2507.16585).
 61. Meli, M., McNiece, M. R., Reaves, B. (2019). *How Bad Can It Git? Characterizing Secret Leakage in Public GitHub Repositories.* DOI: [10.14722/ndss.2019.23418](https://doi.org/10.14722/ndss.2019.23418).
-62. Shannon, C. E. (1948). *A Mathematical Theory of Communication.* DOI: [10.1002/j.1538-7305.1948.tb01338](https://doi.org/10.1002/j.1538-7305.1948.tb01338).
+62. Shannon, C. E. (1948). *A Mathematical Theory of Communication.* Part I DOI: [10.1002/j.1538-7305.1948.tb01338.x](https://doi.org/10.1002/j.1538-7305.1948.tb01338.x); Part II DOI: [10.1002/j.1538-7305.1948.tb00917.x](https://doi.org/10.1002/j.1538-7305.1948.tb00917.x).
 63. Yamaguchi, F., Lindner, F., Rieck, K. (2011). *Vulnerability Extrapolation: Assisted Discovery of Vulnerabilities Using Machine Learning.* [USENIX WOOT '11](https://www.usenix.org/conference/woot11/vulnerability-extrapolation-assisted-discovery-vulnerabilities-using-machine) (no DOI advertised in the proceedings record).
 64. Yamaguchi, F., Lottmann, M., Rieck, K. (2012). *Generalized Vulnerability Extrapolation using Abstract Syntax Trees.* DOI: [10.1145/2420950.2421003](https://doi.org/10.1145/2420950.2421003).
 65. Blackshear, S., Gorogiannis, N., O'Hearn, P. W., Sergey, I. (2018). *RacerD: Compositional Static Race Detection.* DOI: [10.1145/3276514](https://doi.org/10.1145/3276514).

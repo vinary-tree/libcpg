@@ -13,10 +13,12 @@
 //!
 //! ## Usage
 //!
-//! ```ignore
+//! ```rust,no_run
 //! use libcpg::builder::{CpgBuilder, TreeSitterCpgBuilder, CfgExtractor, DfgExtractor};
 //! use libcpg::Language;
 //!
+//! # fn main() -> libcpg::Result<()> {
+//! let source_code = "fn main() { let value = 1; value; }";
 //! // Build CPG from source
 //! let builder = TreeSitterCpgBuilder::new();
 //! let mut cpg = builder.build(source_code, Language::Rust)?;
@@ -28,6 +30,8 @@
 //! // Extract DFG edges
 //! let dfg_extractor = DfgExtractor::new();
 //! dfg_extractor.extract(&mut cpg);
+//! # Ok(())
+//! # }
 //! ```
 
 mod cfg;

@@ -1,10 +1,6 @@
 @startuml
+!include _libcpg-theme.iuml
 title Interval value-range analysis
-skinparam backgroundColor #FAFCFF
-skinparam shadowing false
-skinparam roundcorner 14
-skinparam ArrowColor #324A5F
-skinparam defaultFontColor #172A3A
 skinparam rectangle {
   BorderColor #324A5F
   FontColor #172A3A

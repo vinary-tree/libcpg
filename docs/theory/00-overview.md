@@ -70,7 +70,7 @@ The CPG was introduced specifically to *express and discover vulnerabilities as
 graph queries* [[1]](#references). A large class of bugs is not visible in any one
 view:
 
-- A [taint](../GLOSSARY.md#taint-analysis) bug needs the **DFG** (untrusted value
+- A [taint](../GLOSSARY.md#taint-catalog--taint-witness) bug needs the **DFG** (untrusted value
   reaches a sink) *and* the **CFG/PDG** (no guard on the path sanitises it).
 - A missing-check bug needs the **AST** (the call shape) *and* the **control**
   structure around it.
@@ -89,7 +89,7 @@ detection ([Theory 05](05-subgraph-isomorphism-vf2.md)),
 ([Theory 09](09-graph-neural-networks.md)), and
 [Design Structure Matrix](../GLOSSARY.md#design-structure-matrix-dsm)
 visibility/core analysis ([Theory 10](10-design-structure-matrix-analysis.md)), and
-[Weisfeiler–Lehman](../GLOSSARY.md#weisfeilerleman-wl-refinement)
+[Weisfeiler–Lehman](../GLOSSARY.md#weisfeilerlehman-wl-refinement)
 structural-clone refinement
 ([Theory 11](11-weisfeiler-lehman-structural-clones.md)), and deterministic
 [centrality](../GLOSSARY.md#centrality) over projection topology
@@ -122,7 +122,7 @@ Martin-instability, and assigned component-size evidence
 [object-oriented and function metrics](../GLOSSARY.md#code-metrics)
 from resolved field/call and normalized node-kind evidence
 ([Theory 22](22-object-oriented-and-function-metrics.md)), and deterministic
-[multi-file program composition](../GLOSSARY.md#program-cpg--file-scope)
+[multi-file program composition](../GLOSSARY.md#program-cpg--file-scope--import-graph)
 with evidence-bounded import linkage
 ([Theory 24](24-program-composition.md)), and bounded deterministic
 [IFDS/IDE](../GLOSSARY.md#ifds--ide) procedure-summary fixed points over the
