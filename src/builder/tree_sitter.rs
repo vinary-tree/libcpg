@@ -94,7 +94,14 @@ impl TreeSitterCpgBuilder {
         source: &str,
         language: Language,
     ) -> Result<CodePropertyGraph> {
-        let mut cpg = CodePropertyGraph::new(language);
+        // Tree-sitter counts the root itself. The mapper may omit punctuation,
+        // comments, or transparent syntax nodes, so this is an upper bound that
+        // avoids a second tree walk while preventing graph and id-map growth on
+        // the ordinary construction path.
+        let syntax_node_capacity = tree.root_node().descendant_count();
+        let ast_edge_capacity = syntax_node_capacity.saturating_sub(1);
+        let mut cpg =
+            CodePropertyGraph::with_capacity(language, syntax_node_capacity, ast_edge_capacity);
 
         if self.config.retain_source {
             cpg = cpg.with_source_code(source);

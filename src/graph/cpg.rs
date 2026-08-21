@@ -57,10 +57,25 @@ pub struct CodePropertyGraph {
 impl CodePropertyGraph {
     /// Creates a new empty Code Property Graph.
     pub fn new(language: Language) -> Self {
+        Self::with_capacity(language, 0, 0)
+    }
+
+    /// Creates an empty graph with storage reserved for the expected shape.
+    ///
+    /// This constructor is crate-private because capacities are an ingestion
+    /// concern rather than graph semantics. Tree-sitter exposes its concrete
+    /// syntax-node count in constant time, which gives the builder a safe upper
+    /// bound for included CPG nodes and their AST edges without adding another
+    /// syntax-tree traversal.
+    pub(crate) fn with_capacity(
+        language: Language,
+        node_capacity: usize,
+        edge_capacity: usize,
+    ) -> Self {
         Self {
-            graph: DiGraph::new(),
-            node_index_map: FxHashMap::default(),
-            edge_index_map: FxHashMap::default(),
+            graph: DiGraph::with_capacity(node_capacity, edge_capacity),
+            node_index_map: FxHashMap::with_capacity_and_hasher(node_capacity, Default::default()),
+            edge_index_map: FxHashMap::with_capacity_and_hasher(edge_capacity, Default::default()),
             language,
             source_path: None,
             source_code: None,
@@ -1206,6 +1221,19 @@ pub struct CpgStats {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn capacity_constructor_reserves_graph_and_identifier_maps() {
+        let cpg = CodePropertyGraph::with_capacity(Language::Rust, 17, 23);
+        let (node_capacity, edge_capacity) = cpg.graph.capacity();
+
+        assert!(node_capacity >= 17, "petgraph node arena capacity");
+        assert!(edge_capacity >= 23, "petgraph edge arena capacity");
+        assert!(cpg.node_index_map.capacity() >= 17, "node id-map capacity");
+        assert!(cpg.edge_index_map.capacity() >= 23, "edge id-map capacity");
+        assert_eq!(cpg.node_count(), 0);
+        assert_eq!(cpg.edge_count(), 0);
+    }
     use crate::graph::{MethodSignature, Visibility};
 
     #[test]
