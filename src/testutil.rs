@@ -4,17 +4,18 @@
 //! `use crate::testutil::*`. Integration tests under `tests/` cannot see
 //! `pub(crate)` items and keep their own copies in `tests/common/`.
 //!
-//! Two structural generators exist because [`CodePropertyGraph::connect`] wires
-//! only the petgraph edge — it does **not** set `node.parent`/`node.children`,
-//! which the AST-ancestor analyses (DFG, PDG, metrics, algorithm detection)
-//! read:
+//! Two structural generators exist because an arbitrary set of `AstChild`
+//! edges can contain cycles or give one node several parents. Although
+//! [`CodePropertyGraph::connect`] maintains `node.parent`/`node.children`, such
+//! a graph is not an abstract-syntax tree and is unsuitable for analyses that
+//! walk AST ancestry (DFG, PDG, metrics, algorithm detection):
 //!
 //! * [`arb_cpg_raw`] — random nodes + random edges. For analyses that read only
 //!   node kinds and petgraph adjacency (serde, VF2, similarity, ids).
-//! * [`arb_well_formed_cpg`] — a `Function → Block → statements…` tree with the
-//!   `AstChild` edges, parent pointers, and child lists all set (mirroring the
-//!   real builder). Unlocks CFG/DFG/PDG/metrics/algorithm-detection properties
-//!   without needing a language grammar.
+//! * [`arb_well_formed_cpg`] — a `Function → Block → statements…` tree whose
+//!   `AstChild` edges induce consistent parent pointers and child lists
+//!   (mirroring the real builder). Unlocks CFG/DFG/PDG/metrics and
+//!   algorithm-detection properties without needing a language grammar.
 //! * [`arb_pdg_graph`] — nodes + random control/data-dependence edges, for the
 //!   program-slicing properties.
 
@@ -23,7 +24,7 @@
 
 use crate::{
     CfgEdgeKind, CodePropertyGraph, CpgEdgeKind, CpgNode, CpgNodeKind, DfgEdgeKind, Language,
-    LiteralKind, MethodSignature, NodeId, ScopeId, SourceRange, Visibility,
+    LiteralKind, MethodSignature, NodeId, ScopeId, SourceRange, TypeInfo, Visibility,
 };
 use proptest::prelude::*;
 
@@ -88,12 +89,28 @@ pub(crate) fn arb_node_kind() -> impl Strategy<Value = CpgNodeKind> {
         arb_name().prop_map(|n| CpgNodeKind::Struct { name: n.into() }),
         arb_name().prop_map(|n| CpgNodeKind::Enum { name: n.into() }),
         arb_name().prop_map(|n| CpgNodeKind::Trait { name: n.into() }),
+        (prop::option::of(arb_name()), prop::option::of(arb_name())).prop_map(
+            |(for_type, trait_name)| CpgNodeKind::Impl {
+                for_type: for_type.map(Into::into),
+                trait_name: trait_name.map(Into::into),
+            }
+        ),
         arb_method_signature().prop_map(|signature| CpgNodeKind::Function { signature }),
+        (arb_name(), any::<bool>()).prop_map(|(name, is_variadic)| CpgNodeKind::Parameter {
+            name: name.into(),
+            param_type: None,
+            is_variadic,
+        }),
         (arb_name(), any::<bool>()).prop_map(|(n, m)| CpgNodeKind::Variable {
             name: n.into(),
             var_type: None,
             scope: ScopeId::GLOBAL,
             is_mutable: m,
+        }),
+        arb_name().prop_map(|name| CpgNodeKind::Field {
+            name: name.into(),
+            field_type: None,
+            visibility: Visibility::Private,
         }),
         Just(CpgNodeKind::Block {
             scope: ScopeId::GLOBAL
@@ -104,27 +121,48 @@ pub(crate) fn arb_node_kind() -> impl Strategy<Value = CpgNodeKind> {
         Just(CpgNodeKind::For),
         Just(CpgNodeKind::Loop),
         Just(CpgNodeKind::Match),
+        Just(CpgNodeKind::MatchArm),
         Just(CpgNodeKind::Return),
         Just(CpgNodeKind::Break),
         Just(CpgNodeKind::Continue),
+        Just(CpgNodeKind::Throw),
+        Just(CpgNodeKind::Try),
+        Just(CpgNodeKind::Catch),
+        Just(CpgNodeKind::Finally),
         arb_name().prop_map(|o| CpgNodeKind::BinaryOp { operator: o.into() }),
+        arb_name().prop_map(|o| CpgNodeKind::UnaryOp { operator: o.into() }),
         arb_name().prop_map(|o| CpgNodeKind::Assignment { operator: o.into() }),
         any::<bool>().prop_map(|m| CpgNodeKind::Call {
             target: None,
             is_method: m
+        }),
+        arb_name().prop_map(|member| CpgNodeKind::MemberAccess {
+            member: member.into()
         }),
         arb_name().prop_map(|n| CpgNodeKind::Identifier {
             name: n.into(),
             definition: None
         }),
         arb_literal_kind().prop_map(|kind| CpgNodeKind::Literal { kind }),
+        Just(CpgNodeKind::Lambda {
+            captures: Default::default()
+        }),
+        Just(CpgNodeKind::Await),
+        Just(CpgNodeKind::Yield),
+        arb_name().prop_map(|name| CpgNodeKind::TypeAnnotation {
+            type_info: TypeInfo::new(name)
+        }),
+        arb_name().prop_map(|name| CpgNodeKind::GenericParam { name: name.into() }),
         Just(CpgNodeKind::IndexAccess),
         (arb_name(), any::<bool>()).prop_map(|(n, doc)| {
             let _ = n;
             CpgNodeKind::Comment { is_doc: doc }
         }),
         arb_name().prop_map(|p| CpgNodeKind::Import { path: p.into() }),
+        arb_name().prop_map(|name| CpgNodeKind::Attribute { name: name.into() }),
+        arb_name().prop_map(|name| CpgNodeKind::Macro { name: name.into() }),
         arb_name().prop_map(|m| CpgNodeKind::Error { message: m.into() }),
+        arb_name().prop_map(|kind| CpgNodeKind::Unknown { kind: kind.into() }),
     ]
 }
 
@@ -286,15 +324,16 @@ pub(crate) fn arb_stmt() -> impl Strategy<Value = StmtSpec> {
     })
 }
 
-/// A well-formed CPG: `Function "f" → Block → statements…`, with `AstChild`
-/// edges, parent pointers, and child lists set exactly like the real builder.
-/// The `Function` is the first node, so it is also the graph root.
+/// A well-formed CPG: `Function "f" → Block → statements…`, whose
+/// `AstChild` insertions maintain parent pointers and child lists exactly like
+/// the real builder. The `Function` is the first node, so it is also the graph
+/// root.
 pub(crate) fn arb_well_formed_cpg() -> impl Strategy<Value = CodePropertyGraph> {
     prop::collection::vec(arb_stmt(), 0..=6).prop_map(build_well_formed)
 }
 
-/// Adds `kind` as an AST child of `parent`, wiring the `AstChild` edge, the
-/// child's parent pointer, and the parent's child list.
+/// Adds `kind` as an AST child of `parent`; graph insertion maintains the
+/// child's parent pointer and the parent's child list.
 pub(crate) fn wf_child(cpg: &mut CodePropertyGraph, parent: NodeId, kind: CpgNodeKind) -> NodeId {
     let id = cpg.add_node(CpgNode::new(NodeId::new(0), kind, SourceRange::default()));
     cpg.connect(parent, id, CpgEdgeKind::AstChild);

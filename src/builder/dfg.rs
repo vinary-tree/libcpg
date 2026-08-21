@@ -234,8 +234,10 @@ impl DfgExtractor {
 
         // Add parameter definitions at function entry
         for (var_name, def_site) in &collector.definitions {
-            let node_kind = cpg.node(*def_site).map(|n| n.kind.clone());
-            if matches!(node_kind.as_ref(), Some(CpgNodeKind::Parameter { .. })) {
+            if matches!(
+                cpg.node_tag(*def_site),
+                Some(crate::CpgNodeKindTag::Parameter)
+            ) {
                 if let Some(out_set) = out_sets.get_mut(&function) {
                     out_set.insert((var_name.clone(), *def_site));
                 }
@@ -882,7 +884,7 @@ fn visit_reaching(
     while let Some(frame) = work.pop() {
         match frame {
             ReachingFrame::Enter { node, conditional } => {
-                let Some(kind) = cpg.node(node).map(|node| node.kind.clone()) else {
+                let Some(kind) = cpg.node(node).map(|node| &node.kind) else {
                     continue;
                 };
 
@@ -903,9 +905,9 @@ fn visit_reaching(
                     // Initializer/default children run before the definition
                     // becomes visible. Binder identifiers are not uses.
                     CpgNodeKind::Variable { name, .. } | CpgNodeKind::Parameter { name, .. } => {
-                        let binder = binder_identifier(cpg, node, &name);
+                        let binder = binder_identifier(cpg, node, name);
                         work.push(ReachingFrame::Bind {
-                            name,
+                            name: Arc::clone(name),
                             definition: node,
                             conditional,
                         });
@@ -923,7 +925,7 @@ fn visit_reaching(
                     // read-then-writes, and complex access sites exactly as the
                     // recursive equations did.
                     CpgNodeKind::Assignment { operator } => {
-                        let compound = &*operator != "=";
+                        let compound = operator.as_ref() != "=";
                         let children = cpg.ast_children(node);
                         let target = children.first().copied();
                         let target_is_ident = matches!(
@@ -956,7 +958,7 @@ fn visit_reaching(
                     // A use links every definition currently retained for its
                     // bound name. Its `Exit` remains on the work stack.
                     CpgNodeKind::Identifier { name, .. } => {
-                        if let Some(definitions) = env.get(&name) {
+                        if let Some(definitions) = env.get(name) {
                             pairs.extend(definitions.iter().map(|&definition| (definition, node)));
                         }
                     }
@@ -965,8 +967,8 @@ fn visit_reaching(
                     // regions push two identical child sweeps, implementing the
                     // bounded loop-carried-dependence approximation.
                     _ => {
-                        let child_conditional = conditional || is_conditional_region(&kind);
-                        let passes = usize::from(is_loop_region(&kind)) + 1;
+                        let child_conditional = conditional || is_conditional_region(kind);
+                        let passes = usize::from(is_loop_region(kind)) + 1;
                         let children = cpg.ast_children(node);
                         for _ in 0..passes {
                             for &child in children.iter().rev() {

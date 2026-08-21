@@ -239,6 +239,42 @@ and bounded arenas already used by deep traversals. Performance profiles are
 not stack-safety proofs; the dedicated 256 KiB-stack regression suites remain
 the gate.
 
+### T9.1 H02 — complete copy-sized node-kind tags
+
+**Hypothesis.** CFG and DFG hot paths copied payload-bearing `CpgNodeKind`
+values before mutating the graph. Replacing variant-only clones with a complete
+one-byte tag should reduce heap allocations by 5–20% and improve construction
+time without weakening the stack-safe pushdown machines.
+
+**Controlled change.** `CpgNodeKindTag` classifies all 45 variants one-to-one;
+`CpgNodeKind::tag` and `CodePropertyGraph::node_tag` expose it without
+allocation. The iterative CFG machine copies this tag. The iterative reaching-
+definitions machine borrows the kind and copies only the `Arc<str>` binder it
+must retain in a later heap frame. Its fixed-bounded recursive oracle still
+clones the full enum independently. An all-variant property establishes that
+tag equality is exactly Rust discriminant equality, and the shared generator
+now reaches every variant.
+
+**Controlled result against the pre-H02 H03 tree.** Criterion measured 20
+samples after a one-second warm-up on performance-governed CPUs 0–1:
+
+| Case | Before H02 | H02 | Median time change | Throughput change |
+| --- | ---: | ---: | ---: | ---: |
+| construction, 1,000-node linear AST | 82.493 µs | 81.414 µs | -1.28% | +1.30% |
+| construction, 10,000-node linear AST | 1.003 ms | 1.000 ms | -0.79% (within noise threshold) | +0.80% |
+| construction, 49-line parser corpus | 345.420 µs | 336.240 µs | -2.65% | +2.72% |
+| construction, 514-line parser corpus | 6.384 ms | 6.152 ms | -3.66% | +3.80% |
+
+Against immutable `main`, the final H02 tree was neutral on both synthetic
+linear cases and improved the 49-line and 514-line parser cases by 6.49% and
+8.83%, respectively. Headless DHAT measured exactly the same 174,636
+allocations and 51,793,797 allocated bytes before and after H02, refuting the
+allocation mechanism. The same profile reduced retired instructions by 1.65%
+and cycles by 2.71%; resident-set size fell 5.46%, while cache and translation-
+lookaside-buffer counters had enough run-to-run variance that no causal claim
+is made from them. The hypothesis is accepted for reduced data movement and
+runtime, with its predicted allocation reduction explicitly rejected.
+
 ### T9.1 H03 — maintained AST child index
 
 **Hypothesis.** The traversal profile attributed 4.82% of aggregate samples to

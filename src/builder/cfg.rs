@@ -8,7 +8,7 @@
 use rustc_hash::{FxHashMap, FxHashSet};
 use smallvec::SmallVec;
 
-use crate::{CfgEdgeKind, CodePropertyGraph, CpgEdgeKind, CpgNodeKind, NodeId};
+use crate::{CfgEdgeKind, CodePropertyGraph, CpgEdgeKind, CpgNodeKind, CpgNodeKindTag, NodeId};
 
 /// Configuration for CFG extraction.
 #[derive(Debug, Clone)]
@@ -221,7 +221,7 @@ impl CfgExtractor {
         while let Some(frame) = frames.pop() {
             match frame {
                 CfgFrame::Enter(node) => {
-                    let Some(kind) = cpg.node(node).map(|node| node.kind.clone()) else {
+                    let Some(kind) = cpg.node_tag(node) else {
                         values.push(smallvec::smallvec![node]);
                         continue;
                     };
@@ -236,7 +236,7 @@ impl CfgExtractor {
                     frames.push(CfgFrame::Leave(node));
 
                     match kind {
-                        CpgNodeKind::Block { .. } => {
+                        CpgNodeKindTag::Block => {
                             let children = cpg.ast_children(node).to_vec();
                             if let Some(&first) = children.first() {
                                 cpg.connect_unique(
@@ -256,7 +256,7 @@ impl CfgExtractor {
                                 values.push(smallvec::smallvec![node]);
                             }
                         }
-                        CpgNodeKind::If => {
+                        CpgNodeKindTag::If => {
                             let children = cpg.ast_children(node).to_vec();
                             match children.as_slice() {
                                 [] => values.push(smallvec::smallvec![node]),
@@ -304,7 +304,7 @@ impl CfgExtractor {
                                 }
                             }
                         }
-                        CpgNodeKind::While => {
+                        CpgNodeKindTag::While => {
                             let children = cpg.ast_children(node).to_vec();
                             let body = (children.len() >= 2)
                                 .then(|| {
@@ -349,7 +349,7 @@ impl CfgExtractor {
                                 values.push(smallvec::smallvec![node]);
                             }
                         }
-                        CpgNodeKind::For => {
+                        CpgNodeKindTag::For => {
                             let children = cpg.ast_children(node).to_vec();
                             if let Some(&body) = children.last() {
                                 ctx.push_loop(node, node);
@@ -364,7 +364,7 @@ impl CfgExtractor {
                                 values.push(smallvec::smallvec![node]);
                             }
                         }
-                        CpgNodeKind::Loop => {
+                        CpgNodeKindTag::Loop => {
                             let children = cpg.ast_children(node).to_vec();
                             if let Some(body) = children
                                 .iter()
@@ -390,7 +390,7 @@ impl CfgExtractor {
                                 values.push(smallvec::smallvec![node]);
                             }
                         }
-                        CpgNodeKind::Match => {
+                        CpgNodeKindTag::Match => {
                             let children = cpg.ast_children(node).to_vec();
                             if children.is_empty() {
                                 values.push(smallvec::smallvec![node]);
@@ -418,7 +418,7 @@ impl CfgExtractor {
                                 exits: SmallVec::new(),
                             });
                         }
-                        CpgNodeKind::Return => {
+                        CpgNodeKindTag::Return => {
                             if let Some(&expression) = cpg.ast_children(node).first() {
                                 cpg.connect_unique(
                                     node,
@@ -431,7 +431,7 @@ impl CfgExtractor {
                                 values.push(smallvec::smallvec![node]);
                             }
                         }
-                        CpgNodeKind::Break => {
+                        CpgNodeKindTag::Break => {
                             if let Some(loop_context) = ctx.loop_stack.last_mut() {
                                 loop_context.break_targets.push(node);
                                 cpg.connect_unique(
@@ -442,7 +442,7 @@ impl CfgExtractor {
                             }
                             values.push(SmallVec::new());
                         }
-                        CpgNodeKind::Continue => {
+                        CpgNodeKindTag::Continue => {
                             if let Some(loop_context) = ctx.loop_stack.last() {
                                 cpg.connect_unique(
                                     node,
@@ -452,7 +452,7 @@ impl CfgExtractor {
                             }
                             values.push(SmallVec::new());
                         }
-                        CpgNodeKind::Try if self.config.include_exceptions => {
+                        CpgNodeKindTag::Try if self.config.include_exceptions => {
                             let children = cpg.ast_children(node).to_vec();
                             let mut body = None;
                             let mut catches = Vec::new();
@@ -491,7 +491,7 @@ impl CfgExtractor {
                                 });
                             }
                         }
-                        CpgNodeKind::Throw if self.config.include_exceptions => {
+                        CpgNodeKindTag::Throw if self.config.include_exceptions => {
                             if let Some(&expression) = cpg.ast_children(node).first() {
                                 cpg.connect_unique(
                                     node,
@@ -505,8 +505,8 @@ impl CfgExtractor {
                                 values.push(SmallVec::new());
                             }
                         }
-                        CpgNodeKind::Throw => values.push(smallvec::smallvec![node]),
-                        CpgNodeKind::Call { .. } if self.config.include_call_edges => {
+                        CpgNodeKindTag::Throw => values.push(smallvec::smallvec![node]),
+                        CpgNodeKindTag::Call if self.config.include_call_edges => {
                             let arguments = cpg.ast_children(node).to_vec();
                             if let Some(&argument) = arguments.first() {
                                 cpg.connect_unique(

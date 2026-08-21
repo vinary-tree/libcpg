@@ -566,6 +566,162 @@ pub enum CpgNodeKind {
     },
 }
 
+/// Copy-sized discriminant for every [`CpgNodeKind`] variant.
+///
+/// Unlike [`crate::pattern::NodeKindTag`], which deliberately folds kinds not
+/// used by structural pattern templates into `Unknown`, this tag is a complete
+/// one-to-one classification. Analyses that only branch on a node variant can
+/// copy this single byte before mutating the graph instead of cloning the
+/// payload-bearing [`CpgNodeKind`].
+#[repr(u8)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+pub enum CpgNodeKindTag {
+    /// [`CpgNodeKind::Root`].
+    Root,
+    /// [`CpgNodeKind::Module`].
+    Module,
+    /// [`CpgNodeKind::Class`].
+    Class,
+    /// [`CpgNodeKind::Struct`].
+    Struct,
+    /// [`CpgNodeKind::Enum`].
+    Enum,
+    /// [`CpgNodeKind::Trait`].
+    Trait,
+    /// [`CpgNodeKind::Impl`].
+    Impl,
+    /// [`CpgNodeKind::Function`].
+    Function,
+    /// [`CpgNodeKind::Parameter`].
+    Parameter,
+    /// [`CpgNodeKind::Block`].
+    Block,
+    /// [`CpgNodeKind::Variable`].
+    Variable,
+    /// [`CpgNodeKind::Field`].
+    Field,
+    /// [`CpgNodeKind::Return`].
+    Return,
+    /// [`CpgNodeKind::If`].
+    If,
+    /// [`CpgNodeKind::Else`].
+    Else,
+    /// [`CpgNodeKind::While`].
+    While,
+    /// [`CpgNodeKind::For`].
+    For,
+    /// [`CpgNodeKind::Loop`].
+    Loop,
+    /// [`CpgNodeKind::Match`].
+    Match,
+    /// [`CpgNodeKind::MatchArm`].
+    MatchArm,
+    /// [`CpgNodeKind::Break`].
+    Break,
+    /// [`CpgNodeKind::Continue`].
+    Continue,
+    /// [`CpgNodeKind::Throw`].
+    Throw,
+    /// [`CpgNodeKind::Try`].
+    Try,
+    /// [`CpgNodeKind::Catch`].
+    Catch,
+    /// [`CpgNodeKind::Finally`].
+    Finally,
+    /// [`CpgNodeKind::BinaryOp`].
+    BinaryOp,
+    /// [`CpgNodeKind::UnaryOp`].
+    UnaryOp,
+    /// [`CpgNodeKind::Assignment`].
+    Assignment,
+    /// [`CpgNodeKind::Call`].
+    Call,
+    /// [`CpgNodeKind::MemberAccess`].
+    MemberAccess,
+    /// [`CpgNodeKind::IndexAccess`].
+    IndexAccess,
+    /// [`CpgNodeKind::Identifier`].
+    Identifier,
+    /// [`CpgNodeKind::Literal`].
+    Literal,
+    /// [`CpgNodeKind::Lambda`].
+    Lambda,
+    /// [`CpgNodeKind::Await`].
+    Await,
+    /// [`CpgNodeKind::Yield`].
+    Yield,
+    /// [`CpgNodeKind::TypeAnnotation`].
+    TypeAnnotation,
+    /// [`CpgNodeKind::GenericParam`].
+    GenericParam,
+    /// [`CpgNodeKind::Comment`].
+    Comment,
+    /// [`CpgNodeKind::Import`].
+    Import,
+    /// [`CpgNodeKind::Attribute`].
+    Attribute,
+    /// [`CpgNodeKind::Macro`].
+    Macro,
+    /// [`CpgNodeKind::Error`].
+    Error,
+    /// [`CpgNodeKind::Unknown`].
+    Unknown,
+}
+
+impl CpgNodeKind {
+    /// Returns this kind's complete copy-sized discriminant.
+    pub const fn tag(&self) -> CpgNodeKindTag {
+        match self {
+            Self::Root => CpgNodeKindTag::Root,
+            Self::Module { .. } => CpgNodeKindTag::Module,
+            Self::Class { .. } => CpgNodeKindTag::Class,
+            Self::Struct { .. } => CpgNodeKindTag::Struct,
+            Self::Enum { .. } => CpgNodeKindTag::Enum,
+            Self::Trait { .. } => CpgNodeKindTag::Trait,
+            Self::Impl { .. } => CpgNodeKindTag::Impl,
+            Self::Function { .. } => CpgNodeKindTag::Function,
+            Self::Parameter { .. } => CpgNodeKindTag::Parameter,
+            Self::Block { .. } => CpgNodeKindTag::Block,
+            Self::Variable { .. } => CpgNodeKindTag::Variable,
+            Self::Field { .. } => CpgNodeKindTag::Field,
+            Self::Return => CpgNodeKindTag::Return,
+            Self::If => CpgNodeKindTag::If,
+            Self::Else => CpgNodeKindTag::Else,
+            Self::While => CpgNodeKindTag::While,
+            Self::For => CpgNodeKindTag::For,
+            Self::Loop => CpgNodeKindTag::Loop,
+            Self::Match => CpgNodeKindTag::Match,
+            Self::MatchArm => CpgNodeKindTag::MatchArm,
+            Self::Break => CpgNodeKindTag::Break,
+            Self::Continue => CpgNodeKindTag::Continue,
+            Self::Throw => CpgNodeKindTag::Throw,
+            Self::Try => CpgNodeKindTag::Try,
+            Self::Catch => CpgNodeKindTag::Catch,
+            Self::Finally => CpgNodeKindTag::Finally,
+            Self::BinaryOp { .. } => CpgNodeKindTag::BinaryOp,
+            Self::UnaryOp { .. } => CpgNodeKindTag::UnaryOp,
+            Self::Assignment { .. } => CpgNodeKindTag::Assignment,
+            Self::Call { .. } => CpgNodeKindTag::Call,
+            Self::MemberAccess { .. } => CpgNodeKindTag::MemberAccess,
+            Self::IndexAccess => CpgNodeKindTag::IndexAccess,
+            Self::Identifier { .. } => CpgNodeKindTag::Identifier,
+            Self::Literal { .. } => CpgNodeKindTag::Literal,
+            Self::Lambda { .. } => CpgNodeKindTag::Lambda,
+            Self::Await => CpgNodeKindTag::Await,
+            Self::Yield => CpgNodeKindTag::Yield,
+            Self::TypeAnnotation { .. } => CpgNodeKindTag::TypeAnnotation,
+            Self::GenericParam { .. } => CpgNodeKindTag::GenericParam,
+            Self::Comment { .. } => CpgNodeKindTag::Comment,
+            Self::Import { .. } => CpgNodeKindTag::Import,
+            Self::Attribute { .. } => CpgNodeKindTag::Attribute,
+            Self::Macro { .. } => CpgNodeKindTag::Macro,
+            Self::Error { .. } => CpgNodeKindTag::Error,
+            Self::Unknown { .. } => CpgNodeKindTag::Unknown,
+        }
+    }
+}
+
 /// Literal value kinds.
 #[derive(Debug, Clone, PartialEq)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
@@ -821,6 +977,28 @@ mod tests {
         assert_eq!(NodeId::from(9u32).as_u32(), 9);
         assert_eq!(u32::from(NodeId::new(11)), 11);
         assert_eq!(NodeId::new(3), NodeId(3));
+    }
+
+    #[test]
+    fn complete_kind_tag_is_one_copy_byte() {
+        fn assert_copy<T: Copy>() {}
+        assert_copy::<CpgNodeKindTag>();
+        assert_eq!(std::mem::size_of::<CpgNodeKindTag>(), 1);
+        assert_eq!(CpgNodeKind::Else.tag(), CpgNodeKindTag::Else);
+        assert_eq!(CpgNodeKind::MatchArm.tag(), CpgNodeKindTag::MatchArm);
+        assert_eq!(CpgNodeKind::Finally.tag(), CpgNodeKindTag::Finally);
+        assert_eq!(CpgNodeKind::Await.tag(), CpgNodeKindTag::Await);
+        assert_eq!(
+            CpgNodeKind::TypeAnnotation {
+                type_info: TypeInfo::new("T"),
+            }
+            .tag(),
+            CpgNodeKindTag::TypeAnnotation,
+        );
+        assert_eq!(
+            CpgNodeKind::Unknown { kind: "x".into() }.tag(),
+            CpgNodeKindTag::Unknown,
+        );
     }
 
     #[test]
@@ -1321,6 +1499,17 @@ mod proptests {
             prop_assert!(!n.is_control_flow() || n.is_statement());
             // is_error iff the Error variant.
             prop_assert_eq!(n.is_error(), matches!(kind, CpgNodeKind::Error { .. }));
+        }
+
+        #[test]
+        fn prop_complete_tag_equality_matches_rust_discriminant(
+            left in arb_node_kind(),
+            right in arb_node_kind(),
+        ) {
+            prop_assert_eq!(
+                left.tag() == right.tag(),
+                std::mem::discriminant(&left) == std::mem::discriminant(&right),
+            );
         }
     }
 }

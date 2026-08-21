@@ -27,7 +27,7 @@ suffices:
 ```rust,ignore
 use libcpg::{
     CodePropertyGraph, CpgStats,
-    CpgNode, CpgNodeKind, LiteralKind,
+    CpgNode, CpgNodeKind, CpgNodeKindTag, LiteralKind,
     CpgEdge, CpgEdgeKind, CfgEdgeKind, DfgEdgeKind,
     NodeId, EdgeId, SourceRange,
     Language, Paradigm,
@@ -82,6 +82,7 @@ graph has `Language::Unknown`).
 | `add_node` | `fn add_node(&mut self, node: CpgNode) -> NodeId` | Assigns a fresh `NodeId`, overwriting `node.id`. Sets `root` if this is the first node. |
 | `add_node_with_id` | `fn add_node_with_id(&mut self, node: CpgNode) -> NodeId` | Keeps `node.id` (for reconstruction from serialized data). |
 | `node` | `fn node(&self, id: NodeId) -> Option<&CpgNode>` | Look up a node. Returns `Option`, **not** `Result`. |
+| `node_tag` | `fn node_tag(&self, id: NodeId) -> Option<CpgNodeKindTag>` | Copy the complete one-byte variant tag without cloning the kind's payload. |
 | `node_mut` | `fn node_mut(&mut self, id: NodeId) -> Option<&mut CpgNode>` | Mutable lookup. |
 | `contains_node` | `fn contains_node(&self, id: NodeId) -> bool` | Membership test. |
 | `nodes` | `fn nodes(&self) -> impl Iterator<Item = &CpgNode>` | Iterate all nodes. |
@@ -90,6 +91,14 @@ graph has `Language::Unknown`).
 
 > There is no `remove_node` / `remove_edge`: a CPG is built once and analyzed;
 > extraction stages *add* overlay edges rather than mutate topology in place.
+
+`CpgNodeKind::tag() -> CpgNodeKindTag` and the graph-level `node_tag` accessor
+classify all 45 variants one-to-one. They are intended for control-flow
+dispatch that needs no variant payload, particularly when a copied tag lets a
+caller release its immutable node borrow before mutating the graph. This
+complete tag is distinct from `libcpg::pattern::NodeKindTag`: the pattern tag is
+an intentionally coarser 29-way vocabulary that maps unsupported template
+kinds to `Unknown`.
 
 ### Edge operations
 

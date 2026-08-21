@@ -15,8 +15,8 @@ use serde::{Deserialize, Serialize};
 use super::serde_util::option_arc_str;
 
 use super::{
-    CfgEdgeKind, CpgEdge, CpgEdgeKind, CpgNode, CpgNodeKind, DfgEdgeKind, EdgeId, Language, NodeId,
-    SourceRange,
+    CfgEdgeKind, CpgEdge, CpgEdgeKind, CpgNode, CpgNodeKind, CpgNodeKindTag, DfgEdgeKind, EdgeId,
+    Language, NodeId, SourceRange,
 };
 
 /// A Code Property Graph combining AST, CFG, and DFG.
@@ -168,6 +168,14 @@ impl CodePropertyGraph {
         self.node_index_map
             .get(&id)
             .and_then(|&idx| self.graph.node_weight(idx))
+    }
+
+    /// Returns a node's complete copy-sized kind discriminant.
+    ///
+    /// This is the allocation-free choice when code only needs to branch on
+    /// the [`CpgNodeKind`] variant and must subsequently mutate the graph.
+    pub fn node_tag(&self, id: NodeId) -> Option<CpgNodeKindTag> {
+        self.node(id).map(|node| node.kind.tag())
     }
 
     /// Returns a mutable reference to a node by ID.
@@ -2070,6 +2078,16 @@ mod ext_tests {
         assert_eq!(g.edge_count(), 0);
         assert_eq!(g.language(), Language::Unknown);
         assert!(g.root().is_none());
+    }
+
+    #[test]
+    fn node_tag_is_total_for_present_nodes_and_absent_nodes_are_none() {
+        let mut g = CodePropertyGraph::new(Language::Rust);
+        let root = g.add_node(mk(CpgNodeKind::Root));
+        let function = g.add_node(mk(func("f")));
+        assert_eq!(g.node_tag(root), Some(CpgNodeKindTag::Root));
+        assert_eq!(g.node_tag(function), Some(CpgNodeKindTag::Function));
+        assert_eq!(g.node_tag(NodeId::new(999)), None);
     }
 }
 

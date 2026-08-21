@@ -177,6 +177,35 @@ definition or from a call site to its callee.
 construct becomes a typed node (carrying the original grammar kind string)
 rather than aborting construction.
 
+### Complete copy-sized kind tags
+
+`CpgNodeKind` carries payloads such as names, signatures, and types. When an
+analysis only needs the variant, `kind.tag()` returns the corresponding
+`CpgNodeKindTag`: a `Copy`, one-byte, 45-variant enum with a one-to-one mapping
+to the taxonomy above. The graph-level `cpg.node_tag(id)` combines lookup and
+classification and returns `None` for an unknown identifier.
+
+```rust
+use libcpg::{CodePropertyGraph, CpgNodeKindTag, NodeId};
+
+fn branches(cpg: &CodePropertyGraph, id: NodeId) -> bool {
+    matches!(
+        cpg.node_tag(id),
+        Some(CpgNodeKindTag::If | CpgNodeKindTag::Match)
+    )
+}
+```
+
+Copying a tag is useful when the next operation mutates the graph: it ends the
+immutable lookup borrow without cloning a payload-bearing `CpgNodeKind`.
+Payload-sensitive code should continue to match on `&node.kind`.
+
+Do not confuse `CpgNodeKindTag` with
+[`pattern::NodeKindTag`](../../api/pattern-reference.md#patterntemplate--constraints).
+The former preserves all 45 variants exactly; the latter is an intentionally
+coarse 29-way pattern-template vocabulary and maps kinds outside that
+vocabulary to `Unknown`.
+
 ### Literal kinds
 
 The `Literal` variant carries a `LiteralKind` (9 variants); the scalar kinds

@@ -83,6 +83,16 @@ kinds that have one), and the predicates `is_declaration`, `is_statement`,
 
 `Literal { kind }` carries a `LiteralKind`: `Integer(i64)`, `Float(f64)`, `String(Arc<str>)`, `Char(char)`, `Bool(bool)`, `Null`, `Array`, `Object`, `Regex(Arc<str>)`. Because kinds drive every query and every pattern/complexity heuristic, they are enumerated once here and reused everywhere — [`../components/graph/nodes.md`](../components/graph/nodes.md) walks each group with examples.
 
+Two tag projections serve different architectural roles. The crate-root
+`CpgNodeKindTag` is a complete, one-byte discriminant: `CpgNodeKind::tag()` and
+`CodePropertyGraph::node_tag()` preserve all 45 variants one-to-one so an
+extractor can dispatch without copying names, types, or signatures. In
+contrast, `pattern::NodeKindTag` is a deliberately lossy 29-way public
+vocabulary for pattern matching and similarity; variants outside that
+vocabulary project to `Unknown`. Analyses must choose the complete tag when
+variant identity affects semantics and the coarse tag only when abstraction is
+intentional.
+
 ### Supporting value types
 
 Several kinds embed richer records, all in the `graph` module:
