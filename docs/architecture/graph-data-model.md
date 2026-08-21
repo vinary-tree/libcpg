@@ -4,20 +4,30 @@ The [Code Property Graph](../GLOSSARY.md#code-property-graph-cpg) is one directe
 
 ## petgraph-backed storage
 
-`CodePropertyGraph` wraps a `petgraph::graph::DiGraph<CpgNode, CpgEdge>` and adds two index maps so that a stable identity survives graph mutation and serialization:
+`CodePropertyGraph` wraps a `petgraph::graph::DiGraph<CpgNode, CpgEdge>` and adds
+one node index map so that stable node identity survives graph mutation and
+serialization:
 
 ```text
 CodePropertyGraph (private fields)
 ├── graph:          petgraph DiGraph<CpgNode, CpgEdge>     ← the vertices and edges
 ├── node_index_map: FxHashMap<NodeId, NodeIndex>           ← stable NodeId → petgraph index
-├── edge_index_map: FxHashMap<EdgeId, (NodeIndex, NodeIndex)>
 ├── language:       Language
 ├── source_path / source_code: Option<Arc<str>>
 ├── root:           Option<NodeId>                          ← first node added
 └── cfg_entries / cfg_exits: Vec<NodeId>                    ← CFG boundary nodes
 ```
 
-The distinction between a `NodeId` and petgraph's `NodeIndex` is deliberate. `NodeId` is libcpg's public, stable identity: it is assigned monotonically, never reused, and is what appears in edges, pattern matches, and serialized graphs. petgraph's `NodeIndex` is an internal storage detail; the `FxHashMap` (from `rustc-hash`) bridges the two in $`O(1)`$. All the fields are private — callers interact through methods (`node_count`, `add_node`, `connect`, `node`, the traversal families, `stats`), documented in [`../api/graph-reference.md`](../api/graph-reference.md).
+The distinction between a `NodeId` and petgraph's `NodeIndex` is deliberate.
+`NodeId` is libcpg's public, stable identity: it is assigned monotonically,
+never reused, and appears in edges, pattern matches, and serialized graphs.
+petgraph's `NodeIndex` is an internal storage detail; the `FxHashMap` (from
+`rustc-hash`) bridges the two in $`O(1)`$. `EdgeId` is stored directly in each
+edge weight and assigned by the monotonic `next_edge_id` counter. There is no
+edge-id lookup API, so a second id-to-index map would be write-only duplicate
+storage. All fields are private; callers use methods (`node_count`, `add_node`,
+`connect`, `node`, the traversal families, `stats`) documented in the
+[API reference](../api/graph-reference.md).
 
 Building a graph by hand needs no Cargo features — this is the surface that always works, even under `default = []`:
 
@@ -48,7 +58,7 @@ pub struct CpgNode {
     pub message_kind: Option<MsgKind>,   // typed channel operation, if any
     pub lock_kind: Option<LockKind>,     // typed lock operation, if any
     pub allocation_type: Option<Box<TypeInfo>>, // nominal constructor result, if any
-    pub properties: FxHashMap<PropertyKey, PropertyValue>,
+    pub properties: Option<Box<FxHashMap<PropertyKey, PropertyValue>>>,
     pub children: SmallVec<[NodeId; 4]>, // AST child ids (inline for small arity)
     pub parent: Option<NodeId>,          // AST parent
 }
@@ -69,6 +79,9 @@ types are `Option<Box<TypeInfo>>`; and `TypeAnnotation.type_info` is
 `Box<TypeInfo>`. This makes common nodes dense without introducing shared
 ownership or lifetimes. The indirection is transparent to Serde's data model
 and to field reads through `Deref`; it affects Rust construction syntax only.
+The property map follows the same cold-payload rule: `None` is empty and the
+first `with_property` call creates the boxed map. Its Serde adapter continues
+to encode an empty map as `{}` and a populated map without wrapper layers.
 
 ### The 45 `CpgNodeKind` variants
 
@@ -120,9 +133,13 @@ pub struct CpgEdge {
     pub source: NodeId,
     pub target: NodeId,
     pub kind: CpgEdgeKind,
-    pub label: Option<String>,
+    pub label: Option<Box<str>>,
 }
 ```
+
+The label box is transparent to Serde and borrowed through `as_deref()`. It
+reduces the common unlabeled edge's inline layout without interning unrelated
+labels or adding shared ownership.
 
 Typed constructors keep call sites readable: `CpgEdge::ast_child`, `control_flow`, `data_flow`, `def_use`, `reference`, `call_site` (plus `new` and `with_label`). `is_forward()` reports whether an edge points "forward" (e.g. `AstParent`, `AstPrevSibling`, and `DataFlow(UseDef)` are the reverse-direction kinds).
 

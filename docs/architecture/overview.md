@@ -199,14 +199,30 @@ pub enum Error {
 }
 ```
 
-Note what is *fallible* and what is not: `build`, `build_from_tree`, and `build_file` return `Result`; the extractors do not — `CfgExtractor::extract`, `DfgExtractor::extract`, and `PdgBuilder::build` return `()` and degrade gracefully on malformed input rather than erroring. Graph lookups return `Option`, not `Result`: `cpg.node(id) -> Option<&CpgNode>`, `cpg.edge(id) -> Option<&CpgEdge>`.
+Note what is *fallible* and what is not: `build`, `build_from_tree`, and
+`build_file` return `Result`; the extractors do not—`CfgExtractor::extract`,
+`DfgExtractor::extract`, and `PdgBuilder::build` return `()` and degrade
+gracefully on malformed input rather than erroring. Node lookup returns
+`Option`, not `Result`: `cpg.node(id) -> Option<&CpgNode>`. Edges are read by
+endpoint or adjacency (`edges_between`, `incoming_edges`, `outgoing_edges`) or
+through the complete `edges()` iterator; there is deliberately no edge-id
+lookup API.
 
 ## Memory model
 
-The storage is [petgraph](../GLOSSARY.md#petgraph)-backed, with compact, sharing-friendly node payloads:
+The storage is [petgraph](../GLOSSARY.md#petgraph)-backed, with compact,
+sharing-friendly payloads:
 
-- `CodePropertyGraph` wraps a `petgraph::graph::DiGraph<CpgNode, CpgEdge>` plus two `FxHashMap`s (`rustc-hash`) that map the stable `NodeId`/`EdgeId` onto petgraph's internal `NodeIndex`/`EdgeIndex`. Stable ids survive graph mutation and (de)serialization; petgraph's indices are an implementation detail.
+- `CodePropertyGraph` wraps a `petgraph::graph::DiGraph<CpgNode, CpgEdge>` plus
+  one `FxHashMap` (`rustc-hash`) that maps stable `NodeId` values onto
+  petgraph's internal `NodeIndex`. Each edge carries its stable `EdgeId`
+  directly; no edge-id lookup API exists, so no duplicate edge map is stored.
+  Stable ids survive graph mutation and (de)serialization; petgraph's indices
+  are an implementation detail.
 - Node text and interned names are `Arc<str>` — atomically reference-counted shared string slices — so repeated identifiers and literals share one allocation rather than copying bytes.
+- Empty node properties allocate no map, and a present edge label is a boxed
+  string slice; their Serde adapters preserve the earlier map and string wire
+  shapes.
 - A node's AST child list is a `smallvec::SmallVec<[NodeId; 4]>`, keeping the common small-arity case allocation-free; source positions are six `u32`s in `SourceRange` (interoperable with `text-size`).
 
 This is the *actual* mechanism. The crate also declares `string_cache` and `ahash` as dependencies, but the hot paths use `Arc<str>` and `FxHashMap`; those two crates are not wired into the current code. The full storage model — the four overlays over one node set, and how AST child order is recovered — is the subject of [`graph-data-model.md`](graph-data-model.md).

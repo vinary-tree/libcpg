@@ -470,7 +470,7 @@ impl EdgeKey {
             source,
             target,
             kind: edge_kind_class(&edge.kind),
-            label: edge.label.clone(),
+            label: edge.label.as_deref().map(str::to_owned),
         }
     }
 }
@@ -516,7 +516,7 @@ fn changed_node_fields(
     if old.allocation_type != new.allocation_type {
         fields.push(NodeChangeField::AllocationType);
     }
-    if old.properties != new.properties {
+    if !property_maps_equal(&old.properties, &new.properties) {
         fields.push(NodeChangeField::Properties);
     }
     if !mapped_optional(old.parent, new.parent, old_to_new)
@@ -525,6 +525,17 @@ fn changed_node_fields(
         fields.push(NodeChangeField::AstLinks);
     }
     fields
+}
+
+fn property_maps_equal(
+    left: &Option<Box<FxHashMap<PropertyKey, PropertyValue>>>,
+    right: &Option<Box<FxHashMap<PropertyKey, PropertyValue>>>,
+) -> bool {
+    match (left.as_deref(), right.as_deref()) {
+        (Some(left), Some(right)) => left == right,
+        (Some(properties), None) | (None, Some(properties)) => properties.is_empty(),
+        (None, None) => true,
+    }
 }
 
 fn node_kinds_equivalent(
@@ -588,7 +599,9 @@ fn mapped_slice(old: &[NodeId], new: &[NodeId], old_to_new: &FxHashMap<NodeId, N
 fn snapshot_node(node: &CpgNode) -> DiffNode {
     let mut properties = node
         .properties
-        .iter()
+        .as_deref()
+        .into_iter()
+        .flatten()
         .map(|(key, value)| NodePropertyRecord {
             key: key.clone(),
             value: value.clone(),
@@ -631,7 +644,7 @@ fn snapshot_edge(edge: &CpgEdge) -> DiffEdge {
         source: edge.source,
         target: edge.target,
         kind: edge.kind.clone(),
-        label: edge.label.clone(),
+        label: edge.label.as_deref().map(str::to_owned),
     }
 }
 
@@ -726,6 +739,19 @@ mod tests {
         assert!(diff.changed.is_empty());
         assert_eq!(diff.classification, ChangeKind::Refactoring);
         assert_eq!((graph.node_count(), graph.edge_count()), shape);
+    }
+
+    #[test]
+    fn absent_and_explicitly_empty_property_maps_are_semantically_equal() {
+        let old = CpgNode::new(NodeId::new(1), CpgNodeKind::If, SourceRange::default());
+        let mut new = old.clone();
+        new.properties = Some(Box::default());
+        let old_to_new = FxHashMap::from_iter([(old.id, new.id)]);
+
+        assert_eq!(snapshot_node(&old), snapshot_node(&new));
+        assert!(
+            !changed_node_fields(&old, &new, &old_to_new).contains(&NodeChangeField::Properties)
+        );
     }
 
     #[test]
@@ -857,31 +883,26 @@ mod tests {
 
     #[test]
     fn node_snapshots_are_complete_and_property_order_is_canonical() {
-        let mut first = CpgNode::new(NodeId::new(1), CpgNodeKind::If, SourceRange::default());
-        first.properties.insert(
-            PropertyKey::Custom("zeta".into()),
-            PropertyValue::List(vec![PropertyValue::Int(1)]),
-        );
-        first
-            .properties
-            .insert(PropertyKey::Name, PropertyValue::String("name".into()));
-        first.properties.insert(
-            PropertyKey::Custom("alpha".into()),
-            PropertyValue::Bool(true),
-        );
-        let mut second = first.clone();
-        second.properties.clear();
-        second.properties.insert(
-            PropertyKey::Custom("alpha".into()),
-            PropertyValue::Bool(true),
-        );
-        second
-            .properties
-            .insert(PropertyKey::Name, PropertyValue::String("name".into()));
-        second.properties.insert(
-            PropertyKey::Custom("zeta".into()),
-            PropertyValue::List(vec![PropertyValue::Int(1)]),
-        );
+        let first = CpgNode::new(NodeId::new(1), CpgNodeKind::If, SourceRange::default())
+            .with_property(
+                PropertyKey::Custom("zeta".into()),
+                PropertyValue::List(vec![PropertyValue::Int(1)]),
+            )
+            .with_property(PropertyKey::Name, PropertyValue::String("name".into()))
+            .with_property(
+                PropertyKey::Custom("alpha".into()),
+                PropertyValue::Bool(true),
+            );
+        let second = CpgNode::new(NodeId::new(1), CpgNodeKind::If, SourceRange::default())
+            .with_property(
+                PropertyKey::Custom("alpha".into()),
+                PropertyValue::Bool(true),
+            )
+            .with_property(PropertyKey::Name, PropertyValue::String("name".into()))
+            .with_property(
+                PropertyKey::Custom("zeta".into()),
+                PropertyValue::List(vec![PropertyValue::Int(1)]),
+            );
 
         let first = snapshot_node(&first);
         let second = snapshot_node(&second);

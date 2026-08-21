@@ -7,6 +7,13 @@ exercised by every analysis module. Foundational: ADR-0003 (data flow),
 ADR-0004 (pattern matching), and the PDG/slicing layer all read and write the
 single graph this record describes.
 
+**Amended by T9.1 H05 (2026-08-21).** The original implementation also kept an
+`EdgeId`→petgraph-index map. A repository-wide reader proof found that it was
+only populated, cloned, reserved, and serialized; no API or analysis read it.
+The map was removed. Stable edge identity remains in each `CpgEdge`, and the
+monotonic edge counter still preserves explicit identifiers during
+reconstruction.
+
 ## Context
 
 A [Code Property Graph](../GLOSSARY.md#code-property-graph-cpg) (CPG), introduced
@@ -54,8 +61,6 @@ pub struct CodePropertyGraph {
     graph: DiGraph<CpgNode, CpgEdge>,
     /// Stable NodeId → petgraph NodeIndex.
     node_index_map: FxHashMap<NodeId, NodeIndex>,
-    /// Stable EdgeId → petgraph EdgeIndex.
-    edge_index_map: FxHashMap<EdgeId, EdgeIndex>,
     language: Language,
     // source_path, source_code, root, cfg_entries, cfg_exits …
 }
@@ -82,9 +87,10 @@ Three commitments follow from that shape:
    container.
 
 3. **Stable ids, decoupled from `petgraph`'s indices.** `NodeId(u32)` and
-   `EdgeId` are the public currency; the two `FxHashMap`s translate them to and
-   from `petgraph`'s internal `NodeIndex`/`EdgeIndex`. Callers hold `NodeId`s
-   that never shift under them.
+   `EdgeId(u32)` are the public currency. The node map translates public node
+   ids to petgraph `NodeIndex` values, while each edge weight carries its own
+   stable edge id. Callers hold `NodeId`s that never shift under them, and edge
+   reconstruction preserves explicit ids without a redundant lookup table.
 
 Navigation is exposed as **overlay-typed accessors** that each filter incident
 edges by class, so callers never hand-roll the filtering:
@@ -162,9 +168,11 @@ function's control-flow overlay — McCabe's metric, surfaced as
   [idempotent](../GLOSSARY.md#idempotent) and never delete nodes), so the hazard
   does not arise in practice. A future feature that removes nodes would have to
   respect the map.
-- **Two extra maps per graph.** The `node_index_map` and `edge_index_map` cost
-  one `FxHashMap` entry per node and per edge on top of `petgraph`'s own
-  storage — the price of decoupling public ids from internal indices.
+- **One extra map per graph.** The `node_index_map` costs one `FxHashMap` entry
+  per node on top of petgraph's own storage—the price of constant-time stable
+  node lookup. Edge ids remain stable but have no direct lookup API; a future
+  such API would need to justify and measure an index rather than silently
+  maintaining write-only state.
 
 ## Alternatives considered
 

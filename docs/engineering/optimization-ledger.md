@@ -370,6 +370,78 @@ accepted: substantially less inline and peak memory accompanied a net runtime
 improvement, while the documented allocation-count and dTLB-miss costs remain
 visible for future decisions.
 
+### T9.1 H05 — cold metadata and removal of an unread edge map
+
+**Hypothesis.** Every node stored an empty 32-byte `FxHashMap` header, every
+edge stored a 24-byte `String` option even though most edges were unlabeled,
+and `CodePropertyGraph` maintained an edge-id map that no query read. Lazy
+property allocation, a boxed string slice for present labels, and removal of
+the unread map should reduce node, edge, and graph storage without changing
+semantics or persistence.
+
+**Controlled change.** H05a changed
+`CpgNode.properties` to `Option<Box<FxHashMap<...>>>` and `CpgEdge.label` to
+`Option<Box<str>>`. `None` is the canonical empty property state and
+`with_property` allocates once on first insertion. A custom field adapter
+preserves the existing Serde map shape, including `{}` for empty properties;
+`Box<str>` preserves the existing string shape. H05b then removed
+`edge_index_map`. A repository-wide search proved that its only occurrences in
+production were declaration, capacity reservation, insertion, and cloning—no
+reader, lookup API, or analysis depended on it. Edge ids remain in edge
+weights, and `next_edge_id` still preserves explicit-id reconstruction.
+
+The oracles cover exact empty and populated property JSON, the canonical CPV1
+property bytes, 256-case lazy-map equivalence against an eager `FxHashMap`, a
+256-case arbitrary-label JSON round trip, explicit edge-id reconstruction,
+whole-graph serialization properties, an edge-sorted AST oracle, and the
+independent source-versus-tree builder property. Layout regressions use upper
+bounds because Rust layout is not a stable application binary interface.
+
+**Controlled construction result against committed H04.** Criterion measured
+20 samples after a one-second warm-up on performance-governed CPUs 0–1. The
+change column is Criterion's central comparison estimate; confidence intervals
+crossing the configured noise threshold are reported as no change.
+
+| Case | Before H05 | H05 | Time change | Throughput change |
+| --- | ---: | ---: | ---: | ---: |
+| construction, 1,000-node linear AST | 66.464 µs | 54.567 µs | -17.79% | +21.64% |
+| construction, 10,000-node linear AST | 834.800 µs | 644.450 µs | -22.60% | +29.20% |
+| construction, 49-line parser corpus | 336.210 µs | 335.920 µs | -0.12% (no change detected) | +0.12% |
+| construction, 514-line parser corpus | 6.091 ms | 6.093 ms | -0.68% (no change detected) | +0.68% |
+
+The displayed `time` interval and the change bootstrap are distinct Criterion
+estimators; near zero, their point signs can therefore differ. The confidence
+interval and Criterion verdict, not that sign, determine whether a change is
+claimed.
+
+H05a alone changed the release language-feature layouts from 168 to 144 bytes
+per `CpgNode` (-14.29%) and from 40 to 32 bytes per `CpgEdge` (-20.00%). It
+reduced total DHAT bytes by 4.00% and peak live DHAT bytes by 8.04% with exactly
+the same 175,416 allocations. Its 10,000-node construction case improved
+8.41%; the other three cases were within the noise threshold or had no detected
+change.
+
+After H05b, `CodePropertyGraph` fell from 216 to 184 bytes (-14.81%). Headless
+DHAT fell from 33,906,117 to 31,484,597 total bytes (-7.14%) and from 1,687,524
+to 1,445,372 peak live bytes (-14.35%). It recorded 175,406 allocations, ten
+fewer than H04 because the ten profile repetitions no longer allocate an edge
+map. Massif's page-accounting peak fell 2.32%, from 11,837,440 to 11,563,008
+bytes.
+
+The three-run perf profile was neutral in cycles (+0.05%), reduced retired
+instructions by 0.81%, and increased elapsed time by 1.82%; the latter conflicts
+with the longer Criterion construction result and is treated as process noise,
+not hidden. Page faults fell 9.40% and dTLB loads fell 32.55%. dTLB misses fell
+15.54%, but their 10.17–20.85% run variation prevents a causal claim. Peak RSS
+rose 4.86% and is likewise secondary to the exact layout and DHAT evidence.
+
+Against immutable `main`, the complete T9.1 tree improved the 1,000-node and
+10,000-node constructors by 32.73% and 35.03%, respectively, and the 49-line
+and 514-line parser cases by 6.98% and 6.88%. H05 is accepted: the common empty
+and unlabeled representations are materially smaller, the unread structure is
+gone, the synthetic construction paths are faster, and neither parser path
+regressed under the controlled comparison.
+
 ## Reproduce and compare
 
 The benchmark wrapper defaults to CPUs 0 and 1 and stores logs under

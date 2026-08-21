@@ -43,7 +43,8 @@ In `libcpg` this graph is the type `CodePropertyGraph`, which wraps a
 carries its identity `id: NodeId`, its label `kind: CpgNodeKind`, its
 [`SourceRange`](../GLOSSARY.md#code-property-graph-cpg), and its AST `children` /
 `parent`; a `CpgEdge` carries `id: EdgeId`, `source`, `target`, and
-`kind: CpgEdgeKind`. Storage and memory layout are described in
+`kind: CpgEdgeKind`, plus an optional boxed text label. Storage and memory
+layout are described in
 [`architecture/overview.md`](../architecture/overview.md) and
 [`components/graph/overview.md`](../components/graph/overview.md); this page stays at
 the level of the model.

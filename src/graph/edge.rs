@@ -257,8 +257,8 @@ pub struct CpgEdge {
     pub target: NodeId,
     /// Edge kind.
     pub kind: CpgEdgeKind,
-    /// Optional label for the edge.
-    pub label: Option<String>,
+    /// Optional label for the edge, boxed so unlabeled edges remain compact.
+    pub label: Option<Box<str>>,
 }
 
 impl CpgEdge {
@@ -274,7 +274,7 @@ impl CpgEdge {
     }
 
     /// Sets the edge label.
-    pub fn with_label(mut self, label: impl Into<String>) -> Self {
+    pub fn with_label(mut self, label: impl Into<Box<str>>) -> Self {
         self.label = Some(label.into());
         self
     }
@@ -464,6 +464,13 @@ mod tests {
         assert_eq!(cs.target, t);
     }
 
+    #[cfg(target_pointer_width = "64")]
+    #[test]
+    fn boxed_label_bounds_the_64_bit_edge_layout() {
+        let edge_bytes = std::mem::size_of::<CpgEdge>();
+        assert!(edge_bytes <= 32, "CpgEdge grew to {edge_bytes} bytes");
+    }
+
     #[test]
     fn is_forward_flags() {
         let s = NodeId::new(1);
@@ -500,6 +507,22 @@ mod proptests {
             prop_assert_eq!(EdgeId::from(x).as_u32(), x);
             prop_assert_eq!(u32::from(EdgeId::from(x)), x);
             prop_assert_eq!(EdgeId::new(x).as_u32(), x);
+        }
+
+        #[cfg(feature = "serde")]
+        #[test]
+        fn prop_boxed_label_preserves_wire_shape_and_round_trips(label in ".{0,64}") {
+            let edge = CpgEdge::new(
+                EdgeId::new(3),
+                NodeId::new(1),
+                NodeId::new(2),
+                CpgEdgeKind::CallSite,
+            )
+            .with_label(label.clone());
+            let json = serde_json::to_value(&edge).expect("serialize edge");
+            prop_assert_eq!(json["label"].as_str(), Some(label.as_str()));
+            let round_trip: CpgEdge = serde_json::from_value(json).expect("deserialize edge");
+            prop_assert_eq!(round_trip, edge);
         }
 
         #[test]

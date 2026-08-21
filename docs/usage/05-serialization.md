@@ -124,7 +124,13 @@ A snapshot like this also gives you a natural place to store your own metadata (
 
 ## Node properties: flat values, CPV1, and JSON keys
 
-`CpgNode` has a `properties: FxHashMap<PropertyKey, PropertyValue>` field.
+`CpgNode` has a cold
+`properties: Option<Box<FxHashMap<PropertyKey, PropertyValue>>>` field. `None`
+is the canonical empty state, and `with_property` allocates the map on first
+insertion. Its field adapter preserves the outer wire contract: empty
+properties serialize as `{}`, and a populated box serializes as the map itself.
+Callers borrow the optional map with `node.properties.as_deref()`.
+
 `PropertyValue` has logical string, signed, unsigned, boolean, float, list, and
 null forms, but owns lists as flat postorder node and edge tapes. Constructors
 retain their earlier spellings:

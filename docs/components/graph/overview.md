@@ -74,16 +74,15 @@ for the decision record.
 
 `CodePropertyGraph` is the container for a whole program (or file). It is backed
 by a [petgraph](../../GLOSSARY.md#petgraph) `DiGraph<CpgNode, CpgEdge>` — **not**
-by hand-rolled adjacency lists — plus two side tables that map `libcpg`'s stable
-identifiers to petgraph's internal indices. All fields are **private**; you
-interact with the graph exclusively through its methods.
+by hand-rolled adjacency lists — plus one side table that maps stable `NodeId`
+values to petgraph's internal indices. All fields are **private**; you interact
+with the graph exclusively through its methods.
 
 ```rust
 // Internal layout (all fields private — shown to explain the storage model).
 pub struct CodePropertyGraph {
     graph: DiGraph<CpgNode, CpgEdge>,                    // petgraph node/edge store
     node_index_map: FxHashMap<NodeId, NodeIndex>,        // stable NodeId → petgraph index
-    edge_index_map: FxHashMap<EdgeId, (NodeIndex, NodeIndex)>,
     language: Language,
     source_path: Option<Arc<str>>,
     source_code: Option<Arc<str>>,                       // retained only if requested
@@ -99,10 +98,12 @@ Why this design? petgraph gives `libcpg` a mature graph store and a stable
 `NodeIndex` model. Exact analyses operate on deterministic
 [`GraphProjection`](projections.md) CSR views; the [dominator engine](dominator-analysis.md)
 uses petgraph only as an independent test oracle. The
-`node_index_map` / `edge_index_map` tables let callers hold small, `Copy`,
-serialisation-friendly [`NodeId`](nodes.md#nodeid) / `EdgeId` handles while the
-graph internally uses petgraph indices — so an id survives being written to disk
-and read back, which a raw `NodeIndex` would not.
+`node_index_map` lets callers hold small, `Copy`, serialisation-friendly
+[`NodeId`](nodes.md#nodeid) handles while the graph internally uses petgraph
+indices. `EdgeId` is carried directly by every edge weight and assigned by a
+monotonic counter; because no edge-id lookup API exists, a parallel edge map
+would duplicate storage without serving a read. Both identifiers survive being
+written to disk and read back.
 
 The [centrality family](centrality-analysis.md) consumes those same projection
 views. It never replaces `CodePropertyGraph` storage with a parallel graph;
@@ -260,7 +261,7 @@ pub struct CpgNode {
     pub kind: CpgNodeKind,                 // e.g. Function { .. }, If, Call { .. }
     pub range: SourceRange,                // byte + line/col span
     pub text: Option<Arc<str>>,            // original source text, for terminals
-    pub properties: FxHashMap<PropertyKey, PropertyValue>,
+    pub properties: Option<Box<FxHashMap<PropertyKey, PropertyValue>>>,
     pub children: SmallVec<[NodeId; 4]>,   // AST children, in source order
     pub parent: Option<NodeId>,            // AST parent
 }
@@ -280,7 +281,7 @@ pub struct CpgEdge {
     pub source: NodeId,
     pub target: NodeId,
     pub kind: CpgEdgeKind,                  // AstChild | ControlFlow(..) | DataFlow(..) | ...
-    pub label: Option<String>,
+    pub label: Option<Box<str>>,
 }
 ```
 
@@ -300,14 +301,17 @@ helpers (`is_ast`, `is_cfg`, `is_dfg`, `is_pdg`, `is_call`, `is_type`).
   them in analysis work-lists is cheap.
 - **Shared text.** A node's `text` is an `Option<Arc<str>>`; cloning a node
   bumps a reference count instead of copying the string bytes.
+- **Cold metadata.** A node's property map is allocated only on first
+  insertion, and a present edge label is a boxed string slice. Empty properties
+  and unlabeled edges therefore pay only one pointer-sized optional field.
 - **Small inline children.** A node's AST `children` use a
   `SmallVec<[NodeId; 4]>`, so the common case of four or fewer children needs no
   heap allocation.
-- **Fast maps.** The id→index side tables use `rustc_hash::FxHashMap`, a fast
-  non-cryptographic hash suited to integer keys.
+- **Fast node lookup.** The `NodeId`→`NodeIndex` side table uses
+  `rustc_hash::FxHashMap`, a fast non-cryptographic hash suited to integer keys.
 
-Resolving an id to a node or its incident edges is an
-$`O(1)`$ map lookup followed by petgraph adjacency iteration.
+Resolving a node id or its incident edges is an $`O(1)`$ map lookup followed by
+petgraph adjacency iteration.
 
 ## Thread-safety
 

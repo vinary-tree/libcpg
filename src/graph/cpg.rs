@@ -32,8 +32,6 @@ pub struct CodePropertyGraph {
     graph: DiGraph<CpgNode, CpgEdge>,
     /// Map from NodeId to petgraph NodeIndex.
     node_index_map: FxHashMap<NodeId, NodeIndex>,
-    /// Map from EdgeId to (source NodeIndex, target NodeIndex).
-    edge_index_map: FxHashMap<EdgeId, (NodeIndex, NodeIndex)>,
     /// The programming language of the source code.
     language: Language,
     /// The source file path (if available).
@@ -75,7 +73,6 @@ impl CodePropertyGraph {
         Self {
             graph: DiGraph::with_capacity(node_capacity, edge_capacity),
             node_index_map: FxHashMap::with_capacity_and_hasher(node_capacity, Default::default()),
-            edge_index_map: FxHashMap::with_capacity_and_hasher(edge_capacity, Default::default()),
             language,
             source_path: None,
             source_code: None,
@@ -330,7 +327,6 @@ impl CodePropertyGraph {
         let replace_ast_parent =
             is_ast_child && self.appended_ast_parent_needs_update(target_idx, source);
         self.graph.add_edge(source_idx, target_idx, edge);
-        self.edge_index_map.insert(id, (source_idx, target_idx));
 
         if is_ast_child {
             self.index_appended_ast_child(source, target, replace_ast_parent);
@@ -354,7 +350,6 @@ impl CodePropertyGraph {
         self.next_edge_id = self.next_edge_id.max(id.0 + 1);
 
         self.graph.add_edge(source_idx, target_idx, edge);
-        self.edge_index_map.insert(id, (source_idx, target_idx));
 
         if is_ast_child {
             self.rebuild_ast_children(source);
@@ -1041,7 +1036,6 @@ impl Clone for CodePropertyGraph {
         Self {
             graph: self.graph.clone(),
             node_index_map: self.node_index_map.clone(),
-            edge_index_map: self.edge_index_map.clone(),
             language: self.language,
             source_path: self.source_path.clone(),
             source_code: self.source_code.clone(),
@@ -1370,16 +1364,25 @@ mod tests {
     use super::*;
 
     #[test]
-    fn capacity_constructor_reserves_graph_and_identifier_maps() {
+    fn capacity_constructor_reserves_graph_and_node_identifier_map() {
         let cpg = CodePropertyGraph::with_capacity(Language::Rust, 17, 23);
         let (node_capacity, edge_capacity) = cpg.graph.capacity();
 
         assert!(node_capacity >= 17, "petgraph node arena capacity");
         assert!(edge_capacity >= 23, "petgraph edge arena capacity");
         assert!(cpg.node_index_map.capacity() >= 17, "node id-map capacity");
-        assert!(cpg.edge_index_map.capacity() >= 23, "edge id-map capacity");
         assert_eq!(cpg.node_count(), 0);
         assert_eq!(cpg.edge_count(), 0);
+    }
+
+    #[cfg(target_pointer_width = "64")]
+    #[test]
+    fn graph_layout_excludes_the_unread_edge_identifier_map() {
+        let graph_bytes = std::mem::size_of::<CodePropertyGraph>();
+        assert!(
+            graph_bytes <= 184,
+            "CodePropertyGraph grew to {graph_bytes} bytes"
+        );
     }
     use crate::graph::{MethodSignature, Visibility};
 
@@ -2441,6 +2444,34 @@ mod serde_tests {
         assert_eq!(back.edge_count(), 2);
         assert_eq!(back.language(), Language::Rust);
         assert!(same_shape(&g, &back));
+    }
+
+    #[test]
+    fn serde_accepts_legacy_write_only_edge_map_field() {
+        let mut graph = CodePropertyGraph::new(Language::Rust);
+        let source = graph.add_node(CpgNode::new(
+            NodeId::new(0),
+            CpgNodeKind::Root,
+            SourceRange::default(),
+        ));
+        let target = graph.add_node(CpgNode::new(
+            NodeId::new(0),
+            CpgNodeKind::Return,
+            SourceRange::default(),
+        ));
+        graph.connect(source, target, CpgEdgeKind::AstChild);
+
+        let mut json = serde_json::to_value(&graph).expect("serialize graph");
+        let object = json.as_object_mut().expect("graph serializes as an object");
+        assert!(!object.contains_key("edge_index_map"));
+        object.insert(
+            "edge_index_map".to_owned(),
+            serde_json::json!({"0": [0, 1]}),
+        );
+
+        let restored: CodePropertyGraph =
+            serde_json::from_value(json).expect("deserialize legacy edge map field");
+        assert!(same_shape(&graph, &restored));
     }
 
     proptest! {

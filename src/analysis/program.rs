@@ -1021,7 +1021,7 @@ mod tests {
             .cpg
             .outgoing_edges(import)
             .filter(|edge| edge.kind == CpgEdgeKind::Imports)
-            .filter_map(|edge| edge.label.clone())
+            .filter_map(|edge| edge.label.as_deref().map(str::to_owned))
             .collect();
         assert_eq!(
             labels,

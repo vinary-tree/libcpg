@@ -1472,7 +1472,7 @@ pub struct CpgNode {
     pub message_kind: Option<MsgKind>,
     pub lock_kind: Option<LockKind>,
     pub allocation_type: Option<Box<TypeInfo>>,
-    pub properties: FxHashMap<PropertyKey, PropertyValue>,
+    pub properties: Option<Box<FxHashMap<PropertyKey, PropertyValue>>>,
     pub children: SmallVec<[NodeId; 4]>,
     pub parent: Option<NodeId>,
 }
@@ -1487,7 +1487,7 @@ pub struct CpgNode {
 | `message_kind` | `Option<MsgKind>` | Frontend-normalized channel action, orthogonal to syntax kind. |
 | `lock_kind` | `Option<LockKind>` | Frontend/adapter-normalized lock action, orthogonal to syntax kind. |
 | `allocation_type` | `Option<Box<TypeInfo>>` | Frontend-normalized nominal type allocated by this expression. |
-| `properties` | `FxHashMap<PropertyKey, PropertyValue>` | Extra metadata. |
+| `properties` | `Option<Box<FxHashMap<PropertyKey, PropertyValue>>>` | Extra metadata, allocated only when nonempty. |
 | `children` | `SmallVec<[NodeId; 4]>` | AST child ids (source order). |
 | `parent` | `Option<NodeId>` | AST parent id. |
 
@@ -1517,6 +1517,13 @@ rare, large payloads do not determine the inline size of every graph node.
 `var_type.as_deref()` when an API expects `Option<&TypeInfo>`. Serde treats the
 box as transparent: JSON and other data-model formats retain their prior wire
 shape and contain no wrapper object.
+
+The open-ended `properties` map is also cold. `None` is the canonical empty
+state; `with_property` allocates the map on first insertion. To inspect the
+public field, use `node.properties.as_deref()` and then ordinary map methods.
+Its custom Serde adapter preserves the earlier wire shape: an empty store is
+still `{}`, a nonempty store is still the map itself, and there is no option or
+box wrapper in serialized data.
 
 ---
 
@@ -1688,7 +1695,7 @@ pub struct CpgEdge {
     pub source: NodeId,
     pub target: NodeId,
     pub kind: CpgEdgeKind,
-    pub label: Option<String>,
+    pub label: Option<Box<str>>,
 }
 ```
 
@@ -1697,7 +1704,7 @@ pub struct CpgEdge {
 | Method | Signature | Notes |
 |--------|-----------|-------|
 | `new` | `fn new(id: EdgeId, source: NodeId, target: NodeId, kind: CpgEdgeKind) -> Self` | General constructor. |
-| `with_label` | `fn with_label(self, label: impl Into<String>) -> Self` | Builder: set a label. |
+| `with_label` | `fn with_label(self, label: impl Into<Box<str>>) -> Self` | Builder: set a label. |
 | `ast_child` | `fn ast_child(id: EdgeId, parent: NodeId, child: NodeId) -> Self` | `AstChild` edge. |
 | `control_flow` | `fn control_flow(id: EdgeId, from: NodeId, to: NodeId, kind: CfgEdgeKind) -> Self` | `ControlFlow(kind)` edge. |
 | `data_flow` | `fn data_flow(id: EdgeId, from: NodeId, to: NodeId, kind: DfgEdgeKind) -> Self` | `DataFlow(kind)` edge. |
@@ -1705,6 +1712,11 @@ pub struct CpgEdge {
 | `reference` | `fn reference(id: EdgeId, use_site: NodeId, def: NodeId) -> Self` | `Reference` edge. |
 | `call_site` | `fn call_site(id: EdgeId, call: NodeId, callee: NodeId) -> Self` | `CallSite` edge. |
 | `is_forward` | `fn is_forward(&self) -> bool` | `false` for `AstParent`, `AstPrevSibling`, `DataFlow(UseDef)`. |
+
+Most edges are unlabeled. A present label therefore uses `Box<str>` so an
+unlabeled edge does not carry a three-word `String` representation. Read it as
+`edge.label.as_deref() -> Option<&str>`. Serde represents the box as the same
+JSON string used by the former `Option<String>` field.
 
 > When you use [`connect`](#edge-operations) or `add_edge`, pass any `EdgeId`
 > (e.g. `EdgeId::new(0)`) — the graph reassigns it.

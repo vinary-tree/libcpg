@@ -33,8 +33,8 @@ pub struct CpgNode {
     pub lock_kind: Option<LockKind>,
     /// Nominal constructor result, when normalized.
     pub allocation_type: Option<Box<TypeInfo>>,
-    /// Extra key/value metadata.
-    pub properties: FxHashMap<PropertyKey, PropertyValue>,
+    /// Extra key/value metadata, allocated only when nonempty.
+    pub properties: Option<Box<FxHashMap<PropertyKey, PropertyValue>>>,
     /// AST children, in source order.
     pub children: SmallVec<[NodeId; 4]>,
     /// AST parent, if any.
@@ -167,9 +167,10 @@ definition or from a call site to its callee.
 Function signatures and node-owned type information are boxed because they are
 rare and substantially larger than the common unit or name-bearing variants.
 Without indirection, Rust sizes every `CpgNodeKind` for its largest variant and
-every graph node pays for that space. Boxing these cold payloads keeps the
-language-feature benchmark layout at 168 bytes per `CpgNode`, down from 592,
-while preserving ownership and exact semantics.
+every graph node pays for that space. Boxing these cold payloads first reduced
+the language-feature benchmark layout from 592 to 168 bytes per `CpgNode`;
+allocating the open property map only on first insertion reduces it further to
+144 bytes while preserving ownership and exact semantics.
 
 The box is visible in constructors but transparent to ordinary reads:
 
@@ -454,10 +455,11 @@ A `u32` newtype tagging lexical scopes, carried by `Block` and `Variable` nodes.
 
 ### Properties: `PropertyKey` / `PropertyValue`
 
-Beyond the typed fields above, a node can hold ad-hoc metadata in its
-`properties` map. Keys are a small enum with a `Custom` escape hatch. Values
-have seven logical forms but flat physical ownership, so logical list depth
-does not become Rust call-stack depth:
+Beyond the typed fields above, a node can hold ad-hoc metadata in its cold
+`properties` map. `None` is the canonical empty state, and `with_property`
+allocates the boxed map on first insertion. Keys are a small enum with a
+`Custom` escape hatch. Values have seven logical forms but flat physical
+ownership, so logical list depth does not become Rust call-stack depth:
 
 ```rust
 pub enum PropertyKey { Name, Type, Scope, Visibility, Mutable, Static, Async, Custom(Arc<str>) }
@@ -475,7 +477,11 @@ The historical constructor spellings remain. Scalar accessors and the borrowed
 ```rust
 use libcpg::{PropertyKey, PropertyValueKind};
 
-if let Some(v) = node.properties.get(&PropertyKey::Name) {
+if let Some(v) = node
+    .properties
+    .as_deref()
+    .and_then(|properties| properties.get(&PropertyKey::Name))
+{
     if let Some(name) = v.as_str() {
         println!("name property: {name}");
     }
@@ -489,6 +495,9 @@ if let PropertyValueKind::List(children) = value.kind() {
     }
 }
 ```
+
+The storage choice does not alter persistence: Serde writes `None` as the
+legacy empty map `{}` and a present box as the map itself.
 
 The node tape is postorder; a separate edge tape retains list order through
 checked ranges. Clone and drop are flat vector lifecycle operations, while

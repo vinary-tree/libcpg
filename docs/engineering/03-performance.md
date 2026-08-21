@@ -14,14 +14,16 @@ These are the choices the code actually makes, and why:
 | Concern | Choice | Why |
 | --- | --- | --- |
 | Graph storage | [`petgraph`](../GLOSSARY.md#petgraph) `DiGraph<CpgNode, CpgEdge>` | Mature, well-tested directed-graph store with stable `NodeIndex`/`EdgeIndex` handles. One store holds all four [overlays](../GLOSSARY.md#code-property-graph-cpg); exact analyses use normalized `GraphProjection` CSR views. |
-| Id → index maps | `rustc_hash::FxHashMap` / `FxHashSet` | The CPG keeps `NodeId → NodeIndex` (and edge) maps for O(1)-expected lookup. `FxHash` is a fast, non-cryptographic hasher — a good fit because keys are library-assigned `u32` ids, not attacker-controlled strings. (Security implications: [`security/01`](../security/01-input-and-resource-hardening.md).) |
+| Node id → index map | `rustc_hash::FxHashMap` | The CPG keeps one `NodeId → NodeIndex` map for O(1)-expected lookup. `EdgeId` remains in each edge weight; because there is no edge-id lookup API, no duplicate edge map is maintained. `FxHash` is a fast, non-cryptographic hasher—a good fit because keys are library-assigned `u32` ids, not attacker-controlled strings. (Security implications: [`security/01`](../security/01-input-and-resource-hardening.md).) |
 | Per-node child lists | `smallvec::SmallVec<[NodeId; 4]>` | `CpgNode::children` stores up to four child ids **inline**, with no heap allocation — the common case for AST fan-out — spilling to the heap only for wider nodes. |
+| Cold metadata | `Option<Box<FxHashMap<…>>>` / `Option<Box<str>>` | Empty node properties and unlabeled edges retain pointer-sized optional fields; maps and label text allocate only when present. |
 | Shared source text | `std::sync::Arc<str>` | `CpgNode::text`, operator strings, and string/regex literal payloads are `Arc<str>`: immutable, shared, and cloned in O(1) by bumping a refcount instead of copying bytes. |
 | Source positions | `text-size` `TextRange` | `SourceRange` stores six `u32` offsets compactly; `to_text_range()` converts to `text_size::TextRange` for callers that use that ecosystem. |
 | Error handling | `thiserror` | Derives the [`Error`](../GLOSSARY.md#code-property-graph-cpg) enum without hand-written boilerplate. |
 
-The upshot: a CPG is one contiguous petgraph arena of `CpgNode`/`CpgEdge` values,
-with small inline child vectors and refcounted text, indexed by fast hash maps.
+The upshot: a CPG is one contiguous petgraph arena of compact
+`CpgNode`/`CpgEdge` values, with small inline child vectors, cold boxed metadata,
+refcounted text, and one fast node-id map.
 
 ## Dependencies declared but not yet wired
 

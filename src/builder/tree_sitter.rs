@@ -1074,7 +1074,10 @@ mod proptests {
                 prop_assert_eq!(tree_node.range, source_node.range);
                 prop_assert_eq!(&tree_node.text, &source_node.text);
                 prop_assert_eq!(&tree_node.allocation_type, &source_node.allocation_type);
-                prop_assert_eq!(&tree_node.properties, &source_node.properties);
+                prop_assert_eq!(
+                    tree_node.properties.as_deref(),
+                    source_node.properties.as_deref()
+                );
                 prop_assert_eq!(&tree_node.children, &source_node.children);
                 prop_assert_eq!(tree_node.parent, source_node.parent);
             }

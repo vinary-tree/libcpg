@@ -13,6 +13,36 @@ use serde::{Deserialize, Serialize};
 #[cfg(feature = "serde")]
 use super::serde_util::{arc_str, option_arc_str, smallvec_arc_str_2};
 
+#[cfg(feature = "serde")]
+mod boxed_properties {
+    use super::{PropertyKey, PropertyValue};
+    use rustc_hash::FxHashMap;
+    use serde::{Deserialize, Deserializer, Serialize, Serializer};
+
+    pub fn serialize<S>(
+        properties: &Option<Box<FxHashMap<PropertyKey, PropertyValue>>>,
+        serializer: S,
+    ) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        match properties {
+            Some(properties) => properties.serialize(serializer),
+            None => FxHashMap::<PropertyKey, PropertyValue>::default().serialize(serializer),
+        }
+    }
+
+    pub fn deserialize<'de, D>(
+        deserializer: D,
+    ) -> Result<Option<Box<FxHashMap<PropertyKey, PropertyValue>>>, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        let properties = FxHashMap::deserialize(deserializer)?;
+        Ok((!properties.is_empty()).then(|| Box::new(properties)))
+    }
+}
+
 /// Unique identifier for a node in the CPG.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
@@ -790,8 +820,9 @@ pub struct CpgNode {
         serde(default, skip_serializing_if = "Option::is_none")
     )]
     pub allocation_type: Option<Box<TypeInfo>>,
-    /// Additional properties.
-    pub properties: FxHashMap<PropertyKey, PropertyValue>,
+    /// Additional properties, allocated only when nonempty.
+    #[cfg_attr(feature = "serde", serde(default, with = "boxed_properties"))]
+    pub properties: Option<Box<FxHashMap<PropertyKey, PropertyValue>>>,
     /// AST children (indices into the node array).
     pub children: SmallVec<[NodeId; 4]>,
     /// Parent node (if any).
@@ -809,7 +840,7 @@ impl CpgNode {
             message_kind: None,
             lock_kind: None,
             allocation_type: None,
-            properties: FxHashMap::default(),
+            properties: None,
             children: SmallVec::new(),
             parent: None,
         }
@@ -841,7 +872,9 @@ impl CpgNode {
 
     /// Adds a property.
     pub fn with_property(mut self, key: PropertyKey, value: PropertyValue) -> Self {
-        self.properties.insert(key, value);
+        self.properties
+            .get_or_insert_with(|| Box::new(FxHashMap::default()))
+            .insert(key, value);
         self
     }
 
@@ -1006,8 +1039,8 @@ mod tests {
     #[test]
     fn boxed_node_payloads_bound_the_64_bit_node_layout() {
         let node_bytes = std::mem::size_of::<CpgNode>();
-        assert!(node_bytes <= 168, "CpgNode grew to {node_bytes} bytes");
-        assert!(node_bytes < 3 * 64);
+        assert!(node_bytes <= 144, "CpgNode grew to {node_bytes} bytes");
+        assert!(node_bytes < 5 * 32);
     }
 
     #[test]
@@ -1182,7 +1215,8 @@ mod tests {
         assert_eq!(n.parent, Some(NodeId::new(0)));
         assert_eq!(
             n.properties
-                .get(&PropertyKey::Name)
+                .as_deref()
+                .and_then(|properties| properties.get(&PropertyKey::Name))
                 .and_then(|v| v.as_str()),
             Some("x")
         );
@@ -1520,6 +1554,39 @@ mod proptests {
                 std::mem::discriminant(&left) == std::mem::discriminant(&right),
             );
         }
+
+        #[test]
+        fn prop_cold_properties_match_an_eager_map(
+            entries in prop::collection::vec((0u8..8, any::<i64>()), 0..64),
+        ) {
+            let mut node = CpgNode::new(
+                NodeId::new(0),
+                CpgNodeKind::Root,
+                SourceRange::default(),
+            );
+            let mut expected = FxHashMap::default();
+
+            for (tag, value) in entries {
+                let key = match tag {
+                    0 => PropertyKey::Name,
+                    1 => PropertyKey::Type,
+                    2 => PropertyKey::Scope,
+                    3 => PropertyKey::Visibility,
+                    4 => PropertyKey::Mutable,
+                    5 => PropertyKey::Static,
+                    6 => PropertyKey::Async,
+                    _ => PropertyKey::Custom("generated".into()),
+                };
+                expected.insert(key.clone(), PropertyValue::Int(value));
+                node = node.with_property(key, PropertyValue::Int(value));
+            }
+
+            if expected.is_empty() {
+                prop_assert!(node.properties.is_none());
+            } else {
+                prop_assert_eq!(node.properties.as_deref(), Some(&expected));
+            }
+        }
     }
 }
 
@@ -1656,6 +1723,29 @@ mod serde_tests {
                 }
             })
         );
+    }
+
+    #[test]
+    fn boxed_properties_preserve_the_json_wire_shape() {
+        let empty = CpgNode::new(NodeId::new(1), CpgNodeKind::Root, SourceRange::default());
+        let empty_json = serde_json::to_value(&empty).expect("serialize empty properties");
+        assert_eq!(empty_json["properties"], serde_json::json!({}));
+        let empty_back: CpgNode =
+            serde_json::from_value(empty_json).expect("deserialize empty properties");
+        assert!(empty_back.properties.is_none());
+
+        let populated = empty.with_property(PropertyKey::Name, PropertyValue::Int(7));
+        let populated_json =
+            serde_json::to_value(&populated).expect("serialize populated properties");
+        assert_eq!(
+            populated_json["properties"],
+            serde_json::json!({
+                "Name": [67, 80, 86, 1, 1, 0, 0, 0, 0, 0, 0, 0, 2, 7, 0, 0, 0, 0, 0, 0, 0]
+            })
+        );
+        let populated_back: CpgNode =
+            serde_json::from_value(populated_json).expect("deserialize populated properties");
+        assert_eq!(populated_back.properties, populated.properties);
     }
 
     #[test]

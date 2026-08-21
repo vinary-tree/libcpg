@@ -26,12 +26,17 @@ pub struct CpgEdge {
     pub target: NodeId,
     /// The typed relationship.
     pub kind: CpgEdgeKind,
-    /// Optional human-readable label.
-    pub label: Option<String>,
+    /// Optional human-readable label, boxed when present.
+    pub label: Option<Box<str>>,
 }
 
 pub struct EdgeId(pub u32);   // NodeId's sibling: EdgeId::new(u32), .as_u32(), From<u32>
 ```
+
+Most edges have no label. `Option<Box<str>>` therefore keeps the unlabeled
+inline representation smaller than `Option<String>` while retaining owned
+UTF-8 text. `edge.label.as_deref()` borrows it as `Option<&str>`, and Serde
+continues to encode a present label as an ordinary string.
 
 ## The edge-kind taxonomy
 

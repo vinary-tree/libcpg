@@ -1243,7 +1243,8 @@ fn declared_type(node: &CpgNode) -> Option<Arc<str>> {
 
 fn property_type(node: &CpgNode) -> Option<Arc<str>> {
     node.properties
-        .get(&PropertyKey::Type)
+        .as_deref()
+        .and_then(|properties| properties.get(&PropertyKey::Type))
         .and_then(PropertyValue::as_str)
         .map(Arc::from)
 }
