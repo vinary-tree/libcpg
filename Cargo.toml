@@ -279,6 +279,38 @@ name = "program_merge"
 harness = false
 
 [[bench]]
+name = "traversal_primitives"
+harness = false
+
+[[bench]]
+name = "dfg_extraction"
+harness = false
+required-features = ["lang-rust"]
+
+[[bench]]
+name = "pdg_construction"
+harness = false
+required-features = ["lang-rust"]
+
+[[bench]]
+name = "pattern_vf2"
+harness = false
+
+[[bench]]
+name = "similarity_wl"
+harness = false
+
+[[bench]]
+name = "analyze_corpus"
+harness = false
+required-features = ["lang-rust", "lang-python", "lang-javascript", "lang-go", "lang-c"]
+
+[[bench]]
+name = "profile_workloads"
+harness = false
+required-features = ["lang-rust", "lang-python", "lang-javascript", "lang-go", "lang-c"]
+
+[[bench]]
 name = "ifds_summaries"
 harness = false
 

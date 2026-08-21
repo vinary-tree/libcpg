@@ -26,6 +26,34 @@ fn benchmark_cpg_construction(c: &mut Criterion) {
         );
     }
 
+    #[cfg(feature = "lang-rust")]
+    {
+        use libcpg::{CpgBuilder, TreeSitterCpgBuilder};
+
+        for corpus in [support::RUST_SMALL, support::RUST_MEDIUM] {
+            let oracle = TreeSitterCpgBuilder::new()
+                .build(corpus.source, corpus.language)
+                .expect("parser-backed construction oracle");
+            assert!(oracle.node_count() > 0, "parsed corpus node oracle");
+            assert!(oracle.edge_count() > 0, "parsed corpus edge oracle");
+
+            group.throughput(Throughput::Elements(oracle.node_count() as u64));
+            group.bench_with_input(
+                BenchmarkId::new("tree_sitter_rust", corpus.name),
+                &corpus,
+                |benchmark, corpus| {
+                    benchmark.iter(|| {
+                        black_box(
+                            TreeSitterCpgBuilder::new()
+                                .build(black_box(corpus.source), corpus.language)
+                                .expect("benchmark corpus remains valid"),
+                        )
+                    });
+                },
+            );
+        }
+    }
+
     group.finish();
 }
 

@@ -91,6 +91,18 @@ fn benchmark_scc_analysis(c: &mut Criterion) {
     for node_count in [1_000, 10_000] {
         for shape in [GraphShape::Path, GraphShape::Ring, GraphShape::Clustered] {
             let cpg = call_graph(node_count, shape);
+            let oracle = call_graph_sccs(&cpg);
+            let expected_components = match shape {
+                GraphShape::Path => node_count,
+                GraphShape::Ring => 1,
+                GraphShape::Clustered => node_count.div_ceil(8),
+            };
+            assert_eq!(oracle.node_count(), node_count, "SCC partition node oracle");
+            assert_eq!(
+                oracle.components.len(),
+                expected_components,
+                "SCC component-count oracle"
+            );
             group.throughput(Throughput::Elements(node_count as u64));
             group.bench_with_input(
                 BenchmarkId::new(shape.name(), node_count),
