@@ -2,6 +2,7 @@
 name = "libcpg"
 version = "0.1.1"
 edition = "2021"
+autobenches = false
 authors = ["Dylon Edwards <dylon@f1r3fly.io>"]
 description = "Code Property Graph library for program analysis, pattern detection, and semantic code understanding"
 license = "MIT OR Apache-2.0"
@@ -305,9 +306,9 @@ name = "analyze_corpus"
 harness = false
 required-features = ["lang-rust", "lang-python", "lang-javascript", "lang-go", "lang-c"]
 
-[[bench]]
+[[example]]
 name = "profile_workloads"
-harness = false
+path = "benches/profile_workloads.rs"
 required-features = ["lang-rust", "lang-python", "lang-javascript", "lang-go", "lang-c"]
 
 [[bench]]

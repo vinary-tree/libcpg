@@ -23,7 +23,8 @@ long balance(const ledger_t *ledger, int account) {
 }
 
 bool transfer(ledger_t *ledger, int sender, int receiver, long amount) {
-    if (amount <= 0 || balance(ledger, sender) < amount) {
+    if (amount <= 0 || balance(ledger, sender) < amount ||
+        ledger->length + 2 > ledger->capacity) {
         return false;
     }
     ledger->entries[ledger->length++] = (entry_t){sender, -amount};

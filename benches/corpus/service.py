@@ -3,8 +3,8 @@ class Ledger:
         self.entries = []
 
     def credit(self, account, amount):
-        if amount <= 0:
-            raise ValueError("amount must be positive")
+        if amount == 0:
+            raise ValueError("amount must be nonzero")
         self.entries.append((account, amount))
 
     def balance(self, account):
