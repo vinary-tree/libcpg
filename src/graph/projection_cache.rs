@@ -6,7 +6,7 @@
 //! target so [`CodePropertyGraph::edges_between`](super::CodePropertyGraph::edges_between)
 //! is a pair of binary searches followed by a borrowed slice walk.
 
-use std::{fmt, ops::Index};
+use std::{fmt, ops::Index, sync::OnceLock};
 
 use petgraph::graph::{DiGraph, EdgeIndex, NodeIndex};
 
@@ -302,6 +302,7 @@ impl EdgeCsr {
 #[derive(Debug)]
 pub(crate) struct CpgProjectionCache {
     node_indices: Vec<usize>,
+    dense_node_metadata: OnceLock<Box<DenseNodeMetadata>>,
     forward: EdgeCsr,
     reverse: EdgeCsr,
     by_target: EdgeCsr,
@@ -353,10 +354,81 @@ impl CpgProjectionCache {
 
         Self {
             node_indices,
+            dense_node_metadata: OnceLock::new(),
             forward,
             reverse,
             by_target,
             by_target_nodes,
+        }
+    }
+
+    pub(crate) fn dense_nodes(&self, graph: &DiGraph<CpgNode, CpgEdge>) -> DenseNodeView<'_> {
+        let metadata = self
+            .dense_node_metadata
+            .get_or_init(|| Box::new(self.build_dense_node_metadata(graph)));
+        DenseNodeView {
+            ids: &metadata.ids,
+            unique_out_degree: &metadata.outgoing,
+            unique_in_degree: &metadata.incoming,
+        }
+    }
+
+    fn build_dense_node_metadata(&self, graph: &DiGraph<CpgNode, CpgEdge>) -> DenseNodeMetadata {
+        let ids: Vec<_> = self
+            .node_indices
+            .iter()
+            .map(|&index| {
+                graph
+                    .node_weight(NodeIndex::new(index))
+                    .expect("a projection-cache node index resolves until mutation")
+                    .id
+            })
+            .collect();
+        let raw_node_bound = self
+            .node_indices
+            .iter()
+            .copied()
+            .max()
+            .map_or(0, |index| index + 1);
+        let mut dense_by_raw_node = vec![u32::MAX; raw_node_bound];
+        for (dense_index, &raw_index) in self.node_indices.iter().enumerate() {
+            dense_by_raw_node[raw_index] =
+                u32::try_from(dense_index).expect("a dense node index fits u32");
+        }
+        let mut outgoing = vec![0u32; ids.len()];
+        let mut incoming = vec![0u32; ids.len()];
+        for (dense_source, &graph_source) in self.node_indices.iter().enumerate() {
+            let (start, end) = self.by_target.row_bounds(graph_source);
+            let mut previous = None;
+            for offset in start..end {
+                let target = self.by_target_nodes[offset];
+                if previous == Some(target) {
+                    continue;
+                }
+                outgoing[dense_source] = outgoing[dense_source]
+                    .checked_add(1)
+                    .expect("CPG unique out-degree exceeds the u32 projection domain");
+                let edge = EdgeIndex::new(self.by_target.indices[offset] as usize);
+                let (_, raw_target) = graph
+                    .edge_endpoints(edge)
+                    .expect("a cached edge index resolves until mutation");
+                let dense_target = dense_by_raw_node[raw_target.index()];
+                assert_ne!(
+                    dense_target,
+                    u32::MAX,
+                    "a cached edge target has dense node metadata"
+                );
+                let dense_target = dense_target as usize;
+                incoming[dense_target] = incoming[dense_target]
+                    .checked_add(1)
+                    .expect("CPG unique in-degree exceeds the u32 projection domain");
+                previous = Some(target);
+            }
+        }
+        DenseNodeMetadata {
+            ids,
+            outgoing,
+            incoming,
         }
     }
 
@@ -441,6 +513,21 @@ impl CpgProjectionCache {
             layer_slice(graph, self.forward.row(node_index), layer),
         )
     }
+}
+
+/// Deterministic dense node metadata aligned by ascending [`NodeId`].
+#[derive(Debug, Clone, Copy)]
+pub(crate) struct DenseNodeView<'a> {
+    pub(crate) ids: &'a [NodeId],
+    pub(crate) unique_out_degree: &'a [u32],
+    pub(crate) unique_in_degree: &'a [u32],
+}
+
+#[derive(Debug)]
+struct DenseNodeMetadata {
+    ids: Vec<NodeId>,
+    outgoing: Vec<u32>,
+    incoming: Vec<u32>,
 }
 
 #[derive(Debug, Clone, Copy)]

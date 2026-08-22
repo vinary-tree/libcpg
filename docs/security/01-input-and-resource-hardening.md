@@ -388,8 +388,10 @@ never support a complete negative claim. See the
 
 [VF2](../GLOSSARY.md#vf2) subgraph isomorphism is worst-case super-exponential—
 $`O(N!\,N)`$—so on adversarial graphs the search space is the concern. Its typed
-heap-frame driver makes search depth independent of the native call stack, but stack
-safety is not a time or heap-work budget. Three controls constrain exposure:
+heap-frame driver makes search depth independent of the native call stack. Dense mapping
+arrays, Fenwick-ordered sets, and flat terminal-delta logs are also heap-resident; checked
+`u32` conversion prevents a sentinel collision. Stack safety is not a time or heap-work
+budget. Three controls constrain exposure:
 
 - **`with_max_matches(n)`** stops after emitting `n` matches (`0` means unlimited,
   the default). Set it to a small number—or `1` for an existence query—to avoid
@@ -400,6 +402,13 @@ safety is not a time or heap-work budget. Three controls constrain exposure:
 - **Graph admission and deadlines** supply the actual hostile-input work boundary.
   Bound pattern and target node/edge counts before matching, and enforce an outer
   deadline when latency must be guaranteed.
+
+The distinct predecessor/successor prune counts unique directed endpoints. It is sound
+for the current non-induced existential multiedge relation, but it is not a complete work
+cap: highly symmetric compatible graphs can still expose factorial search. The fully lazy
+dense node view avoids charging graphs that never invoke VF2. See
+[ADR-0057](../design/0057-dense-stack-safe-vf2-state.md) and
+[validation 52](../scientific/52-dense-vf2-validation.md).
 
 ```rust
 // requires: no features (pattern module is always compiled)

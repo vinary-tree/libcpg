@@ -99,7 +99,7 @@ function scope.
 | Loop induction | at most $`C+1`$ invariant rounds after candidate-use summary construction; $`O(D)`$ expression heap state | Typed postorder frames memoize ordinary nested use summaries independent of node-id order; malformed cycles use exact iterative reachability. Typed affine/sign continuations retain logical depth $`D`$ on the heap, while the affine semantic budget remains three. A parent-before-child public 100,000-operator step completes on 256 KiB. |
 | Evidence-aware complexity | provider cost plus $`O(L + R)`$ composition | Computes the legacy AST fallback, validated function scope, loop forest/dominance, and induction report; then formats $`L`$ loops and combines $`R`$ recursion sites. Provider worst cases are documented with loop and induction analysis. |
 | [`backward_slice`](../GLOSSARY.md#backward-slice--forward-slice) / `forward_slice` | $`O(V + E)`$, capped at `max_nodes` | Breadth-first over PDG edges; returns as soon as the slice reaches `max_nodes`. |
-| [VF2](../GLOSSARY.md#vf2) `find_matches` | worst case $`O(N!\,N)`$ time and $`O(PT)`$ search-frame heap space | $`P`$ and $`T`$ are pattern and target nodes. Feasibility prunes in practice; `max_matches` bounds emitted results but cannot bound a no-match search. Typed candidate/cursor frames make native call depth constant; the public 100,000-node path gate completes on a 256 KiB stack. See [`theory/05-subgraph-isomorphism-vf2.md`](../theory/05-subgraph-isomorphism-vf2.md). |
+| [VF2](../GLOSSARY.md#vf2) `find_matches` | worst case $`O(N!\,N)`$ time; $`O(P+T+E_P+E_T)`$ auxiliary heap on a live branch | $`P`$ and $`T`$ are pattern and target nodes. Lazy dense metadata and mappings are linear; flat terminal deltas are edge-linear; cursor-only search frames are $`O(P)`$. Fenwick selection is logarithmic, and distinct directed-degree pruning is necessary but cannot bound a no-match search. `max_matches` bounds only emitted results. Native call depth is constant; the public 100,000-node path gate completes on a 256 KiB stack. See [`theory/05-subgraph-isomorphism-vf2.md`](../theory/05-subgraph-isomorphism-vf2.md). |
 | [Jaccard](../GLOSSARY.md#jaccard-similarity) similarity | $`O(V_1 + V_2)`$ | Over the two graphs' node-kind multisets. |
 | Weisfeiler-Lehman similarity | $`O(k(V + E))`$ | $`k = 3`$ label-refinement rounds. |
 | Bipartite GED upper bound | $`O(N^3+E_1+E_2)`$ time, $`O(N^2+E_1+E_2)`$ space | Two deterministic Hungarian solves plus concrete typed-edge script evaluation; each input is capped at 512 nodes, beyond which a flagged linear surrogate is returned. |
@@ -172,8 +172,10 @@ before Criterion enters the timed loop:
   parser-built Rust templates after requiring represented dependence evidence;
 - `pattern_matching` measures bounded VF2 matching over 256- and 4,096-node
   paths;
-- `pattern_vf2` is the T9 canonical VF2 baseline over the same size classes,
-  with an exact one-match cap oracle;
+- `pattern_vf2` is the T9 canonical VF2 search benchmark over the same size
+  classes, with an exact one-match cap oracle; its Criterion fixture and
+  search-only profile retain constructed graphs so candidate-state cost is not
+  obscured by construction;
 - `dataflow_liveness` measures backward-May liveness over 512- and 4,096-node
   chains, 64- and 512-rung diamond ladders, and 128- and 1,024-node nested-loop
   families;

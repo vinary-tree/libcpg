@@ -984,8 +984,20 @@ mod matching {
         let cpg = TreeSitterCpgBuilder::new()
             .build("fn g(a: i32) -> i32 { a * 2 }", Language::Rust)
             .expect("build");
-        let matches = Vf2Matcher::new().find_matches(&cpg, &cpg);
-        assert!(!matches.is_empty(), "a graph matches itself");
+        let before = (cpg.node_count(), cpg.edge_count());
+        let matcher = Vf2Matcher::new()
+            .with_strict_kinds(true)
+            .with_strict_edges(true)
+            .with_max_matches(1);
+        let first = matcher.find_matches(&cpg, &cpg);
+        let second = matcher.find_matches(&cpg, &cpg);
+        assert_eq!(first.len(), 1, "a parsed graph matches itself");
+        assert_eq!(first[0].node_mapping.len(), cpg.node_count());
+        assert_eq!(
+            first[0].node_mapping, second[0].node_mapping,
+            "the parsed-graph embedding is deterministic"
+        );
+        assert_eq!((cpg.node_count(), cpg.edge_count()), before);
         let sim = GraphSimilarity::new().with_metric(SimilarityMetric::Jaccard);
         assert!((sim.similarity(&cpg, &cpg) - 1.0).abs() < 1e-9);
     }

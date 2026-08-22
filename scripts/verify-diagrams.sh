@@ -56,8 +56,11 @@ render_pass() {
 
     (
         cd "$pass_root"
+        # PlantUML shares renderer-global id generators between worker
+        # threads. Serial rendering prevents cross-diagram scheduling from
+        # changing otherwise equivalent SVG ids between the two passes.
         env JAVA_TOOL_OPTIONS=-Djava.awt.headless=true DISPLAY= \
-            plantuml -tsvg -nometadata ./*.puml
+            plantuml --threads 1 --svg --disable-metadata ./*.puml
         local source
         for source in ./*.dot; do
             dot -Tsvg "$source" -o "${source%.dot}.svg"

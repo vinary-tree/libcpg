@@ -4,10 +4,13 @@
 //! in Code Property Graphs. VF2 is efficient for finding pattern matches
 //! in sparse graphs typical of code analysis.
 
-use rustc_hash::{FxHashMap, FxHashSet};
+#[cfg(test)]
+use rustc_hash::FxHashSet;
 
 use super::{NodeKindTag, PatternMatch, SubgraphMatcher};
 use crate::{CodePropertyGraph, CpgEdgeKind, CpgNodeKind, NodeId};
+
+const UNMAPPED: u32 = u32::MAX;
 
 /// VF2 subgraph isomorphism matcher.
 ///
@@ -53,22 +56,7 @@ impl Vf2Matcher {
 
     /// Checks if two nodes are compatible for matching.
     fn nodes_compatible(&self, pattern_node: &CpgNodeKind, target_node: &CpgNodeKind) -> bool {
-        if self.strict_kinds {
-            // Exact kind match required
-            NodeKindTag::from_kind(pattern_node) == NodeKindTag::from_kind(target_node)
-        } else {
-            // Relaxed matching: same category is enough
-            match (pattern_node, target_node) {
-                // Both are declarations
-                (p, t) if is_declaration(p) && is_declaration(t) => true,
-                // Both are expressions
-                (p, t) if is_expression(p) && is_expression(t) => true,
-                // Both are statements
-                (p, t) if is_statement(p) && is_statement(t) => true,
-                // Same tag
-                _ => NodeKindTag::from_kind(pattern_node) == NodeKindTag::from_kind(target_node),
-            }
-        }
+        node_kinds_compatible(self.strict_kinds, pattern_node, target_node)
     }
 
     /// Checks if two edges are compatible for matching.
@@ -93,6 +81,20 @@ impl Vf2Matcher {
                 || pattern_edge == target_edge
         }
     }
+}
+
+fn node_kinds_compatible(
+    strict: bool,
+    pattern_node: &CpgNodeKind,
+    target_node: &CpgNodeKind,
+) -> bool {
+    if strict {
+        return NodeKindTag::from_kind(pattern_node) == NodeKindTag::from_kind(target_node);
+    }
+    (is_declaration(pattern_node) && is_declaration(target_node))
+        || (is_expression(pattern_node) && is_expression(target_node))
+        || (is_statement(pattern_node) && is_statement(target_node))
+        || NodeKindTag::from_kind(pattern_node) == NodeKindTag::from_kind(target_node)
 }
 
 fn is_declaration(kind: &CpgNodeKind) -> bool {
@@ -145,15 +147,10 @@ impl SubgraphMatcher for Vf2Matcher {
     ) -> Vec<PatternMatch> {
         let mut matches = Vec::new();
 
-        // Get pattern nodes
-        let pattern_nodes: Vec<NodeId> = pattern.node_ids().collect();
-        if pattern_nodes.is_empty() {
+        if pattern.node_count() == 0 {
             return matches;
         }
-
-        // Get target nodes
-        let target_nodes: Vec<NodeId> = target.node_ids().collect();
-        if target_nodes.len() < pattern_nodes.len() {
+        if target.node_count() < pattern.node_count() {
             return matches;
         }
 
@@ -197,10 +194,11 @@ impl Vf2Matcher {
     /// Stack-safe depth-first VF2 search.
     ///
     /// Each [`Vf2SearchFrame`] is the defunctionalized continuation of one
-    /// recursive search activation: its candidate vector is the loop-local
-    /// value and `next_candidate` is the suspended loop cursor. A non-root
-    /// frame owns exactly one mapping, which is undone when that frame is
-    /// exhausted. Complete mappings are emitted and undone immediately.
+    /// recursive search activation: its pattern index and terminal/full-set
+    /// selector fix the candidate domain, while `next_target` is the suspended
+    /// loop cursor. A non-root frame owns exactly one mapping, which is undone
+    /// when that frame is exhausted. Complete mappings are emitted and undone
+    /// immediately.
     fn vf2_search(&self, state: &mut Vf2State, matches: &mut Vec<PatternMatch>) {
         if self.max_matches > 0 && matches.len() >= self.max_matches {
             return;
@@ -210,7 +208,8 @@ impl Vf2Matcher {
             return;
         }
 
-        let mut search = vec![Vf2SearchFrame::root(state.candidate_pairs())];
+        let mut search = Vec::with_capacity(state.pattern_topology.nodes.len());
+        search.push(Vf2SearchFrame::root(state));
         while !search.is_empty() {
             if self.max_matches > 0 && matches.len() >= self.max_matches {
                 break;
@@ -218,12 +217,10 @@ impl Vf2Matcher {
 
             let candidate = {
                 let frame = search.last_mut().expect("search stack is non-empty");
-                let candidate = frame.candidates.get(frame.next_candidate).copied();
-                frame.next_candidate += usize::from(candidate.is_some());
-                candidate
+                state.next_candidate(frame)
             };
 
-            let Some((pattern_node, target_node)) = candidate else {
+            let Some((pattern_index, target_index)) = candidate else {
                 let frame = search.pop().expect("search stack is non-empty");
                 if frame.owns_mapping {
                     state.pop_mapping();
@@ -231,16 +228,16 @@ impl Vf2Matcher {
                 continue;
             };
 
-            if !self.is_feasible(state, pattern_node, target_node) {
+            if !self.is_feasible(state, pattern_index, target_index) {
                 continue;
             }
 
-            state.push_mapping(pattern_node, target_node);
+            state.push_mapping_indices(pattern_index, target_index);
             if state.is_complete() {
                 matches.push(state.to_pattern_match());
                 state.pop_mapping();
             } else {
-                search.push(Vf2SearchFrame::child(state.candidate_pairs()));
+                search.push(Vf2SearchFrame::child(state));
             }
         }
 
@@ -254,21 +251,26 @@ impl Vf2Matcher {
     }
 
     /// Checks if adding a mapping is feasible.
-    fn is_feasible(&self, state: &Vf2State, pattern_node: NodeId, target_node: NodeId) -> bool {
-        // Get nodes from graphs
-        let p_node = match state.pattern.node(pattern_node) {
-            Some(n) => n,
-            None => return false,
-        };
-        let t_node = match state.target.node(target_node) {
-            Some(n) => n,
-            None => return false,
-        };
-
-        // Check node compatibility
-        if !self.nodes_compatible(&p_node.kind, &t_node.kind) {
+    fn is_feasible(&self, state: &Vf2State, pattern_index: usize, target_index: usize) -> bool {
+        let (pattern_kind, target_kind) = state.node_kinds(pattern_index, target_index);
+        if !self.nodes_compatible(pattern_kind, target_kind) {
             return false;
         }
+
+        // Every distinct predecessor/successor needs a distinct image. This
+        // label-agnostic degree rule is a necessary condition for the existing
+        // non-induced monomorphism semantics, including parallel edges, and is
+        // therefore a sound VF2 look-ahead prune rather than a heuristic veto.
+        if state.pattern_topology.out_degree[pattern_index]
+            > state.target_topology.out_degree[target_index]
+            || state.pattern_topology.in_degree[pattern_index]
+                > state.target_topology.in_degree[target_index]
+        {
+            return false;
+        }
+
+        let pattern_node = state.pattern_topology.nodes[pattern_index];
+        let target_node = state.target_topology.nodes[target_index];
 
         // Check edge consistency with existing mappings
         // For each pattern edge involving pattern_node, there must be
@@ -284,7 +286,7 @@ impl Vf2Matcher {
             let mapped_target = if p_edge.target == pattern_node {
                 Some(target_node)
             } else {
-                state.mapping.get(&p_edge.target).copied()
+                state.mapped_target(p_edge.target)
             };
             if let Some(mapped_target) = mapped_target {
                 // There must be a compatible edge in the target
@@ -308,7 +310,7 @@ impl Vf2Matcher {
             let mapped_source = if p_edge.source == pattern_node {
                 Some(target_node)
             } else {
-                state.mapping.get(&p_edge.source).copied()
+                state.mapped_target(p_edge.source)
             };
             if let Some(mapped_source) = mapped_source {
                 // There must be a compatible edge in the target
@@ -332,236 +334,518 @@ impl Vf2Matcher {
 /// One suspended candidate loop in the iterative VF2 depth-first search.
 #[derive(Debug)]
 struct Vf2SearchFrame {
-    candidates: Vec<(NodeId, NodeId)>,
-    next_candidate: usize,
+    pattern_index: u32,
+    next_target: u32,
+    terminal_only: bool,
     owns_mapping: bool,
 }
 
 impl Vf2SearchFrame {
-    fn root(candidates: Vec<(NodeId, NodeId)>) -> Self {
-        Self {
-            candidates,
-            next_candidate: 0,
-            owns_mapping: false,
-        }
+    fn root(state: &Vf2State<'_>) -> Self {
+        Self::new(state, false)
     }
 
-    fn child(candidates: Vec<(NodeId, NodeId)>) -> Self {
+    fn child(state: &Vf2State<'_>) -> Self {
+        Self::new(state, true)
+    }
+
+    fn new(state: &Vf2State<'_>, owns_mapping: bool) -> Self {
+        let terminal_only = !state.pattern_terminal.is_empty() && !state.target_terminal.is_empty();
+        let pattern_index = if terminal_only {
+            state.pattern_terminal.first()
+        } else {
+            state.unmapped_pattern.first()
+        }
+        .expect("an incomplete VF2 state has an unmapped pattern node");
+
         Self {
-            candidates,
-            next_candidate: 0,
-            owns_mapping: true,
+            pattern_index: u32::try_from(pattern_index)
+                .expect("pattern index fits the dense node domain"),
+            next_target: 0,
+            terminal_only,
+            owns_mapping,
         }
     }
 }
 
-/// A record of exactly what a single [`Vf2State::push_mapping`] changed, so the
-/// matching [`Vf2State::pop_mapping`] can undo it precisely.
+/// A dense ordered set backed by a Fenwick tree.
 ///
-/// The DFS needs to restore the *exact* pre-push state on backtrack. Two bugs
-/// previously made that impossible: `pop_mapping` removed an *arbitrary* pair
-/// (`mapping.iter().last()`) instead of the last-pushed one, and the terminal-set
-/// helper's removal path was a silent no-op (every branch was gated `if adding`).
-/// Recording the pushed pair *plus* the precise terminal-set deltas turns
-/// backtracking into an exact inverse of the push — the standard VF2 stack
-/// discipline (Cordella et al. 2004).
+/// Membership is one bit per dense node. The Fenwick tree supplies the first
+/// member and the next member at or after a cursor in logarithmic time without
+/// allocating tree nodes or scanning an ever-longer prefix on deep paths.
 #[derive(Debug)]
-struct Vf2Frame {
-    /// The pattern node mapped by this push.
-    pattern_node: NodeId,
-    /// The target node mapped by this push.
-    target_node: NodeId,
-    /// Whether `pattern_node` was in `pattern_terminal` before the push.
-    pattern_was_terminal: bool,
-    /// Whether `target_node` was in `target_terminal` before the push.
-    target_was_terminal: bool,
-    /// Pattern nodes this push newly inserted into `pattern_terminal`.
-    pattern_terminal_added: Vec<NodeId>,
-    /// Target nodes this push newly inserted into `target_terminal`.
-    target_terminal_added: Vec<NodeId>,
+struct DenseSet {
+    present: Vec<bool>,
+    /// Empty sets store present bits; full sets store absent bits. The latter
+    /// keeps construction O(1) in touched pages instead of filling every
+    /// Fenwick cell before the first candidate is read.
+    inverted: bool,
+    fenwick: Vec<u32>,
+    count: usize,
+    select_step: usize,
+}
+
+impl DenseSet {
+    fn empty(length: usize) -> Self {
+        assert!(
+            length < u32::MAX as usize,
+            "VF2 dense node domain must leave one u32 sentinel"
+        );
+        Self {
+            present: vec![false; length],
+            inverted: false,
+            fenwick: vec![0; length + 1],
+            count: 0,
+            select_step: if length == 0 {
+                0
+            } else {
+                1usize << length.ilog2()
+            },
+        }
+    }
+
+    fn full(length: usize) -> Self {
+        let mut set = Self::empty(length);
+        set.present.fill(true);
+        set.inverted = true;
+        set.count = length;
+        set
+    }
+
+    fn is_empty(&self) -> bool {
+        self.count == 0
+    }
+
+    fn len(&self) -> usize {
+        self.count
+    }
+
+    fn contains(&self, index: usize) -> bool {
+        self.present.get(index).is_some_and(|present| *present)
+    }
+
+    fn insert(&mut self, index: usize) -> bool {
+        assert!(index < self.present.len(), "dense-set index is in bounds");
+        if self.present[index] {
+            return false;
+        }
+        self.present[index] = true;
+        self.count += 1;
+        self.update_stored(index, !self.inverted);
+        true
+    }
+
+    fn remove(&mut self, index: usize) -> bool {
+        assert!(index < self.present.len(), "dense-set index is in bounds");
+        if !self.present[index] {
+            return false;
+        }
+        self.present[index] = false;
+        self.count -= 1;
+        self.update_stored(index, self.inverted);
+        true
+    }
+
+    fn update_stored(&mut self, index: usize, adding: bool) {
+        let mut tree_index = index + 1;
+        while tree_index < self.fenwick.len() {
+            self.fenwick[tree_index] = if adding {
+                self.fenwick[tree_index]
+                    .checked_add(1)
+                    .expect("Fenwick population fits the u32 dense node domain")
+            } else {
+                self.fenwick[tree_index]
+                    .checked_sub(1)
+                    .expect("Fenwick removal mirrors an insertion")
+            };
+            tree_index += tree_index & tree_index.wrapping_neg();
+        }
+    }
+
+    fn prefix_count(&self, end: usize) -> usize {
+        let mut tree_index = end.min(self.present.len());
+        let mut count = 0u32;
+        while tree_index > 0 {
+            count += self.fenwick[tree_index];
+            tree_index &= tree_index - 1;
+        }
+        if self.inverted {
+            end.min(self.present.len()) - count as usize
+        } else {
+            count as usize
+        }
+    }
+
+    fn select(&self, rank: usize) -> Option<usize> {
+        if rank >= self.count {
+            return None;
+        }
+        let mut remaining = u32::try_from(rank).expect("rank fits the dense node domain");
+        let mut index = 0usize;
+        let mut step = self.select_step;
+        while step > 0 {
+            let next = index + step;
+            if next < self.fenwick.len() {
+                let stored = self.fenwick[next];
+                let population = if self.inverted {
+                    u32::try_from(next & next.wrapping_neg())
+                        .expect("a Fenwick span fits the u32 dense node domain")
+                        - stored
+                } else {
+                    stored
+                };
+                if population <= remaining {
+                    index = next;
+                    remaining -= population;
+                }
+            }
+            step >>= 1;
+        }
+        debug_assert!(index < self.present.len() && self.present[index]);
+        Some(index)
+    }
+
+    fn first(&self) -> Option<usize> {
+        self.select(0)
+    }
+
+    fn next_at_or_after(&self, start: usize) -> Option<usize> {
+        if start >= self.present.len() {
+            return None;
+        }
+        self.select(self.prefix_count(start))
+    }
+}
+
+/// Immutable graph data aligned by ascending stable [`NodeId`].
+#[derive(Debug, Clone, Copy)]
+struct Vf2Topology<'a> {
+    nodes: &'a [NodeId],
+    out_degree: &'a [u32],
+    in_degree: &'a [u32],
+}
+
+impl<'a> Vf2Topology<'a> {
+    fn new(graph: &'a CodePropertyGraph) -> Self {
+        let dense = graph.dense_node_view();
+        Self {
+            nodes: dense.ids,
+            out_degree: dense.unique_out_degree,
+            in_degree: dense.unique_in_degree,
+        }
+    }
+
+    fn index_of(&self, node: NodeId) -> Option<usize> {
+        self.nodes.binary_search(&node).ok()
+    }
+}
+
+/// Exact inverse information for one dense mapping push.
+#[derive(Debug)]
+struct Vf2UndoFrame {
+    pattern_index: u32,
+    target_index: u32,
+    pattern_delta_start: u32,
+    target_delta_start: u32,
 }
 
 /// VF2 algorithm state.
+///
+/// All hot membership and mapping structures are dense vectors indexed by the
+/// immutable ascending-`NodeId` projection. Ordered candidate lookup uses
+/// allocation-free Fenwick cursors, while flat delta logs restore terminal
+/// counts exactly on backtracking.
 #[derive(Debug)]
 pub struct Vf2State<'a> {
-    /// The pattern graph.
     pattern: &'a CodePropertyGraph,
-    /// The target graph.
     target: &'a CodePropertyGraph,
-    /// Current mapping from pattern nodes to target nodes.
-    mapping: FxHashMap<NodeId, NodeId>,
-    /// Reverse mapping from target nodes to pattern nodes.
-    reverse_mapping: FxHashMap<NodeId, NodeId>,
-    /// Pattern nodes not yet mapped.
-    unmapped_pattern: FxHashSet<NodeId>,
-    /// Target nodes not yet used.
-    unused_target: FxHashSet<NodeId>,
-    /// Pattern nodes adjacent to mapped nodes (terminal set).
-    pattern_terminal: FxHashSet<NodeId>,
-    /// Target nodes adjacent to used nodes (terminal set).
-    target_terminal: FxHashSet<NodeId>,
-    /// Explicit push-order stack enabling correct DFS backtracking. Each frame
-    /// records the mapped pair and the terminal-set changes that push made, so
-    /// [`Vf2State::pop_mapping`] restores the exact prior state.
-    order: Vec<Vf2Frame>,
+    pattern_topology: Vf2Topology<'a>,
+    target_topology: Vf2Topology<'a>,
+    mapping: Vec<u32>,
+    reverse_mapping: Vec<u32>,
+    unmapped_pattern: DenseSet,
+    unused_target: DenseSet,
+    pattern_terminal: DenseSet,
+    target_terminal: DenseSet,
+    pattern_terminal_count: Vec<u32>,
+    target_terminal_count: Vec<u32>,
+    pattern_seen: Vec<bool>,
+    target_seen: Vec<bool>,
+    pattern_terminal_delta: Vec<u32>,
+    target_terminal_delta: Vec<u32>,
+    order: Vec<Vf2UndoFrame>,
 }
 
 impl<'a> Vf2State<'a> {
-    /// Creates a new VF2 state.
+    /// Creates a new, empty partial mapping over deterministic dense views.
     pub fn new(pattern: &'a CodePropertyGraph, target: &'a CodePropertyGraph) -> Self {
-        let unmapped_pattern: FxHashSet<NodeId> = pattern.node_ids().collect();
-        let unused_target: FxHashSet<NodeId> = target.node_ids().collect();
+        let pattern_topology = Vf2Topology::new(pattern);
+        let target_topology = Vf2Topology::new(target);
+        let pattern_len = pattern_topology.nodes.len();
+        let target_len = target_topology.nodes.len();
 
         Self {
             pattern,
             target,
-            mapping: FxHashMap::default(),
-            reverse_mapping: FxHashMap::default(),
-            unmapped_pattern,
-            unused_target,
-            pattern_terminal: FxHashSet::default(),
-            target_terminal: FxHashSet::default(),
-            order: Vec::new(),
+            pattern_topology,
+            target_topology,
+            mapping: vec![UNMAPPED; pattern_len],
+            reverse_mapping: vec![UNMAPPED; target_len],
+            unmapped_pattern: DenseSet::full(pattern_len),
+            unused_target: DenseSet::full(target_len),
+            pattern_terminal: DenseSet::empty(pattern_len),
+            target_terminal: DenseSet::empty(target_len),
+            pattern_terminal_count: vec![0; pattern_len],
+            target_terminal_count: vec![0; target_len],
+            pattern_seen: vec![false; pattern_len],
+            target_seen: vec![false; target_len],
+            pattern_terminal_delta: Vec::with_capacity(pattern_len),
+            target_terminal_delta: Vec::with_capacity(pattern_len.min(target_len)),
+            order: Vec::with_capacity(pattern_len),
         }
     }
 
-    /// Returns true if the mapping is complete.
+    /// Returns true if every pattern node is mapped.
     pub fn is_complete(&self) -> bool {
         self.unmapped_pattern.is_empty()
     }
 
-    /// Returns candidate pairs for the next mapping.
+    /// Returns the canonical candidate pairs for the next mapping.
     pub fn candidate_pairs(&self) -> Vec<(NodeId, NodeId)> {
-        let mut pattern_candidates = Vec::new();
-        let mut target_candidates = Vec::new();
-
-        // If there are nodes in terminal sets, prefer those
-        if !self.pattern_terminal.is_empty() && !self.target_terminal.is_empty() {
-            pattern_candidates.extend(self.pattern_terminal.iter().copied());
-            target_candidates.extend(self.target_terminal.iter().copied());
-        } else if !self.unmapped_pattern.is_empty() {
-            pattern_candidates.extend(self.unmapped_pattern.iter().copied());
-            target_candidates.extend(self.unused_target.iter().copied());
-        }
-
-        pattern_candidates.sort_unstable();
-        target_candidates.sort_unstable();
-        let Some(pattern_node) = pattern_candidates.first().copied() else {
+        if self.is_complete() {
             return Vec::new();
-        };
-        target_candidates
-            .into_iter()
-            .map(|target_node| (pattern_node, target_node))
-            .collect()
+        }
+        let mut frame = Vf2SearchFrame::root(self);
+        let mut candidates = Vec::with_capacity(if frame.terminal_only {
+            self.target_terminal.len()
+        } else {
+            self.unused_target.len()
+        });
+        while let Some((pattern_index, target_index)) = self.next_candidate(&mut frame) {
+            candidates.push((
+                self.pattern_topology.nodes[pattern_index],
+                self.target_topology.nodes[target_index],
+            ));
+        }
+        candidates
     }
 
-    /// Adds a mapping and records an internal undo frame so the change can be
-    /// reversed exactly on backtrack.
+    fn next_candidate(&self, frame: &mut Vf2SearchFrame) -> Option<(usize, usize)> {
+        let targets = if frame.terminal_only {
+            &self.target_terminal
+        } else {
+            &self.unused_target
+        };
+        let target_index = targets.next_at_or_after(frame.next_target as usize)?;
+        debug_assert!(targets.contains(target_index));
+        frame.next_target =
+            u32::try_from(target_index + 1).expect("target cursor fits the dense node domain");
+        Some((frame.pattern_index as usize, target_index))
+    }
+
+    fn node_kinds(
+        &self,
+        pattern_index: usize,
+        target_index: usize,
+    ) -> (&CpgNodeKind, &CpgNodeKind) {
+        let pattern = self
+            .pattern
+            .node(self.pattern_topology.nodes[pattern_index])
+            .expect("a dense pattern node resolves");
+        let target = self
+            .target
+            .node(self.target_topology.nodes[target_index])
+            .expect("a dense target node resolves");
+        (&pattern.kind, &target.kind)
+    }
+
+    fn mapped_target(&self, pattern_node: NodeId) -> Option<NodeId> {
+        let pattern_index = self.pattern_topology.index_of(pattern_node)?;
+        let target_index = self.mapping[pattern_index];
+        (target_index != UNMAPPED).then(|| self.target_topology.nodes[target_index as usize])
+    }
+
+    /// Adds a valid unused node pair to the partial mapping.
+    ///
+    /// Invalid identifiers, a repeated pattern node, or a reused target node
+    /// indicate caller corruption and fail immediately instead of silently
+    /// producing a non-injective state.
     pub fn push_mapping(&mut self, pattern_node: NodeId, target_node: NodeId) {
-        self.mapping.insert(pattern_node, target_node);
-        self.reverse_mapping.insert(target_node, pattern_node);
-        self.unmapped_pattern.remove(&pattern_node);
-        self.unused_target.remove(&target_node);
-        let pattern_was_terminal = self.pattern_terminal.remove(&pattern_node);
-        let target_was_terminal = self.target_terminal.remove(&target_node);
+        let pattern_index = self
+            .pattern_topology
+            .index_of(pattern_node)
+            .expect("a pushed pattern node belongs to the pattern graph");
+        let target_index = self
+            .target_topology
+            .index_of(target_node)
+            .expect("a pushed target node belongs to the target graph");
+        self.push_mapping_indices(pattern_index, target_index);
+    }
 
-        // Extend the terminal sets with still-unmapped neighbors of the newly
-        // mapped pair, recording *only the entries actually inserted* so the
-        // matching `pop_mapping` removes precisely those (a neighbor already in
-        // the set is justified by another mapped node and must survive the pop).
-        // `self.pattern`/`self.target` are shared `&` references (Copy), so the
-        // edge iterators borrow the graphs, not `self`, leaving the terminal
-        // sets free to mutate.
-        let mut pattern_terminal_added = Vec::new();
-        for edge in self.pattern.outgoing_edges(pattern_node) {
-            if self.unmapped_pattern.contains(&edge.target)
-                && self.pattern_terminal.insert(edge.target)
-            {
-                pattern_terminal_added.push(edge.target);
-            }
-        }
-        for edge in self.pattern.incoming_edges(pattern_node) {
-            if self.unmapped_pattern.contains(&edge.source)
-                && self.pattern_terminal.insert(edge.source)
-            {
-                pattern_terminal_added.push(edge.source);
-            }
-        }
+    fn push_mapping_indices(&mut self, pattern_index: usize, target_index: usize) {
+        assert!(
+            self.mapping[pattern_index] == UNMAPPED,
+            "a pattern node may be mapped only once"
+        );
+        assert!(
+            self.reverse_mapping[target_index] == UNMAPPED,
+            "a target node may be used only once"
+        );
 
-        let mut target_terminal_added = Vec::new();
-        for edge in self.target.outgoing_edges(target_node) {
-            if self.unused_target.contains(&edge.target) && self.target_terminal.insert(edge.target)
-            {
-                target_terminal_added.push(edge.target);
-            }
-        }
-        for edge in self.target.incoming_edges(target_node) {
-            if self.unused_target.contains(&edge.source) && self.target_terminal.insert(edge.source)
-            {
-                target_terminal_added.push(edge.source);
-            }
-        }
+        self.mapping[pattern_index] =
+            u32::try_from(target_index).expect("target index fits the dense node domain");
+        self.reverse_mapping[target_index] =
+            u32::try_from(pattern_index).expect("pattern index fits the dense node domain");
+        assert!(self.unmapped_pattern.remove(pattern_index));
+        assert!(self.unused_target.remove(target_index));
+        self.pattern_terminal.remove(pattern_index);
+        self.target_terminal.remove(target_index);
 
-        self.order.push(Vf2Frame {
-            pattern_node,
-            target_node,
-            pattern_was_terminal,
-            target_was_terminal,
-            pattern_terminal_added,
-            target_terminal_added,
+        let pattern_delta_start = u32::try_from(self.pattern_terminal_delta.len())
+            .expect("pattern terminal delta fits the edge domain");
+        extend_terminal(
+            self.pattern,
+            self.pattern_topology.nodes,
+            pattern_index,
+            &self.mapping,
+            &mut self.pattern_terminal_count,
+            &mut self.pattern_terminal,
+            &mut self.pattern_seen,
+            &mut self.pattern_terminal_delta,
+        );
+        let target_delta_start = u32::try_from(self.target_terminal_delta.len())
+            .expect("target terminal delta fits the edge domain");
+        extend_terminal(
+            self.target,
+            self.target_topology.nodes,
+            target_index,
+            &self.reverse_mapping,
+            &mut self.target_terminal_count,
+            &mut self.target_terminal,
+            &mut self.target_seen,
+            &mut self.target_terminal_delta,
+        );
+
+        self.order.push(Vf2UndoFrame {
+            pattern_index: u32::try_from(pattern_index)
+                .expect("pattern index fits the dense node domain"),
+            target_index: u32::try_from(target_index)
+                .expect("target index fits the dense node domain"),
+            pattern_delta_start,
+            target_delta_start,
         });
     }
 
-    /// Removes the last-pushed mapping, restoring the exact pre-push state.
-    ///
-    /// This pops the true top of the push-order stack (not an arbitrary
-    /// `FxHashMap` entry) and reverses precisely the terminal-set edits the
-    /// corresponding push made, so the DFS explores every embedding.
+    /// Removes the last-pushed mapping and restores the exact preceding state.
     pub fn pop_mapping(&mut self) {
         let Some(frame) = self.order.pop() else {
             return;
         };
 
-        // Undo the terminal-set insertions made by the matching push.
-        for node in frame.pattern_terminal_added {
-            self.pattern_terminal.remove(&node);
-        }
-        for node in frame.target_terminal_added {
-            self.target_terminal.remove(&node);
-        }
+        undo_terminal(
+            frame.pattern_delta_start as usize,
+            &mut self.pattern_terminal_count,
+            &mut self.pattern_terminal,
+            &mut self.pattern_terminal_delta,
+        );
+        undo_terminal(
+            frame.target_delta_start as usize,
+            &mut self.target_terminal_count,
+            &mut self.target_terminal,
+            &mut self.target_terminal_delta,
+        );
 
-        // Undo the mapping itself.
-        self.mapping.remove(&frame.pattern_node);
-        self.reverse_mapping.remove(&frame.target_node);
-        self.unmapped_pattern.insert(frame.pattern_node);
-        self.unused_target.insert(frame.target_node);
-
-        // Restore the mapped pair's own terminal membership.
-        if frame.pattern_was_terminal {
-            self.pattern_terminal.insert(frame.pattern_node);
+        let pattern_index = frame.pattern_index as usize;
+        let target_index = frame.target_index as usize;
+        self.mapping[pattern_index] = UNMAPPED;
+        self.reverse_mapping[target_index] = UNMAPPED;
+        assert!(self.unmapped_pattern.insert(pattern_index));
+        assert!(self.unused_target.insert(target_index));
+        if self.pattern_terminal_count[pattern_index] > 0 {
+            self.pattern_terminal.insert(pattern_index);
         }
-        if frame.target_was_terminal {
-            self.target_terminal.insert(frame.target_node);
+        if self.target_terminal_count[target_index] > 0 {
+            self.target_terminal.insert(target_index);
         }
     }
 
-    /// Converts the current state to a PatternMatch.
+    /// Converts the current complete state to a public match value.
     pub fn to_pattern_match(&self) -> PatternMatch {
         let root = self
             .mapping
             .iter()
-            .min_by_key(|(pattern, _)| *pattern)
-            .map(|(_, target)| *target)
-            .unwrap_or(NodeId::new(0));
-
-        let mut pm = PatternMatch::new("VF2Match", root, 1.0);
-
-        for (&p_node, &t_node) in &self.mapping {
-            pm.node_mapping.insert(p_node, t_node);
+            .find(|&&target| target != UNMAPPED)
+            .map_or(NodeId::new(0), |&target| {
+                self.target_topology.nodes[target as usize]
+            });
+        let mut result = PatternMatch::new("VF2Match", root, 1.0);
+        for (pattern_index, target_index) in self.mapping.iter().enumerate() {
+            if *target_index != UNMAPPED {
+                result.node_mapping.insert(
+                    self.pattern_topology.nodes[pattern_index],
+                    self.target_topology.nodes[*target_index as usize],
+                );
+            }
         }
-
-        pm
+        result
     }
+}
+
+#[allow(clippy::too_many_arguments)]
+fn extend_terminal(
+    graph: &CodePropertyGraph,
+    nodes: &[NodeId],
+    mapped: usize,
+    mapping: &[u32],
+    terminal_count: &mut [u32],
+    terminal: &mut DenseSet,
+    seen: &mut [bool],
+    delta: &mut Vec<u32>,
+) {
+    let start = delta.len();
+    let node = nodes[mapped];
+    let neighbors = graph
+        .outgoing_edges(node)
+        .map(|edge| edge.target)
+        .chain(graph.incoming_edges(node).map(|edge| edge.source));
+    for neighbor in neighbors {
+        let neighbor_index = nodes
+            .binary_search(&neighbor)
+            .expect("an edge endpoint belongs to its graph");
+        if mapping[neighbor_index] == UNMAPPED && !seen[neighbor_index] {
+            seen[neighbor_index] = true;
+            delta.push(
+                u32::try_from(neighbor_index).expect("neighbor index fits the dense node domain"),
+            );
+            terminal_count[neighbor_index] = terminal_count[neighbor_index]
+                .checked_add(1)
+                .expect("a terminal adjacency count fits u32");
+            if terminal_count[neighbor_index] == 1 {
+                terminal.insert(neighbor_index);
+            }
+        }
+    }
+    for &neighbor in &delta[start..] {
+        seen[neighbor as usize] = false;
+    }
+}
+
+fn undo_terminal(
+    start: usize,
+    terminal_count: &mut [u32],
+    terminal: &mut DenseSet,
+    delta: &mut Vec<u32>,
+) {
+    for &neighbor in &delta[start..] {
+        let neighbor = neighbor as usize;
+        terminal_count[neighbor] = terminal_count[neighbor]
+            .checked_sub(1)
+            .expect("terminal undo mirrors a mapping push");
+        if terminal_count[neighbor] == 0 {
+            terminal.remove(neighbor);
+        }
+    }
+    delta.truncate(start);
 }
 
 #[cfg(test)]
@@ -900,6 +1184,141 @@ mod tests {
         assert_eq!(matches[0].node_mapping.get(&p), Some(&t));
     }
 
+    #[test]
+    fn parallel_pattern_edges_keep_existential_monomorphism_semantics() {
+        fn if_node(graph: &mut CodePropertyGraph) -> NodeId {
+            graph.add_node(CpgNode::new(
+                NodeId::new(0),
+                CpgNodeKind::If,
+                SourceRange::default(),
+            ))
+        }
+
+        let mut pattern = CodePropertyGraph::new(Language::Rust);
+        let p0 = if_node(&mut pattern);
+        let p1 = if_node(&mut pattern);
+        pattern.connect(p0, p1, CpgEdgeKind::AstChild);
+        pattern.connect(p0, p1, CpgEdgeKind::AstChild);
+
+        let mut target = CodePropertyGraph::new(Language::Rust);
+        let t0 = if_node(&mut target);
+        let t1 = if_node(&mut target);
+        target.connect(t0, t1, CpgEdgeKind::AstChild);
+
+        let matches = Vf2Matcher::new()
+            .with_strict_kinds(true)
+            .with_strict_edges(true)
+            .find_matches(&pattern, &target);
+        assert_eq!(matches.len(), 1);
+        assert_eq!(matches[0].node_mapping.get(&p0), Some(&t0));
+        assert_eq!(matches[0].node_mapping.get(&p1), Some(&t1));
+    }
+
+    #[test]
+    fn non_induced_matching_allows_extra_target_edges_but_preserves_direction() {
+        fn if_node(graph: &mut CodePropertyGraph) -> NodeId {
+            graph.add_node(CpgNode::new(
+                NodeId::new(0),
+                CpgNodeKind::If,
+                SourceRange::default(),
+            ))
+        }
+
+        let mut pattern = CodePropertyGraph::new(Language::Rust);
+        let p0 = if_node(&mut pattern);
+        let p1 = if_node(&mut pattern);
+        pattern.connect(p0, p1, CpgEdgeKind::AstChild);
+
+        let mut one_way = CodePropertyGraph::new(Language::Rust);
+        let a = if_node(&mut one_way);
+        let b = if_node(&mut one_way);
+        one_way.connect(a, b, CpgEdgeKind::AstChild);
+        let directed = Vf2Matcher::new()
+            .with_strict_kinds(true)
+            .with_strict_edges(true)
+            .find_matches(&pattern, &one_way);
+        assert_eq!(directed.len(), 1, "the edge direction selects one mapping");
+
+        one_way.connect(b, a, CpgEdgeKind::ControlDependence);
+        let extra_incompatible = Vf2Matcher::new()
+            .with_strict_kinds(true)
+            .with_strict_edges(true)
+            .find_matches(&pattern, &one_way);
+        assert_eq!(
+            embedding_pairs(&extra_incompatible[0]),
+            embedding_pairs(&directed[0]),
+            "an extra reverse edge of another kind does not veto a non-induced match"
+        );
+
+        fn embedding_pairs(found: &PatternMatch) -> Vec<(NodeId, NodeId)> {
+            let mut pairs: Vec<_> = found
+                .node_mapping
+                .iter()
+                .map(|(&pattern, &target)| (pattern, target))
+                .collect();
+            pairs.sort_unstable();
+            pairs
+        }
+    }
+
+    #[test]
+    fn disconnected_pattern_enumerates_every_injection() {
+        let mut pattern = CodePropertyGraph::new(Language::Rust);
+        for _ in 0..2 {
+            pattern.add_node(CpgNode::new(
+                NodeId::new(0),
+                CpgNodeKind::If,
+                SourceRange::default(),
+            ));
+        }
+        let mut target = CodePropertyGraph::new(Language::Rust);
+        for _ in 0..3 {
+            target.add_node(CpgNode::new(
+                NodeId::new(0),
+                CpgNodeKind::If,
+                SourceRange::default(),
+            ));
+        }
+
+        let matches = Vf2Matcher::new()
+            .with_strict_kinds(true)
+            .with_strict_edges(true)
+            .find_matches(&pattern, &target);
+        assert_eq!(matches.len(), 3 * 2);
+    }
+
+    #[test]
+    fn dense_set_selects_members_in_order_across_boundaries() {
+        let mut set = DenseSet::empty(130);
+        for index in [129, 0, 64, 63, 65] {
+            assert!(set.insert(index));
+        }
+        assert_eq!(set.len(), 5);
+        assert_eq!(set.first(), Some(0));
+        assert_eq!(set.next_at_or_after(1), Some(63));
+        assert_eq!(set.next_at_or_after(64), Some(64));
+        assert_eq!(set.next_at_or_after(66), Some(129));
+        assert_eq!(set.next_at_or_after(130), None);
+        assert!(set.remove(64));
+        assert!(!set.remove(64));
+        assert_eq!(set.next_at_or_after(64), Some(65));
+
+        let full = DenseSet::full(130);
+        assert_eq!(full.len(), 130);
+        for index in 0..130 {
+            assert_eq!(full.select(index), Some(index));
+        }
+    }
+
+    #[test]
+    fn search_and_undo_continuations_are_compact_heap_records() {
+        use std::mem::size_of;
+
+        assert!(size_of::<Vf2SearchFrame>() <= 16);
+        assert!(size_of::<Vf2UndoFrame>() <= 16);
+        assert_eq!(size_of::<u32>(), size_of::<NodeId>());
+    }
+
     /// Regression test for the relaxed `edges_compatible` fix. Relaxed matching
     /// must stay a true *relaxation* of strict matching even for edge kinds with
     /// no coarse AST/CFG/DFG/call bucket (here a PDG `ControlDependence` edge).
@@ -953,6 +1372,7 @@ mod tests {
 mod proptests {
     use super::*;
     use crate::testutil::*;
+    use crate::{CpgNode, SourceRange};
     use proptest::prelude::*;
 
     /// Bounded recursive reference equations retained only for shallow
@@ -971,8 +1391,16 @@ mod proptests {
             return;
         }
         for (pattern_node, target_node) in state.candidate_pairs() {
-            if matcher.is_feasible(state, pattern_node, target_node) {
-                state.push_mapping(pattern_node, target_node);
+            let pattern_index = state
+                .pattern_topology
+                .index_of(pattern_node)
+                .expect("candidate pattern node resolves");
+            let target_index = state
+                .target_topology
+                .index_of(target_node)
+                .expect("candidate target node resolves");
+            if matcher.is_feasible(state, pattern_index, target_index) {
+                state.push_mapping_indices(pattern_index, target_index);
                 recursive_search(matcher, state, matches);
                 state.pop_mapping();
                 if matcher.max_matches > 0 && matches.len() >= matcher.max_matches {
@@ -993,7 +1421,7 @@ mod proptests {
         let mut state = Vf2State::new(pattern, target);
         let mut matches = Vec::new();
         recursive_search(matcher, &mut state, &mut matches);
-        assert!(state.mapping.is_empty());
+        assert!(state.mapping.iter().all(|&target| target == UNMAPPED));
         assert!(state.order.is_empty());
         matches
     }
@@ -1036,6 +1464,101 @@ mod proptests {
                 mapping
             })
             .collect()
+    }
+
+    /// Independent exhaustive injection oracle for bounded generated graphs.
+    /// It knows nothing about VF2 terminal sets, dense cursors, degree pruning,
+    /// or undo logs: it enumerates every injective assignment iteratively and
+    /// then applies only the public node/edge compatibility relation.
+    fn exhaustive_embedding_set(
+        matcher: &Vf2Matcher,
+        pattern: &CodePropertyGraph,
+        target: &CodePropertyGraph,
+    ) -> FxHashSet<Vec<(u32, u32)>> {
+        let mut pattern_nodes: Vec<_> = pattern.node_ids().collect();
+        let mut target_nodes: Vec<_> = target.node_ids().collect();
+        pattern_nodes.sort_unstable();
+        target_nodes.sort_unstable();
+        if pattern_nodes.is_empty() || target_nodes.len() < pattern_nodes.len() {
+            return FxHashSet::default();
+        }
+
+        let mut result = FxHashSet::default();
+        let mut assignment = vec![0usize; pattern_nodes.len()];
+        let mut target_used = vec![false; target_nodes.len()];
+        let mut next_target = vec![0usize; pattern_nodes.len()];
+        let mut depth = 0usize;
+
+        loop {
+            if depth == pattern_nodes.len() {
+                let preserves_edges = pattern.edges().all(|edge| {
+                    let source = pattern_nodes
+                        .binary_search(&edge.source)
+                        .expect("oracle edge source exists");
+                    let target_index = pattern_nodes
+                        .binary_search(&edge.target)
+                        .expect("oracle edge target exists");
+                    target
+                        .edges_between(
+                            target_nodes[assignment[source]],
+                            target_nodes[assignment[target_index]],
+                        )
+                        .any(|candidate| matcher.edges_compatible(&edge.kind, &candidate.kind))
+                });
+                if preserves_edges {
+                    result.insert(
+                        pattern_nodes
+                            .iter()
+                            .enumerate()
+                            .map(|(index, pattern)| {
+                                (pattern.as_u32(), target_nodes[assignment[index]].as_u32())
+                            })
+                            .collect(),
+                    );
+                }
+                depth -= 1;
+                target_used[assignment[depth]] = false;
+                continue;
+            }
+
+            let mut choice = None;
+            while next_target[depth] < target_nodes.len() {
+                let candidate = next_target[depth];
+                next_target[depth] += 1;
+                if target_used[candidate] {
+                    continue;
+                }
+                let pattern_kind = &pattern
+                    .node(pattern_nodes[depth])
+                    .expect("oracle pattern node exists")
+                    .kind;
+                let target_kind = &target
+                    .node(target_nodes[candidate])
+                    .expect("oracle target node exists")
+                    .kind;
+                if matcher.nodes_compatible(pattern_kind, target_kind) {
+                    choice = Some(candidate);
+                    break;
+                }
+            }
+
+            if let Some(candidate) = choice {
+                assignment[depth] = candidate;
+                target_used[candidate] = true;
+                depth += 1;
+                if depth < pattern_nodes.len() {
+                    next_target[depth] = 0;
+                }
+            } else {
+                next_target[depth] = 0;
+                if depth == 0 {
+                    break;
+                }
+                depth -= 1;
+                target_used[assignment[depth]] = false;
+            }
+        }
+        result
     }
 
     fn reverse_insertion(graph: &CodePropertyGraph) -> CodePropertyGraph {
@@ -1147,6 +1670,7 @@ mod proptests {
             cap in 1usize..=8,
         ) {
             let pattern = small_pattern(&g, k);
+            let reversed_pattern = reverse_insertion(&pattern);
             let reversed = reverse_insertion(&g);
             let matcher = Vf2Matcher::new()
                 .with_strict_kinds(true)
@@ -1154,9 +1678,50 @@ mod proptests {
                 .with_max_matches(cap);
             let first = matcher.find_matches(&pattern, &g);
             let second = matcher.find_matches(&pattern, &reversed);
+            let both_reversed = matcher.find_matches(&reversed_pattern, &reversed);
             let repeat = matcher.find_matches(&pattern, &g);
             prop_assert_eq!(embedding_sequence(&first), embedding_sequence(&second));
+            prop_assert_eq!(embedding_sequence(&first), embedding_sequence(&both_reversed));
             prop_assert_eq!(embedding_sequence(&first), embedding_sequence(&repeat));
+        }
+
+        /// Dense order-statistics membership is extensionally equal to an
+        /// independent ordered-set model after every generated mutation.
+        #[test]
+        fn prop_dense_set_matches_btree_model(
+            length in 0usize..=128,
+            operations in prop::collection::vec((any::<bool>(), any::<usize>()), 0..=256),
+        ) {
+            use std::collections::BTreeSet;
+
+            let mut dense = DenseSet::empty(length);
+            let mut model = BTreeSet::new();
+            for (adding, raw_index) in operations {
+                if length == 0 {
+                    prop_assert!(dense.is_empty());
+                    continue;
+                }
+                let index = raw_index % length;
+                let dense_changed = if adding {
+                    dense.insert(index)
+                } else {
+                    dense.remove(index)
+                };
+                let model_changed = if adding {
+                    model.insert(index)
+                } else {
+                    model.remove(&index)
+                };
+                prop_assert_eq!(dense_changed, model_changed);
+                prop_assert_eq!(dense.len(), model.len());
+                prop_assert_eq!(dense.first(), model.first().copied());
+                for start in 0..=length {
+                    prop_assert_eq!(
+                        dense.next_at_or_after(start),
+                        model.range(start..).next().copied(),
+                    );
+                }
+            }
         }
 
         /// Increasing a positive cap retains the entire prior canonical prefix.
@@ -1243,6 +1808,57 @@ mod proptests {
                 .with_strict_edges(true)
                 .with_max_matches(1);
             prop_assert!(!matcher.find_matches(&g, &g).is_empty());
+        }
+    }
+
+    proptest! {
+        #![proptest_config(ProptestConfig::with_cases(128))]
+
+        /// For bounded random labelled directed multigraphs, dense VF2 returns
+        /// exactly the exhaustive set of injections under both strictness axes.
+        #[test]
+        fn prop_dense_vf2_equals_exhaustive_injection_oracle(
+            g in arb_cpg_raw(),
+            k in 1usize..=4,
+            strict_kinds in any::<bool>(),
+            strict_edges in any::<bool>(),
+        ) {
+            let pattern = small_pattern(&g, k);
+            let matcher = Vf2Matcher::new()
+                .with_strict_kinds(strict_kinds)
+                .with_strict_edges(strict_edges);
+            let expected = exhaustive_embedding_set(&matcher, &pattern, &g);
+            let actual = embedding_set(&matcher.find_matches(&pattern, &g));
+            prop_assert_eq!(actual, expected);
+        }
+
+        /// Appending a target node that is strictly incompatible with every
+        /// pattern node cannot change either the embedding set or its order.
+        #[test]
+        fn prop_incompatible_target_node_is_irrelevant(g in arb_cpg_raw(), k in 1usize..=4) {
+            let pattern = small_pattern(&g, k);
+            let matcher = Vf2Matcher::new()
+                .with_strict_kinds(true)
+                .with_strict_edges(true);
+            let candidates = [
+                CpgNodeKind::Root,
+                CpgNodeKind::Return,
+                CpgNodeKind::If,
+                CpgNodeKind::While,
+                CpgNodeKind::Break,
+                CpgNodeKind::Continue,
+            ];
+            let kind = candidates
+                .into_iter()
+                .find(|candidate| {
+                    pattern.nodes().all(|node| !matcher.nodes_compatible(&node.kind, candidate))
+                })
+                .expect("four pattern nodes cannot occupy six distinct strict tags");
+            let before = matcher.find_matches(&pattern, &g);
+            let mut extended = g.clone();
+            extended.add_node(CpgNode::new(NodeId::new(0), kind, SourceRange::default()));
+            let after = matcher.find_matches(&pattern, &extended);
+            prop_assert_eq!(embedding_sequence(&after), embedding_sequence(&before));
         }
     }
 }

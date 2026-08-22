@@ -1,0 +1,50 @@
+@startuml
+!include _libcpg-theme.iuml
+title Dense stack-safe VF2 — data and control flow
+
+rectangle "CodePropertyGraph\nexact typed multigraph" as CPG #DBE4FF
+database "lazy dense node view\nascending NodeId\nunique in/out degree" as META #C3FAE8
+rectangle "dense Vf2State\nu32 mapping arrays\nterminal counts" as STATE #E5DBFF
+collections "Fenwick ordered sets\nunmapped · unused\npattern/target terminal" as SETS #D3F9D8
+queue "search PDA\n(pattern index, cursor,\nterminal flag, ownership)" as SEARCH #FFF3BF
+collections "flat undo logs\ncompact offset frames" as UNDO #FFE8CC
+hexagon "kind + distinct degree +\nincident-edge feasible?" as FEASIBLE #FFE3E3
+rectangle "PatternMatch\ncanonical NodeId mapping" as MATCH #D0EBFF
+
+CPG --> META : first VF2 state only
+META --> STATE : aligned ids and degrees
+STATE --> SETS : membership / select
+SETS --> SEARCH : first + next_at_or_after
+SEARCH --> FEASIBLE : one candidate
+META --> FEASIBLE : necessary degree bounds
+CPG --> FEASIBLE : exact directed edges
+FEASIBLE --> STATE : yes: push dense mapping
+STATE --> UNDO : append changed indices
+STATE --> MATCH : complete: emit
+SEARCH --> UNDO : exhausted / capped: pop
+UNDO --> STATE : exact inverse
+
+note right of SEARCH
+  Heap frames are defunctionalized
+  continuations. Native call depth
+  is constant in graph depth.
+end note
+
+note bottom of FEASIBLE
+  Distinct degree is sound for the existing
+  non-induced existential multiedge relation.
+  Extra target edges remain permitted.
+end note
+
+legend right
+  |= colour |= role |
+  |<#DBE4FF>| authoritative graph |
+  |<#C3FAE8>| lazy immutable metadata |
+  |<#E5DBFF>| dense mutable search state |
+  |<#D3F9D8>| ordered membership index |
+  |<#FFF3BF>| pushdown control state |
+  |<#FFE8CC>| exact restoration evidence |
+  |<#FFE3E3>| feasibility decision |
+  |<#D0EBFF>| immutable result |
+endlegend
+@enduml

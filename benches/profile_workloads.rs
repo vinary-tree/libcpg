@@ -62,13 +62,29 @@ fn scc() -> usize {
     call_graph_sccs(&graph).components.len()
 }
 
-fn vf2() -> usize {
+fn vf2_fixture() -> (CodePropertyGraph, CodePropertyGraph, Vf2Matcher) {
     let pattern = linear_graph(4);
     let target = linear_graph(4_096);
-    Vf2Matcher::new()
-        .with_max_matches(1)
-        .find_matches(&pattern, &target)
-        .len()
+    let matcher = Vf2Matcher::new().with_max_matches(1);
+    (pattern, target, matcher)
+}
+
+fn vf2() -> usize {
+    let (pattern, target, matcher) = vf2_fixture();
+    matcher.find_matches(&pattern, &target).len()
+}
+
+fn repeated_vf2(repetitions: usize) -> usize {
+    let (pattern, target, matcher) = vf2_fixture();
+    let mut checksum = 0usize;
+    for _ in 0..repetitions {
+        checksum = checksum.wrapping_add(
+            black_box(&matcher)
+                .find_matches(black_box(&pattern), black_box(&target))
+                .len(),
+        );
+    }
+    checksum
 }
 
 fn wl() -> usize {
@@ -129,9 +145,17 @@ fn main() {
         size_of::<NodeId>(),
         size_of::<GraphProjection>(),
     );
-    let mut checksum = 0usize;
-    for _ in 0..repetitions {
-        checksum = checksum.wrapping_add(black_box(run(black_box(&workload))));
-    }
+    // Keep the VF2 graphs alive across repetitions so this workload measures
+    // search-state construction and traversal rather than graph construction.
+    // The aggregate `all` workload intentionally retains its end-to-end shape.
+    let checksum = if workload == "pattern_vf2" {
+        repeated_vf2(repetitions)
+    } else {
+        let mut checksum = 0usize;
+        for _ in 0..repetitions {
+            checksum = checksum.wrapping_add(black_box(run(black_box(&workload))));
+        }
+        checksum
+    };
     println!("workload={workload} repetitions={repetitions} checksum={checksum}");
 }

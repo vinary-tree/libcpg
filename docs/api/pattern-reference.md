@@ -205,8 +205,11 @@ inspect the state-space search. Most callers use `Vf2Matcher` and never touch it
 `push_mapping`/`pop_mapping` maintain an explicit push-order stack so backtracking
 restores the mapping and [terminal sets](../GLOSSARY.md#terminal-set-vf2) exactly.
 `candidate_pairs` chooses the smallest eligible pattern `NodeId` and ascending target
-`NodeId`s, producing a canonical result sequence. `Vf2Matcher` drives this state with a
-separate private heap stack of candidate vectors and suspended cursors; the public state
+`NodeId`s, producing a canonical result sequence. Internally, stable ids map to checked
+dense `u32` indices; mappings and terminal counts are arrays, ordered sets use Fenwick
+selectors, and terminal changes occupy shared flat delta logs. The public
+`candidate_pairs` method materializes its documented vector, while `Vf2Matcher` drives the
+same sequence with a separate private heap stack of cursor-only frames. The public-state
 stack is an undo log, not the search continuation stack. Consequently, matching depth is
 independent of native call-stack capacity.
 

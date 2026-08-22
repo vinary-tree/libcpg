@@ -100,8 +100,9 @@ alternatives is folklore, and a decision without its costs is marketing.
 | [0054 — Deterministic CPG ML exports](0054-deterministic-cpg-ml-exports.md) | Canonicalize typed CPG tensors and exact AST terminal paths without an ML runtime, source reparsing, graph mutation, or source-depth recursion. | Accepted |
 | [0055 — Deterministic dependence-aware CPG diff](0055-deterministic-dependence-aware-cpg-diff.md) | Reuse bounded GED correspondence for exact canonical node/edge edit scripts and classify only represented PDG-edge changes as behavior-changing. | Accepted |
 | [0056 — Lazy deterministic exact-edge projection cache](0056-lazy-deterministic-edge-projection-cache.md) | Cache exact edge indices in deterministic forward/reverse/endpoint CSR rows, invalidate on mutation, and retain `GraphProjection` as a separate owned abstraction. | Accepted |
+| [0057 — Dense stack-safe VF2 state](0057-dense-stack-safe-vf2-state.md) | Replace hash-owned candidates with lazy dense graph metadata, Fenwick-ordered sets, flat undo logs, cursor-only heap frames, and a sound distinct-degree prune without changing canonical match semantics. | Accepted |
 
-These fifty-six are not independent. ADR-0001 fixes the substrate that all analyses
+These fifty-seven are not independent. ADR-0001 fixes the substrate that all analyses
 write onto; ADR-0002 and ADR-0005 together explain how a language reaches that
 substrate and what you must switch on to get there; ADR-0003 and ADR-0004 are
 two analyses *over* the substrate (one always-on, one feature-gated) that each
@@ -254,6 +255,10 @@ ADR-0056 optimizes ADR-0001's read boundary with exact edge-index CSR rows,
 while preserving ADR-0016's owned normalized `GraphProjection` as a different
 semantic layer. Its mutation invalidation and native-adjacency build phase
 prevent stale indices and repeated whole-graph rebuilds.
+ADR-0057 consumes ADR-0056's stable node/edge indexes for fully lazy dense VF2
+metadata. It preserves ADR-0004's canonical non-induced match relation while
+moving candidate order, mapping, terminal membership, and exact restoration
+into compact heap structures with constant native call depth.
 
 ![Module architecture of libcpg, showing the graph core and the analysis modules layered over it](../diagrams/module-architecture.svg)
 
@@ -265,7 +270,7 @@ prevent stale indices and repeated whole-graph rebuilds.
   (`0001`…). Numbers are never reused; a reversed decision is marked
   *Superseded* and a new record supersedes it, so history stays legible.
 - **Status lifecycle.** `Proposed → Accepted → (Superseded by NNNN | Deprecated)`.
-  All fifty-six current records are **Accepted** and reflect the shipped `v0.1.1`
+  All fifty-seven current records are **Accepted** and reflect the shipped `v0.1.1`
   code.
 - **Grounding.** Every claim here is traceable to source: the
   [`Cargo.toml`](../engineering/01-build-and-features.md) feature block, the

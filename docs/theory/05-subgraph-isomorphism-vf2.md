@@ -33,27 +33,37 @@ The decision problem "does $`P`$ embed into $`G`$?" is **NP‑complete** in gene
 
 VF2 (Cordella, Foggia, Sansone, Vento [[1]](#references)) frames matching as a depth‑first walk over **partial mappings**. A state $`s`$ holds a partial injection $`\mu_s`$ covering some pattern nodes; the search grows $`\mu_s`$ one pair $`(p, t)`$ at a time, checks that the extension stays consistent (a *feasibility* test), and **backtracks** by undoing the extension when a branch is exhausted. `libcpg` realizes that depth-first control flow as typed heap frames rather than recursive calls. A state whose mapping covers *all* of $`V_P`$ is a complete match and is emitted.
 
-`libcpg`'s state is the `Vf2State` struct. Its fields correspond one‑to‑one with the classical VF2 state description:
+`libcpg`'s `Vf2State` represents the classical state over an immutable dense
+node domain. Ascending stable `NodeId` order defines each index:
 
 ```rust
 pub struct Vf2State<'a> {
-    pattern: &'a CodePropertyGraph,          // P
-    target:  &'a CodePropertyGraph,          // G
-    mapping:          FxHashMap<NodeId, NodeId>, // μ  : pattern → target
-    reverse_mapping:  FxHashMap<NodeId, NodeId>, // μ⁻¹: target  → pattern
-    unmapped_pattern: FxHashSet<NodeId>,     // pattern nodes not yet in μ
-    unused_target:    FxHashSet<NodeId>,     // target nodes not yet in μ
-    pattern_terminal: FxHashSet<NodeId>,     // fringe on the pattern side
-    target_terminal:  FxHashSet<NodeId>,     // fringe on the target side
-    order:            Vec<Vf2Frame>,         // explicit push‑order stack (undo log)
+    pattern: &'a CodePropertyGraph,     // P; authoritative exact edges
+    target:  &'a CodePropertyGraph,     // G; authoritative exact edges
+    pattern_topology: Vf2Topology<'a>,  // ascending ids + unique degrees
+    target_topology:  Vf2Topology<'a>,
+    mapping: Vec<u32>,                  // dense P index → dense G index
+    reverse_mapping: Vec<u32>,          // dense G index → dense P index
+    unmapped_pattern: DenseSet,         // initially full ordered set
+    unused_target: DenseSet,            // initially full ordered set
+    pattern_terminal: DenseSet,         // fringe ordered set
+    target_terminal: DenseSet,
+    pattern_terminal_count: Vec<u32>,   // mapped-neighbour justifications
+    target_terminal_count: Vec<u32>,
+    pattern_terminal_delta: Vec<u32>,   // flat exact-undo logs
+    target_terminal_delta: Vec<u32>,
+    order: Vec<Vf2UndoFrame>,           // compact offsets into those logs
 }
 ```
 
-The `order` stack is `libcpg`'s correctness backbone; Section 5 explains why it must exist.
-It is distinct from `Vf2Matcher`'s private `Vec<Vf2SearchFrame>`: `order` restores state,
-whereas each search frame stores a candidate vector, a suspended cursor, and whether the
-frame owns one mapping. Defunctionalizing the recursive continuation this way makes native
-call-stack consumption independent of $`|V_P|`$.
+`DenseSet` combines membership bits with a [Fenwick tree](../GLOSSARY.md#fenwick-tree),
+so it selects the first member or the first member at/after a cursor in logarithmic time.
+It neither sorts hash entries nor scans an ever-growing mapped prefix. The `order` stack is
+`libcpg`'s correctness backbone; Section 5 explains why it must exist. It is distinct from
+`Vf2Matcher`'s private `Vec<Vf2SearchFrame>`: `order` restores state, whereas a search
+frame stores only a pattern index, target cursor, terminal/full-set selector, and ownership
+bit. Defunctionalizing the recursive continuation this way makes native call-stack
+consumption independent of $`|V_P|`$.
 
 ![VF2 state machine: initialise a root search frame, advance its candidate cursor, test feasibility, push a mapping and child frame, or exhaust and undo the child, emitting a match when the mapping is complete.](../diagrams/vf2-state-machine.svg)
 
@@ -67,8 +77,9 @@ The single most important pruning idea is to **grow the mapping along edges** ra
 - otherwise (the mapping is empty, or a connected component has been fully consumed), fall back to the smallest unmapped pattern `NodeId`, paired with every unused target in ascending order.
 
 Preferring the fringe keeps the partial mapping **connected**, which means each new pair is immediately constrained by edges to already‑mapped nodes — so infeasible pairs are rejected early instead of deep in the tree.
-Sorting also defines a canonical depth-first sequence: graph insertion and hash-table order
-cannot change the result order, the representative match root, or the prefix selected by a
+The dense view is sorted once when first requested. Fenwick selection then defines the
+canonical depth-first sequence without a per-frame allocation or sort: graph insertion
+order cannot change the result order, representative match root, or prefix selected by a
 positive result cap.
 
 ---
@@ -76,32 +87,34 @@ positive result cap.
 ## 3. The matching algorithm in literate form
 
 `Vf2Matcher::vf2_search` is an iterative pushdown machine. A
-`Frame(candidates, cursor, owns_mapping)` is the defunctionalized continuation of one
-depth-first candidate loop: `cursor` is where that loop resumes, and `owns_mapping` says
-whether exhausting the frame must undo one extension.
+`Frame(pattern_index, target_cursor, terminal_only, owns_mapping)` is the
+defunctionalized continuation of one depth-first candidate loop: `target_cursor` is where
+ordered-set selection resumes, and `owns_mapping` says whether exhausting the frame must
+undo one extension.
 
 ```text
 Algorithm VF2‑Match(P, G, max_matches):
   s       ← empty state over (P, G)         # μ = ∅, both fringes empty
   results ← [ ]
-  frames  ← [Frame(CandidatePairs(s), cursor = 0, owns_mapping = false)]
+  frames  ← [CursorFrame(s, owns_mapping = false)]
 
   while frames is not empty:
     ❶ if max_matches > 0 and |results| >= max_matches: break
     ❷ f ← frames.last
-    ❸ if f.cursor = |f.candidates|:
+    ❸ candidate ← NextEligibleAtOrAfter(s, f.target_cursor)
+       if candidate does not exist:
           exhausted ← frames.pop
           if exhausted.owns_mapping: Pop(s)              # exact inverse of Push
           continue
-    ❹ (p, t) ← f.candidates[f.cursor]
-       f.cursor ← f.cursor + 1                            # suspended resume point
+    ❹ (p, t) ← candidate
+       f.target_cursor ← DenseIndex(t) + 1                # suspended resume point
     ❺ if not Feasible(s, p, t): continue                  # Section 4
     ❻ Push(s, p, t)                                       # extend μ; log exact undo
     ❼ if s.unmapped_pattern = ∅:
           results.append(snapshot(s.mapping) as PatternMatch)
           Pop(s)                                          # leaf owns no child frame
        else:
-          frames.push(Frame(CandidatePairs(s), 0, true))
+          frames.push(CursorFrame(s, owns_mapping = true))
 
   for f in reverse(frames):                               # cap-safe unwind
     if f.owns_mapping: Pop(s)
@@ -113,7 +126,7 @@ Three properties are worth stating explicitly, because the correctness of *every
 1. **Completeness.** With `max_matches = 0`, cursor advancement at ❹ tries every feasible candidate for the chosen pattern node, so the machine enumerates **every** embedding—not just the first. `with_max_matches(k)` for $`k>0`$ returns the first $`k`$ embeddings in canonical order.
 2. **Soundness.** A mapping is emitted at ❼ only after each incremental `Push` passed `Feasible`, so the accumulated injection satisfies the edge- and kind-constraints of Section 1 by construction.
 3. **Exact restoration.** Normal frame exhaustion and positive-cap unwinding both perform exactly one `Pop` for every live child frame, so the caller-visible state is empty after matching.
-4. **No graph copying or native recursion.** The search mutates one shared state and undoes each step; it never clones $`P`$ or $`G`$ and never allocates one native call frame per pattern node. Mapping and terminal storage remain $`O(|V_P|+|V_G|)`$; live candidate vectors add a conservative $`O(|V_P||V_G|)`$ heap bound, while a uniquely constrained path uses $`O(|V_P|)`$ search-frame memory.
+4. **No graph copying or native recursion.** The search mutates one shared state and undoes each step; it never clones $`P`$ or $`G`$, materializes a candidate vector for an internal frame, or allocates one native call frame per pattern node. The search PDA uses $`O(|V_P|)`$ compact heap frames.
 
 The public surface that drives this is deliberately tiny:
 
@@ -134,7 +147,7 @@ let matches: Vec<libcpg::PatternMatch> = matcher.find_matches(&pattern, &target)
 
 ## 4. Feasibility: the pruning rules
 
-`Feasible(s, p, t)` decides whether mapping pattern node $`p`$ to target node $`t`$ can possibly extend to a full match. `libcpg` applies two checks — a **semantic** check on kinds and a **syntactic** check on incident edges.
+`Feasible(s, p, t)` decides whether mapping pattern node $`p`$ to target node $`t`$ can possibly extend to a full match. `libcpg` applies three necessary checks: a **semantic** check on kinds, a distinct directed-degree check, and a **syntactic** check on incident edges.
 
 ### 4.1 Node compatibility (strict vs. relaxed)
 
@@ -151,6 +164,13 @@ let matches: Vec<libcpg::PatternMatch> = matcher.find_matches(&pattern, &target)
 
 ### 4.2 Edge consistency
 
+Before reading exact edges, the dense topology rejects $`(p,t)`$ when $`p`$
+has more distinct successors or more distinct predecessors than $`t`$. Every
+distinct pattern neighbour needs a distinct image under an injection, so this
+is a necessary condition. Counting unique endpoints rather than raw edges is
+essential: current parallel-edge semantics require a compatible target edge
+existentially and do not require equal multiplicity.
+
 For the candidate $`(p,t)`$, every pattern edge that touches $`p`$ **and whose other endpoint is already mapped** must have a compatible partner in the target:
 
 - **Outgoing:** for each pattern edge $`p \to q`$ with $`q`$ already mapped to $`\mu(q)`$, the target must contain a compatible edge $`t \to \mu(q)`$.
@@ -158,7 +178,11 @@ For the candidate $`(p,t)`$, every pattern edge that touches $`p`$ **and whose o
 
 Edges are compared by `edges_compatible`: under `with_strict_edges(true)` the `CpgEdgeKind` values must be equal; under the relaxed default, both being AST, both CFG, both DFG, or both call edges suffices (via `is_ast` / `is_cfg` / `is_dfg` / `is_call`). Because only pattern edges are required to have target partners, the search accepts non‑induced embeddings, as promised in Section 1.
 
-> **Scope note.** `libcpg` implements VF2's core **syntactic feasibility** rule (consistency with the already‑mapped neighbourhood) and uses the terminal sets to *order* candidates. It does not add VF2's optional *k*‑look‑ahead cardinality cuts (the $`R_{term}`$/$`R_{new}`$ rules that compare fringe sizes). Those cuts prune more but are not required for correctness; on the sparse graphs of real code the consistency rule plus connected growth already keep the tree small.
+> **Scope note.** The distinct-degree rule is label-independent look-ahead; it
+> is not VF2++ or VF3 candidate ordering. `libcpg` does not add the classical
+> $`R_{term}`$/$`R_{new}`$ fringe-cardinality cuts. Stronger cuts need a separate
+> proof against this non-induced typed multigraph relation before they can enter
+> production.
 
 ![Pattern graph on the left, target CPG on the right, with the matched subgraph and the node mapping highlighted.](../diagrams/vf2-pattern-target.svg)
 
@@ -173,17 +197,20 @@ Depth‑first search is only correct if **`Pop` is the exact inverse of `Push`**
 `libcpg` guarantees exact inversion with an explicit **push‑order stack** of undo frames:
 
 ```rust
-struct Vf2Frame {
-    pattern_node: NodeId,          // the pair this push mapped …
-    target_node:  NodeId,
-    pattern_was_terminal: bool,    // … its prior fringe membership …
-    target_was_terminal:  bool,
-    pattern_terminal_added: Vec<NodeId>, // … and the fringe entries THIS push inserted
-    target_terminal_added:  Vec<NodeId>,
+struct Vf2UndoFrame {
+    pattern_index: u32,        // the dense pair this push mapped
+    target_index: u32,
+    pattern_delta_start: u32,  // suffixes added to shared flat logs
+    target_delta_start: u32,
 }
 ```
 
-`Push` records, in the frame, only the fringe entries it actually inserted (a neighbour already on the fringe is justified by *another* mapped node and must survive the later `Pop`). `Pop` then reverses exactly those insertions, removes the mapped pair, and restores the pair's own prior fringe membership — nothing more, nothing less.
+`Push` increments one dense justification count per distinct incident neighbour
+and appends the changed index to a flat delta log. A neighbour already on the
+fringe may be justified by another mapped node and must survive a later `Pop`.
+`Pop` replays precisely the two suffixes named by the compact frame, decrements
+their counts, removes the mapped pair, and restores its membership—nothing more
+and nothing less.
 
 ### Why this is not a formality
 
@@ -229,6 +256,9 @@ This bound is unavoidable in the worst case — subgraph isomorphism is NP‑com
 
 - **Sparsity.** CPGs are near‑linear in their edges; a node's neighbourhood is small, so the edge‑consistency rule rejects most candidates immediately.
 - **Connected growth.** Terminal‑set ordering keeps the partial mapping connected, so after the first pair each new candidate is pinned by an edge to something already mapped — collapsing the branching factor.
+- **Necessary degree pruning.** A pair whose target has too few distinct
+  predecessors or successors cannot extend to an injection and is rejected
+  before exact incident-edge scans.
 
 Reported behaviour (from `libcpg`'s own doc‑comments and the VF2 literature [[1]](#references)) is roughly $`O(N^2 M)`$ in the typical case, where $`M`$ is the target size, and closer to $`O(N)`$ when strong labels prune early. Two knobs reduce work after preserving their documented semantics:
 
@@ -237,10 +267,11 @@ Reported behaviour (from `libcpg`'s own doc‑comments and the VF2 literature [[
 | `with_max_matches(k)`, $`k>0`$ | stop after the first $`k`$ canonical embeddings—e.g. $`k = 1`$ for a Boolean "does it occur?" query; no positive result means the full search may still run |
 | `with_strict_kinds(true)` / `with_strict_edges(true)` | fewer compatible pairs ⇒ smaller tree (higher precision, lower recall) |
 
-The mapping tables, two fringes, and undo log use $`O(N+M)`$ memory over shared graph
-references. The explicit search stack retains candidate vectors for its live depth, giving
-a conservative $`O(NM)`$ heap bound and $`O(N)`$ heap use on a uniquely constrained path.
-Native call-stack use is $`O(1)`$ with respect to $`N`$.
+The dense mappings, ordered sets, terminal counts, and lazy node metadata use
+$`O(N+M)`$ memory over shared graph references. Flat terminal deltas can retain
+$`O(|E_P|+|E_G|)`$ indices along a live branch. The explicit search stack uses
+$`O(N)`$ compact cursor frames rather than $`O(NM)`$ candidate vectors. Native
+call-stack use is $`O(1)`$ with respect to $`N`$, $`M`$, degree, and depth.
 
 ---
 

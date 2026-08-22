@@ -517,6 +517,45 @@ read and allocation objectives pass, the cumulative corpus boundary does not
 regress, and the cold/peak costs are explicit. Full method and counter tables
 are in [validation 51](../scientific/51-projection-cache-validation.md).
 
+### T9.2 H08 — dense stack-safe VF2 state
+
+H07's corrected search-only profile made the next bottleneck unambiguous: hash-set
+collection accounted for 41.58% of samples, sorting for 28%, vector collection for 8%,
+and candidate-pair construction for 7.33%. H08 maps stable graph ids into a lazy dense
+domain, replaces mapping and fringe hash tables with arrays and Fenwick-ordered sets,
+stores terminal restoration in flat delta logs, and gives each search-PDA frame only a
+pattern index and target cursor. A necessary distinct directed-neighbour check rejects
+impossible candidates without changing non-induced or parallel-edge semantics.
+
+**Isolated result against committed H07.** The corrected Criterion workload retains the
+fixture and measures only capped matching:
+
+| Target | H07 | H08 | Central change |
+|---:|---:|---:|---:|
+| 256 nodes | 4.726 µs | 0.949 µs | -79.89% |
+| 4,096 nodes | 63.429 µs | 1.977 µs | -96.91% |
+
+Against immutable `main`, an independent final run reports 0.940 µs and 1.999 µs,
+improvements of 80.26% and 96.83%. The small central-time variation between runs is
+expected; the exact one-match oracle and canonical result prefix are unchanged.
+
+**Headless search-only result against H07.** Ten thousand retained-fixture searches
+reduce DHAT bytes 27.28%, allocation blocks 38.88%, cycles 96.71%, retired instructions
+97.44%, cache references 65.43%, cache misses 84.78%, and dTLB misses 85.69%. DHAT and
+Massif peak live memory fall 6.00% and 0.22%; maximum RSS falls from 4,400 to 4,324 KiB
+(1.73%). RSS remains a coarse startup-sensitive sample, so no stronger generalization is
+made. No GUI or heaptrack process was used.
+
+**End-to-end control and rejected variants.** Fully lazy node metadata improves small
+Rust 4.83%, medium Rust 4.12%, and the cross-language corpus 1.84% against H07; large
+Rust improves 3.33% within Criterion's noise threshold. An eager degree view regressed
+small/cross cases by about 4.2%; making degrees lazy but copying ids eagerly still showed
+medium/large regressions. Those variants were rejected at their root. Candidate reordering
+and raw-degree cuts were also rejected because they would change canonical capped prefixes
+or the established existential multiedge relation. Full counters, properties, stack gate,
+and falsification boundaries are in
+[validation 52](../scientific/52-dense-vf2-validation.md).
+
 ## Reproduce and compare
 
 The benchmark wrapper defaults to CPUs 0 and 1 and stores logs under

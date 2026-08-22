@@ -37,7 +37,10 @@ backtracking whenever a partial mapping cannot be completed. Three ideas make it
    $`t`$ are compatible in [kind](../../GLOSSARY.md#node-kind--edge-kind) and that every
    already-mapped neighbour of $`p`$ is joined to $`t`$ by a compatible edge in the
    target. Infeasible pairs never enter the mapping.
-3. **Exact backtracking.** When a branch is exhausted, the mapping *and the terminal sets*
+3. **Distinct-degree look-ahead.** A candidate whose target has too few unique incoming
+   or outgoing neighbours cannot extend to an injection and is rejected before exact-edge
+   checks. Unique endpoints preserve the existential meaning of parallel pattern edges.
+4. **Exact backtracking.** When a branch is exhausted, the mapping *and the terminal sets*
    are restored to precisely their pre-push state, so the search explores every embedding
    without corruption.
 
@@ -47,29 +50,30 @@ backtracking whenever a partial mapping cannot be completed. Three ideas make it
 need. Its fields (all private; you interact through `Vf2Matcher`):
 
 ```rust
-use rustc_hash::{FxHashMap, FxHashSet};
-use libcpg::{CodePropertyGraph, NodeId};
-
 pub struct Vf2State<'a> {
-    pattern: &'a CodePropertyGraph,          // the pattern graph
-    target: &'a CodePropertyGraph,           // the target graph
-    mapping: FxHashMap<NodeId, NodeId>,      // pattern node → target node
-    reverse_mapping: FxHashMap<NodeId, NodeId>, // target node → pattern node
-    unmapped_pattern: FxHashSet<NodeId>,     // pattern nodes not yet mapped
-    unused_target: FxHashSet<NodeId>,        // target nodes not yet used
-    pattern_terminal: FxHashSet<NodeId>,     // fringe on the pattern side
-    target_terminal: FxHashSet<NodeId>,      // fringe on the target side
-    // ...plus a private push-order stack `order` used for exact backtracking.
+    pattern: &'a CodePropertyGraph,
+    target: &'a CodePropertyGraph,
+    mapping: Vec<u32>,                 // dense pattern → target index
+    reverse_mapping: Vec<u32>,         // dense target → pattern index
+    unmapped_pattern: DenseSet,        // membership + Fenwick order index
+    unused_target: DenseSet,
+    pattern_terminal: DenseSet,
+    target_terminal: DenseSet,
+    pattern_terminal_count: Vec<u32>,  // fringe justification counts
+    target_terminal_count: Vec<u32>,
+    // ...flat terminal-delta logs and compact undo frames.
 }
 ```
 
-Two independent heap stacks serve different purposes. `Vf2State::order` is the **undo
-log**: each `push_mapping` records the mapped pair, whether each node was already in its
-terminal set, and exactly which terminal entries the push *newly inserted*. The matching
-`pop_mapping` reverses precisely those edits. `Vf2Matcher::vf2_search` owns a separate
-`Vec<Vf2SearchFrame>` whose candidate vectors and cursors are the defunctionalized
-continuations of the depth-first search. Consequently, pattern depth consumes heap memory,
-not native call-stack frames. The undo-log regression
+The CPG supplies ascending stable ids and distinct directed degrees through a fully lazy
+dense view. A `DenseSet` combines a bit vector with a Fenwick tree so canonical successor
+selection is logarithmic and allocation-free. Two independent heap stacks serve different
+purposes. `Vf2State::order` is the **undo log**: each compact frame stores the mapped dense
+pair and offsets into shared flat terminal-delta logs. The matching `pop_mapping` reverses
+precisely that suffix. `Vf2Matcher::vf2_search` owns a separate
+`Vec<Vf2SearchFrame>` whose cursor-only frames are the defunctionalized continuations of
+the depth-first search. Consequently, pattern depth consumes heap memory, not native
+call-stack frames. The undo-log regression
 `test_multi_embedding_backtracking` in `src/pattern/vf2.rs` guards this invariant (see
 [the diamond example](#the-diamond-a-backtracking-litmus-test)).
 
@@ -79,29 +83,30 @@ not native call-stack frames. The undo-log regression
 
 ### The search, as literate pseudocode
 
-Each `Frame(candidates, cursor, owns_mapping)` remembers one suspended candidate loop.
+Each `Frame(pattern_index, target_cursor, terminal_only, owns_mapping)` remembers one suspended candidate loop.
 The root frame owns no mapping; every child frame owns the mapping that led to it and
 therefore performs exactly one `pop_mapping` when exhausted.
 
 ```text
 search(state, matches):
-  1. search_stack ← [Frame(candidate_pairs(state), cursor = 0, owns = false)]
+  1. search_stack ← [CursorFrame(state, owns = false)]
   2. while search_stack is not empty:
        3. if a positive match cap is full: break
        4. frame ← search_stack.last
-       5. if frame.cursor = length(frame.candidates):
+       5. candidate ← next eligible target at or after frame.target_cursor
+          if candidate does not exist:
             exhausted ← search_stack.pop
             if exhausted.owns: state.pop_mapping()       # exact undo
             continue
-       6. (p, t) ← frame.candidates[frame.cursor]
-          frame.cursor ← frame.cursor + 1             # suspend after this pair
+       6. (p, t) ← candidate
+          frame.target_cursor ← dense_index(t) + 1     # suspend after this pair
        7. if not is_feasible(state, p, t): continue
        8. state.push_mapping(p, t)
        9. if state.is_complete():
             matches.push(state.to_pattern_match())
             state.pop_mapping()                          # leaf has no child frame
           else:
-            search_stack.push(Frame(candidate_pairs(state), 0, owns = true))
+            search_stack.push(CursorFrame(state, owns = true))
  10. for each remaining frame from deepest to root:
        if frame.owns: state.pop_mapping()                # cap-safe unwind
 ```
@@ -116,7 +121,8 @@ independent of hash-table and graph insertion order.
 
 **Feasibility** (`is_feasible`, step 7). A pair $`(p, t)`$ survives when:
 
-- `p` and `t` have compatible kinds (strict or relaxed — see below); and
+- `p` and `t` have compatible kinds (strict or relaxed — see below);
+- `p` has no more distinct predecessors or successors than `t`; and
 - for every pattern edge $`p \to q`$ whose head `q` is *already mapped* to some $`t_q`$,
   the target has a compatible edge $`t \to t_q`$; and symmetrically for every incoming
   pattern edge $`q \to p`$ with `q` already mapped.
@@ -136,10 +142,10 @@ candidate set. A result cap stops after the requested embedding has been found; 
 bound a no-match search. Untrusted-input services must also admit bounded graph sizes or
 enforce an outer deadline.
 
-For a pattern of $`P`$ nodes and a target of $`T`$ nodes, the mapping, terminal sets, and
-undo log use $`O(P+T)`$ memory. Live search frames retain candidate vectors whose
-conservative worst-case total is $`O(PT)`$; a uniquely constrained path uses $`O(P)`$.
-Native call-stack use is $`O(1)`$ with respect to graph depth.
+For a pattern of $`P`$ nodes and a target of $`T`$ nodes, dense mappings, ordered sets,
+counts, and metadata use $`O(P+T)`$ memory. Flat terminal deltas add a worst-case
+$`O(|E_P|+|E_T|)`$ live-branch bound. Cursor-only search frames use $`O(P)`$ heap space;
+native call-stack use is $`O(1)`$ with respect to graph depth.
 
 ## Using `Vf2Matcher`
 

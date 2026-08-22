@@ -18,7 +18,7 @@ use serde::{Deserialize, Serialize};
 use super::serde_util::option_arc_str;
 
 use super::projection_cache::{
-    CfgNeighbors, CpgEdges, CpgProjectionCache, DfgNeighbors, EdgeLayer,
+    CfgNeighbors, CpgEdges, CpgProjectionCache, DenseNodeView, DfgNeighbors, EdgeLayer,
 };
 #[cfg(test)]
 use super::CfgEdgeKind;
@@ -863,6 +863,14 @@ impl CodePropertyGraph {
         self.projection_cache().layer(&self.graph, layer)
     }
 
+    /// Borrows dense node metadata aligned by ascending stable identifier.
+    ///
+    /// Search algorithms use this crate-internal view to keep their hot state
+    /// vector-indexed without copying or re-sorting graph identifiers.
+    pub(crate) fn dense_node_view(&self) -> DenseNodeView<'_> {
+        self.projection_cache().dense_nodes(&self.graph)
+    }
+
     /// Iterates the complete AST overlay in canonical source/target/id order.
     pub(crate) fn ast_overlay_edges(&self) -> impl Iterator<Item = &CpgEdge> {
         self.overlay_edges(EdgeLayer::Ast)
@@ -1502,6 +1510,32 @@ mod tests {
         assert!(cpg.node_index_map.capacity() >= 17, "node id-map capacity");
         assert_eq!(cpg.node_count(), 0);
         assert_eq!(cpg.edge_count(), 0);
+    }
+
+    #[test]
+    fn dense_node_view_sorts_ids_and_counts_distinct_directed_neighbors() {
+        let mut cpg = CodePropertyGraph::new(Language::Rust);
+        for id in [30, 10, 20] {
+            cpg.add_node_with_id(CpgNode::new(
+                NodeId::new(id),
+                CpgNodeKind::If,
+                SourceRange::default(),
+            ));
+        }
+        let a = NodeId::new(10);
+        let b = NodeId::new(20);
+        cpg.connect(a, a, CpgEdgeKind::AstChild);
+        cpg.connect(a, b, CpgEdgeKind::AstChild);
+        cpg.connect(a, b, CpgEdgeKind::ControlDependence);
+        cpg.connect(b, a, CpgEdgeKind::DataDependence);
+
+        let dense = cpg.dense_node_view();
+        assert_eq!(
+            dense.ids,
+            [NodeId::new(10), NodeId::new(20), NodeId::new(30)]
+        );
+        assert_eq!(dense.unique_out_degree, [2, 1, 0]);
+        assert_eq!(dense.unique_in_degree, [2, 1, 0]);
     }
 
     #[test]

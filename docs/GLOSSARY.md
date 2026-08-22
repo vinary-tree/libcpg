@@ -519,6 +519,15 @@ A compile-time switch declared in `Cargo.toml` that gates optional code and depe
 
 The fixed-length numeric summary of a candidate subgraph (12 fields) that `PatternClassifier` scores to label a [design pattern](#design-pattern) — an alternative to template matching. `ClassificationMode` selects rule-based, ML (`ml-linfa`), or hybrid scoring. Not to be confused with a graph feature vector used by the `Cosine` [similarity metric](#similarity-metric). See [`components/patterns/classification.md`](components/patterns/classification.md).
 
+### Fenwick tree
+
+A flat indexed tree for prefix populations and order-statistic selection in
+$`O(\log n)`$ time. `Vf2State` pairs one with dense membership bits so it can
+select the next canonical terminal or unused node without sorting or scanning
+a mapped prefix. Initially full sets index absent entries through the
+complement, allowing zero-filled lazy construction. See
+[`design/0057-dense-stack-safe-vf2-state.md`](design/0057-dense-stack-safe-vf2-state.md).
+
 ### Gang of Four (GoF)
 
 The four authors of *Design Patterns* [[11]](#references) and, by metonymy, the 23 patterns catalogued there, grouped into `GofCategory::Creational` (5), `Structural` (7), and `Behavioral` (11). `libcpg` names them with the `GofPattern` enum — note the variant is `FactoryMethod` (never `Factory`). See [`components/patterns/gang-of-four.md`](components/patterns/gang-of-four.md).
@@ -1070,7 +1079,7 @@ They supply [propagation cost](#propagation-cost) and median
 
 ### VF2
 
-The subgraph-isomorphism algorithm of Cordella, Foggia, Sansone, and Vento [[4]](#references): a depth-first state-space search that grows a partial node mapping, pruning with feasibility rules over node kinds and incident edges, and backtracking when stuck. `libcpg`'s `Vf2Matcher` implements it with an explicit push-order stack so backtracking restores the mapping and [terminal sets](#terminal-set-vf2) exactly. Worst-case cost is $`O(N!\,N)`$ but pruning makes it practical. See [`theory/05-subgraph-isomorphism-vf2.md`](theory/05-subgraph-isomorphism-vf2.md).
+The subgraph-isomorphism algorithm of Cordella, Foggia, Sansone, and Vento [[4]](#references): a depth-first state-space search that grows a partial node mapping, pruning with feasibility rules over node kinds and incident edges, and backtracking when stuck. `libcpg`'s `Vf2Matcher` uses dense arrays, [Fenwick](#fenwick-tree)-ordered sets, flat undo logs, and a cursor-only heap pushdown automaton so backtracking restores the mapping and [terminal sets](#terminal-set-vf2) exactly without depth-dependent native recursion. Worst-case cost is $`O(N!\,N)`$ but pruning makes it practical. See [`theory/05-subgraph-isomorphism-vf2.md`](theory/05-subgraph-isomorphism-vf2.md).
 
 ### Weisfeiler-Lehman kernel / label refinement
 
