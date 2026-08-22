@@ -422,7 +422,7 @@ pub fn cfg_projection(
     let scope = function_scope_nodes(cpg, function);
     let mut nodes = vec![function];
     let mut edges = Vec::new();
-    for edge in cpg.edges() {
+    for edge in cpg.cfg_overlay_edges() {
         if edge.kind.is_cfg()
             && !matches!(edge.kind, CpgEdgeKind::ControlFlow(CfgEdgeKind::Call))
             && scope.contains(&edge.source)
@@ -455,7 +455,7 @@ pub fn dfg_projection(cpg: &CodePropertyGraph, function: Option<NodeId>) -> Grap
         .into_iter()
         .collect::<Vec<_>>();
     let mut edges = Vec::new();
-    for edge in cpg.edges() {
+    for edge in cpg.dfg_overlay_edges() {
         let in_scope = scope
             .as_ref()
             .is_none_or(|scope| scope.contains(&edge.source) && scope.contains(&edge.target));
@@ -476,7 +476,7 @@ pub fn pdg_projection(
     let scope = function_scope_nodes(cpg, function);
     let mut nodes = vec![function];
     let mut edges = Vec::new();
-    for edge in cpg.edges() {
+    for edge in cpg.pdg_overlay_edges() {
         if edge.kind.is_pdg() && scope.contains(&edge.source) && scope.contains(&edge.target) {
             nodes.extend([edge.source, edge.target]);
             edges.push((edge.source, edge.target, 1.0));

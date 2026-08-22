@@ -442,6 +442,81 @@ and unlabeled representations are materially smaller, the unread structure is
 gone, the synthetic construction paths are faster, and neither parser path
 regressed under the controlled comparison.
 
+### T9.2 H07 — lazy deterministic exact-edge CSR cache
+
+**Hypothesis.** CFG/DFG neighbor and endpoint queries repeatedly filtered
+petgraph adjacency and collected fresh vectors. One lazily built cache of exact
+edge indices, with deterministic forward/reverse overlay rows and source/target
+rows, should make warm reads proportional to the selected row and eliminate
+their result allocations. It must preserve exact parallel edges, invalidate on
+mutation, remain absent from serialization, and keep graph depth off the native
+stack.
+
+**Controlled change.** `CodePropertyGraph` now owns a
+`OnceLock<Box<CpgProjectionCache>>`. A counting/scatter builder creates three
+CSR edge-index orders, sorts only nontrivial rows, and retains aligned target ids
+for endpoint partitions. `CpgEdges`, `CfgNeighbors`, and `DfgNeighbors` are
+borrowed exact-size/double-ended iterators. Stable projection, SCC, PDG, VF2,
+and statistics readers use the cache. Mutation-oriented call resolution, DFG,
+and uniqueness checks use crate-private native petgraph adjacency so a read does
+not trigger “build global cache, append one edge, invalidate” inside a loop.
+
+The semantic oracles compare every cached accessor with direct edge filtering
+over 256 generated graphs and compare logical sequences across 256 insertion
+permutations. Parser integration repeats the full oracle after Rust call
+resolution and PDG construction. Exact examples cover parallel edges, unknown
+ids, cursor behavior, mutation invalidation, clone, and serde omission. A
+100,000-node CFG path plus a 99,999-edge DFG row builds, traverses, and drops on
+a 256 KiB native stack.
+
+**Isolated warm-read result against committed H05.** Criterion's central
+time-change estimate is shown; node and AST child reads are controls outside
+the new cache.
+
+| Case | 1,024 nodes | 8,192 nodes |
+|---|---:|---:|
+| `node` control | +1.07% (noise threshold) | +2.17% |
+| `ast_children` control | +3.86% | -2.74% |
+| `cfg_successors` | -33.11% | -18.13% |
+| `dfg_successors` | -31.09% | -14.03% |
+| `edges_between` | -45.10% | -45.77% |
+
+The isolated corpus comparison measures the cold first build: approximately
+50-line Rust regressed 7.58%, 500-line and 5,000-line Rust had no detected
+change (+0.56% and -0.37%), and the four-language bundle regressed 4.25%.
+That cost is retained as a documented falsification boundary rather than
+relabelled as warm traversal.
+
+**Complete result against immutable `main`.** The cumulative branch improves
+CFG reads 37.71%/18.33%, DFG reads 30.83%/18.93%, and endpoint lookup
+45.71%/44.99% at 1,024/8,192 nodes. AST child reads, supplied by H03, improve
+88.95%/85.36%. End-to-end analysis improves 6.74% on small Rust, 8.54% on
+medium Rust, and 11.01% on the cross-language corpus; the large Rust result
+(-2.63%) remains inside the configured noise threshold.
+
+**Headless allocation and peak result against H05.** Ten cold construction-plus-
+traversal repetitions produced the following complete trade-off:
+
+| Measure | H05 | H07 | Change |
+|---|---:|---:|---:|
+| DHAT bytes | 77,000,155 | 75,364,395 | -2.12% |
+| DHAT blocks | 737,604 | 246,274 | -66.61% |
+| DHAT peak live bytes | 2,999,920 | 4,310,480 | +43.69% |
+| Massif page peak | 13,053,952 | 14,323,712 | +9.73% |
+| maximum RSS | 5,776 KiB | 7,056 KiB | +22.16% |
+| cycles | 99,396,514 | 105,750,416 | +6.39% |
+| retired instructions | 248,637,765 | 338,333,466 | +36.07% |
+
+The cold profile performs only one read sweep, so cache construction dominates
+its counters while Criterion measures repeated warm access. Allocation blocks
+fall by two thirds, validating the target, but retained peak memory rises. The
+graph header grows from 184 to 200 bytes and remains below the pre-H05 216-byte
+layout. VTune's headless collectors were unavailable under host `ptrace_scope`;
+perf used its headless DWARF fallback. H07 is accepted because its exact warm
+read and allocation objectives pass, the cumulative corpus boundary does not
+regress, and the cold/peak costs are explicit. Full method and counter tables
+are in [validation 51](../scientific/51-projection-cache-validation.md).
+
 ## Reproduce and compare
 
 The benchmark wrapper defaults to CPUs 0 and 1 and stores logs under

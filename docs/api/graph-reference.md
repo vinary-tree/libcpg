@@ -26,7 +26,7 @@ suffices:
 
 ```rust,ignore
 use libcpg::{
-    CodePropertyGraph, CpgStats,
+    CodePropertyGraph, CpgStats, CpgEdges, CfgNeighbors, DfgNeighbors,
     CpgNode, CpgNodeKind, CpgNodeKindTag, LiteralKind,
     CpgEdge, CpgEdgeKind, CfgEdgeKind, DfgEdgeKind,
     NodeId, EdgeId, SourceRange,
@@ -45,13 +45,13 @@ root re-exports are canonical.
 ## `CodePropertyGraph`
 
 The central container. It is **not** a bag of vectors: it wraps a
-[petgraph](../GLOSSARY.md#petgraph) `DiGraph<CpgNode, CpgEdge>` plus two
-`FxHashMap` side-tables that translate the stable `NodeId`/`EdgeId` the API
-exposes into petgraph's internal `NodeIndex`/`EdgeIndex`. All fields are private;
-you interact through the methods below.
+[petgraph](../GLOSSARY.md#petgraph) `DiGraph<CpgNode, CpgEdge>`, one `FxHashMap`
+that translates stable `NodeId` values into petgraph's internal `NodeIndex`,
+and a lazy exact-edge projection cache. All fields are private; you interact
+through the methods below.
 
 ```rust
-pub struct CodePropertyGraph { /* private: petgraph DiGraph + id→index maps + metadata */ }
+pub struct CodePropertyGraph { /* private: DiGraph + node index + lazy edge cache + metadata */ }
 ```
 
 Besides the topology it records: the [`Language`](#language) it was built for, an
@@ -92,6 +92,12 @@ graph has `Language::Unknown`).
 > There is no `remove_node` / `remove_edge`: a CPG is built once and analyzed;
 > extraction stages *add* overlay edges rather than mutate topology in place.
 
+The stable-id domain includes `u32::MAX`. Explicit reconstruction may insert
+that maximum id. Once the monotonic allocator reaches an already-assigned
+maximum, a subsequent automatic node insertion panics rather than wrapping and
+aliasing an existing node. Applications admitting hostile reconstructed graphs
+should enforce an aggregate node/edge limit far below the identity ceiling.
+
 `CpgNodeKind::tag() -> CpgNodeKindTag` and the graph-level `node_tag` accessor
 classify all 45 variants one-to-one. They are intended for control-flow
 dispatch that needs no variant payload, particularly when a copied tag lets a
@@ -107,11 +113,17 @@ kinds to `Unknown`.
 | `add_edge` | `fn add_edge(&mut self, edge: CpgEdge) -> Option<EdgeId>` | Assigns a fresh `EdgeId`. `None` if either endpoint is absent. |
 | `add_edge_with_id` | `fn add_edge_with_id(&mut self, edge: CpgEdge) -> Option<EdgeId>` | Keeps `edge.id` (reconstruction). |
 | `connect` | `fn connect(&mut self, source: NodeId, target: NodeId, kind: CpgEdgeKind) -> Option<EdgeId>` | Convenience constructor + insert. Returns `None` if an endpoint is missing. |
-| `edges_between` | `fn edges_between(&self, source: NodeId, target: NodeId) -> Vec<&CpgEdge>` | All parallel edges from `source` to `target`. |
+| `edges_between` | `fn edges_between(&self, source: NodeId, target: NodeId) -> CpgEdges<'_>` | Allocation-free exact-size view of all parallel edges from `source` to `target`. |
 | `edges` | `fn edges(&self) -> impl Iterator<Item = &CpgEdge>` | Iterate all edges. |
 
 There is no `edge(id)` accessor; look edges up by endpoint with `edges_between`,
 `outgoing_edges`, or `incoming_edges`.
+
+`EdgeId::new(u32::MAX)` is likewise representable during reconstruction; after
+the monotonic allocator reaches an already-assigned maximum, the next automatic
+insertion panics rather than wrapping. Rejected insertions with a missing
+endpoint do not change topology or invalidate an already-valid projection
+cache.
 
 ### AST traversal
 
@@ -138,8 +150,8 @@ on, e.g., `ConditionalTrue` vs `LoopBack`.
 
 | Method | Signature | Notes |
 |--------|-----------|-------|
-| `cfg_successors` | `fn cfg_successors(&self, id: NodeId) -> Vec<(NodeId, CfgEdgeKind)>` | Outgoing control flow. |
-| `cfg_predecessors` | `fn cfg_predecessors(&self, id: NodeId) -> Vec<(NodeId, CfgEdgeKind)>` | Incoming control flow. |
+| `cfg_successors` | `fn cfg_successors(&self, id: NodeId) -> CfgNeighbors<'_>` | Allocation-free outgoing control flow in deterministic target/edge-id order. |
+| `cfg_predecessors` | `fn cfg_predecessors(&self, id: NodeId) -> CfgNeighbors<'_>` | Allocation-free incoming control flow in deterministic source/edge-id order. |
 | `cfg_entries` | `fn cfg_entries(&self) -> &[NodeId]` | Function entry nodes. |
 | `cfg_exits` | `fn cfg_exits(&self) -> &[NodeId]` | Recorded exit nodes. |
 | `add_cfg_entry` | `fn add_cfg_entry(&mut self, id: NodeId)` | Register an entry (dedup). |
@@ -152,8 +164,8 @@ on, e.g., `ConditionalTrue` vs `LoopBack`.
 |--------|-----------|-------|
 | `reaching_definitions` | `fn reaching_definitions(&self, use_site: NodeId) -> Vec<NodeId>` | Definitions reaching `use_site` (incoming `DefUse`/`ReachingDef`). |
 | `uses_of_definition` | `fn uses_of_definition(&self, def: NodeId) -> Vec<NodeId>` | Uses reached by `def` (outgoing `DefUse`). |
-| `dfg_successors` | `fn dfg_successors(&self, id: NodeId) -> Vec<(NodeId, DfgEdgeKind)>` | Outgoing data flow. |
-| `dfg_predecessors` | `fn dfg_predecessors(&self, id: NodeId) -> Vec<(NodeId, DfgEdgeKind)>` | Incoming data flow. |
+| `dfg_successors` | `fn dfg_successors(&self, id: NodeId) -> DfgNeighbors<'_>` | Allocation-free outgoing data flow in deterministic target/edge-id order. |
+| `dfg_predecessors` | `fn dfg_predecessors(&self, id: NodeId) -> DfgNeighbors<'_>` | Allocation-free incoming data flow in deterministic source/edge-id order. |
 
 See [reaching definitions](../GLOSSARY.md#reaching-definition) for the semantics
 these edges encode.
@@ -191,9 +203,18 @@ no `nodes_of_kind(kind)`.
 
 | Method | Signature | Notes |
 |--------|-----------|-------|
-| `outgoing_edges` | `fn outgoing_edges(&self, id: NodeId) -> impl Iterator<Item = &CpgEdge>` | All outgoing edges. |
-| `incoming_edges` | `fn incoming_edges(&self, id: NodeId) -> impl Iterator<Item = &CpgEdge>` | All incoming edges. |
+| `outgoing_edges` | `fn outgoing_edges(&self, id: NodeId) -> CpgEdges<'_>` | Allocation-free exact-size view of all outgoing edges. |
+| `incoming_edges` | `fn incoming_edges(&self, id: NodeId) -> CpgEdges<'_>` | Allocation-free exact-size view of all incoming edges. |
 | `edges_by_kind` | `fn edges_by_kind<F: Fn(&CpgEdgeKind) -> bool>(&self, predicate: F) -> impl Iterator<Item = &CpgEdge>` | Filter edges by a kind predicate. |
+
+`CpgEdges`, `CfgNeighbors`, and `DfgNeighbors` are borrowed, cloneable,
+double-ended, exact-size iterators. `is_empty`, `len`, `iter`, and ordinary
+iterator combinators do not allocate. CFG/DFG views additionally provide
+`to_vec()` for callers that need ownership before mutating the graph. The first
+cached traversal after construction or mutation builds deterministic
+compressed-sparse-row (CSR) indices; subsequent reads borrow their rows. See
+[ADR-0056](../design/0056-lazy-deterministic-edge-projection-cache.md) for the
+invalidation and ordering contract.
 
 ### Graph metrics
 

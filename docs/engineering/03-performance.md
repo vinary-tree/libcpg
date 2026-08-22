@@ -15,6 +15,7 @@ These are the choices the code actually makes, and why:
 | --- | --- | --- |
 | Graph storage | [`petgraph`](../GLOSSARY.md#petgraph) `DiGraph<CpgNode, CpgEdge>` | Mature, well-tested directed-graph store with stable `NodeIndex`/`EdgeIndex` handles. One store holds all four [overlays](../GLOSSARY.md#code-property-graph-cpg); exact analyses use normalized `GraphProjection` CSR views. |
 | Node id → index map | `rustc_hash::FxHashMap` | The CPG keeps one `NodeId → NodeIndex` map for O(1)-expected lookup. `EdgeId` remains in each edge weight; because there is no edge-id lookup API, no duplicate edge map is maintained. `FxHash` is a fast, non-cryptographic hasher—a good fit because keys are library-assigned `u32` ids, not attacker-controlled strings. (Security implications: [`security/01`](../security/01-input-and-resource-hardening.md).) |
+| Lazy exact-edge projection cache | three CSR edge-index orders behind `OnceLock<Box<_>>` | A first stable edge read groups exact edges by source/layer, target/layer, and source/target. Warm outgoing, incoming, CFG, DFG, and endpoint views borrow deterministic exact-size rows without allocating. Every public topology mutation invalidates the derived box; mutation-oriented builders use native petgraph adjacency. |
 | Per-node child lists | `smallvec::SmallVec<[NodeId; 4]>` | `CpgNode::children` stores up to four child ids **inline**, with no heap allocation — the common case for AST fan-out — spilling to the heap only for wider nodes. |
 | Cold metadata | `Option<Box<FxHashMap<…>>>` / `Option<Box<str>>` | Empty node properties and unlabeled edges retain pointer-sized optional fields; maps and label text allocate only when present. |
 | Shared source text | `std::sync::Arc<str>` | `CpgNode::text`, operator strings, and string/regex literal payloads are `Arc<str>`: immutable, shared, and cloned in O(1) by bumping a refcount instead of copying bytes. |
@@ -23,7 +24,8 @@ These are the choices the code actually makes, and why:
 
 The upshot: a CPG is one contiguous petgraph arena of compact
 `CpgNode`/`CpgEdge` values, with small inline child vectors, cold boxed metadata,
-refcounted text, and one fast node-id map.
+refcounted text, one fast node-id map, and an optional read-optimized exact-edge
+index.
 
 ## Dependencies declared but not yet wired
 
@@ -44,13 +46,15 @@ in an analysis-specific harness.
 
 ## Preallocation
 
-Preallocation (sizing a collection up front when the element count is known) is a
-project-wide best practice, but its current coverage in `libcpg` is **sparse** —
-there is essentially one `with_capacity` site, in the PDG builder. Most collections
-grow dynamically. Introducing preallocation at the hot construction sites — for
-example, reserving `CpgNode`/`CpgEdge` capacity from the tree-sitter node count
-before the AST walk — is a safe, mechanical optimization and a good contribution;
-see [contributing](04-contributing.md).
+Preallocation (sizing a collection up front when the element count is known) is
+used at the major structural boundaries. `build_from_tree` treats tree-sitter's
+`descendant_count` as an upper bound and constructs the CPG with node and AST
+edge capacity before mapping. Graph projection, continuation machines, and
+analysis result builders use local exact or conservative capacities where their
+input cardinality is already known. Collections whose retained size depends on
+semantic filtering still grow dynamically rather than reserving an unrelated
+worst case. New reservations must be measured because over-reservation can
+increase peak memory without reducing allocator traffic.
 
 ## Asymptotic cost of key operations
 
@@ -73,6 +77,7 @@ function scope.
 | Operation | Expected cost | Notes |
 | --- | --- | --- |
 | CPG construction (AST walk) | $`O(n)`$ | One depth-first pass over the parse tree, one `CpgNode` per kept tree-sitter node. |
+| Lazy exact-edge cache build / read | build $`O(V+E+\sum_r d_r\log d_r)`$ time and $`O(V+E)`$ retained space; warm row $`O(1)`$ plus output; layer/endpoint selection $`O(\log d_r)`$ plus output | Three counting/scatter CSR orders preserve exact parallel edges. The first qualifying read pays construction; warm `CpgEdges`, `CfgNeighbors`, and `DfgNeighbors` allocate nothing. Mutation discards the cache. |
 | CFG extraction (per parser-built function) | $`O(n + e_c)`$ | Typed heap continuations visit each AST node once and emit $`e_c`$ unique control-flow edges; heap state is $`O(d+x)`$ for depth $`d`$ and live exit frontier $`x`$, while native call depth is constant. Shared hand-built DAG regions retain path-replay semantics. |
 | DFG reaching-defs (per function) | $`O(W)`$ structural work and $`O(V+E)`$ conservative traversal heap | $`W = O(V\,2^d)`$ for $`V`$ AST nodes at maximum loop nesting $`d`$: one [AST-ordered sweep](../GLOSSARY.md#ast-ordered-reaching-definitions), with every loop body revisited once per enclosing-pass context. Typed `Enter`/`Bind`/`Exit` frames and an active path make native call depth constant. The public 100,000-level 256 KiB gate completes in 0.75 s; retained `max_iterations` is not used by this live algorithm. |
 | DFG field/index auxiliary pass | $`O((D+F+M)h + A)`$ expected time, $`O(D+F)`$ index space | One immutable exact-name index is shared across a full extraction: $`D`$ nominal declarations, $`F`$ fields, $`M`$ member accesses, maximum AST-parent height $`h`$, and $`A`$ member/index/assignment sites. Hash lookup is expected constant time; ambiguity retains all candidates and emits no reference. |

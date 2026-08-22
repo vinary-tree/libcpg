@@ -143,7 +143,7 @@ pub fn control_flow_sccs(
     let mut node_set = FxHashSet::default();
     node_set.insert(function);
 
-    for edge in cpg.edges().filter(|edge| edge.kind.is_cfg()) {
+    for edge in cpg.cfg_overlay_edges() {
         if scope.contains(&edge.source) && scope.contains(&edge.target) {
             node_set.insert(edge.source);
             node_set.insert(edge.target);
@@ -153,8 +153,7 @@ pub fn control_flow_sccs(
     let nodes = sorted_nodes(node_set);
     let adjacency = adjacency_from_edges(
         &nodes,
-        cpg.edges()
-            .filter(|edge| edge.kind.is_cfg())
+        cpg.cfg_overlay_edges()
             .map(|edge| (edge.source, edge.target)),
     );
     Ok(decompose(

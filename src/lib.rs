@@ -149,11 +149,12 @@ pub(crate) mod testutil;
 
 // Re-export commonly used types
 pub use graph::{
-    CfgEdgeKind, CodePropertyGraph, CpgEdge, CpgEdgeKind, CpgNode, CpgNodeKind, CpgNodeKindTag,
-    CpgStats, DfgEdgeKind, EdgeId, Language, LiteralKind, LockKind, LockMode, MethodSignature,
-    MsgKind, NodeId, Paradigm, PropertyKey, PropertyList, PropertyListIter, PropertyValue,
-    PropertyValueError, PropertyValueKind, PropertyValueLimit, PropertyValueLimits,
-    PropertyValueMetrics, PropertyValueRef, ScopeId, SourceRange, TypeInfo, Visibility,
+    CfgEdgeKind, CfgNeighbors, CodePropertyGraph, CpgEdge, CpgEdgeKind, CpgEdges, CpgNode,
+    CpgNodeKind, CpgNodeKindTag, CpgStats, DfgEdgeKind, DfgNeighbors, EdgeId, Language,
+    LiteralKind, LockKind, LockMode, MethodSignature, MsgKind, NodeId, Paradigm, PropertyKey,
+    PropertyList, PropertyListIter, PropertyValue, PropertyValueError, PropertyValueKind,
+    PropertyValueLimit, PropertyValueLimits, PropertyValueMetrics, PropertyValueRef, ScopeId,
+    SourceRange, TypeInfo, Visibility,
 };
 
 pub use analysis::{

@@ -6,7 +6,10 @@ use petgraph::graph::{DiGraph, NodeIndex};
 use petgraph::Direction;
 use rustc_hash::FxHashMap;
 use smallvec::SmallVec;
-use std::sync::Arc;
+use std::{
+    fmt,
+    sync::{Arc, OnceLock},
+};
 
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
@@ -14,9 +17,14 @@ use serde::{Deserialize, Serialize};
 #[cfg(feature = "serde")]
 use super::serde_util::option_arc_str;
 
+use super::projection_cache::{
+    CfgNeighbors, CpgEdges, CpgProjectionCache, DfgNeighbors, EdgeLayer,
+};
+#[cfg(test)]
+use super::CfgEdgeKind;
 use super::{
-    CfgEdgeKind, CpgEdge, CpgEdgeKind, CpgNode, CpgNodeKind, CpgNodeKindTag, DfgEdgeKind, EdgeId,
-    Language, NodeId, SourceRange,
+    CpgEdge, CpgEdgeKind, CpgNode, CpgNodeKind, CpgNodeKindTag, DfgEdgeKind, EdgeId, Language,
+    NodeId, SourceRange,
 };
 
 /// A Code Property Graph combining AST, CFG, and DFG.
@@ -25,7 +33,6 @@ use super::{
 /// - Abstract Syntax Tree (AST) structure via parent/child relationships
 /// - Control Flow Graph (CFG) via control flow edges
 /// - Data Flow Graph (DFG) via def-use and use-def chains
-#[derive(Debug)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct CodePropertyGraph {
     /// The underlying directed graph.
@@ -50,6 +57,27 @@ pub struct CodePropertyGraph {
     cfg_entries: Vec<NodeId>,
     /// Exit points for the CFG (function exit/return nodes).
     cfg_exits: Vec<NodeId>,
+    /// Lazily built CSR read index; every topology mutation invalidates it.
+    #[cfg_attr(feature = "serde", serde(skip, default))]
+    projection_cache: OnceLock<Box<CpgProjectionCache>>,
+}
+
+impl fmt::Debug for CodePropertyGraph {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter
+            .debug_struct("CodePropertyGraph")
+            .field("graph", &self.graph)
+            .field("node_index_map", &self.node_index_map)
+            .field("language", &self.language)
+            .field("source_path", &self.source_path)
+            .field("source_code", &self.source_code)
+            .field("next_node_id", &self.next_node_id)
+            .field("next_edge_id", &self.next_edge_id)
+            .field("root", &self.root)
+            .field("cfg_entries", &self.cfg_entries)
+            .field("cfg_exits", &self.cfg_exits)
+            .finish()
+    }
 }
 
 impl CodePropertyGraph {
@@ -81,6 +109,7 @@ impl CodePropertyGraph {
             root: None,
             cfg_entries: Vec::new(),
             cfg_exits: Vec::new(),
+            projection_cache: OnceLock::new(),
         }
     }
 
@@ -129,9 +158,15 @@ impl CodePropertyGraph {
     // ========== Node Operations ==========
 
     /// Adds a node to the graph and returns its ID.
+    ///
+    /// # Panics
+    ///
+    /// Panics after all `u32` node identifiers have been assigned. A graph can
+    /// contain [`NodeId::new`] with `u32::MAX`, but no later automatic insertion can
+    /// produce another unique identifier.
     pub fn add_node(&mut self, mut node: CpgNode) -> NodeId {
-        let id = NodeId::new(self.next_node_id);
-        self.next_node_id += 1;
+        let id = self.take_next_node_id();
+        self.invalidate_projection_cache();
         node.id = id;
 
         let index = self.graph.add_node(node);
@@ -147,8 +182,9 @@ impl CodePropertyGraph {
 
     /// Adds a node with a specific ID (for reconstruction from serialization).
     pub fn add_node_with_id(&mut self, node: CpgNode) -> NodeId {
+        self.invalidate_projection_cache();
         let id = node.id;
-        self.next_node_id = self.next_node_id.max(id.0 + 1);
+        self.next_node_id = self.next_node_id.max(id.0.saturating_add(1));
 
         let index = self.graph.add_node(node);
         self.node_index_map.insert(id, index);
@@ -157,6 +193,19 @@ impl CodePropertyGraph {
             self.root = Some(id);
         }
 
+        id
+    }
+
+    fn take_next_node_id(&mut self) -> NodeId {
+        let id = NodeId::new(self.next_node_id);
+        if self.next_node_id == u32::MAX {
+            assert!(
+                !self.node_index_map.contains_key(&id),
+                "the CPG NodeId domain is exhausted"
+            );
+        } else {
+            self.next_node_id += 1;
+        }
         id
     }
 
@@ -177,6 +226,7 @@ impl CodePropertyGraph {
 
     /// Returns a mutable reference to a node by ID.
     pub fn node_mut(&mut self, id: NodeId) -> Option<&mut CpgNode> {
+        self.invalidate_projection_cache();
         self.node_index_map
             .get(&id)
             .copied()
@@ -313,12 +363,18 @@ impl CodePropertyGraph {
     /// source node's child index and derives the target's parent from the
     /// lowest-ID incoming AST-child edge. Callers must not repeat that metadata
     /// update manually.
+    ///
+    /// # Panics
+    ///
+    /// Panics after all `u32` edge identifiers have been assigned. A graph can
+    /// contain [`EdgeId::new`] with `u32::MAX`, but no later automatic insertion can
+    /// produce another unique identifier.
     pub fn add_edge(&mut self, mut edge: CpgEdge) -> Option<EdgeId> {
         let source_idx = *self.node_index_map.get(&edge.source)?;
         let target_idx = *self.node_index_map.get(&edge.target)?;
 
-        let id = EdgeId::new(self.next_edge_id);
-        self.next_edge_id += 1;
+        let id = self.take_next_edge_id();
+        self.invalidate_projection_cache();
         edge.id = id;
 
         let is_ast_child = edge.kind == CpgEdgeKind::AstChild;
@@ -343,11 +399,12 @@ impl CodePropertyGraph {
         let source_idx = *self.node_index_map.get(&edge.source)?;
         let target_idx = *self.node_index_map.get(&edge.target)?;
 
+        self.invalidate_projection_cache();
         let id = edge.id;
         let is_ast_child = edge.kind == CpgEdgeKind::AstChild;
         let source = edge.source;
         let target = edge.target;
-        self.next_edge_id = self.next_edge_id.max(id.0 + 1);
+        self.next_edge_id = self.next_edge_id.max(id.0.saturating_add(1));
 
         self.graph.add_edge(source_idx, target_idx, edge);
 
@@ -357,6 +414,19 @@ impl CodePropertyGraph {
         }
 
         Some(id)
+    }
+
+    fn take_next_edge_id(&mut self) -> EdgeId {
+        let id = EdgeId::new(self.next_edge_id);
+        if self.next_edge_id == u32::MAX {
+            assert!(
+                !self.graph.edge_weights().any(|edge| edge.id == id),
+                "the CPG EdgeId domain is exhausted"
+            );
+        } else {
+            self.next_edge_id += 1;
+        }
+        id
     }
 
     /// Appends a monotonically numbered AST edge to the stored source order.
@@ -451,11 +521,13 @@ impl CodePropertyGraph {
         target: NodeId,
         kind: CpgEdgeKind,
     ) -> Option<EdgeId> {
+        let source_index = *self.node_index_map.get(&source)?;
+        let target_index = *self.node_index_map.get(&target)?;
         let existing = self
-            .edges_between(source, target)
-            .into_iter()
-            .find(|e| e.kind == kind)
-            .map(|e| e.id);
+            .graph
+            .edges_connecting(source_index, target_index)
+            .find(|edge| edge.weight().kind == kind)
+            .map(|edge| edge.weight().id);
         match existing {
             Some(id) => Some(id),
             None => self.connect(source, target, kind),
@@ -473,11 +545,15 @@ impl CodePropertyGraph {
         kind: CpgEdgeKind,
         label: &str,
     ) -> Option<EdgeId> {
+        let source_index = *self.node_index_map.get(&source)?;
+        let target_index = *self.node_index_map.get(&target)?;
         let existing = self
-            .edges_between(source, target)
-            .into_iter()
-            .find(|edge| edge.kind == kind && edge.label.as_deref() == Some(label))
-            .map(|edge| edge.id);
+            .graph
+            .edges_connecting(source_index, target_index)
+            .find(|edge| {
+                edge.weight().kind == kind && edge.weight().label.as_deref() == Some(label)
+            })
+            .map(|edge| edge.weight().id);
         match existing {
             Some(id) => Some(id),
             None => {
@@ -487,20 +563,9 @@ impl CodePropertyGraph {
     }
 
     /// Returns edges between two nodes.
-    pub fn edges_between(&self, source: NodeId, target: NodeId) -> Vec<&CpgEdge> {
-        let source_idx = match self.node_index_map.get(&source) {
-            Some(&idx) => idx,
-            None => return Vec::new(),
-        };
-        let target_idx = match self.node_index_map.get(&target) {
-            Some(&idx) => idx,
-            None => return Vec::new(),
-        };
-
-        self.graph
-            .edges_connecting(source_idx, target_idx)
-            .map(|e| e.weight())
-            .collect()
+    pub fn edges_between(&self, source: NodeId, target: NodeId) -> CpgEdges<'_> {
+        self.projection_cache()
+            .between(&self.graph, self.node_index(source), target)
     }
 
     /// Returns an iterator over all edges.
@@ -580,29 +645,13 @@ impl CodePropertyGraph {
     // ========== CFG Traversal ==========
 
     /// Returns CFG successors of a node.
-    pub fn cfg_successors(&self, id: NodeId) -> Vec<(NodeId, CfgEdgeKind)> {
-        self.outgoing_edges(id)
-            .filter_map(|e| {
-                if let CpgEdgeKind::ControlFlow(kind) = &e.kind {
-                    Some((e.target, *kind))
-                } else {
-                    None
-                }
-            })
-            .collect()
+    pub fn cfg_successors(&self, id: NodeId) -> CfgNeighbors<'_> {
+        CfgNeighbors::new(self.outgoing_layer(id, EdgeLayer::Cfg), true)
     }
 
     /// Returns CFG predecessors of a node.
-    pub fn cfg_predecessors(&self, id: NodeId) -> Vec<(NodeId, CfgEdgeKind)> {
-        self.incoming_edges(id)
-            .filter_map(|e| {
-                if let CpgEdgeKind::ControlFlow(kind) = &e.kind {
-                    Some((e.source, *kind))
-                } else {
-                    None
-                }
-            })
-            .collect()
+    pub fn cfg_predecessors(&self, id: NodeId) -> CfgNeighbors<'_> {
+        CfgNeighbors::new(self.incoming_layer(id, EdgeLayer::Cfg), false)
     }
 
     /// Returns all CFG entry nodes (function entries).
@@ -669,29 +718,13 @@ impl CodePropertyGraph {
     }
 
     /// Returns data flow successors of a node.
-    pub fn dfg_successors(&self, id: NodeId) -> Vec<(NodeId, DfgEdgeKind)> {
-        self.outgoing_edges(id)
-            .filter_map(|e| {
-                if let CpgEdgeKind::DataFlow(kind) = &e.kind {
-                    Some((e.target, *kind))
-                } else {
-                    None
-                }
-            })
-            .collect()
+    pub fn dfg_successors(&self, id: NodeId) -> DfgNeighbors<'_> {
+        DfgNeighbors::new(self.outgoing_layer(id, EdgeLayer::Dfg), true)
     }
 
     /// Returns data flow predecessors of a node.
-    pub fn dfg_predecessors(&self, id: NodeId) -> Vec<(NodeId, DfgEdgeKind)> {
-        self.incoming_edges(id)
-            .filter_map(|e| {
-                if let CpgEdgeKind::DataFlow(kind) = &e.kind {
-                    Some((e.source, *kind))
-                } else {
-                    None
-                }
-            })
-            .collect()
+    pub fn dfg_predecessors(&self, id: NodeId) -> DfgNeighbors<'_> {
+        DfgNeighbors::new(self.incoming_layer(id, EdgeLayer::Dfg), false)
     }
 
     // ========== Call Graph ==========
@@ -711,7 +744,7 @@ impl CodePropertyGraph {
     /// Returns callees of a call site.
     pub fn callees(&self, call_site: NodeId) -> Vec<NodeId> {
         let mut callees: Vec<_> = self
-            .outgoing_edges(call_site)
+            .native_outgoing_edges(call_site)
             .filter_map(|e| {
                 if matches!(
                     e.kind,
@@ -731,7 +764,7 @@ impl CodePropertyGraph {
     /// Returns callers of a function.
     pub fn callers(&self, function: NodeId) -> Vec<NodeId> {
         let mut callers: Vec<_> = self
-            .incoming_edges(function)
+            .native_incoming_edges(function)
             .filter_map(|e| {
                 if matches!(
                     e.kind,
@@ -815,29 +848,124 @@ impl CodePropertyGraph {
     // ========== Edge Helpers ==========
 
     /// Returns outgoing edges from a node.
-    pub fn outgoing_edges(&self, id: NodeId) -> impl Iterator<Item = &CpgEdge> {
+    pub fn outgoing_edges(&self, id: NodeId) -> CpgEdges<'_> {
+        self.projection_cache()
+            .outgoing(&self.graph, self.node_index(id))
+    }
+
+    /// Returns incoming edges to a node.
+    pub fn incoming_edges(&self, id: NodeId) -> CpgEdges<'_> {
+        self.projection_cache()
+            .incoming(&self.graph, self.node_index(id))
+    }
+
+    fn overlay_edges(&self, layer: EdgeLayer) -> impl Iterator<Item = &CpgEdge> {
+        self.projection_cache().layer(&self.graph, layer)
+    }
+
+    /// Iterates the complete AST overlay in canonical source/target/id order.
+    pub(crate) fn ast_overlay_edges(&self) -> impl Iterator<Item = &CpgEdge> {
+        self.overlay_edges(EdgeLayer::Ast)
+    }
+
+    /// Iterates the complete CFG overlay in canonical source/target/id order.
+    pub(crate) fn cfg_overlay_edges(&self) -> impl Iterator<Item = &CpgEdge> {
+        self.overlay_edges(EdgeLayer::Cfg)
+    }
+
+    /// Iterates the complete DFG overlay in canonical source/target/id order.
+    pub(crate) fn dfg_overlay_edges(&self) -> impl Iterator<Item = &CpgEdge> {
+        self.overlay_edges(EdgeLayer::Dfg)
+    }
+
+    /// Iterates the complete PDG overlay in canonical source/target/id order.
+    pub(crate) fn pdg_overlay_edges(&self) -> impl Iterator<Item = &CpgEdge> {
+        self.overlay_edges(EdgeLayer::Pdg)
+    }
+
+    /// Iterates the explicit call overlay in canonical source/target/id order.
+    pub(crate) fn call_overlay_edges(&self) -> impl Iterator<Item = &CpgEdge> {
+        self.overlay_edges(EdgeLayer::Call)
+    }
+
+    /// Walks petgraph's native outgoing row without constructing the read cache.
+    ///
+    /// This is reserved for crate-internal algorithms that make one complete
+    /// pass and canonicalize their own result. Public repeated/random access
+    /// goes through the deterministic CSR cache.
+    #[inline]
+    pub(crate) fn native_outgoing_edges(&self, id: NodeId) -> impl Iterator<Item = &CpgEdge> {
         self.node_index_map
             .get(&id)
-            .map(|&idx| {
+            .map(|&index| {
                 self.graph
-                    .edges_directed(idx, Direction::Outgoing)
-                    .map(|e| e.weight())
+                    .edges_directed(index, Direction::Outgoing)
+                    .map(|edge| edge.weight())
             })
             .into_iter()
             .flatten()
     }
 
-    /// Returns incoming edges to a node.
-    pub fn incoming_edges(&self, id: NodeId) -> impl Iterator<Item = &CpgEdge> {
+    /// Walks petgraph's native incoming row without constructing the read cache.
+    #[inline]
+    pub(crate) fn native_incoming_edges(&self, id: NodeId) -> impl Iterator<Item = &CpgEdge> {
         self.node_index_map
             .get(&id)
-            .map(|&idx| {
+            .map(|&index| {
                 self.graph
-                    .edges_directed(idx, Direction::Incoming)
-                    .map(|e| e.weight())
+                    .edges_directed(index, Direction::Incoming)
+                    .map(|edge| edge.weight())
             })
             .into_iter()
             .flatten()
+    }
+
+    /// Walks petgraph's native endpoint relation without constructing the cache.
+    ///
+    /// Mutation-oriented passes use this only for a local check immediately
+    /// before an insertion, which would otherwise invalidate a freshly built
+    /// read cache.
+    #[inline]
+    pub(crate) fn native_edges_between(
+        &self,
+        source: NodeId,
+        target: NodeId,
+    ) -> impl Iterator<Item = &CpgEdge> {
+        self.node_index_map
+            .get(&source)
+            .copied()
+            .zip(self.node_index_map.get(&target).copied())
+            .map(|(source, target)| {
+                self.graph
+                    .edges_connecting(source, target)
+                    .map(|edge| edge.weight())
+            })
+            .into_iter()
+            .flatten()
+    }
+
+    fn outgoing_layer(&self, id: NodeId, layer: EdgeLayer) -> CpgEdges<'_> {
+        self.projection_cache()
+            .outgoing_layer(&self.graph, self.node_index(id), layer)
+    }
+
+    fn incoming_layer(&self, id: NodeId, layer: EdgeLayer) -> CpgEdges<'_> {
+        self.projection_cache()
+            .incoming_layer(&self.graph, self.node_index(id), layer)
+    }
+
+    fn node_index(&self, id: NodeId) -> Option<NodeIndex> {
+        self.node_index_map.get(&id).copied()
+    }
+
+    fn projection_cache(&self) -> &CpgProjectionCache {
+        self.projection_cache
+            .get_or_init(|| Box::new(CpgProjectionCache::build(&self.graph)))
+            .as_ref()
+    }
+
+    fn invalidate_projection_cache(&mut self) {
+        let _ = self.projection_cache.take();
     }
 
     /// Returns all edges of a specific kind.
@@ -952,10 +1080,10 @@ impl CodePropertyGraph {
 
     /// Returns statistics about the graph.
     pub fn stats(&self) -> CpgStats {
-        let ast_edges = self.edges().filter(|e| e.kind.is_ast()).count();
-        let cfg_edges = self.edges().filter(|e| e.kind.is_cfg()).count();
-        let dfg_edges = self.edges().filter(|e| e.kind.is_dfg()).count();
-        let call_edges = self.edges().filter(|e| e.kind.is_call()).count();
+        let ast_edges = self.ast_overlay_edges().count();
+        let cfg_edges = self.cfg_overlay_edges().count();
+        let dfg_edges = self.dfg_overlay_edges().count();
+        let call_edges = self.call_overlay_edges().count();
 
         CpgStats {
             node_count: self.node_count(),
@@ -1044,6 +1172,7 @@ impl Clone for CodePropertyGraph {
             root: self.root,
             cfg_entries: self.cfg_entries.clone(),
             cfg_exits: self.cfg_exits.clone(),
+            projection_cache: OnceLock::new(),
         }
     }
 }
@@ -1375,13 +1504,121 @@ mod tests {
         assert_eq!(cpg.edge_count(), 0);
     }
 
+    #[test]
+    fn maximum_stable_identifiers_are_representable_and_exhaustion_is_explicit() {
+        let mut nodes = CodePropertyGraph::new(Language::Rust);
+        let maximum = nodes.add_node_with_id(CpgNode::new(
+            NodeId::new(u32::MAX),
+            CpgNodeKind::Root,
+            SourceRange::default(),
+        ));
+        assert_eq!(maximum, NodeId::new(u32::MAX));
+        assert_eq!(nodes.outgoing_edges(maximum).len(), 0);
+        assert!(nodes.projection_cache.get().is_some());
+
+        let node_exhaustion = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+            nodes.add_node(CpgNode::new(
+                NodeId::new(0),
+                CpgNodeKind::Return,
+                SourceRange::default(),
+            ));
+        }));
+        assert!(node_exhaustion.is_err());
+        assert_eq!(nodes.node_count(), 1);
+        assert!(nodes.projection_cache.get().is_some());
+
+        let mut edges = CodePropertyGraph::new(Language::Rust);
+        let source = edges.add_node(CpgNode::new(
+            NodeId::new(0),
+            CpgNodeKind::Root,
+            SourceRange::default(),
+        ));
+        let target = edges.add_node(CpgNode::new(
+            NodeId::new(0),
+            CpgNodeKind::Return,
+            SourceRange::default(),
+        ));
+        let maximum = edges
+            .add_edge_with_id(CpgEdge::new(
+                EdgeId::new(u32::MAX),
+                source,
+                target,
+                CpgEdgeKind::AstChild,
+            ))
+            .expect("maximum edge id is representable");
+        assert_eq!(maximum, EdgeId::new(u32::MAX));
+        assert_eq!(edges.outgoing_edges(source).len(), 1);
+        assert!(edges.projection_cache.get().is_some());
+
+        let edge_exhaustion = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+            edges.connect(
+                source,
+                target,
+                CpgEdgeKind::ControlFlow(CfgEdgeKind::Sequential),
+            );
+        }));
+        assert!(edge_exhaustion.is_err());
+        assert_eq!(edges.edge_count(), 1);
+        assert!(edges.projection_cache.get().is_some());
+    }
+
     #[cfg(target_pointer_width = "64")]
     #[test]
     fn graph_layout_excludes_the_unread_edge_identifier_map() {
         let graph_bytes = std::mem::size_of::<CodePropertyGraph>();
         assert!(
-            graph_bytes <= 184,
+            graph_bytes <= 200,
             "CodePropertyGraph grew to {graph_bytes} bytes"
+        );
+    }
+
+    #[test]
+    fn topology_mutation_invalidates_the_lazy_projection_cache() {
+        let mut graph = CodePropertyGraph::new(Language::Rust);
+        let first = graph.add_node(CpgNode::new(
+            NodeId::new(0),
+            CpgNodeKind::Root,
+            SourceRange::default(),
+        ));
+        let second = graph.add_node(CpgNode::new(
+            NodeId::new(0),
+            CpgNodeKind::Return,
+            SourceRange::default(),
+        ));
+
+        let debug_before_cache = format!("{graph:?}");
+        assert!(graph.edges_between(first, second).is_empty());
+        assert_eq!(
+            format!("{graph:?}"),
+            debug_before_cache,
+            "derived cache state is not part of the logical graph snapshot"
+        );
+        graph.connect(first, second, CpgEdgeKind::AstChild);
+        assert_eq!(graph.edges_between(first, second).len(), 1);
+        assert_eq!(graph.ast_children(first), &[second]);
+
+        graph.connect(
+            first,
+            second,
+            CpgEdgeKind::ControlFlow(CfgEdgeKind::Sequential),
+        );
+        assert_eq!(graph.edges_between(first, second).len(), 2);
+        assert_eq!(
+            graph.cfg_successors(first).to_vec(),
+            vec![(second, CfgEdgeKind::Sequential)]
+        );
+
+        assert!(graph
+            .add_edge(CpgEdge::new(
+                EdgeId::new(0),
+                first,
+                NodeId::new(u32::MAX),
+                CpgEdgeKind::AstChild,
+            ))
+            .is_none());
+        assert!(
+            graph.projection_cache.get().is_some(),
+            "a rejected non-mutation preserves the valid cache"
         );
     }
     use crate::graph::{MethodSignature, Visibility};
@@ -1798,6 +2035,51 @@ mod ext_tests {
     }
 
     #[test]
+    fn projection_cache_build_and_walk_cross_one_hundred_thousand_nodes_on_a_small_stack() {
+        const DEPTH: usize = 100_000;
+        let mut graph = CodePropertyGraph::with_capacity(Language::Rust, DEPTH, (DEPTH - 1) * 2);
+        let first = graph.add_node(mk(CpgNodeKind::Root));
+        let mut previous = first;
+        for _ in 1..DEPTH {
+            let next = graph.add_node(mk(CpgNodeKind::Return));
+            graph.connect(
+                previous,
+                next,
+                CpgEdgeKind::ControlFlow(CfgEdgeKind::Sequential),
+            );
+            graph.connect(first, next, CpgEdgeKind::DataFlow(DfgEdgeKind::DefUse));
+            previous = next;
+        }
+        let graph = std::sync::Arc::new(graph);
+
+        let worker_graph = std::sync::Arc::clone(&graph);
+        let last = std::thread::Builder::new()
+            .name("projection-cache-small-stack".into())
+            .stack_size(256 * 1024)
+            .spawn(move || {
+                assert_eq!(worker_graph.dfg_successors(first).count(), DEPTH - 1);
+                let mut current = first;
+                for _ in 1..DEPTH {
+                    let mut successors = worker_graph.cfg_successors(current);
+                    let (next, kind) = successors.next().expect("linear CFG successor");
+                    assert_eq!(kind, CfgEdgeKind::Sequential);
+                    assert!(successors.next().is_none());
+                    assert_eq!(
+                        worker_graph.edges_between(current, next).len(),
+                        if current == first { 2 } else { 1 },
+                    );
+                    current = next;
+                }
+                current
+            })
+            .expect("spawn projection-cache small-stack worker")
+            .join()
+            .expect("projection-cache small-stack worker completes");
+
+        assert_eq!(last, previous);
+    }
+
+    #[test]
     fn node_at_offset_picks_smallest_enclosing() {
         let mut g = CodePropertyGraph::new(Language::Rust);
         let big = g.add_node(mk_r(CpgNodeKind::Root, 0, 100));
@@ -2155,6 +2437,86 @@ mod proptests {
         edges.into_iter().map(|(_, target)| target).collect()
     }
 
+    fn sorted_edge_ids<'a>(edges: impl IntoIterator<Item = &'a CpgEdge>) -> Vec<u32> {
+        let mut ids: Vec<_> = edges.into_iter().map(|edge| edge.id.as_u32()).collect();
+        ids.sort_unstable();
+        ids
+    }
+
+    fn cfg_signature(cpg: &CodePropertyGraph, node: NodeId, outgoing: bool) -> Vec<String> {
+        let mut signature: Vec<_> = cpg
+            .edges()
+            .filter_map(|edge| {
+                let CpgEdgeKind::ControlFlow(kind) = edge.kind else {
+                    return None;
+                };
+                let neighbor = if outgoing {
+                    (edge.source == node).then_some(edge.target)
+                } else {
+                    (edge.target == node).then_some(edge.source)
+                }?;
+                Some(format!("{}:{kind:?}", neighbor.as_u32()))
+            })
+            .collect();
+        signature.sort_unstable();
+        signature
+    }
+
+    fn dfg_signature(cpg: &CodePropertyGraph, node: NodeId, outgoing: bool) -> Vec<String> {
+        let mut signature: Vec<_> = cpg
+            .edges()
+            .filter_map(|edge| {
+                let CpgEdgeKind::DataFlow(kind) = edge.kind else {
+                    return None;
+                };
+                let neighbor = if outgoing {
+                    (edge.source == node).then_some(edge.target)
+                } else {
+                    (edge.target == node).then_some(edge.source)
+                }?;
+                Some(format!("{}:{kind:?}", neighbor.as_u32()))
+            })
+            .collect();
+        signature.sort_unstable();
+        signature
+    }
+
+    fn cached_order(cpg: &CodePropertyGraph) -> Vec<(NodeId, Vec<u32>, Vec<u32>)> {
+        let mut nodes: Vec<_> = cpg.node_ids().collect();
+        nodes.sort_unstable();
+        nodes
+            .into_iter()
+            .map(|node| {
+                (
+                    node,
+                    cpg.outgoing_edges(node)
+                        .map(|edge| edge.id.as_u32())
+                        .collect(),
+                    cpg.incoming_edges(node)
+                        .map(|edge| edge.id.as_u32())
+                        .collect(),
+                )
+            })
+            .collect()
+    }
+
+    fn reverse_insertion(cpg: &CodePropertyGraph) -> CodePropertyGraph {
+        let mut reversed = CodePropertyGraph::new(cpg.language());
+        let mut nodes: Vec<_> = cpg.nodes().cloned().collect();
+        nodes.reverse();
+        for node in nodes {
+            reversed.add_node_with_id(node);
+        }
+        let mut edges: Vec<_> = cpg.edges().cloned().collect();
+        edges.reverse();
+        for edge in edges {
+            reversed
+                .add_edge_with_id(edge)
+                .expect("reversed edge endpoints exist");
+        }
+        reversed
+    }
+
     fn recursive_ast_depth_oracle(
         cpg: &CodePropertyGraph,
         node: NodeId,
@@ -2204,6 +2566,69 @@ mod proptests {
                 let expected = edge_sorted_ast_children(&g, id);
                 prop_assert_eq!(g.ast_children(id), expected);
             }
+        }
+
+        #[test]
+        fn prop_cached_projection_accessors_equal_direct_edge_filters(g in arb_cpg_raw()) {
+            let mut nodes: Vec<_> = g.node_ids().collect();
+            nodes.sort_unstable();
+
+            let expected_ast = sorted_edge_ids(g.edges().filter(|edge| edge.kind.is_ast()));
+            let expected_cfg = sorted_edge_ids(g.edges().filter(|edge| edge.kind.is_cfg()));
+            let expected_dfg = sorted_edge_ids(g.edges().filter(|edge| edge.kind.is_dfg()));
+            let expected_pdg = sorted_edge_ids(g.edges().filter(|edge| edge.kind.is_pdg()));
+            let expected_call = sorted_edge_ids(g.edges().filter(|edge| edge.kind.is_call()));
+            prop_assert_eq!(sorted_edge_ids(g.ast_overlay_edges()), expected_ast);
+            prop_assert_eq!(sorted_edge_ids(g.cfg_overlay_edges()), expected_cfg);
+            prop_assert_eq!(sorted_edge_ids(g.dfg_overlay_edges()), expected_dfg);
+            prop_assert_eq!(sorted_edge_ids(g.pdg_overlay_edges()), expected_pdg);
+            prop_assert_eq!(sorted_edge_ids(g.call_overlay_edges()), expected_call);
+
+            for &source in &nodes {
+                let expected_out = sorted_edge_ids(g.edges().filter(|edge| edge.source == source));
+                let expected_in = sorted_edge_ids(g.edges().filter(|edge| edge.target == source));
+                prop_assert_eq!(sorted_edge_ids(g.outgoing_edges(source)), expected_out);
+                prop_assert_eq!(sorted_edge_ids(g.incoming_edges(source)), expected_in);
+
+                let mut actual_cfg_out: Vec<_> = g
+                    .cfg_successors(source)
+                    .map(|(node, kind)| format!("{}:{kind:?}", node.as_u32()))
+                    .collect();
+                actual_cfg_out.sort_unstable();
+                let mut actual_cfg_in: Vec<_> = g
+                    .cfg_predecessors(source)
+                    .map(|(node, kind)| format!("{}:{kind:?}", node.as_u32()))
+                    .collect();
+                actual_cfg_in.sort_unstable();
+                let mut actual_dfg_out: Vec<_> = g
+                    .dfg_successors(source)
+                    .map(|(node, kind)| format!("{}:{kind:?}", node.as_u32()))
+                    .collect();
+                actual_dfg_out.sort_unstable();
+                let mut actual_dfg_in: Vec<_> = g
+                    .dfg_predecessors(source)
+                    .map(|(node, kind)| format!("{}:{kind:?}", node.as_u32()))
+                    .collect();
+                actual_dfg_in.sort_unstable();
+                prop_assert_eq!(actual_cfg_out, cfg_signature(&g, source, true));
+                prop_assert_eq!(actual_cfg_in, cfg_signature(&g, source, false));
+                prop_assert_eq!(actual_dfg_out, dfg_signature(&g, source, true));
+                prop_assert_eq!(actual_dfg_in, dfg_signature(&g, source, false));
+
+                for &target in &nodes {
+                    let expected = sorted_edge_ids(
+                        g.edges()
+                            .filter(|edge| edge.source == source && edge.target == target),
+                    );
+                    prop_assert_eq!(sorted_edge_ids(g.edges_between(source, target)), expected);
+                }
+            }
+        }
+
+        #[test]
+        fn prop_cached_projection_order_is_insertion_invariant(g in arb_cpg_raw()) {
+            let reversed = reverse_insertion(&g);
+            prop_assert_eq!(cached_order(&g), cached_order(&reversed));
         }
 
         #[test]
@@ -2464,6 +2889,7 @@ mod serde_tests {
         let mut json = serde_json::to_value(&graph).expect("serialize graph");
         let object = json.as_object_mut().expect("graph serializes as an object");
         assert!(!object.contains_key("edge_index_map"));
+        assert!(!object.contains_key("projection_cache"));
         object.insert(
             "edge_index_map".to_owned(),
             serde_json::json!({"0": [0, 1]}),

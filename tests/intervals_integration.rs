@@ -260,11 +260,11 @@ fn parser_built_rust_comparison_refines_the_public_report() {
     let successors = cpg.cfg_successors(comparison);
     let true_target = successors
         .iter()
-        .find_map(|(target, kind)| (*kind == CfgEdgeKind::ConditionalTrue).then_some(*target))
+        .find_map(|(target, kind)| (kind == CfgEdgeKind::ConditionalTrue).then_some(target))
         .expect("true branch target");
     let false_target = successors
         .iter()
-        .find_map(|(target, kind)| (*kind == CfgEdgeKind::ConditionalFalse).then_some(*target))
+        .find_map(|(target, kind)| (kind == CfgEdgeKind::ConditionalFalse).then_some(target))
         .expect("false branch target");
 
     assert_eq!(

@@ -302,8 +302,10 @@ for (succ, kind) in cpg.cfg_successors(func) {
 # Ok::<(), libcpg::Error>(())
 ```
 
-`cpg.cfg_successors(id)` returns `Vec<(NodeId, CfgEdgeKind)>` and `cpg.cfg_predecessors(id)`
-the incoming counterpart, so the overlay is navigable in both directions. See
+`cpg.cfg_successors(id)` returns an allocation-free `CfgNeighbors` iterator over
+`(NodeId, CfgEdgeKind)` pairs; `cpg.cfg_predecessors(id)` is the incoming
+counterpart. Call `.to_vec()` only when ownership is required before mutation.
+See
 [`../graph/traversal.md`](../graph/traversal.md) for the full navigation surface.
 
 ---

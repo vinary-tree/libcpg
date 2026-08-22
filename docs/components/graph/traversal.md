@@ -11,8 +11,9 @@ the recurring analysis patterns — reachability, def-use following, and a
 
 The single most important thing to internalise: accessors return ids (or
 id/edge-kind pairs), *not* `&CpgNode`s. The hot-path `ast_children` accessor
-borrows its maintained index; descendant and flow accessors return owned
-`Vec`s. Resolve an id to a node with `node(id) -> Option<&CpgNode>`.
+borrows its maintained index; exact edge and CFG/DFG accessors borrow lazy
+exact-size iterator views; transitive discovery accessors return owned `Vec`s.
+Resolve an id to a node with `node(id) -> Option<&CpgNode>`.
 
 | Accessor | Returns |
 |----------|---------|
@@ -21,16 +22,16 @@ borrows its maintained index; descendant and flow accessors return owned
 | `ast_parent(id)` | `Option<NodeId>` |
 | `ast_descendants(id)` | `Vec<NodeId>` (depth-first) |
 | `ast_ancestors(id)` | `Vec<NodeId>` (toward the root) |
-| `cfg_successors(id)` / `cfg_predecessors(id)` | `Vec<(NodeId, CfgEdgeKind)>` |
+| `cfg_successors(id)` / `cfg_predecessors(id)` | `CfgNeighbors<'_>` yielding `(NodeId, CfgEdgeKind)` |
 | `cfg_entries()` / `cfg_exits()` | `&[NodeId]` |
 | `cfg_nodes()` | `impl Iterator<Item = &CpgNode>` |
 | `reaching_definitions(use)` / `uses_of_definition(def)` | `Vec<NodeId>` |
-| `dfg_successors(id)` / `dfg_predecessors(id)` | `Vec<(NodeId, DfgEdgeKind)>` |
+| `dfg_successors(id)` / `dfg_predecessors(id)` | `DfgNeighbors<'_>` yielding `(NodeId, DfgEdgeKind)` |
 | `call_sites(fn)` / `callees(call)` / `callers(fn)` | `Vec<NodeId>` |
 | `node_at_offset(off)` / `scope_at_offset(off)` | `Option<&CpgNode>` |
 | `nodes_in_range(range)` | `Vec<&CpgNode>` |
-| `outgoing_edges(id)` / `incoming_edges(id)` | `impl Iterator<Item = &CpgEdge>` |
-| `edges_between(a, b)` | `Vec<&CpgEdge>` |
+| `outgoing_edges(id)` / `incoming_edges(id)` | `CpgEdges<'_>` yielding `&CpgEdge` |
+| `edges_between(a, b)` | `CpgEdges<'_>` yielding `&CpgEdge` |
 | `subgraph(&[NodeId])` / `function_cfg(fn)` / `function_dfg(fn)` | `CodePropertyGraph` |
 
 There is no generic `successors` / `predecessors` / `neighbors` method and no
@@ -85,9 +86,10 @@ fn next_sibling(cpg: &CodePropertyGraph, id: NodeId) -> Option<NodeId> {
 
 ## CFG traversal
 
-`cfg_successors` and `cfg_predecessors` return `Vec<(NodeId, CfgEdgeKind)>` — the
-neighbour paired with the labelled control-flow edge. A depth-first reachability
-check is the canonical use; it runs in $`O(V + E)`$ over the CFG:
+`cfg_successors` and `cfg_predecessors` return `CfgNeighbors`, a borrowed
+exact-size iterator over the neighbour paired with the labelled control-flow
+edge. A depth-first reachability check is the canonical use; it runs in
+$`O(V + E)`$ over the CFG:
 
 ```rust
 use std::collections::HashSet;
@@ -104,7 +106,7 @@ fn cfg_reachable(cpg: &CodePropertyGraph, from: NodeId, to: NodeId) -> bool {
         if !seen.insert(cur) {
             continue;                                 // already visited
         }
-        for (succ, _kind) in cpg.cfg_successors(cur) {   // Vec<(NodeId, CfgEdgeKind)>
+        for (succ, _kind) in cpg.cfg_successors(cur) {   // CfgNeighbors<'_>
             stack.push(succ);
         }
     }
@@ -138,7 +140,7 @@ let direct_uses = cpg.uses_of_definition(def_id);        // Vec<NodeId>
 let reaching = cpg.reaching_definitions(use_id);         // Vec<NodeId>
 
 // Every data-flow successor, with the edge kind that links it.
-for (next, kind) in cpg.dfg_successors(def_id) {         // Vec<(NodeId, DfgEdgeKind)>
+for (next, kind) in cpg.dfg_successors(def_id) {         // DfgNeighbors<'_>
     println!("{def_id:?} --{kind:?}--> {next:?}");
 }
 ```
@@ -147,6 +149,13 @@ for (next, kind) in cpg.dfg_successors(def_id) {         // Vec<(NodeId, DfgEdge
 *every* [`DfgEdgeKind`](edges.md#dfg-edges) (parameter passing, field/index
 access, aliasing, …). Choose the narrower accessor when you want pure def-use
 chains and the broader one when you want all value flow.
+
+The borrowed edge/neighbor views are cloneable, double-ended, and exact-size.
+They expose `len()` and `is_empty()` without traversal or allocation. Call
+`cfg_successors(id).to_vec()` / `dfg_successors(id).to_vec()`, or collect a
+`CpgEdges` view, only when ownership is necessary before graph mutation. Their
+lazy-cache ordering and invalidation contract is documented in
+[`projections.md`](projections.md#exact-edge-cache-versus-owned-projection).
 
 ## Worked example: forward taint / reachability
 

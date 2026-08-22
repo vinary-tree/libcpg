@@ -624,7 +624,7 @@ mod tests {
                     .cfg_predecessors(pair[1])
                     .iter()
                     .filter(|(source, _)| *source == pair[0])
-                    .all(|(_, kind)| *kind == CfgEdgeKind::Sequential));
+                    .all(|(_, kind)| kind == CfgEdgeKind::Sequential));
             }
         }
 

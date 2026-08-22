@@ -1,6 +1,6 @@
 # Diagram catalog
 
-Every figure in the `libcpg` documentation is a **committed source** (`.puml` for PlantUML, `.dot` for Graphviz) rendered to a **committed `.svg`** that the Markdown pages embed. Sources are version-controlled so figures are reproducible and reviewable; SVGs are committed so they render on GitHub (which does not render PlantUML/Graphviz inline). This directory holds all 124 figures plus the shared theme.
+Every figure in the `libcpg` documentation is a **committed source** (`.puml` for PlantUML, `.dot` for Graphviz) rendered to a **committed `.svg`** that the Markdown pages embed. Sources are version-controlled so figures are reproducible and reviewable; SVGs are committed so they render on GitHub (which does not render PlantUML/Graphviz inline). This directory holds all 125 figures plus the shared theme.
 
 ## Conventions
 
@@ -59,6 +59,7 @@ Grouped by subject. Each row: the source (its `.svg` sibling is embedded by the 
 | `node-kind-taxonomy.puml` | mindmap | The 45 `CpgNodeKind` variants by group | theory/01, architecture/graph-data-model, api/graph-reference, components/graph/nodes |
 | `edge-kind-taxonomy.puml` | mindmap | `CpgEdgeKind` grouped (AST/CFG/DFG/PDG/…) | theory/01, architecture/graph-data-model, api/graph-reference, components/graph/edges |
 | `projection-csr.puml` | component | CPG overlay selection and deterministic forward/reverse CSR construction | components/graph/projections |
+| `projection-cache-lifecycle.puml` | component/lifecycle flow | first exact-edge read → deterministic cached CSR rows → borrowed views → mutation invalidation/rebuild | architecture/graph-data-model, design/0056 |
 | `centrality-pipeline.puml` | component/algorithm flow | validated projection → bounded directed/undirected centrality kernels → aligned node/edge scores | components/graph/centrality-analysis, theory/12, design/0017 |
 | `community-pipeline.puml` | component/algorithm flow | validated projection → deterministic local moving and bounded aggregation → canonical assignment → optional connected refinement | components/graph/community-detection, theory/13, design/0018 |
 | `cohesion-pipeline.puml` | component/algorithm flow | validated projection → simple topology or weighted matrix → peeling, low-link, cut, correlation, and attack kernels → canonical results | components/graph/cohesion-analysis, theory/14, design/0019 |

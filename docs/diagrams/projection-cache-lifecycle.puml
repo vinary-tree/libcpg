@@ -1,0 +1,45 @@
+@startuml
+!include _libcpg-theme.iuml
+title Exact-edge projection cache — stable read and mutation lifecycle
+
+actor "builder / mutating analysis" as BUILDER #FFE8CC
+rectangle "CodePropertyGraph\npetgraph + stable NodeId map" as CPG #DBE4FF
+rectangle "first cached read\ncount · scatter · row-sort" as BUILD #FFF3BF
+database "heap-owned exact-edge cache\nforward rows by layer\nreverse rows by layer\nsource rows by target" as CACHE #C3FAE8
+collections "borrowed views\nCpgEdges\nCfgNeighbors\nDfgNeighbors" as VIEWS #D3F9D8
+rectangle "stable consumers\nprojection · SCC · PDG · VF2\nstats and public traversal" as READERS #E5DBFF
+rectangle "topology mutation\nadd node / edge\nmutable node access" as MUTATE #FFE3E3
+
+BUILDER --> CPG : append through native adjacency
+CPG --> BUILD : cache empty + read requested
+BUILD --> CACHE : exact raw EdgeIndex rows
+CACHE --> VIEWS : binary-partition borrowed slice
+VIEWS --> READERS : deterministic, zero allocation
+READERS ..> CPG : stable NodeId evidence
+BUILDER --> MUTATE : next construction step
+MUTATE --> CACHE : invalidate before mutation
+MUTATE --> CPG : apply mutation
+CPG --> CACHE : later read reuses cache
+
+note bottom of CACHE
+  Edge payloads stay in petgraph.
+  Parallel edges remain distinct.
+  Clone and Serde start uncached.
+end note
+
+note bottom of MUTATE
+  No cached view can coexist with a
+  mutable borrow in safe Rust.
+end note
+
+legend right
+  |= colour |= role |
+  |<#FFE8CC>| mutation owner |
+  |<#DBE4FF>| authoritative CPG |
+  |<#FFF3BF>| deterministic construction |
+  |<#C3FAE8>| derived exact-edge index |
+  |<#D3F9D8>| borrowed read views |
+  |<#E5DBFF>| stable analysis consumers |
+  |<#FFE3E3>| invalidation boundary |
+endlegend
+@enduml

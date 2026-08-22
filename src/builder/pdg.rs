@@ -129,7 +129,7 @@ fn compute_data_dependence(cpg: &CodePropertyGraph, function: NodeId) -> Vec<(No
 
     let mut seen: FxHashSet<(u32, u32)> = FxHashSet::default();
     let mut edges: Vec<(NodeId, NodeId)> = Vec::new();
-    for edge in cpg.edges() {
+    for edge in cpg.dfg_overlay_edges() {
         if matches!(
             edge.kind,
             CpgEdgeKind::DataFlow(DfgEdgeKind::DefUse | DfgEdgeKind::ReachingDef)

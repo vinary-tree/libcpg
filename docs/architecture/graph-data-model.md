@@ -12,6 +12,7 @@ serialization:
 CodePropertyGraph (private fields)
 ├── graph:          petgraph DiGraph<CpgNode, CpgEdge>     ← the vertices and edges
 ├── node_index_map: FxHashMap<NodeId, NodeIndex>           ← stable NodeId → petgraph index
+├── projection_cache: OnceLock<Box<CpgProjectionCache>>     ← lazy exact-edge CSR rows
 ├── language:       Language
 ├── source_path / source_code: Option<Arc<str>>
 ├── root:           Option<NodeId>                          ← first node added
@@ -173,10 +174,12 @@ The payoff of the shared $`V`$ is that the overlays *co-locate*: the same `Call`
 
 *Figure — one node set with the AST, CFG, and DFG overlays drawn as distinct edge colors; a query hops between them without leaving the graph. Source: [`diagrams/cpg-overlay.dot`](../diagrams/cpg-overlay.dot).*
 
-Each overlay is queried through its own traversal family. Most multi-value
-queries return an owned `Vec`; the hot-path `ast_children` query instead borrows
-the node's maintained child index as `&[NodeId]`. Call `.to_vec()` when a caller
-must retain the children while mutating the graph.
+Each overlay is queried through its own traversal family. Hot edge queries
+borrow exact-size iterator views from the lazy projection cache; the hot-path
+`ast_children` query instead borrows the node's maintained child index as
+`&[NodeId]`. Call `.to_vec()` or `.collect()` when a caller must retain a result
+while mutating the graph. Higher-level queries that discover a transitive set
+still return owned vectors.
 
 | Overlay | Edges | Queries |
 |---------|-------|---------|
@@ -221,6 +224,74 @@ containment through `connect`/`add_edge`, not repeat the bookkeeping by mutating
 the public fields. Direct field mutation remains possible for deliberately
 malformed robustness fixtures, but it can make the indices disagree with the
 edge set.
+
+## Lazy exact-edge projection cache
+
+The public [`GraphProjection`](../components/graph/projections.md) is a compact,
+owned, payload-free topology for an analysis. `CodePropertyGraph` also owns a
+different structure: a **projection cache** containing exact petgraph edge
+indices. It accelerates repeated reads of the mutable CPG without cloning edge
+payloads or merging parallel edges.
+
+![The lazy exact-edge cache from first read through mutation and rebuild](../diagrams/projection-cache-lifecycle.svg)
+
+*Figure — a first edge-projection read builds deterministic forward, reverse,
+and endpoint CSR rows; reads borrow exact edges; topology mutation discards the
+box before the next read. Source:
+[`diagrams/projection-cache-lifecycle.puml`](../diagrams/projection-cache-lifecycle.puml).*
+
+**Compressed sparse row** (CSR) stores a row-offset array beside one contiguous
+value array. For internal node index $`i`$, the forward edge-index row is
+
+```math
+R^{+}(i) = I^{+}[O^{+}[i] \ldots O^{+}[i+1]).
+```
+
+Here $`O^{+}`$ is the forward offset array and $`I^{+}`$ stores exact petgraph
+edge indices. Reverse rows $`R^{-}`$ use the target as row owner. A third row
+order groups each source's entries by target, enabling `edges_between(s, t)`
+to find the exact parallel-edge interval with two binary partition searches.
+Forward/reverse rows group by overlay—AST, CFG, DFG, PDG, call, then other—and
+then by opposite stable `NodeId`, `EdgeId`, and raw edge index. That final raw
+index breaks malformed duplicate-id ties without making normal ordering depend
+on hash enumeration.
+
+The construction is a counting/scatter pass followed by independent row-local
+sorts. Stating the mutation boundary in the algorithm is essential: a cached
+petgraph index is valid only for the topology from which it was derived.
+
+```text
+READ_EDGE_VIEW(cpg, query):
+    if cpg.projection_cache is empty:
+        count every edge into forward, reverse, and by-target row offsets
+        scatter raw edge records into those rows
+        sort each nontrivial row by its canonical key
+        retain exact edge indices in one heap-owned cache
+    binary-partition the requested row and return a borrowed exact-size view
+
+MUTATE_CPG(cpg, operation):
+    discard cpg.projection_cache
+    apply node or edge mutation through the graph API
+```
+
+The first read costs $`O(V+E+\sum_r d_r\log d_r)`$ time and $`O(V+E)`$
+auxiliary space, where $`d_r`$ is one row's degree. A later whole-row lookup is
+$`O(1)`$ plus iteration, an overlay lookup adds two $`O(\log d_r)`$ partitions,
+and an endpoint lookup adds two $`O(\log d^{+}(s))`$ partitions. The public
+views `CpgEdges`, `CfgNeighbors`, and `DfgNeighbors` allocate nothing and retain
+exact parallel-edge payloads.
+
+`add_node`, `add_node_with_id`, `node_mut`, `add_edge`, and
+`add_edge_with_id` invalidate the cache. Clone and deserialization start empty;
+Serde omits the derived field, so persisted shape remains compatible. Mutating
+builders use petgraph's native adjacency inside build-and-append loops, avoiding
+the wasteful pattern “build cache, add one edge, invalidate, repeat.” Stable
+analysis consumers—projection construction, SCC, PDG, and VF2—use cached reads.
+Every build and traversal uses finite loops, row-local library sorting, and heap
+vectors; graph depth does not become native call depth. The rationale and
+controlled measurements are recorded in
+[ADR-0056](../design/0056-lazy-deterministic-edge-projection-cache.md) and
+[scientific validation 51](../scientific/51-projection-cache-validation.md).
 
 ## Mutability, identity, and serialization
 

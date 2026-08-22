@@ -1928,15 +1928,18 @@ impl BasicBlockIdentifier {
             let mut block = vec![leader];
             let mut current = leader;
             loop {
-                let successors = cpg.cfg_successors(current);
-                let [(successor, CfgEdgeKind::Sequential)] = successors.as_slice() else {
+                let mut successors = cpg.cfg_successors(current);
+                let Some((successor, CfgEdgeKind::Sequential)) = successors.next() else {
                     break;
                 };
-                if leaders.contains(successor) {
+                if successors.next().is_some() {
                     break;
                 }
-                block.push(*successor);
-                current = *successor;
+                if leaders.contains(&successor) {
+                    break;
+                }
+                block.push(successor);
+                current = successor;
             }
             blocks.insert(leader, block);
         }
@@ -2472,13 +2475,13 @@ mod tests {
         assert!(
             !cpg.cfg_successors(brk)
                 .iter()
-                .any(|(_, k)| *k == CfgEdgeKind::Break),
+                .any(|(_, k)| k == CfgEdgeKind::Break),
             "a loop-less `break` has no target"
         );
         assert!(
             !cpg.cfg_successors(cont)
                 .iter()
-                .any(|(_, k)| *k == CfgEdgeKind::Continue),
+                .any(|(_, k)| k == CfgEdgeKind::Continue),
             "a loop-less `continue` has no target"
         );
     }
@@ -2619,7 +2622,7 @@ mod tests {
         assert!(
             !cpg.cfg_predecessors(after)
                 .iter()
-                .any(|(source, _)| *source == ret),
+                .any(|(source, _)| source == ret),
             "a terminal exit exposed by a wrapper must not reach its sibling"
         );
     }
@@ -2655,7 +2658,7 @@ mod tests {
             [then_return, else_return].iter().all(|terminal| {
                 !cpg.cfg_predecessors(after)
                     .iter()
-                    .any(|(source, _)| source == terminal)
+                    .any(|(source, _)| source == *terminal)
             }),
             "no all-return branch may be threaded into the next statement"
         );
@@ -2766,7 +2769,7 @@ mod tests {
         assert!(
             !cpg.cfg_successors(throw)
                 .iter()
-                .any(|(_, k)| *k == CfgEdgeKind::Throw),
+                .any(|(_, k)| k == CfgEdgeKind::Throw),
             "no handler edges when exception tracking is off"
         );
         assert!(

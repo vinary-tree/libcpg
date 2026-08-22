@@ -6,6 +6,13 @@ source ranges, properties, names, or other payloads. `GraphProjection` is the
 feature-free read substrate used by exact analyses. It retains the shared
 `NodeId` identity space while giving algorithms compact integer indices.
 
+This owned analysis value is distinct from the CPG's **exact-edge projection
+cache**. `GraphProjection` merges parallel endpoint pairs and may align one
+numeric weight per pair; the internal cache preserves every exact `CpgEdge`
+and accelerates repeated traversal of the mutable source graph. The two layers
+compose: cached exact-edge rows select CPG evidence, then a constructor
+normalizes that evidence into an owned `GraphProjection`.
+
 ![A CPG overlay is filtered, normalized, and encoded as forward and reverse CSR arrays](../../diagrams/projection-csr.svg)
 
 *Figure — projection construction and its read-only relationship to the CPG.
@@ -61,6 +68,60 @@ The built-in constructors have these scopes:
 | `dfg_projection(cpg, Some(root))` | `root` plus in-scope DFG endpoints | `DataFlow` within the AST scope, stopping before nested functions |
 | `pdg_projection(cpg, f)` | `f` plus in-scope PDG edge endpoints | `ControlDependence` and `DataDependence` |
 | `SccDecomposition::condensation_projection()` | each component's smallest node as representative | edges between distinct strongly connected components |
+
+## Exact-edge cache versus owned projection
+
+The names are deliberately close because both structures project edge
+relations, but their contracts differ:
+
+| Property | CPG exact-edge cache | Public `GraphProjection` |
+|---|---|---|
+| Owner | one `CodePropertyGraph` | caller-owned analysis value |
+| Payload | raw edge indices resolving to exact `CpgEdge` values | dense target ids and optional numeric weights |
+| Parallel edges | preserved individually | merged per `(source, target)` |
+| Lifetime | borrowed; invalidated by graph mutation | independent immutable value |
+| Vertex coordinates | petgraph indices internally, stable ids at API boundary | dense `u32` indices mapped to sorted `NodeId` values |
+| Primary purpose | zero-allocation repeated CPG reads | validated compact algorithm substrate |
+
+`CpgEdges`, `CfgNeighbors`, and `DfgNeighbors` are the public borrowed views.
+All implement `Iterator`, `DoubleEndedIterator`, and `ExactSizeIterator`;
+cloning a view copies only references and cursors. CFG/DFG views yield copied
+`(NodeId, edge-kind)` pairs and provide `to_vec()` for an intentional ownership
+boundary.
+
+```rust
+use libcpg::{CodePropertyGraph, NodeId};
+
+fn cfg_targets(cpg: &CodePropertyGraph, node: NodeId) -> Vec<NodeId> {
+    cpg.cfg_successors(node)
+        .map(|(target, _kind)| target)
+        .collect()
+}
+```
+
+The cache groups forward and reverse rows first by overlay class and then by
+the opposite endpoint and stable edge id. A separate source-owned order groups
+by target for exact endpoint queries. The first qualifying read builds all
+rows; a mutation invalidates them atomically.
+
+```text
+SELECT_EXACT_EDGES(cpg, source, optional_target, optional_layer):
+    cache = cpg.cache.get_or_build_from(cpg.graph)
+    row = cache.forward[source]
+    if optional_target exists:
+        row = equal_target_interval(cache.by_target[source], optional_target)
+    else if optional_layer exists:
+        row = equal_layer_interval(row, optional_layer)
+    return a borrowed exact-edge iterator over row
+```
+
+No recursive graph traversal occurs during construction or lookup. A
+100,000-node fixture with a 99,999-edge high-degree row builds and traverses the
+cache on a 256 KiB native stack. Mutation invalidation, serialization omission,
+set equality, and insertion-order invariance are tested separately; see
+[validation 51](../../scientific/51-projection-cache-validation.md). The
+architectural choice is fixed by
+[ADR-0056](../../design/0056-lazy-deterministic-edge-projection-cache.md).
 
 `cfg_projection` and `pdg_projection` return `ProjectionError::UnknownNode`
 when `f` is absent and `ProjectionError::NotAFunction` when it is not a

@@ -7,6 +7,7 @@ mod cpg;
 mod edge;
 mod language;
 mod node;
+mod projection_cache;
 mod property_value;
 
 #[cfg(feature = "serde")]
@@ -19,6 +20,7 @@ pub use node::{
     CpgNode, CpgNodeKind, CpgNodeKindTag, LiteralKind, LockKind, LockMode, MethodSignature,
     MsgKind, NodeId, PropertyKey, ScopeId, SourceRange, TypeInfo, Visibility,
 };
+pub use projection_cache::{CfgNeighbors, CpgEdges, DfgNeighbors};
 pub use property_value::{
     PropertyList, PropertyListIter, PropertyValue, PropertyValueError, PropertyValueKind,
     PropertyValueLimit, PropertyValueLimits, PropertyValueMetrics, PropertyValueRef,

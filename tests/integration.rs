@@ -831,6 +831,12 @@ mod graph_projections {
             .collect()
     }
 
+    fn edge_ids<'a>(edges: impl Iterator<Item = &'a libcpg::CpgEdge>) -> Vec<u32> {
+        let mut ids: Vec<_> = edges.map(|edge| edge.id.as_u32()).collect();
+        ids.sort_unstable();
+        ids
+    }
+
     #[test]
     fn parsed_corpus_projections_equal_direct_overlay_traversal() {
         let mut cpg = TreeSitterCpgBuilder::new()
@@ -895,6 +901,75 @@ mod graph_projections {
             direct_edges(&cpg, &modules, |kind| matches!(kind, CpgEdgeKind::Imports))
         );
         assert_eq!(projected_edges(&calls), BTreeSet::from([(caller, callee)]));
+
+        let nodes: Vec<_> = cpg.nodes().map(|node| node.id).collect();
+        for &source in &nodes {
+            assert_eq!(
+                edge_ids(cpg.outgoing_edges(source)),
+                edge_ids(cpg.edges().filter(|edge| edge.source == source)),
+                "cached outgoing row for {source:?}",
+            );
+            assert_eq!(
+                edge_ids(cpg.incoming_edges(source)),
+                edge_ids(cpg.edges().filter(|edge| edge.target == source)),
+                "cached incoming row for {source:?}",
+            );
+
+            let cached_cfg: Vec<_> = cpg
+                .cfg_successors(source)
+                .map(|(target, kind)| (target.as_u32(), format!("{kind:?}")))
+                .collect();
+            let mut direct_cfg: Vec<_> = cpg
+                .edges()
+                .filter(|edge| {
+                    edge.source == source && matches!(edge.kind, CpgEdgeKind::ControlFlow(_))
+                })
+                .collect();
+            direct_cfg.sort_by_key(|edge| (edge.target.as_u32(), edge.id.as_u32()));
+            let direct_cfg: Vec<_> = direct_cfg
+                .into_iter()
+                .map(|edge| {
+                    let CpgEdgeKind::ControlFlow(kind) = edge.kind else {
+                        unreachable!("filtered CFG edge")
+                    };
+                    (edge.target.as_u32(), format!("{kind:?}"))
+                })
+                .collect();
+            assert_eq!(cached_cfg, direct_cfg, "cached CFG row for {source:?}");
+
+            let cached_dfg: Vec<_> = cpg
+                .dfg_successors(source)
+                .map(|(target, kind)| (target.as_u32(), format!("{kind:?}")))
+                .collect();
+            let mut direct_dfg: Vec<_> = cpg
+                .edges()
+                .filter(|edge| {
+                    edge.source == source && matches!(edge.kind, CpgEdgeKind::DataFlow(_))
+                })
+                .collect();
+            direct_dfg.sort_by_key(|edge| (edge.target.as_u32(), edge.id.as_u32()));
+            let direct_dfg: Vec<_> = direct_dfg
+                .into_iter()
+                .map(|edge| {
+                    let CpgEdgeKind::DataFlow(kind) = edge.kind else {
+                        unreachable!("filtered DFG edge")
+                    };
+                    (edge.target.as_u32(), format!("{kind:?}"))
+                })
+                .collect();
+            assert_eq!(cached_dfg, direct_dfg, "cached DFG row for {source:?}");
+
+            for &target in &nodes {
+                assert_eq!(
+                    edge_ids(cpg.edges_between(source, target)),
+                    edge_ids(
+                        cpg.edges()
+                            .filter(|edge| edge.source == source && edge.target == target),
+                    ),
+                    "cached endpoint row for {source:?} -> {target:?}",
+                );
+            }
+        }
         assert_eq!((cpg.node_count(), cpg.edge_count()), before);
     }
 }

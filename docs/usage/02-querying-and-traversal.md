@@ -10,8 +10,15 @@ A note on return types, because they are consistent and easy to remember:
   avoiding a graph scan and allocation on this frequent path. Iterate with
   `for &child in cpg.ast_children(node)`; call `.to_vec()` first only when the
   loop must mutate the graph or an owned worklist must outlive the borrow.
-- Other navigation that follows an overlay returns an **owned `Vec`** (e.g.
-  `cfg_successors -> Vec<(NodeId, CfgEdgeKind)>`).
+- Hot edge navigation returns a **borrowed exact-size iterator**:
+  `outgoing_edges`/`incoming_edges`/`edges_between` return `CpgEdges`, while
+  `cfg_successors`/`cfg_predecessors` and their DFG counterparts return
+  `CfgNeighbors` and `DfgNeighbors`. These views allocate nothing; call
+  `.to_vec()` on a CFG/DFG view or `.collect()` on `CpgEdges` only when an
+  owned result must outlive the immutable graph borrow.
+- Higher-level navigation that constructs a result, such as
+  `ast_descendants`, `reaching_definitions`, and `callers`, returns an owned
+  `Vec`.
 - Whole-graph scans return **iterators** (`nodes()`, `functions()`, `nodes_by_kind(..)`).
 - Lookups return **`Option`** (`node(id)`, `node_at_offset(off)`), never `Result`.
 
@@ -111,7 +118,7 @@ fn branches_of(cpg: &CodePropertyGraph, node: NodeId) {
     }
 
     // Predecessors carry the edge kind too.
-    let _preds = cpg.cfg_predecessors(node);
+    let _pred_count = cpg.cfg_predecessors(node).len();
 
     // Function entry/exit seeds recorded during construction:
     let _entries = cpg.cfg_entries(); // &[NodeId]
@@ -124,6 +131,20 @@ To iterate only the nodes that participate in control flow, use `cfg_nodes()`
 edges, and traversal orders, use the feature-free
 [`block_cfg`](../components/graph/basic-block-cfg.md) view. Per-construct edge
 semantics are covered in [CFG construction](../components/builder/cfg.md).
+
+The returned `CfgNeighbors` is tied to `&cpg`. If the loop must add topology,
+copy the ordered pairs before the first mutable borrow:
+
+```rust
+use libcpg::{CodePropertyGraph, CpgEdgeKind, NodeId};
+
+fn duplicate_cfg_edges(cpg: &mut CodePropertyGraph, source: NodeId) {
+    let successors = cpg.cfg_successors(source).to_vec();
+    for (target, kind) in successors {
+        let _ = cpg.connect(source, target, CpgEdgeKind::ControlFlow(kind));
+    }
+}
+```
 
 ---
 
@@ -142,8 +163,8 @@ fn data_flow(cpg: &CodePropertyGraph, use_site: NodeId, definition: NodeId) {
     let uses = cpg.uses_of_definition(definition);   // Vec<NodeId>
 
     // General neighbours, with the edge kind:
-    let succ = cpg.dfg_successors(definition);        // Vec<(NodeId, DfgEdgeKind)>
-    let pred = cpg.dfg_predecessors(use_site);        // Vec<(NodeId, DfgEdgeKind)>
+    let succ = cpg.dfg_successors(definition);        // DfgNeighbors<'_>
+    let pred = cpg.dfg_predecessors(use_site);        // DfgNeighbors<'_>
 
     println!(
         "{} reaching defs, {} uses, {} dfg-succ, {} dfg-pred",
@@ -317,7 +338,7 @@ fn edge_queries(cpg: &CodePropertyGraph, node: NodeId) {
     let dfg_total = cpg.edges_by_kind(|k| k.is_dfg()).count();
 
     // Edges between a specific pair:
-    let _between = cpg.edges_between(node, node); // Vec<&CpgEdge>
+    let _between = cpg.edges_between(node, node); // CpgEdges<'_>
 
     println!("{out} out, {inc} in, {dfg_total} dfg edges total");
 }

@@ -278,7 +278,7 @@ pub fn build_symbol_table(cpg: &mut CodePropertyGraph, cfg: &ResolveConfig) -> S
                 if let Some(scope) = enclosing {
                     let mut represented_names = BTreeSet::new();
                     let mut targets: Vec<_> = cpg
-                        .outgoing_edges(node)
+                        .native_outgoing_edges(node)
                         .filter(|edge| matches!(edge.kind, CpgEdgeKind::Imports))
                         .filter_map(|edge| {
                             let target = cpg.node(edge.target)?;
@@ -604,8 +604,7 @@ fn existing_resolution_confidence(
     call: NodeId,
     target: NodeId,
 ) -> Option<Confidence> {
-    cpg.edges_between(call, target)
-        .into_iter()
+    cpg.native_edges_between(call, target)
         .filter(|edge| edge.kind.is_call())
         .filter_map(|edge| edge.label.as_deref().and_then(Confidence::from_label))
         .max_by_key(|confidence| confidence.rank())
@@ -619,8 +618,7 @@ fn connect_labeled_unique(
     label: &str,
 ) -> bool {
     if cpg
-        .edges_between(source, target)
-        .into_iter()
+        .native_edges_between(source, target)
         .any(|edge| edge.kind == kind)
     {
         return false;

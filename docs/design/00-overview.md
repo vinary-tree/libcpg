@@ -99,8 +99,9 @@ alternatives is folklore, and a decision without its costs is marketing.
 | [0053 — Evidence-bounded concurrency bug candidates](0053-evidence-bounded-concurrency-bug-candidates.md) | Compose exact access identity, canonical MHP, and typed locksets into immutable race and RMW-gap witnesses. | Accepted |
 | [0054 — Deterministic CPG ML exports](0054-deterministic-cpg-ml-exports.md) | Canonicalize typed CPG tensors and exact AST terminal paths without an ML runtime, source reparsing, graph mutation, or source-depth recursion. | Accepted |
 | [0055 — Deterministic dependence-aware CPG diff](0055-deterministic-dependence-aware-cpg-diff.md) | Reuse bounded GED correspondence for exact canonical node/edge edit scripts and classify only represented PDG-edge changes as behavior-changing. | Accepted |
+| [0056 — Lazy deterministic exact-edge projection cache](0056-lazy-deterministic-edge-projection-cache.md) | Cache exact edge indices in deterministic forward/reverse/endpoint CSR rows, invalidate on mutation, and retain `GraphProjection` as a separate owned abstraction. | Accepted |
 
-These fifty-five are not independent. ADR-0001 fixes the substrate that all analyses
+These fifty-six are not independent. ADR-0001 fixes the substrate that all analyses
 write onto; ADR-0002 and ADR-0005 together explain how a language reaches that
 substrate and what you must switch on to get there; ADR-0003 and ADR-0004 are
 two analyses *over* the substrate (one always-on, one feature-gated) that each
@@ -249,6 +250,10 @@ ADR-0055 reuses ADR-0023's deterministic bounded GED correspondence, then
 compares exact typed node/edge evidence in aligned coordinates. Its
 `BehaviorChanging` label is intentionally confined to represented PDG-edge
 edits and therefore never claims language-semantic equivalence.
+ADR-0056 optimizes ADR-0001's read boundary with exact edge-index CSR rows,
+while preserving ADR-0016's owned normalized `GraphProjection` as a different
+semantic layer. Its mutation invalidation and native-adjacency build phase
+prevent stale indices and repeated whole-graph rebuilds.
 
 ![Module architecture of libcpg, showing the graph core and the analysis modules layered over it](../diagrams/module-architecture.svg)
 
@@ -260,7 +265,7 @@ edits and therefore never claims language-semantic equivalence.
   (`0001`…). Numbers are never reused; a reversed decision is marked
   *Superseded* and a new record supersedes it, so history stays legible.
 - **Status lifecycle.** `Proposed → Accepted → (Superseded by NNNN | Deprecated)`.
-  All fifty-five current records are **Accepted** and reflect the shipped `v0.1.1`
+  All fifty-six current records are **Accepted** and reflect the shipped `v0.1.1`
   code.
 - **Grounding.** Every claim here is traceable to source: the
   [`Cargo.toml`](../engineering/01-build-and-features.md) feature block, the

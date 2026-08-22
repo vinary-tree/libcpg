@@ -254,6 +254,8 @@ let slice = backward_slice(&cpg, func, 256);         // bounded backward slice
 
 [0055 Deterministic dependence-aware CPG diff](design/0055-deterministic-dependence-aware-cpg-diff.md)
 
+[0056 Lazy deterministic exact-edge projection cache](design/0056-lazy-deterministic-edge-projection-cache.md)
+
 ### API reference
 [Graph / analysis reference](api/graph-reference.md) · [Builder reference](api/builder-reference.md) · [Pattern / algorithm / GNN reference](api/pattern-reference.md)
 
@@ -414,6 +416,8 @@ let slice = backward_slice(&cpg, func, 256);         // bounded backward slice
 [Deterministic ML-export validation](scientific/49-ml-export-validation.md)
 
 [Deterministic CPG-diff validation](scientific/50-cpg-diff-validation.md)
+
+[Lazy exact-edge projection-cache validation](scientific/51-projection-cache-validation.md)
 
 ### Security
 [Threat model](security/00-threat-model.md) · [Input & resource hardening](security/01-input-and-resource-hardening.md) · [Taint-analysis security boundary](security/02-taint-analysis.md) · [Interprocedural-slicing security boundary](security/03-system-dependence-slicing.md) · [Channel-topology security boundary](security/04-channel-topology.md) · [Deadlock-analysis security boundary](security/05-deadlock-analysis.md) · [MHP-analysis security boundary](security/06-mhp-analysis.md) · [Session-analysis security boundary](security/07-session-analysis.md) · [Typestate-analysis security boundary](security/08-typestate-analysis.md) · [Bug-detector security boundary](security/09-bug-detectors.md) · [Population-anomaly security boundary](security/10-population-anomaly-detectors.md) · [Clone/feasibility security boundary](security/11-clone-feasibility-detectors.md) · [API-usage protocol-mining security boundary](security/12-api-usage-protocol-mining.md) · [CWE-template security boundary](security/13-cwe-template-analysis.md) · [Cryptographic API-misuse security boundary](security/14-cryptographic-api-misuse.md) · [Secret-flow/access-policy security boundary](security/15-secret-and-access-policy-analysis.md) · [Vulnerability-extrapolation security boundary](security/16-vulnerability-extrapolation.md) · [Virtual-call type-refinement security boundary](security/17-type-refinement-boundary.md) · [Concurrency-bug detection security boundary](security/18-concurrency-bug-detection.md) · [ML-export security boundary](security/19-ml-export-boundary.md) · [CPG-diff security boundary](security/20-cpg-diff-boundary.md)

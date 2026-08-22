@@ -19,6 +19,7 @@ Source: [`diagrams/resource-bounds.puml`](../diagrams/resource-bounds.puml).*
 | Bound | Default | Enforced in | Effect when exceeded |
 | --- | --- | --- | --- |
 | `CpgBuilderConfig::max_file_size` | 10 MB | `build` only (not `build_from_tree`) | `build` returns `Error::Construction` before parsing |
+| Exact-edge projection-cache admission | caller-selected aggregate CPG node/edge limit | first `outgoing_edges`, `incoming_edges`, `edges_between`, CFG/DFG neighbor, or cached overlay read | construction and lookup are iterative, but the cache retains $`O(V+E)`$ raw-index storage; reject an oversized hand-built/deserialized CPG before its first cached read |
 | `PropertyValueLimits::{max_nodes,max_edges,max_string_bytes,max_encoded_bytes,max_work}` | `1_000_000`, `1_000_000`, 64 MiB, 256 MiB, `4_000_000` | CPV1 encode/decode/Serde and explicit validation | returns a typed error naming the exceeded dimension before accepting the value; canonical shape validation rejects cycles, sharing, forward references, nonpartitioned edge ranges, invalid tags/UTF-8, and trailing bytes |
 | `ExprKeyLimits::{max_nodes,max_operands,max_string_bytes,max_encoded_bytes,max_work}` | `1_000_000`, `4_000_000`, 64 MiB, 256 MiB, `5_000_000` | expression-fact extraction, CEK1 encode/decode/Serde, explicit validation | aborts the complete fact derivation or key operation with `ExprKeyError`; canonical standalone validation rejects empty/multiple roots, cycles, forward references, nonpartitioned ranges, noncontiguous postorder, duplicate parents, invalid tags/scalars/UTF-8, and trailing bytes |
 | Program-composition admission | caller-selected file/node/edge/path-byte limits | `merge_programs`; `build_import_graph` | finite and non-recursive, but intentionally has no independent cap; reject an oversized aggregate before composition |
@@ -101,6 +102,32 @@ apply the `max_file_size` check** — the caller already parsed the source and o
 the tree. If your Mode-B input is untrusted, you must bound it yourself before
 parsing (next section). This is a deliberate design property, not an oversight; see
 [`design/0002-mode-b-build-from-tree.md`](../design/0002-mode-b-build-from-tree.md).
+
+## Lazy edge cache: aggregate graph admission
+
+The first exact-edge projection read builds three deterministic CSR orders over
+the whole represented graph. Subsequent outgoing, incoming, CFG, DFG, and
+endpoint views allocate nothing, but the cache remains live with the CPG until
+mutation or destruction. This trades repeated allocation traffic for
+$`O(V+E)`$ retained raw-index storage. No independent public cap is imposed
+because trusted applications may analyze graphs larger than the parser's
+default 10 MB source boundary.
+
+For untrusted Mode-B or deserialized graphs, cap node count, edge count, and
+aggregate payload bytes before calling a cached accessor. The cache uses checked
+`u32` conversions consistent with the CPG's public `NodeId`/`EdgeId` domain;
+admit far below that identity ceiling. Construction uses finite counting,
+scatter, and row-local sorting loops. A malicious long path therefore consumes
+heap proportional to admitted size but cannot create graph-depth native
+recursion. A high-degree row can require $`O(d\log d)`$ comparison work for
+degree $`d`$, so an edge-count limit is also the degree limit.
+
+Every public node/edge mutation invalidates the box before changing topology.
+Borrowed iterator lifetimes prevent safe Rust code from mutating the graph while
+an exact raw-index view is live. Serde omits the derived cache, and clone starts
+uncached, so an attacker cannot inject stale raw indices through persistence.
+See [ADR-0056](../design/0056-lazy-deterministic-edge-projection-cache.md) and
+[validation 51](../scientific/51-projection-cache-validation.md).
 
 ## Recursive metadata: flat ownership and CPV1 limits
 

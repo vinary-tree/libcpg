@@ -842,7 +842,7 @@ fn lexical_parent(cpg: &CodePropertyGraph, node: NodeId) -> Option<NodeId> {
     if let Some(parent) = cpg.node(node).and_then(|node| node.parent) {
         return Some(parent);
     }
-    cpg.incoming_edges(node)
+    cpg.native_incoming_edges(node)
         .filter_map(|edge| (edge.kind == CpgEdgeKind::AstChild).then_some(edge.source))
         .min()
 }
@@ -1481,7 +1481,7 @@ mod tests {
         assert!(
             cpg.dfg_successors(buf_def)
                 .iter()
-                .any(|(t, _)| *t == buf_use),
+                .any(|(t, _)| t == buf_use),
             "dfg_successors(let buf) must reach the `buf` use"
         );
 
@@ -1498,7 +1498,7 @@ mod tests {
         assert!(
             cpg.dfg_successors(out_def)
                 .iter()
-                .any(|(t, _)| *t == out_use),
+                .any(|(t, _)| t == out_use),
             "dfg_successors(let out) must reach the `out` use"
         );
     }
@@ -1555,7 +1555,7 @@ mod tests {
             "`x` must not flow to `y`'s use"
         );
         assert!(
-            !cpg.dfg_successors(x_def).iter().any(|(t, _)| *t == y_use),
+            !cpg.dfg_successors(x_def).iter().any(|(t, _)| t == y_use),
             "`x`'s def must not reach `y`'s use"
         );
     }
