@@ -97,7 +97,16 @@ The public types are built for concurrency but do **not** silently parallelize:
 
 - `CodePropertyGraph` is a plain owned value: it is **mutable** during construction (`add_node`, `connect`, and the extractors all mutate it) and implements `Clone`. It is *not* "immutable after construction".
 - The matcher and detector traits are `Send + Sync` (`SubgraphMatcher`, `PatternDetector`, `AlgorithmDetector`, `CpgBuilder`), so a caller can run them across files or functions with its own thread pool.
-- `rayon` is a declared dependency and the crate is written to be parallelizable, but the current extractors and detectors iterate functions **sequentially** — no `par_iter` is wired in `src/` yet. There are **no** atomic progress counters and **no** SIMD paths; the `gpu` feature is reserved with no code behind it. Twenty-eight Criterion targets currently measure SCC analysis, condensation analytics, synthetic and parser-backed CPG construction, traversal primitives, DFG/PDG construction, VF2 matching, WL similarity, whole-corpus analysis, variable liveness, loop induction, DSM, centrality, community detection/refinement, cohesion/robustness, spectral connectivity, bounded cycle enumeration, directed motif census, bounded bipartite GED, function-clone detection, clone/feasibility advisories, API-usage/temporal mining, declarative CWE templates, program composition, IFDS/IDE summaries, and taint-summary propagation. Remaining benchmark gaps and the measured baseline are tracked in [`../engineering/03-performance.md`](../engineering/03-performance.md) and the [`optimization ledger`](../engineering/optimization-ledger.md).
+- `rayon` powers explicit `*_parallel` CFG/DFG/PDG and ordered VF2-batch entry
+  points. Indexed workers borrow an immutable graph and return owned plans; one
+  ordered emitter performs graph mutation, preserving the serial edge and
+  result sequence. The default builder configuration and all serial methods
+  remain serial. There are **no** atomic progress counters and **no** SIMD
+  paths; the `gpu` feature is reserved with no code behind it. Thirty Criterion
+  targets include a controlled 1/2/4/8/16/32-worker parallel-analysis sweep;
+  the full inventory and remaining gaps are tracked in
+  [`../engineering/03-performance.md`](../engineering/03-performance.md) and
+  the [`optimization ledger`](../engineering/optimization-ledger.md).
 
 ## Module map
 

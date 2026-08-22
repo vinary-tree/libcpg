@@ -115,6 +115,13 @@ pub struct CpgBuilderConfig {
     pub max_file_size: usize,
     /// Whether to run the evidence-bounded call/import resolution post-pass.
     pub resolve_imports: bool,
+    /// Whether independent per-function CFG and DFG plans use the current
+    /// Rayon thread pool.
+    ///
+    /// Parallel planning preserves the serial graph order exactly. It is most
+    /// useful for files containing many non-trivial functions; the serial
+    /// default avoids thread-pool overhead for small inputs.
+    pub parallel_analysis: bool,
 }
 
 impl Default for CpgBuilderConfig {
@@ -126,6 +133,7 @@ impl Default for CpgBuilderConfig {
             include_comments: false,
             max_file_size: 10 * 1024 * 1024, // 10MB
             resolve_imports: false,
+            parallel_analysis: false,
         }
     }
 }
@@ -169,6 +177,12 @@ impl CpgBuilderConfig {
     /// Sets whether to resolve uniquely supported call/import targets.
     pub fn with_import_resolution(mut self, resolve: bool) -> Self {
         self.resolve_imports = resolve;
+        self
+    }
+
+    /// Sets whether CFG and DFG planning uses the current Rayon thread pool.
+    pub fn with_parallel_analysis(mut self, parallel: bool) -> Self {
+        self.parallel_analysis = parallel;
         self
     }
 }

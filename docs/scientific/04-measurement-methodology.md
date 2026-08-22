@@ -1,6 +1,6 @@
 # Measurement methodology
 
-`libcpg` ships twenty-two runnable Criterion targets. Their baseline groups are
+`libcpg` ships thirty runnable Criterion targets. Their baseline groups are
 feature-free; the `induction_analysis` target also registers an
 `algorithm-detection`-gated complexity-evidence group. Each active group
 asserts a deterministic correctness oracle **before** entering the timed loop.
@@ -19,7 +19,7 @@ the source transformation under study does not [[1]](#references).
 
 ## 1. Current evidence
 
-All twenty-two targets use `harness = false`, which hands execution to Criterion
+All thirty targets use `harness = false`, which hands execution to Criterion
 rather than Rust's test harness:
 
 ```toml
@@ -117,6 +117,7 @@ harness = false
 | `condensation` | `condensation_metrics` with and without `coffman_graham` | component paths and eight independent chains at 1,024 and 8,192 components | exact source levels, weighted critical path, height, width, optional CG coverage, width, and downward precedence |
 | `cpg_construction` | graph-arena construction | paths at 1,000 and 10,000 nodes | exact node/edge counts and identifiers |
 | `pattern_matching` | bounded `Vf2Matcher::find_matches` | paths at 256 and 4,096 nodes | exact bounded embedding set |
+| `parallel_analysis` | serial/parallel CFG, DFG, and PDG construction; serial/parallel ordered VF2 batches | 512 functions with 16 definition/use pairs each and 128 repeated patterns; worker counts 1/2/4/8/16/32 on 256 KiB stacks | exact edge-stream and match-sequence equality with the serial oracle before every worker-count timing |
 | `dataflow_liveness` | `liveness` | chains at 512/4,096 nodes, diamond ladders at 64/512 rungs, nested loops at 128/1,024 nodes | exact per-node equality with an independent round-robin solver |
 | `induction_analysis` | `loop_induction` | single counted loops with 64/512/2,048 invariant definitions | exact IV, bound, intended-invariant, DFG-contract, subset, and non-mutation checks |
 | `induction_analysis` with `algorithm-detection` | `ComplexityAnalyzer::estimate_time_complexity_with_evidence` | the same single counted loops at 64/512/2,048 invariant definitions | exact class/confidence, header/comparison/bound provenance, IV name, and non-mutation checks |
@@ -139,7 +140,8 @@ harness = false
 
 The evidence is deliberately local: a result for one named family, size,
 machine, toolchain, and environment is not a universal speed claim. DFG/PDG
-construction, whole-corpus analysis, and GNN propagation remain unbenchmarked.
+construction and whole-corpus analysis have focused targets; GNN propagation
+remains unbenchmarked.
 Automated correctness tests do not assert elapsed time because wall-clock
 thresholds are unstable across hosts.
 
@@ -327,7 +329,7 @@ $`d`$ is embedding dimension.
 | function clone detection | $`O(P+q(V+E)+I\cdot\operatorname{VF2})`$ for $`P`$ size-qualified pairs, $`q`$ WL rounds, and $`I`$ bounded verifier calls | active equality/insertion/reordering target with 16/64 functions |
 | inconsistent-clone advisories | $`O(P(A_LA_R+G))`$ inside pair/tape/alignment/GED caps | active Type-2 guard-divergence target with 8/32 functions |
 | infeasible-path advisories | per-function SCCP + intervals + bounded condition-arena state/step work | active contradictory-condition target with 8/32 functions |
-| DFG/PDG construction | analysis-specific; must separate extraction from slicing | benchmark gap |
+| serial/parallel CFG/DFG/PDG construction and ordered VF2 batches | analysis-specific plan/emission work; parallel scaling is bounded by serial emission and scheduling overhead | active exact-oracle 1/2/4/8/16/32-worker target |
 | GNN propagation | $`O(\text{layers}\cdot(V+E)\cdot d)`$ | benchmark gap |
 
 Scaling that departs materially from the expected class is itself a finding and

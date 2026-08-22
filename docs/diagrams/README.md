@@ -148,6 +148,7 @@ Grouped by subject. Each row: the source (its `.svg` sibling is embedded by the 
 |---|---|---|---|
 | `vf2-state-machine.puml` | state | VF2 search states + backtracking | theory/05, design/0004, components/patterns/vf2-matching |
 | `vf2-dense-state.puml` | component/data flow | lazy dense node metadata → Fenwick ordered sets → cursor-only search PDA → flat exact undo → canonical match | theory/05, design/0057, components/patterns/vf2-matching, scientific/52 |
+| `parallel-plan-emit.puml` | component/concurrency flow | immutable indexed CFG/DFG/PDG or VF2 workers → ordered owned plans → one deterministic serial emitter | design/0059, usage/29, scientific/54, builder and VF2 components |
 | `vf2-pattern-target.dot` | graph | Pattern vs target with one embedding | theory/05, api/pattern-reference, components/patterns/vf2-matching, scientific/03 |
 | `vf2-diamond.dot` | graph | Diamond target, exactly two embeddings | components/patterns/vf2-matching, scientific/03 |
 | `similarity-metrics.puml` | mindmap | Jaccard / Cosine / WL / GraphEdit | theory/06, components/patterns/vf2-matching |
@@ -196,6 +197,7 @@ Grouped by subject. Each row: the source (its `.svg` sibling is embedded by the 
 |---|---|---|---|
 | `build-equivalence.puml` | activity | `build` ≡ `build_from_tree` node-payload and typed-edge equality | scientific/01, engineering/02 |
 | `measurement-methodology.puml` | activity | Rigorous benchmarking method (a documented gap) | scientific/04, engineering/03 |
+| `parallel-affinity-sweep.puml` | deployment/measurement map | CCD-balanced physical-core affinity for the 1/2/4/8/16/32-worker scaling sweep | scientific/54 |
 | `threat-model-dataflow.puml` | activity | Untrusted input flow & trust boundaries | security/00 |
 | `resource-bounds.puml` | mindmap | Construction/analysis caps and validation, including condensation/layering, DSM, Martin metrics, architectural smells, centrality, Louvain, k-truss, minimum-cut, and attack ceilings | security/01 |
 | `api-usage-temporal-pipeline.puml` | component/evidence flow | Typed call admission → centered AUGs → exact fragments/deviations alongside named typestate properties → qualified report | architecture/data-flow, design/0047, components/graph/api-usage-protocol-mining, security/12 |

@@ -287,6 +287,12 @@ After the walk, phases 3 through 5 run when enabled. Resolution is positioned
 between CFG and DFG so the DFG's interprocedural parameter and return helpers
 observe established callers without changing the default opt-out shape.
 
+When `CpgBuilderConfig::parallel_analysis` is `true`, phases 3 and 5 compute
+independent per-function plans on the current Rayon pool. Each phase still emits
+plans serially in function order, and resolution remains between them. The
+default is serial; see [parallel analysis](../../usage/29-parallel-analysis.md)
+for pool configuration, exactness, and resource guidance.
+
 ---
 
 ## What the builder does *not* do

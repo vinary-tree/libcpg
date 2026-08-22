@@ -15,11 +15,10 @@ in parallel;<<#FFF3BF>>
 stop
 note right
   <b>Current coverage:</b> the active
-  <i>scc_analysis</i> criterion target measures
-  paths, rings, and cyclic clusters. Construction,
-  DFG/PDG, VF2, and GNN still need focused
-  <latex>[[bench]]</latex> targets before making
-  performance claims about those surfaces.
+  Criterion targets cover construction,
+  DFG/PDG, VF2, and controlled parallel scaling.
+  GNN still needs a focused <latex>[[bench]]</latex>
+  target before performance claims on that surface.
 end note
 legend right
   |= colour |= role |

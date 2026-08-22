@@ -93,6 +93,7 @@ pub struct CpgBuilderConfig {
     pub include_comments: bool,
     pub max_file_size: usize,
     pub resolve_imports: bool,
+    pub parallel_analysis: bool,
 }
 ```
 
@@ -104,11 +105,12 @@ pub struct CpgBuilderConfig {
 | `include_comments` | `false` | Keep comment nodes in the AST. |
 | `max_file_size` | `10 * 1024 * 1024` (10 MiB) | Reject larger inputs in `build` (see the [security guidance](#security--max_file_size-applies-only-to-build)). |
 | `resolve_imports` | `false` | Run evidence-bounded call/import resolution after CFG and before DFG extraction. |
+| `parallel_analysis` | `false` | Compute independent per-function CFG and DFG plans on the current Rayon pool, then emit them in exact serial order. |
 
 Builder methods (each returns `Self`): `new()`, `with_source(bool)`,
 `with_cfg(bool)`, `with_dfg(bool)`, `with_comments(bool)`,
-`with_max_file_size(usize)`, `with_import_resolution(bool)`. `Default` yields the
-table above.
+`with_max_file_size(usize)`, `with_import_resolution(bool)`,
+`with_parallel_analysis(bool)`. `Default` yields the table above.
 
 ```rust
 // requires: no features (config construction is feature-free)
@@ -119,7 +121,8 @@ let config = CpgBuilderConfig::new()
     .with_cfg(true)
     .with_dfg(true)
     .with_comments(true)
-    .with_import_resolution(true); // resolve unique calls before interprocedural DFG
+    .with_import_resolution(true)  // resolve unique calls before interprocedural DFG
+    .with_parallel_analysis(true); // use the caller's current Rayon pool
 ```
 
 The historical field/method name says “imports,” but the implemented post-pass
@@ -285,6 +288,7 @@ pub struct CfgExtractorConfig {
 | `new` | `fn new() -> Self` | Default config. |
 | `with_config` | `fn with_config(config: CfgExtractorConfig) -> Self` | Custom config. |
 | `extract` | `fn extract(&self, cpg: &mut CodePropertyGraph)` | Build CFG for every `Function` node. |
+| `extract_parallel` | `fn extract_parallel(&self, cpg: &mut CodePropertyGraph)` | Plan every function CFG on the current Rayon pool; indexed collection plus ordered emission is exactly serial-equivalent. |
 | `extract_function_cfg` | `fn extract_function_cfg(&self, cpg: &mut CodePropertyGraph, function: NodeId)` | Build CFG for one function. |
 
 `extract_function_cfg` marks the function as a CFG entry, connects it to its body
@@ -295,6 +299,11 @@ variants; a loop/`try` context stack routes `break`/`continue`/`throw` edges. It
 native call depth is independent of AST depth, active-path `Enter`/`Leave`
 state cuts malformed cycles without suppressing shared DAG paths, and every
 emission uses `connect_unique`, so it is idempotent.
+
+`extract` and `extract_parallel` share the same immutable-plan/ordered-emitter
+architecture. The latter parallelizes plan discovery only; graph mutation stays
+serial so edge identifiers, entry/exit order, and serde bytes do not depend on
+scheduling. See [ADR-0059](../design/0059-deterministic-parallel-plan-emission.md).
 
 ```rust
 // requires: no features (feature-free over a hand-built or Mode-B graph)
@@ -345,6 +354,7 @@ pub struct DfgExtractorConfig {
 | `new` | `fn new() -> Self` | Default config. |
 | `with_config` | `fn with_config(config: DfgExtractorConfig) -> Self` | Custom config. |
 | `extract` | `fn extract(&self, cpg: &mut CodePropertyGraph)` | Build DFG for every `Function`. |
+| `extract_parallel` | `fn extract_parallel(&self, cpg: &mut CodePropertyGraph)` | Plan every function DFG on the current Rayon pool and emit in exact serial order. |
 | `extract_function_dfg` | `fn extract_function_dfg(&self, cpg: &mut CodePropertyGraph, function: NodeId)` | Build DFG for one function. |
 
 The sweep abstract-interprets the function body in source order, threading each
@@ -423,6 +433,8 @@ pub struct PdgBuilder { /* private */ }
 |--------|-----------|-------|
 | `new` | `fn new() -> Self` | Constructor. |
 | `build` | `fn build(&self, cpg: &mut CodePropertyGraph, function: NodeId)` | Add `ControlDependence` + `DataDependence` edges for `function`. Idempotent. |
+| `build_all` | `fn build_all(&self, cpg: &mut CodePropertyGraph)` | Plan and emit every function in stable order with one shared existing-edge snapshot. |
+| `build_all_parallel` | `fn build_all_parallel(&self, cpg: &mut CodePropertyGraph)` | Plan every function on the current Rayon pool, then emit in exact serial order. |
 
 `build` requires that `function`'s CFG and DFG already exist. It computes
 [control dependence](../GLOSSARY.md#control-dependence) [[1]](#references) as the

@@ -2,7 +2,7 @@
 
 use libcpg::{
     CfgEdgeKind, CodePropertyGraph, CpgEdgeKind, CpgNode, CpgNodeKind, DfgEdgeKind, Language,
-    MethodSignature, NodeId, ProjectionKind, SourceRange, Visibility,
+    MethodSignature, NodeId, ProjectionKind, ScopeId, SourceRange, Visibility,
 };
 
 /// Stable seed used by every synthetic performance fixture.
@@ -126,6 +126,62 @@ fn function_node(name: String) -> CpgNode {
         },
         SourceRange::default(),
     )
+}
+
+/// Build a deterministic many-function AST for parallel analysis experiments.
+///
+/// Each function owns a flat block of alternating variable definitions and
+/// identifier uses. The shape provides independent CFG, DFG, and PDG work
+/// without making source parsing part of the measured interval.
+pub fn parallel_analysis_graph(
+    function_count: usize,
+    statements_per_function: usize,
+) -> CodePropertyGraph {
+    let mut graph = CodePropertyGraph::new(Language::Rust);
+    for function_index in 0..function_count {
+        let function = graph.add_node(function_node(format!("parallel_{function_index}")));
+        let body = graph.add_node(
+            CpgNode::new(
+                0.into(),
+                CpgNodeKind::Block {
+                    scope: ScopeId::GLOBAL,
+                },
+                SourceRange::default(),
+            )
+            .with_parent(function),
+        );
+        graph.connect_unique(function, body, CpgEdgeKind::AstChild);
+        for statement_index in 0..statements_per_function {
+            let name = format!("v_{function_index}_{statement_index}");
+            let definition = graph.add_node(
+                CpgNode::new(
+                    0.into(),
+                    CpgNodeKind::Variable {
+                        name: name.clone().into(),
+                        var_type: None,
+                        is_mutable: true,
+                        scope: ScopeId::GLOBAL,
+                    },
+                    SourceRange::default(),
+                )
+                .with_parent(body),
+            );
+            graph.connect_unique(body, definition, CpgEdgeKind::AstChild);
+            let use_site = graph.add_node(
+                CpgNode::new(
+                    0.into(),
+                    CpgNodeKind::Identifier {
+                        name: name.into(),
+                        definition: None,
+                    },
+                    SourceRange::default(),
+                )
+                .with_parent(body),
+            );
+            graph.connect_unique(body, use_site, CpgEdgeKind::AstChild);
+        }
+    }
+    graph
 }
 
 /// Generate a deterministic graph from an explicit seed.

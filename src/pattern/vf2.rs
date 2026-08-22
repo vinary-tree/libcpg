@@ -4,6 +4,7 @@
 //! in Code Property Graphs. VF2 is efficient for finding pattern matches
 //! in sparse graphs typical of code analysis.
 
+use rayon::prelude::*;
 #[cfg(test)]
 use rustc_hash::FxHashSet;
 
@@ -52,6 +53,40 @@ impl Vf2Matcher {
     pub fn with_max_matches(mut self, max: usize) -> Self {
         self.max_matches = max;
         self
+    }
+
+    /// Finds matches for an ordered batch of pattern graphs.
+    ///
+    /// The outer result has one entry per input pattern in the same order. Each
+    /// inner result retains [`SubgraphMatcher::find_matches`]'s deterministic
+    /// embedding order.
+    pub fn find_matches_many(
+        &self,
+        patterns: &[CodePropertyGraph],
+        target: &CodePropertyGraph,
+    ) -> Vec<Vec<PatternMatch>> {
+        patterns
+            .iter()
+            .map(|pattern| self.find_matches(pattern, target))
+            .collect()
+    }
+
+    /// Finds an ordered batch of patterns concurrently on the current Rayon
+    /// pool.
+    ///
+    /// Rayon uses an indexed parallel iterator here: scheduling and worker
+    /// count cannot reorder either the pattern results or any pattern's match
+    /// list. Install a custom [`rayon::ThreadPool`] around this call to select
+    /// the worker count or stack size.
+    pub fn find_matches_many_parallel(
+        &self,
+        patterns: &[CodePropertyGraph],
+        target: &CodePropertyGraph,
+    ) -> Vec<Vec<PatternMatch>> {
+        patterns
+            .par_iter()
+            .map(|pattern| self.find_matches(pattern, target))
+            .collect()
     }
 
     /// Checks if two nodes are compatible for matching.
@@ -1774,6 +1809,39 @@ mod proptests {
                     .find_matches(&pattern, &g)
             };
             prop_assert_eq!(embedding_sequence(&limited), embedding_sequence(&expected));
+        }
+
+        /// Indexed parallel batch matching preserves both pattern order and
+        /// each pattern's canonical embedding order exactly.
+        #[test]
+        fn prop_parallel_pattern_batch_is_exactly_serial(
+            g in arb_cpg_raw(),
+            sizes in prop::collection::vec(1usize..=4, 0..=16),
+            strict_kinds in any::<bool>(),
+            strict_edges in any::<bool>(),
+            cap in 0usize..=8,
+        ) {
+            let patterns: Vec<_> = sizes
+                .into_iter()
+                .map(|size| small_pattern(&g, size))
+                .collect();
+            let matcher = Vf2Matcher::new()
+                .with_strict_kinds(strict_kinds)
+                .with_strict_edges(strict_edges)
+                .with_max_matches(cap);
+            let serial = matcher.find_matches_many(&patterns, &g);
+            let pool = rayon::ThreadPoolBuilder::new()
+                .num_threads(4)
+                .stack_size(256 * 1024)
+                .build()
+                .expect("bounded Rayon pool");
+            let parallel = pool.install(|| matcher.find_matches_many_parallel(&patterns, &g));
+            let serial_sequences: Vec<_> = serial.iter().map(|matches| embedding_sequence(matches)).collect();
+            let parallel_sequences: Vec<_> = parallel
+                .iter()
+                .map(|matches| embedding_sequence(matches))
+                .collect();
+            prop_assert_eq!(parallel_sequences, serial_sequences);
         }
 
         /// The relaxed matcher's embedding set is a superset of the strict

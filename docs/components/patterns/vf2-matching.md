@@ -294,6 +294,16 @@ backtrack corrupted state and dropped the $`A{-}C{-}D`$ embedding. The frame-sta
 described above is what makes this test pass; it is `libcpg`'s realisation of the standard
 VF2 stack discipline.
 
+## Ordered parallel batches
+
+When many independent patterns share one target, use
+`Vf2Matcher::find_matches_many_parallel`. The outer result retains input-pattern
+order and each inner vector retains the ordinary VF2 embedding order. The
+serial `find_matches_many` method is the exact oracle and avoids Rayon dispatch
+for small batches. Both honor the matcher's strictness and `max_matches`
+configuration. Pool sizing and measured scaling are in the
+[parallel-analysis guide](../../usage/29-parallel-analysis.md).
+
 ## Graph similarity
 
 When you want a *degree of resemblance* between two whole graphs rather than an exact
@@ -358,6 +368,8 @@ all four metrics lives in [graph similarity](../../theory/06-graph-similarity.md
 - Theory: [subgraph isomorphism & VF2](../../theory/05-subgraph-isomorphism-vf2.md),
   [graph similarity](../../theory/06-graph-similarity.md).
 - API: [pattern reference](../../api/pattern-reference.md).
+- [ADR-0059](../../design/0059-deterministic-parallel-plan-emission.md) —
+  indexed reduction and exact ordered batch semantics.
 
 ## References
 

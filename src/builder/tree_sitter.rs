@@ -114,7 +114,11 @@ impl TreeSitterCpgBuilder {
         // Phase 2: Extract CFG
         if self.config.build_cfg {
             let cfg_extractor = CfgExtractor::new();
-            cfg_extractor.extract(&mut cpg);
+            if self.config.parallel_analysis {
+                cfg_extractor.extract_parallel(&mut cpg);
+            } else {
+                cfg_extractor.extract(&mut cpg);
+            }
         }
 
         // Phase 3: Resolve uniquely supported call targets before the
@@ -126,7 +130,11 @@ impl TreeSitterCpgBuilder {
         // Phase 4: Extract DFG
         if self.config.build_dfg {
             let dfg_extractor = DfgExtractor::new();
-            dfg_extractor.extract(&mut cpg);
+            if self.config.parallel_analysis {
+                dfg_extractor.extract_parallel(&mut cpg);
+            } else {
+                dfg_extractor.extract(&mut cpg);
+            }
         }
 
         Ok(cpg)

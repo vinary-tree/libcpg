@@ -367,6 +367,18 @@ if let Some(chain) = chains.get("x") {
 
 ---
 
+## Parallel all-function planning
+
+`extract_parallel` shares one immutable field-resolution index, computes one
+owned edge plan per function on the current Rayon pool, and emits those plans in
+the same function/edge order as `extract`. No worker observes another plan's
+new DFG edges; duplicates within or across plans are resolved by the ordinary
+ordered `connect_unique` emission. See the
+[parallel-analysis guide](../../usage/29-parallel-analysis.md) for pool control
+and the exact phase order.
+
+---
+
 ## Idempotency
 
 The complete DFG pass is **idempotent**. `build_def_use_edges` snapshots existing
@@ -412,6 +424,8 @@ problems. The full rationale and trade-offs are recorded in
   `DfgExtractorConfig`, `Definition`/`Use`/`DefUseChain`, and `build_def_use_chains`.
 - [`../../theory/03-data-flow-and-reaching-definitions.md`](../../theory/03-data-flow-and-reaching-definitions.md)
   — data-flow lattices, fixed points, and why libcpg uses an AST-ordered sweep.
+- [ADR-0059](../../design/0059-deterministic-parallel-plan-emission.md) — why
+  immutable plans and one ordered emitter preserve exact graph semantics.
 
 ---
 

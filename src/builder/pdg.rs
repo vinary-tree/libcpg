@@ -49,6 +49,7 @@
 use std::collections::{BTreeMap, BTreeSet, VecDeque};
 
 use petgraph::Direction;
+use rayon::prelude::*;
 use rustc_hash::FxHashSet;
 
 use crate::{post_dominator_tree, CodePropertyGraph, CpgEdgeKind, DfgEdgeKind, NodeId};
@@ -61,6 +62,27 @@ use crate::{post_dominator_tree, CodePropertyGraph, CpgEdgeKind, DfgEdgeKind, No
 #[derive(Debug, Clone, Default)]
 pub struct PdgBuilder {
     _private: (),
+}
+
+#[derive(Debug)]
+struct PdgPlan {
+    control_edges: Vec<(NodeId, NodeId)>,
+    data_edges: Vec<(NodeId, NodeId)>,
+}
+
+impl PdgPlan {
+    fn emit(self, cpg: &mut CodePropertyGraph, existing: &mut FxHashSet<(u32, u32, bool)>) {
+        for (controller, dependent) in self.control_edges {
+            if existing.insert((controller.0, dependent.0, true)) {
+                cpg.connect(controller, dependent, CpgEdgeKind::ControlDependence);
+            }
+        }
+        for (def, use_site) in self.data_edges {
+            if existing.insert((def.0, use_site.0, false)) {
+                cpg.connect(def, use_site, CpgEdgeKind::DataDependence);
+            }
+        }
+    }
 }
 
 impl PdgBuilder {
@@ -78,32 +100,58 @@ impl PdgBuilder {
     /// [`crate::builder::TreeSitterCpgBuilder::build_from_tree`]) with
     /// `build_cfg`/`build_dfg` enabled, or the extractors were run manually.
     pub fn build(&self, cpg: &mut CodePropertyGraph, function: NodeId) {
-        // Compute both dependence relations while only borrowing `cpg`
-        // immutably, then emit. Snapshot existing PDG edges first so a re-build
-        // does not duplicate them (idempotency).
-        let existing: FxHashSet<(u32, u32, bool)> = cpg
-            .edges()
-            .filter_map(|e| match e.kind {
-                CpgEdgeKind::ControlDependence => Some((e.source.0, e.target.0, true)),
-                CpgEdgeKind::DataDependence => Some((e.source.0, e.target.0, false)),
-                _ => None,
-            })
+        let mut existing = existing_pdg_edges(cpg);
+        self.plan(cpg, function).emit(cpg, &mut existing);
+    }
+
+    /// Builds PDG edges for every function in stable graph order.
+    pub fn build_all(&self, cpg: &mut CodePropertyGraph) {
+        let functions: Vec<NodeId> = cpg.functions().map(|node| node.id).collect();
+        let plans: Vec<_> = functions
+            .into_iter()
+            .map(|function| self.plan(cpg, function))
             .collect();
-
-        let control_edges = compute_control_dependence(cpg, function);
-        let data_edges = compute_data_dependence(cpg, function);
-
-        for (controller, dependent) in control_edges {
-            if !existing.contains(&(controller.0, dependent.0, true)) {
-                cpg.connect(controller, dependent, CpgEdgeKind::ControlDependence);
-            }
-        }
-        for (def, use_site) in data_edges {
-            if !existing.contains(&(def.0, use_site.0, false)) {
-                cpg.connect(def, use_site, CpgEdgeKind::DataDependence);
-            }
+        let mut existing = existing_pdg_edges(cpg);
+        for plan in plans {
+            plan.emit(cpg, &mut existing);
         }
     }
+
+    /// Builds every function PDG concurrently on the current Rayon pool.
+    ///
+    /// Dependence discovery reads only the immutable CFG, DFG, and AST layers.
+    /// The resulting plans retain function order and are emitted serially with
+    /// a shared idempotency set, so worker scheduling cannot affect graph bytes.
+    /// Install a custom [`rayon::ThreadPool`] around this call to select the
+    /// worker count or stack size.
+    pub fn build_all_parallel(&self, cpg: &mut CodePropertyGraph) {
+        let functions: Vec<NodeId> = cpg.functions().map(|node| node.id).collect();
+        let plans: Vec<_> = functions
+            .par_iter()
+            .map(|&function| self.plan(cpg, function))
+            .collect();
+        let mut existing = existing_pdg_edges(cpg);
+        for plan in plans {
+            plan.emit(cpg, &mut existing);
+        }
+    }
+
+    fn plan(&self, cpg: &CodePropertyGraph, function: NodeId) -> PdgPlan {
+        PdgPlan {
+            control_edges: compute_control_dependence(cpg, function),
+            data_edges: compute_data_dependence(cpg, function),
+        }
+    }
+}
+
+fn existing_pdg_edges(cpg: &CodePropertyGraph) -> FxHashSet<(u32, u32, bool)> {
+    cpg.edges()
+        .filter_map(|edge| match edge.kind {
+            CpgEdgeKind::ControlDependence => Some((edge.source.0, edge.target.0, true)),
+            CpgEdgeKind::DataDependence => Some((edge.source.0, edge.target.0, false)),
+            _ => None,
+        })
+        .collect()
 }
 
 /// Computes the control-dependence edges `(controller, dependent)` for
@@ -614,6 +662,39 @@ mod proptests {
             let after_first = cpg.edge_count();
             PdgBuilder::new().build(&mut cpg, func);
             prop_assert_eq!(after_first, cpg.edge_count());
+        }
+
+        /// Parallel all-function construction emits the same ordered PDG edge
+        /// stream as repeated serial construction, including idempotency when
+        /// arbitrary PDG edges already exist.
+        #[test]
+        fn prop_parallel_pdg_is_exactly_serial(mut cpg in arb_well_formed_cpg()) {
+            CfgExtractor::new().extract(&mut cpg);
+            DfgExtractor::new().extract(&mut cpg);
+            let functions: Vec<_> = cpg.functions().map(|node| node.id).collect();
+            let mut repeated_single = cpg.clone();
+            let mut serial_all = cpg.clone();
+            let mut parallel = cpg;
+            let builder = PdgBuilder::new();
+            for function in functions {
+                builder.build(&mut repeated_single, function);
+            }
+            builder.build_all(&mut serial_all);
+            let pool = rayon::ThreadPoolBuilder::new()
+                .num_threads(4)
+                .stack_size(256 * 1024)
+                .build()
+                .expect("bounded Rayon pool");
+            pool.install(|| builder.build_all_parallel(&mut parallel));
+
+            prop_assert_eq!(
+                parallel.edges().cloned().collect::<Vec<_>>(),
+                repeated_single.edges().cloned().collect::<Vec<_>>(),
+            );
+            prop_assert_eq!(
+                serial_all.edges().cloned().collect::<Vec<_>>(),
+                repeated_single.edges().cloned().collect::<Vec<_>>(),
+            );
         }
     }
 }

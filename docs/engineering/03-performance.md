@@ -27,22 +27,24 @@ The upshot: a CPG is one contiguous petgraph arena of compact
 refcounted text, one fast node-id map, and an optional read-optimized exact-edge
 index.
 
-## Dependencies declared but not yet wired
+## Parallel execution and remaining unused dependencies
 
-Several dependencies appear in `Cargo.toml` but have **no call sites in `src/`**.
-They are documented here so the performance story is not oversold:
+Rayon is wired only into explicit parallel entry points. Other dependencies in
+this table still have **no call sites in `src/`**; documenting both states keeps
+the performance story bounded to implemented behavior:
 
 | Dependency | Declared for | Actual state in `src/` |
 | --- | --- | --- |
-| `rayon` | parallel processing (the crate-level doc comment lists it under "Parallel Processing (planned)") | **Not wired.** There is no `par_iter` / `into_par_iter` / `par_bridge` anywhere in `src/`. Analysis is currently single-threaded. |
+| `rayon` | explicit parallel analysis | **Wired.** `CfgExtractor::extract_parallel`, `DfgExtractor::extract_parallel`, `PdgBuilder::build_all_parallel`, and `Vf2Matcher::find_matches_many_parallel` use indexed parallel collection. Serial methods and the default builder configuration remain serial. |
 | `ahash` | an alternative fast hasher | **Unused.** The code hashes with `rustc_hash::FxHash`; `ahash` is never referenced. |
 | `string_cache` | interned string labels | **Unused.** Node labels/text are stored as `Arc<str>`, not `string_cache` atoms. |
 | `regex` | pattern matching | **Unused as a crate.** The only `"regex"` occurrences in `src/` are node-kind string literals mapped to a `Literal` kind, not calls into the `regex` crate. |
 
-Wiring rayon into the naturally-parallel passes (per-function CFG/DFG extraction,
-independent VF2 searches) is a clear future optimization; per the project's
-data-driven-optimization discipline it should be **measured before and after**
-in an analysis-specific harness.
+Parallel workers borrow one immutable graph and produce heap-owned plans. A
+single ordered emitter applies graph mutations, so the implementation needs no
+graph clone, shared mutation, or scheduling-sensitive edge assignment. The
+controlled worker-count sweep and profiler evidence are reported in
+[scientific validation 54](../scientific/54-parallel-analysis-validation.md).
 
 ## Preallocation
 
@@ -146,11 +148,12 @@ once, loop bodies twice, and a path set cuts malformed AST cycles.
 
 ## Benchmark coverage and remaining gaps
 
-Twenty-nine explicitly declared Criterion targets are active. Forty-one operation
+Thirty explicitly declared Criterion targets are active. Forty-one operation
 groups are feature-free; three more require the parser-language features used
 by DFG, PDG, and corpus measurement; `induction_analysis` registers one
-additional `algorithm-detection`-gated operation. A full-feature measurement
-therefore exposes forty-five groups. Every
+additional `algorithm-detection`-gated operation; `parallel_analysis` adds two
+feature-free operation groups. A full-feature measurement therefore exposes
+forty-seven groups. Every
 active group constructs and checks a deterministic oracle
 before Criterion enters the timed loop:
 
@@ -179,6 +182,10 @@ before Criterion enters the timed loop:
   classes, with an exact one-match cap oracle; its Criterion fixture and
   search-only profile retain constructed graphs so candidate-state cost is not
   obscured by construction;
+- `parallel_analysis` measures serial and 1/2/4/8/16/32-worker CFG/DFG/PDG
+  pipelines over 512 functions and ordered VF2 batches over 128 patterns. Every
+  worker-count fixture must equal the exact serial edge or match sequence before
+  timing; each Rayon pool uses a 256 KiB worker stack;
 - `dataflow_liveness` measures backward-May liveness over 512- and 4,096-node
   chains, 64- and 512-rung diamond ladders, and 128- and 1,024-node nested-loop
   families;
@@ -391,6 +398,7 @@ cargo bench --bench program_merge --no-default-features
 cargo bench --bench ifds_taint --no-default-features
 cargo bench --bench traversal_primitives --no-default-features
 cargo bench --bench pattern_vf2 --no-default-features
+cargo bench --bench parallel_analysis --no-default-features
 cargo bench --bench similarity_wl --no-default-features
 cargo bench --bench dfg_extraction --features lang-rust
 cargo bench --bench pdg_construction --features lang-rust

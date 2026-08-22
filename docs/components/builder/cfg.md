@@ -379,6 +379,18 @@ relation to test-path counts live in
 
 ---
 
+## Parallel all-function planning
+
+`extract_parallel` computes one heap-owned plan per function on the current
+Rayon pool, collects plans in function order, and then performs the same serial
+`connect_unique`/entry/exit emission as `extract`. Workers hold only immutable
+CPG borrows, so scheduling cannot change edge identifiers or CFG registry order.
+The tree-sitter pipeline selects this method when
+`CpgBuilderConfig::parallel_analysis` is `true`. Pool sizing and examples are in
+the [parallel-analysis guide](../../usage/29-parallel-analysis.md).
+
+---
+
 ## Re-running the extractor
 
 `extract` is construction phase 3, and it is also idempotent. CFG entry/exit
@@ -407,6 +419,8 @@ than adding a parallel edge. The DFG and PDG stages are likewise safe to rerun.
   recursive handler component was defunctionalized as one typed machine.
 - [Scientific validation 37](../../scientific/37-cfg-extraction-machine-validation.md)
   — exact oracle, malformed-input, determinism, and 100,000-depth evidence.
+- [Scientific validation 54](../../scientific/54-parallel-analysis-validation.md)
+  — serial equivalence, worker-count scaling, and small-worker-stack evidence.
 
 ---
 

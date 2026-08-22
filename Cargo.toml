@@ -302,6 +302,10 @@ name = "pattern_vf2"
 harness = false
 
 [[bench]]
+name = "parallel_analysis"
+harness = false
+
+[[bench]]
 name = "similarity_wl"
 harness = false
 

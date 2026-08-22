@@ -16,7 +16,7 @@ A CPG library makes three kinds of assertion, and each demands a different stand
 
 These are distinct from *performance* claims ("construction is fast", "VF2
 prunes well"), which require controlled measurement rather than assertion.
-`libcpg` ships twenty-nine oracle-guarded Criterion targets (forty-one
+`libcpg` ships thirty oracle-guarded Criterion targets (forty-three
 feature-free operation groups, three parser-gated groups, and the gated
 complexity-evidence group), but their evidence is limited to
 the named graph families, sizes, environment, and operation. The
@@ -51,19 +51,19 @@ Two properties of the suite make this rigorous rather than merely suggestive:
 
 ## 3. The evidence base
 
-The all-features Cargo inventory contains **1,220 library tests**, **141
-integration/robustness tests**, and **3 rustdoc examples**, for **1,364
+The all-features Cargo inventory contains **1,262 library tests**, **146
+integration/robustness tests**, and **3 rustdoc examples**, for **1,411
 executable cases**. The integration inventory includes public and parser-backed gates for graph construction,
 optimization, architecture, concurrency, summaries, slicing, persistence, and
 typestate plus resource/definition/exception, population, clone, and path bug detectors,
 including aggregate, Rust, Java dual-build, exact 4/5 and 9/10, and
 depth-100,000 detector targets. These cases combine fixed examples,
-differential oracles, and 95 exact
+differential oracles, and 99 exact
 source-level `proptest!` blocks. The feature-free matrix remains
 independently runnable and exercises the exact graph/data-flow substrate
-without compiling any grammar. Twenty-nine active Criterion targets supplement
-correctness with forty-one feature-free operation groups, three parser-gated
-groups, and a forty-fifth when `algorithm-detection` is enabled; see
+without compiling any grammar. Thirty active Criterion targets supplement
+correctness with forty-three feature-free operation groups, three parser-gated
+groups, and a forty-seventh when `algorithm-detection` is enabled; see
 [Testing](../engineering/02-testing.md) for the census and [04](04-measurement-methodology.md)
 for the measurement contract.
 
@@ -76,7 +76,7 @@ Because `default = []`, many tests are **feature-gated**. The end-to-end reachin
 | [01 — Invariants & equivalence](01-cpg-invariants-and-equivalence.md) | Single shared node set; graph-assigned unique IDs; AST child/parent consistency; idempotent extractors; `build` ≡ `build_from_tree` (identical node payloads, typed edges, and language) | example + property `build_from_tree_matches_build` tests, `parsed_shadowing_and_idempotent`, `def_use_backward_slice`, `parsed_nested_use_resolves_and_chains` | `lang-rust` (equivalence, DFG) / feature-free (slice) |
 | [02 — Reaching-defs validation](02-reaching-defs-validation.md) | Nested-expression use resolution; latest-definition (strong update); non-flow of unrelated variables; shadowing scope; idempotency | `parsed_nested_use_resolves_and_chains`, `parsed_reassignment_uses_latest_definition`, `parsed_unrelated_variable_does_not_flow`, `parsed_shadowing_and_idempotent` | `lang-rust` |
 | [03 — VF2 completeness](03-vf2-completeness.md) | Soundness floor (empty pattern → no match); kind-feasibility pruning; **all** embeddings found (diamond → exactly 2) with exact backtracking | `test_empty_pattern`, `test_single_node_match`, `test_multi_embedding_backtracking` | feature-free |
-| [04 — Measurement methodology](04-measurement-methodology.md) | Environment control and exact-oracle timing for SCC, dominators/post-dominators, condensation analytics, arena construction, bounded VF2, liveness, loop induction, DSM, WL, centrality, community, cohesion, spectral, cycle, motif, GED, function clones, clone/feasibility, API-usage/temporal, CWE-template, program-composition, IFDS/IDE, and taint-summary operations | twenty-nine `benches/*.rs` Criterion targets | 41 feature-free groups; three parser-gated groups; a 45th with `algorithm-detection` |
+| [04 — Measurement methodology](04-measurement-methodology.md) | Environment control and exact-oracle timing for SCC, dominators/post-dominators, condensation analytics, arena construction, bounded and batched VF2, serial/parallel CFG/DFG/PDG, liveness, loop induction, DSM, WL, centrality, community, cohesion, spectral, cycle, motif, GED, function clones, clone/feasibility, API-usage/temporal, CWE-template, program-composition, IFDS/IDE, and taint-summary operations | thirty `benches/*.rs` Criterion targets | 43 feature-free groups; three parser-gated groups; a 47th with `algorithm-detection` |
 | [05 — SCCP validation](05-sccp-validation.md) | Concrete value soundness, lattice laws, conditional-edge partition, refinement monotonicity, determinism, parser integration | `straight_line_literal_programs_match_the_concrete_interpreter`, SCCP unit/property tests, `sccp_integration` | feature-free / `lang-rust` parser case |
 | [06 — Interval validation](06-interval-analysis-validation.md) | Concrete range soundness, hull/widen/narrow laws, loop convergence, narrowing descent, determinism, SCCP cross-check, parser integration | interval unit/property tests, `intervals_integration` | feature-free / `lang-rust` parser case |
 | [07 — Loop-induction validation](07-induction-analysis-validation.md) | DFG invariant contract, unique latch-dominating recurrences, checked affine steps, comparison direction, determinism, parser integration, malformed/stack safety | induction unit/property tests, `induction_integration`, robustness harness | feature-free / `serde` / `lang-rust` parser case |
@@ -126,6 +126,7 @@ Because `default = []`, many tests are **feature-gated**. The end-to-end reachin
 | [51 — Lazy exact-edge projection-cache validation](51-projection-cache-validation.md) | Direct-filter equality, insertion-order determinism, mutation invalidation, serde omission, warm traversal/allocator effects, honest cold/peak costs, and constant native call depth | two 256-case properties, parser/call/PDG integration, exact mutation/persistence examples, Criterion corpus/traversal controls, headless DHAT/Massif/perf, depth-100,000 and degree-99,999/256 KiB gate | feature-free / `serde` / `lang-rust` |
 | [52 — Dense stack-safe VF2 validation](52-dense-vf2-validation.md) | Exhaustive-oracle equality, canonical sequence/caps, non-induced typed-multigraph semantics, dense ordered-set equivalence, isolated timing/allocation effects, and constant native call depth | 128-case exhaustive/metamorphic campaigns, recursive differential oracle, `BTreeSet` model, exact examples, parser integration, Criterion/corpus/headless profiles, depth-100,000/256 KiB gate | feature-free / `lang-rust` |
 | [53 — Borrowed-CSR dominator validation](53-dominator-optimization-validation.md) | Exact dominance/frontier/post-dominance relations, insertion determinism, borrowed-overlay performance, PDG consumer effect, and constant native call depth | 8,329 exhaustive graphs, four 256-case properties, petgraph/former-PDG/removal oracles, parser integration, Criterion/headless profiles, depth-100,000/256 KiB gate | feature-free / `lang-rust` |
+| [54 — Deterministic parallel-analysis validation](54-parallel-analysis-validation.md) | Exact serial/parallel CFG, DFG, PDG, and ordered VF2-batch equality; worker-count invariance; scaling; allocation and counter effects; constant native call depth | four 128-case properties, 1/2/4/8/16/32-worker integration, serde-byte equality, parser integration, Criterion/headless profiles, depth-100,000/256 KiB gate | feature-free / `serde` / `lang-rust` |
 
 ## 5. What is proven, and what is advisory
 
@@ -237,7 +238,7 @@ Scientific honesty requires separating the two:
 - **Empirically bounded.** Performance results apply only to a target's named
   fixture, size, and controlled environment. Deterministic CPG differencing and
   GNN propagation remain measurement gaps; no result
-  from the twenty-nine active targets (or forty-five fully enabled operation groups) may be
+  from the thirty active targets (or forty-seven fully enabled operation groups) may be
   generalized to them. Martin metrics, reflexion conformance, architectural
   layering, and architectural-smell detection have no dedicated targets, so
   their validation supports correctness but makes no

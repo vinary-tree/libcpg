@@ -5,6 +5,7 @@
 //! constructs and emits their edges without mapping source depth onto native
 //! Rust call frames.
 
+use rayon::prelude::*;
 use rustc_hash::{FxHashMap, FxHashSet};
 use smallvec::SmallVec;
 
@@ -42,6 +43,42 @@ pub struct CfgExtractor {
 }
 
 type CfgExits = SmallVec<[NodeId; 4]>;
+
+/// Immutable-computation result for one function's control-flow graph.
+///
+/// Keeping the plan heap-owned separates independent per-function analysis
+/// from ordered graph mutation. The same representation serves serial and
+/// Rayon execution, so parallelism cannot change edge, entry, or exit order.
+#[derive(Debug)]
+struct CfgPlan {
+    function: NodeId,
+    edges: Vec<(NodeId, NodeId, CpgEdgeKind)>,
+    exits: CfgExits,
+}
+
+impl CfgPlan {
+    fn new(function: NodeId) -> Self {
+        Self {
+            function,
+            edges: Vec::new(),
+            exits: SmallVec::new(),
+        }
+    }
+
+    fn connect_unique(&mut self, source: NodeId, target: NodeId, kind: CpgEdgeKind) {
+        self.edges.push((source, target, kind));
+    }
+
+    fn emit(self, cpg: &mut CodePropertyGraph) {
+        cpg.add_cfg_entry(self.function);
+        for (source, target, kind) in self.edges {
+            cpg.connect_unique(source, target, kind);
+        }
+        for exit in self.exits {
+            cpg.add_cfg_exit(exit);
+        }
+    }
+}
 
 /// One instruction or continuation in CFG extraction's pushdown machine.
 #[derive(Debug)]
@@ -146,11 +183,31 @@ impl CfgExtractor {
 
     /// Extracts CFG edges for all functions in the CPG.
     pub fn extract(&self, cpg: &mut CodePropertyGraph) {
-        // Find all function nodes
         let functions: Vec<NodeId> = cpg.functions().map(|n| n.id).collect();
+        let plans: Vec<_> = functions
+            .into_iter()
+            .map(|function| self.plan_function_cfg(cpg, function))
+            .collect();
+        for plan in plans {
+            plan.emit(cpg);
+        }
+    }
 
-        for func_id in functions {
-            self.extract_function_cfg(cpg, func_id);
+    /// Extracts all function CFGs concurrently on the current Rayon pool.
+    ///
+    /// Each worker computes an owned control-flow plan from the immutable AST.
+    /// Plans are collected in function order and only then emitted serially, making
+    /// the resulting graph byte-for-byte independent of scheduling and worker
+    /// count. Install a custom [`rayon::ThreadPool`] around this call to select
+    /// the worker count or stack size.
+    pub fn extract_parallel(&self, cpg: &mut CodePropertyGraph) {
+        let functions: Vec<NodeId> = cpg.functions().map(|node| node.id).collect();
+        let plans: Vec<_> = functions
+            .par_iter()
+            .map(|&function| self.plan_function_cfg(cpg, function))
+            .collect();
+        for plan in plans {
+            plan.emit(cpg);
         }
     }
 
@@ -165,8 +222,11 @@ impl CfgExtractor {
 
     /// Extracts CFG edges for a single function.
     pub fn extract_function_cfg(&self, cpg: &mut CodePropertyGraph, function: NodeId) {
-        // Mark function entry
-        cpg.add_cfg_entry(function);
+        self.plan_function_cfg(cpg, function).emit(cpg);
+    }
+
+    fn plan_function_cfg(&self, cpg: &CodePropertyGraph, function: NodeId) -> CfgPlan {
+        let mut plan = CfgPlan::new(function);
 
         // Build CFG using a context that tracks loop and try structures
         let mut ctx = CfgContext::new();
@@ -175,20 +235,16 @@ impl CfgExtractor {
         let children = cpg.ast_children(function).to_vec();
         if let Some(&body) = children.last() {
             // Connect function to body entry
-            cpg.connect_unique(
+            plan.connect_unique(
                 function,
                 body,
                 CpgEdgeKind::ControlFlow(CfgEdgeKind::Sequential),
             );
 
             // Process the function body
-            let exits = self.process_node(cpg, body, &mut ctx);
-
-            // Mark all exit points
-            for exit in exits {
-                cpg.add_cfg_exit(exit);
-            }
+            plan.exits = self.process_node(cpg, &mut plan, body, &mut ctx);
         }
+        plan
     }
 
     /// Executes the former recursive equations on fixed-bounded test inputs.
@@ -211,7 +267,8 @@ impl CfgExtractor {
     /// Processes one AST region with a typed heap continuation machine.
     fn process_node(
         &self,
-        cpg: &mut CodePropertyGraph,
+        cpg: &CodePropertyGraph,
+        plan: &mut CfgPlan,
         node_id: NodeId,
         ctx: &mut CfgContext,
     ) -> CfgExits {
@@ -239,7 +296,7 @@ impl CfgExtractor {
                         CpgNodeKindTag::Block => {
                             let children = cpg.ast_children(node).to_vec();
                             if let Some(&first) = children.first() {
-                                cpg.connect_unique(
+                                plan.connect_unique(
                                     node,
                                     first,
                                     CpgEdgeKind::ControlFlow(CfgEdgeKind::Sequential),
@@ -261,7 +318,7 @@ impl CfgExtractor {
                             match children.as_slice() {
                                 [] => values.push(smallvec::smallvec![node]),
                                 [condition] => {
-                                    cpg.connect_unique(
+                                    plan.connect_unique(
                                         node,
                                         *condition,
                                         CpgEdgeKind::ControlFlow(CfgEdgeKind::Sequential),
@@ -269,12 +326,12 @@ impl CfgExtractor {
                                     values.push(smallvec::smallvec![*condition]);
                                 }
                                 [condition, then_branch] => {
-                                    cpg.connect_unique(
+                                    plan.connect_unique(
                                         node,
                                         *condition,
                                         CpgEdgeKind::ControlFlow(CfgEdgeKind::Sequential),
                                     );
-                                    cpg.connect_unique(
+                                    plan.connect_unique(
                                         *condition,
                                         *then_branch,
                                         CpgEdgeKind::ControlFlow(CfgEdgeKind::ConditionalTrue),
@@ -285,12 +342,12 @@ impl CfgExtractor {
                                     frames.push(CfgFrame::Enter(*then_branch));
                                 }
                                 [condition, then_branch, else_branch, ..] => {
-                                    cpg.connect_unique(
+                                    plan.connect_unique(
                                         node,
                                         *condition,
                                         CpgEdgeKind::ControlFlow(CfgEdgeKind::Sequential),
                                     );
-                                    cpg.connect_unique(
+                                    plan.connect_unique(
                                         *condition,
                                         *then_branch,
                                         CpgEdgeKind::ControlFlow(CfgEdgeKind::ConditionalTrue),
@@ -333,12 +390,12 @@ impl CfgExtractor {
                             });
                             if let (Some(body), Some(condition)) = (body, condition) {
                                 ctx.push_loop(node, condition);
-                                cpg.connect_unique(
+                                plan.connect_unique(
                                     node,
                                     condition,
                                     CpgEdgeKind::ControlFlow(CfgEdgeKind::Sequential),
                                 );
-                                cpg.connect_unique(
+                                plan.connect_unique(
                                     condition,
                                     body,
                                     CpgEdgeKind::ControlFlow(CfgEdgeKind::ConditionalTrue),
@@ -353,7 +410,7 @@ impl CfgExtractor {
                             let children = cpg.ast_children(node).to_vec();
                             if let Some(&body) = children.last() {
                                 ctx.push_loop(node, node);
-                                cpg.connect_unique(
+                                plan.connect_unique(
                                     node,
                                     body,
                                     CpgEdgeKind::ControlFlow(CfgEdgeKind::ConditionalTrue),
@@ -379,7 +436,7 @@ impl CfgExtractor {
                                 .or_else(|| children.first().copied())
                             {
                                 ctx.push_loop(node, node);
-                                cpg.connect_unique(
+                                plan.connect_unique(
                                     node,
                                     body,
                                     CpgEdgeKind::ControlFlow(CfgEdgeKind::Sequential),
@@ -401,7 +458,7 @@ impl CfgExtractor {
                                     cpg.node(children[0]).map(|child| &child.kind),
                                     Some(CpgNodeKind::MatchArm)
                                 ) {
-                                cpg.connect_unique(
+                                plan.connect_unique(
                                     node,
                                     children[0],
                                     CpgEdgeKind::ControlFlow(CfgEdgeKind::Sequential),
@@ -420,7 +477,7 @@ impl CfgExtractor {
                         }
                         CpgNodeKindTag::Return => {
                             if let Some(&expression) = cpg.ast_children(node).first() {
-                                cpg.connect_unique(
+                                plan.connect_unique(
                                     node,
                                     expression,
                                     CpgEdgeKind::ControlFlow(CfgEdgeKind::Sequential),
@@ -434,7 +491,7 @@ impl CfgExtractor {
                         CpgNodeKindTag::Break => {
                             if let Some(loop_context) = ctx.loop_stack.last_mut() {
                                 loop_context.break_targets.push(node);
-                                cpg.connect_unique(
+                                plan.connect_unique(
                                     node,
                                     loop_context.loop_id,
                                     CpgEdgeKind::ControlFlow(CfgEdgeKind::Break),
@@ -444,7 +501,7 @@ impl CfgExtractor {
                         }
                         CpgNodeKindTag::Continue => {
                             if let Some(loop_context) = ctx.loop_stack.last() {
-                                cpg.connect_unique(
+                                plan.connect_unique(
                                     node,
                                     loop_context.continue_target,
                                     CpgEdgeKind::ControlFlow(CfgEdgeKind::Continue),
@@ -468,7 +525,7 @@ impl CfgExtractor {
                                 }
                             }
                             if let Some(body) = body {
-                                cpg.connect_unique(
+                                plan.connect_unique(
                                     node,
                                     body,
                                     CpgEdgeKind::ControlFlow(CfgEdgeKind::Sequential),
@@ -493,7 +550,7 @@ impl CfgExtractor {
                         }
                         CpgNodeKindTag::Throw if self.config.include_exceptions => {
                             if let Some(&expression) = cpg.ast_children(node).first() {
-                                cpg.connect_unique(
+                                plan.connect_unique(
                                     node,
                                     expression,
                                     CpgEdgeKind::ControlFlow(CfgEdgeKind::Sequential),
@@ -501,7 +558,7 @@ impl CfgExtractor {
                                 frames.push(CfgFrame::ThrowAfterExpression { throw_node: node });
                                 frames.push(CfgFrame::Enter(expression));
                             } else {
-                                Self::emit_throw_edges(cpg, node, ctx);
+                                Self::emit_throw_edges(cpg, plan, node, ctx);
                                 values.push(SmallVec::new());
                             }
                         }
@@ -509,7 +566,7 @@ impl CfgExtractor {
                         CpgNodeKindTag::Call if self.config.include_call_edges => {
                             let arguments = cpg.ast_children(node).to_vec();
                             if let Some(&argument) = arguments.first() {
-                                cpg.connect_unique(
+                                plan.connect_unique(
                                     node,
                                     argument,
                                     CpgEdgeKind::ControlFlow(CfgEdgeKind::Sequential),
@@ -521,11 +578,11 @@ impl CfgExtractor {
                                 });
                                 frames.push(CfgFrame::Enter(argument));
                             } else {
-                                Self::emit_call_edge(cpg, node);
+                                Self::emit_call_edge(cpg, plan, node);
                                 values.push(smallvec::smallvec![node]);
                             }
                         }
-                        _ => Self::begin_sequential(cpg, node, &mut frames, &mut values),
+                        _ => Self::begin_sequential(cpg, plan, node, &mut frames, &mut values),
                     }
                 }
                 CfgFrame::Leave(node) => {
@@ -566,7 +623,7 @@ impl CfgExtractor {
                     let next_index = index + 1;
                     if let Some(&next) = children.get(next_index) {
                         for &exit in &current_exits {
-                            cpg.connect_unique(
+                            plan.connect_unique(
                                 exit,
                                 next,
                                 CpgEdgeKind::ControlFlow(Self::continuation_edge_kind(
@@ -611,7 +668,7 @@ impl CfgExtractor {
                     } else {
                         else_branch
                     };
-                    cpg.connect_unique(
+                    plan.connect_unique(
                         condition,
                         actual_else,
                         CpgEdgeKind::ControlFlow(CfgEdgeKind::ConditionalFalse),
@@ -626,7 +683,7 @@ impl CfgExtractor {
                 CfgFrame::WhileAfterBody { condition } => {
                     let body_exits = values.pop().expect("a while body produces one exit set");
                     for exit in body_exits {
-                        cpg.connect_unique(
+                        plan.connect_unique(
                             exit,
                             condition,
                             CpgEdgeKind::ControlFlow(CfgEdgeKind::LoopBack),
@@ -640,7 +697,7 @@ impl CfgExtractor {
                 CfgFrame::ForAfterBody { header } => {
                     let body_exits = values.pop().expect("a for body produces one exit set");
                     for exit in body_exits {
-                        cpg.connect_unique(
+                        plan.connect_unique(
                             exit,
                             header,
                             CpgEdgeKind::ControlFlow(CfgEdgeKind::LoopBack),
@@ -654,7 +711,7 @@ impl CfgExtractor {
                 CfgFrame::LoopAfterBody { header } => {
                     let body_exits = values.pop().expect("a loop body produces one exit set");
                     for exit in body_exits {
-                        cpg.connect_unique(
+                        plan.connect_unique(
                             exit,
                             header,
                             CpgEdgeKind::ControlFlow(CfgEdgeKind::LoopBack),
@@ -680,13 +737,13 @@ impl CfgExtractor {
                         ) {
                             continue;
                         }
-                        cpg.connect_unique(
+                        plan.connect_unique(
                             source,
                             arm,
                             CpgEdgeKind::ControlFlow(CfgEdgeKind::Case),
                         );
                         if let Some(&body) = cpg.ast_children(arm).last() {
-                            cpg.connect_unique(
+                            plan.connect_unique(
                                 arm,
                                 body,
                                 CpgEdgeKind::ControlFlow(CfgEdgeKind::Sequential),
@@ -740,7 +797,7 @@ impl CfgExtractor {
                     let _ = values
                         .pop()
                         .expect("a thrown expression produces one exit set");
-                    Self::emit_throw_edges(cpg, throw_node, ctx);
+                    Self::emit_throw_edges(cpg, plan, throw_node, ctx);
                     values.push(SmallVec::new());
                 }
                 CfgFrame::CallAfterArgument {
@@ -750,7 +807,7 @@ impl CfgExtractor {
                 } => {
                     let _ = values.pop().expect("a call argument produces one exit set");
                     if let Some(&argument) = arguments.get(next_index) {
-                        cpg.connect_unique(
+                        plan.connect_unique(
                             call,
                             argument,
                             CpgEdgeKind::ControlFlow(CfgEdgeKind::Sequential),
@@ -762,7 +819,7 @@ impl CfgExtractor {
                         });
                         frames.push(CfgFrame::Enter(argument));
                     } else {
-                        Self::emit_call_edge(cpg, call);
+                        Self::emit_call_edge(cpg, plan, call);
                         values.push(smallvec::smallvec![call]);
                     }
                 }
@@ -773,7 +830,7 @@ impl CfgExtractor {
                     let next_index = index + 1;
                     if let Some(&next) = children.get(next_index) {
                         for &exit in &exits {
-                            cpg.connect_unique(
+                            plan.connect_unique(
                                 exit,
                                 next,
                                 CpgEdgeKind::ControlFlow(CfgEdgeKind::Sequential),
@@ -798,7 +855,7 @@ impl CfgExtractor {
                     ctx.pop_try();
                     if let Some(finally) = finally {
                         for exit in body_exits {
-                            cpg.connect_unique(
+                            plan.connect_unique(
                                 exit,
                                 finally,
                                 CpgEdgeKind::ControlFlow(CfgEdgeKind::Sequential),
@@ -832,7 +889,7 @@ impl CfgExtractor {
                         }
                     }
                     if let Some((catch, body)) = catch_body {
-                        cpg.connect_unique(
+                        plan.connect_unique(
                             catch,
                             body,
                             CpgEdgeKind::ControlFlow(CfgEdgeKind::Catch),
@@ -862,7 +919,7 @@ impl CfgExtractor {
                     let catch_exits = values.pop().expect("a catch body produces one exit set");
                     if let Some(finally) = finally {
                         for exit in catch_exits {
-                            cpg.connect_unique(
+                            plan.connect_unique(
                                 exit,
                                 finally,
                                 CpgEdgeKind::ControlFlow(CfgEdgeKind::Sequential),
@@ -898,14 +955,15 @@ impl CfgExtractor {
     }
 
     fn begin_sequential(
-        cpg: &mut CodePropertyGraph,
+        cpg: &CodePropertyGraph,
+        plan: &mut CfgPlan,
         node: NodeId,
         frames: &mut Vec<CfgFrame>,
         values: &mut Vec<CfgExits>,
     ) {
         let children = cpg.ast_children(node).to_vec();
         if let Some(&first) = children.first() {
-            cpg.connect_unique(
+            plan.connect_unique(
                 node,
                 first,
                 CpgEdgeKind::ControlFlow(CfgEdgeKind::Sequential),
@@ -917,20 +975,25 @@ impl CfgExtractor {
         }
     }
 
-    fn emit_call_edge(cpg: &mut CodePropertyGraph, call: NodeId) {
+    fn emit_call_edge(cpg: &CodePropertyGraph, plan: &mut CfgPlan, call: NodeId) {
         if let Some(CpgNodeKind::Call {
             target: Some(target),
             ..
         }) = cpg.node(call).map(|node| &node.kind)
         {
-            cpg.connect_unique(call, *target, CpgEdgeKind::ControlFlow(CfgEdgeKind::Call));
+            plan.connect_unique(call, *target, CpgEdgeKind::ControlFlow(CfgEdgeKind::Call));
         }
     }
 
-    fn emit_throw_edges(cpg: &mut CodePropertyGraph, throw_node: NodeId, ctx: &CfgContext) {
+    fn emit_throw_edges(
+        _cpg: &CodePropertyGraph,
+        plan: &mut CfgPlan,
+        throw_node: NodeId,
+        ctx: &CfgContext,
+    ) {
         if let Some(try_context) = ctx.try_stack.last() {
             for &catch in &try_context.catch_handlers {
-                cpg.connect_unique(
+                plan.connect_unique(
                     throw_node,
                     catch,
                     CpgEdgeKind::ControlFlow(CfgEdgeKind::Throw),
@@ -3279,6 +3342,34 @@ mod proptests {
         prop::collection::vec(arb_cfg_spec(), 0..=5).prop_map(build_cfg_cpg)
     }
 
+    fn build_multi_function_cfg_cpg(functions: Vec<Vec<CfgSpec>>) -> CodePropertyGraph {
+        let mut cpg = CodePropertyGraph::new(Language::Rust);
+        for (index, specs) in functions.iter().enumerate() {
+            let function = cpg.add_node(CpgNode::new(
+                NodeId::new(0),
+                CpgNodeKind::Function {
+                    signature: Box::new(MethodSignature {
+                        name: format!("generated_cfg_{index}").into(),
+                        params: Default::default(),
+                        return_type: None,
+                        is_static: false,
+                        is_async: false,
+                        visibility: Visibility::Public,
+                    }),
+                },
+                SourceRange::default(),
+            ));
+            let body = wf_child(&mut cpg, function, cfg_kind_block());
+            build_cfg_specs(&mut cpg, body, function, specs);
+        }
+        cpg
+    }
+
+    fn arb_multi_function_cfg_cpg() -> impl Strategy<Value = CodePropertyGraph> {
+        prop::collection::vec(prop::collection::vec(arb_cfg_spec(), 0..=4), 0..=8)
+            .prop_map(build_multi_function_cfg_cpg)
+    }
+
     fn cfg_edges(cpg: &CodePropertyGraph) -> Vec<crate::CpgEdge> {
         cpg.edges()
             .filter(|edge| matches!(edge.kind, CpgEdgeKind::ControlFlow(_)))
@@ -3419,6 +3510,44 @@ mod proptests {
                     prop_assert!(blocks.contains_key(&edge.target));
                 }
             }
+        }
+    }
+
+    proptest! {
+        #![proptest_config(ProptestConfig::with_cases(128))]
+
+        /// Parallel planning is observationally identical to the serial
+        /// extractor for generated multi-function ASTs and every configuration
+        /// bit. A 256 KiB worker stack also verifies that Rayon does not restore
+        /// input-shaped native recursion around the heap continuation machine.
+        #[test]
+        fn prop_parallel_cfg_is_exactly_serial(
+            cpg in arb_multi_function_cfg_cpg(),
+            mask in 0_u8..8,
+        ) {
+            let config = CfgExtractorConfig {
+                include_fallthrough: mask & 1 != 0,
+                include_exceptions: mask & 2 != 0,
+                include_call_edges: mask & 4 != 0,
+            };
+            let mut serial = cpg.clone();
+            let mut parallel = cpg;
+            CfgExtractor::with_config(config.clone()).extract(&mut serial);
+            let pool = rayon::ThreadPoolBuilder::new()
+                .num_threads(4)
+                .stack_size(256 * 1024)
+                .build()
+                .expect("bounded Rayon pool");
+            pool.install(|| {
+                CfgExtractor::with_config(config).extract_parallel(&mut parallel);
+            });
+
+            prop_assert_eq!(parallel.cfg_entries(), serial.cfg_entries());
+            prop_assert_eq!(parallel.cfg_exits(), serial.cfg_exits());
+            prop_assert_eq!(
+                parallel.edges().cloned().collect::<Vec<_>>(),
+                serial.edges().cloned().collect::<Vec<_>>(),
+            );
         }
     }
 }

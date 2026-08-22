@@ -49,6 +49,15 @@ and [`components/graph/spectral-analysis.md`](components/graph/spectral-analysis
 
 A structural category of algorithm (sorting, searching, graph traversal, dynamic programming, …) that the `algorithm-detection` feature recognises from a function's control-flow and recursion shape via **heuristics** (e.g. "has a midpoint calculation", "has a visited set", "has a memoization table"). Exposed as `AlgorithmFamily`. Detection is heuristic, not a proof of identity. See [`components/algorithms/families.md`](components/algorithms/families.md).
 
+### Analysis plan / ordered emitter
+
+An **analysis plan** is a heap-owned, graph-local description of edges or
+results computed while workers hold only immutable CPG borrows. An **ordered
+emitter** consumes indexed plans in the original function or pattern order and
+performs the graph mutation serially. This split makes worker scheduling
+irrelevant to stable edge identities, duplicate handling, and public result
+order. See [ADR-0059](design/0059-deterministic-parallel-plan-emission.md).
+
 ### Articulation vertex / Bridge / Two-edge-connected component
 
 An **articulation vertex** is a vertex whose deletion increases connected-
@@ -559,6 +568,15 @@ forward/reverse CSR contract before public-field consumers traverse it. See
 ### Idempotent
 
 An operation that has the same effect whether applied once or many times. `CfgExtractor::extract`, `DfgExtractor::extract`, and `PdgBuilder::build` are idempotent: re-running them does not duplicate edges. This lets construction stages be re-applied safely.
+
+### Indexed parallel collection / Rayon pool
+
+An **indexed parallel collection** retains the input order of independent work
+items even though a **Rayon pool** may execute them in another schedule.
+libcpg uses this property to collect per-function and per-pattern
+[analysis plans](#analysis-plan--ordered-emitter), then emits or returns them in
+serial order. Callers control pool width and worker-stack size by installing an
+operation in their own Rayon pool; the default builder path remains serial.
 
 ### IFDS / IDE
 

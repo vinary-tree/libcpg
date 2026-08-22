@@ -6,14 +6,15 @@ use std::mem::size_of;
 use libcpg::pattern::Vf2Matcher;
 use libcpg::{
     call_graph_projection, call_graph_sccs, dominator_tree, post_dominator_tree,
-    structural_clone_classes, wl_labels, CodePropertyGraph, CpgBuilder, CpgBuilderConfig, CpgEdge,
-    CpgNode, DfgExtractor, GraphProjection, NodeId, PdgBuilder, SubgraphMatcher,
-    TreeSitterCpgBuilder,
+    structural_clone_classes, wl_labels, CfgExtractor, CodePropertyGraph, CpgBuilder,
+    CpgBuilderConfig, CpgEdge, CpgNode, DfgExtractor, GraphProjection, NodeId, PdgBuilder,
+    SubgraphMatcher, TreeSitterCpgBuilder,
 };
 
 use support::{
-    assert_synthetic_graph, assert_traversal_graph, linear_graph, synthetic_graph, traversal_graph,
-    CorpusFile, SyntheticShape, CROSS_LANGUAGE, FIXTURE_SEED, RUST_LARGE, RUST_MEDIUM,
+    assert_synthetic_graph, assert_traversal_graph, linear_graph, parallel_analysis_graph,
+    synthetic_graph, traversal_graph, CorpusFile, SyntheticShape, CROSS_LANGUAGE, FIXTURE_SEED,
+    RUST_LARGE, RUST_MEDIUM,
 };
 
 fn construction() -> usize {
@@ -55,6 +56,44 @@ fn pdg() -> usize {
         PdgBuilder::new().build(&mut graph, function);
     }
     graph.edges().filter(|edge| edge.kind.is_pdg()).count()
+}
+
+fn repeated_parallel_analysis(parallel: bool, repetitions: usize) -> usize {
+    let template = parallel_analysis_graph(512, 16);
+    let mut checksum = 0usize;
+    if parallel {
+        let workers = std::env::var("LIBCPG_PARALLEL_THREADS")
+            .ok()
+            .and_then(|value| value.parse::<usize>().ok())
+            .unwrap_or(32);
+        assert!(
+            workers > 0,
+            "parallel profile worker count must be positive"
+        );
+        let pool = rayon::ThreadPoolBuilder::new()
+            .num_threads(workers)
+            .stack_size(256 * 1024)
+            .build()
+            .expect("bounded profile Rayon pool");
+        for _ in 0..repetitions {
+            let mut graph = template.clone();
+            pool.install(|| {
+                CfgExtractor::new().extract_parallel(&mut graph);
+                DfgExtractor::new().extract_parallel(&mut graph);
+                PdgBuilder::new().build_all_parallel(&mut graph);
+            });
+            checksum = checksum.wrapping_add(graph.edge_count());
+        }
+    } else {
+        for _ in 0..repetitions {
+            let mut graph = template.clone();
+            CfgExtractor::new().extract(&mut graph);
+            DfgExtractor::new().extract(&mut graph);
+            PdgBuilder::new().build_all(&mut graph);
+            checksum = checksum.wrapping_add(graph.edge_count());
+        }
+    }
+    checksum
 }
 
 fn dominators_fixture() -> (GraphProjection, CodePropertyGraph, NodeId) {
@@ -159,6 +198,8 @@ fn run(name: &str) -> usize {
         }
         "scc_analysis" => scc(),
         "pattern_vf2" => vf2(),
+        "parallel_analysis_serial" => repeated_parallel_analysis(false, 1),
+        "parallel_analysis_parallel" => repeated_parallel_analysis(true, 1),
         "similarity_wl" => wl(),
         "analyze_corpus" => corpus(),
         "all" => construction() + traversal() + dfg() + pdg() + scc() + vf2() + wl() + corpus(),
@@ -187,6 +228,8 @@ fn main() {
     // The aggregate `all` workload intentionally retains its end-to-end shape.
     let checksum = match workload.as_str() {
         "pattern_vf2" => repeated_vf2(repetitions),
+        "parallel_analysis_serial" => repeated_parallel_analysis(false, repetitions),
+        "parallel_analysis_parallel" => repeated_parallel_analysis(true, repetitions),
         "dominator_analysis" => {
             // Retain the immutable CSR/CPG fixture across repetitions so the
             // workload isolates analysis rather than fixture construction.

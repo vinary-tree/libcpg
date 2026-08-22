@@ -924,7 +924,10 @@ To close the door on the earlier draft's fictions:
   `#[serde(skip)]`. See [`../usage/05-serialization.md`](../usage/05-serialization.md)
   [ADR-0040](../design/0040-flat-property-value-arena.md), and
   [ADR-0041](../design/0041-shared-flat-expression-facts.md).
-- **No hidden parallelism.** The extractors iterate functions sequentially; callers may parallelize using the `Send + Sync` traits.
+- **No hidden parallelism.** Serial methods remain serial. Callers explicitly
+  opt into per-function planning with `parallel_analysis` or the public
+  `*_parallel` methods; indexed plans feed one ordered graph emitter. See the
+  [parallel-analysis guide](../usage/29-parallel-analysis.md).
 
 ## Where to go next
 

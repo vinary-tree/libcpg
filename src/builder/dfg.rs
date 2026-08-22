@@ -3,6 +3,7 @@
 //! This module provides algorithms to extract DFG edges from a Code Property Graph.
 //! It performs reaching definitions analysis and builds def-use chains.
 
+use rayon::prelude::*;
 use rustc_hash::{FxHashMap, FxHashSet};
 use smallvec::SmallVec;
 use std::sync::Arc;
@@ -42,6 +43,24 @@ impl Default for DfgExtractorConfig {
 #[derive(Debug)]
 pub struct DfgExtractor {
     config: DfgExtractorConfig,
+}
+
+/// Immutable-computation result for one function's data-flow graph.
+#[derive(Debug, Default)]
+struct DfgPlan {
+    edges: Vec<(NodeId, NodeId, CpgEdgeKind)>,
+}
+
+impl DfgPlan {
+    fn connect_unique(&mut self, source: NodeId, target: NodeId, kind: CpgEdgeKind) {
+        self.edges.push((source, target, kind));
+    }
+
+    fn emit(self, cpg: &mut CodePropertyGraph) {
+        for (source, target, kind) in self.edges {
+            cpg.connect_unique(source, target, kind);
+        }
+    }
 }
 
 /// Immutable exact-name index used by member-to-field resolution.
@@ -126,15 +145,39 @@ impl DfgExtractor {
 
     /// Extracts DFG edges for all functions in the CPG.
     pub fn extract(&self, cpg: &mut CodePropertyGraph) {
-        // Find all function nodes
         let functions: Vec<NodeId> = cpg.functions().map(|n| n.id).collect();
         let field_index = self
             .config
             .include_field_access
             .then(|| FieldResolutionIndex::new(cpg));
+        let plans: Vec<_> = functions
+            .into_iter()
+            .map(|function| self.plan_function_dfg(cpg, function, field_index.as_ref()))
+            .collect();
+        for plan in plans {
+            plan.emit(cpg);
+        }
+    }
 
-        for func_id in functions {
-            self.extract_function_dfg_indexed(cpg, func_id, field_index.as_ref());
+    /// Extracts all function DFGs concurrently on the current Rayon pool.
+    ///
+    /// Workers read the same immutable AST, CFG, and call-resolution evidence
+    /// and produce owned edge plans. Indexed collection followed by serial
+    /// emission preserves the exact serial edge order for every worker count.
+    /// Install a custom [`rayon::ThreadPool`] around this call to select the
+    /// worker count or stack size.
+    pub fn extract_parallel(&self, cpg: &mut CodePropertyGraph) {
+        let functions: Vec<NodeId> = cpg.functions().map(|node| node.id).collect();
+        let field_index = self
+            .config
+            .include_field_access
+            .then(|| FieldResolutionIndex::new(cpg));
+        let plans: Vec<_> = functions
+            .par_iter()
+            .map(|&function| self.plan_function_dfg(cpg, function, field_index.as_ref()))
+            .collect();
+        for plan in plans {
+            plan.emit(cpg);
         }
     }
 
@@ -144,15 +187,17 @@ impl DfgExtractor {
             .config
             .include_field_access
             .then(|| FieldResolutionIndex::new(cpg));
-        self.extract_function_dfg_indexed(cpg, function, field_index.as_ref());
+        self.plan_function_dfg(cpg, function, field_index.as_ref())
+            .emit(cpg);
     }
 
-    fn extract_function_dfg_indexed(
+    fn plan_function_dfg(
         &self,
-        cpg: &mut CodePropertyGraph,
+        cpg: &CodePropertyGraph,
         function: NodeId,
         field_index: Option<&FieldResolutionIndex>,
-    ) {
+    ) -> DfgPlan {
+        let mut plan = DfgPlan::default();
         // Phase 1: Collect field/index/parameter sites for the auxiliary edge
         // builders below. Def/use *edges* are no longer driven from this
         // collector's name→site tables — see `build_def_use_edges`.
@@ -165,24 +210,26 @@ impl DfgExtractor {
         // Phase 2+3: Reaching-definition-based def-use edges, threaded all the
         // way down to the AST-expression identifier uses nested inside each
         // statement (e.g. `buf` in `decode(buf)`).
-        self.build_def_use_edges(cpg, function);
+        self.build_def_use_edges(cpg, &mut plan, function);
 
         // Phase 4: Build additional DFG edges
         if self.config.include_parameters {
-            self.build_parameter_edges(cpg, function, &collector);
+            self.build_parameter_edges(cpg, &mut plan, function, &collector);
         }
 
         if self.config.include_return_values {
-            self.build_return_edges(cpg, function, &collector);
+            self.build_return_edges(cpg, &mut plan, function, &collector);
         }
 
         if self.config.include_field_access {
             self.build_field_access_edges(
                 cpg,
+                &mut plan,
                 &collector,
                 field_index.expect("field index exists when field access is enabled"),
             );
         }
+        plan
     }
 
     /// **Superseded** by [`Self::build_def_use_edges`]'s AST-ordered sweep, and
@@ -362,7 +409,7 @@ impl DfgExtractor {
     /// [`CpgNodeKind`], never on grammar specifics) and idempotent: an edge is
     /// added only when an identical one does not already exist, so uses that
     /// *are* CFG nodes are not double-linked and re-running `extract` is a no-op.
-    fn build_def_use_edges(&self, cpg: &mut CodePropertyGraph, function: NodeId) {
+    fn build_def_use_edges(&self, cpg: &CodePropertyGraph, plan: &mut DfgPlan, function: NodeId) {
         // Idempotency: never re-add a DefUse edge that already exists.
         let mut existing: FxHashSet<(u32, u32)> = cpg
             .edges()
@@ -387,7 +434,7 @@ impl DfgExtractor {
 
         for (def, use_site) in pairs {
             if def != use_site && existing.insert((def.0, use_site.0)) {
-                cpg.connect_unique(def, use_site, CpgEdgeKind::DataFlow(DfgEdgeKind::DefUse));
+                plan.connect_unique(def, use_site, CpgEdgeKind::DataFlow(DfgEdgeKind::DefUse));
             }
         }
     }
@@ -395,7 +442,8 @@ impl DfgExtractor {
     /// Builds parameter passing edges.
     fn build_parameter_edges(
         &self,
-        cpg: &mut CodePropertyGraph,
+        cpg: &CodePropertyGraph,
+        plan: &mut DfgPlan,
         function: NodeId,
         collector: &DefUseCollector,
     ) {
@@ -427,7 +475,7 @@ impl DfgExtractor {
             // Match arguments to parameters
             for (i, &param) in params.iter().enumerate() {
                 if let Some(&arg) = call_args.get(i) {
-                    cpg.connect_unique(arg, param, CpgEdgeKind::DataFlow(DfgEdgeKind::Parameter));
+                    plan.connect_unique(arg, param, CpgEdgeKind::DataFlow(DfgEdgeKind::Parameter));
                 }
             }
         }
@@ -449,7 +497,7 @@ impl DfgExtractor {
                 if let Some(uses) = collector.uses.get(&name) {
                     for &use_site in uses {
                         if param != use_site && existing_def_use.insert((param.0, use_site.0)) {
-                            cpg.connect_unique(
+                            plan.connect_unique(
                                 param,
                                 use_site,
                                 CpgEdgeKind::DataFlow(DfgEdgeKind::DefUse),
@@ -464,7 +512,8 @@ impl DfgExtractor {
     /// Builds return value edges.
     fn build_return_edges(
         &self,
-        cpg: &mut CodePropertyGraph,
+        cpg: &CodePropertyGraph,
+        plan: &mut DfgPlan,
         function: NodeId,
         _collector: &DefUseCollector,
     ) {
@@ -493,7 +542,7 @@ impl DfgExtractor {
             let ret_children = cpg.ast_children(ret);
             if let Some(&ret_expr) = ret_children.first() {
                 for &caller in &callers {
-                    cpg.connect_unique(
+                    plan.connect_unique(
                         ret_expr,
                         caller,
                         CpgEdgeKind::DataFlow(DfgEdgeKind::ReturnValue),
@@ -515,7 +564,8 @@ impl DfgExtractor {
     /// and field evidence produces no `Reference` edge.
     fn build_field_access_edges(
         &self,
-        cpg: &mut CodePropertyGraph,
+        cpg: &CodePropertyGraph,
+        plan: &mut DfgPlan,
         collector: &DefUseCollector,
         field_index: &FieldResolutionIndex,
     ) {
@@ -526,11 +576,11 @@ impl DfgExtractor {
             // First child is typically the object being accessed
             if let Some(&obj) = children.first() {
                 // Create field read edge from object to member access
-                cpg.connect_unique(obj, node_id, CpgEdgeKind::DataFlow(DfgEdgeKind::FieldRead));
+                plan.connect_unique(obj, node_id, CpgEdgeKind::DataFlow(DfgEdgeKind::FieldRead));
             }
 
             if let Some(field) = resolve_receiver_field(cpg, field_index, node_id) {
-                cpg.connect_unique(node_id, field, CpgEdgeKind::Reference);
+                plan.connect_unique(node_id, field, CpgEdgeKind::Reference);
             }
         }
 
@@ -543,12 +593,12 @@ impl DfgExtractor {
                 let index = children[1];
 
                 // Create index read edges
-                cpg.connect_unique(
+                plan.connect_unique(
                     array,
                     node_id,
                     CpgEdgeKind::DataFlow(DfgEdgeKind::IndexRead),
                 );
-                cpg.connect_unique(
+                plan.connect_unique(
                     index,
                     node_id,
                     CpgEdgeKind::DataFlow(DfgEdgeKind::DataDependency),
@@ -568,7 +618,7 @@ impl DfgExtractor {
                 Some(CpgNodeKind::IndexAccess) => DfgEdgeKind::IndexWrite,
                 _ => continue,
             };
-            cpg.connect_unique(assignment, target, CpgEdgeKind::DataFlow(write_kind));
+            plan.connect_unique(assignment, target, CpgEdgeKind::DataFlow(write_kind));
         }
     }
 }
@@ -3355,6 +3405,44 @@ mod proptests {
                     edge.kind,
                     CpgEdgeKind::DataFlow(DfgEdgeKind::Parameter)
                 )));
+        }
+    }
+
+    proptest! {
+        #![proptest_config(ProptestConfig::with_cases(128))]
+
+        /// Parallel DFG planning produces the exact serial edge stream for
+        /// generated calls, returns, branches, fields, and every auxiliary-edge
+        /// configuration. Workers run with a 256 KiB stack to preserve the
+        /// reaching machine's heap-bounded native stack usage.
+        #[test]
+        fn prop_parallel_dfg_is_exactly_serial(
+            cpg in arb_well_formed_cpg(),
+            mask in 0_u8..16,
+        ) {
+            let config = DfgExtractorConfig {
+                include_field_access: mask & 1 != 0,
+                include_parameters: mask & 2 != 0,
+                include_return_values: mask & 4 != 0,
+                track_aliases: mask & 8 != 0,
+                max_iterations: 100,
+            };
+            let mut serial = cpg.clone();
+            let mut parallel = cpg;
+            DfgExtractor::with_config(config.clone()).extract(&mut serial);
+            let pool = rayon::ThreadPoolBuilder::new()
+                .num_threads(4)
+                .stack_size(256 * 1024)
+                .build()
+                .expect("bounded Rayon pool");
+            pool.install(|| {
+                DfgExtractor::with_config(config).extract_parallel(&mut parallel);
+            });
+
+            prop_assert_eq!(
+                parallel.edges().cloned().collect::<Vec<_>>(),
+                serial.edges().cloned().collect::<Vec<_>>(),
+            );
         }
     }
 }

@@ -1,0 +1,48 @@
+@startuml
+!include _libcpg-theme.iuml
+title CCD-balanced physical-core sweep on the recorded 32-core host
+
+rectangle "Criterion controller\n15 samples · 1 s warm-up\n3 s requested measurement" as BENCH #FFF3BF
+
+node "CCD 0\n32 MiB L3" as CCD0 #DBE4FF {
+  rectangle "cores 0–7" as C0 #D0EBFF
+}
+node "CCD 1\n32 MiB L3" as CCD1 #D3F9D8 {
+  rectangle "cores 8–15" as C1 #B2F2BB
+}
+node "CCD 2\n32 MiB L3" as CCD2 #E5DBFF {
+  rectangle "cores 16–23" as C2 #D0BFFF
+}
+node "CCD 3\n32 MiB L3" as CCD3 #FFE8CC {
+  rectangle "cores 24–31" as C3 #FFD8A8
+}
+
+collections "affinity sets\n1: 0\n2: 0,8\n4: 0,8,16,24\n8: 0,4,...,28\n16: even physical cores\n32: all physical cores" as SETS #C3FAE8
+database "captured evidence\ncentral time · confidence interval\nthroughput · outliers" as EVIDENCE #B2F2BB
+
+BENCH --> SETS : one isolated run per worker count
+SETS --> C0 : taskset
+SETS --> C1 : taskset
+SETS --> C2 : taskset
+SETS --> C3 : taskset
+C0 --> EVIDENCE
+C1 --> EVIDENCE
+C2 --> EVIDENCE
+C3 --> EVIDENCE
+
+note bottom of SETS
+  Simultaneous multithreading siblings 32–63 are excluded.
+  Worker stacks are 256 KiB. The performance governor is active.
+end note
+
+legend right
+  |= colour |= role |
+  |<#FFF3BF>| controlled benchmark driver |
+  |<#DBE4FF>| CCD 0 physical cores |
+  |<#D3F9D8>| CCD 1 physical cores |
+  |<#E5DBFF>| CCD 2 physical cores |
+  |<#FFE8CC>| CCD 3 physical cores |
+  |<#C3FAE8>| deterministic affinity protocol |
+  |<#B2F2BB>| captured measurements |
+endlegend
+@enduml

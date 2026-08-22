@@ -152,6 +152,8 @@ pub struct Vf2Matcher { /* private: strict_kinds, strict_edges, max_matches */ }
 | `with_strict_kinds` | `fn with_strict_kinds(self, strict: bool) -> Self` | Require exact node-kind tags. |
 | `with_strict_edges` | `fn with_strict_edges(self, strict: bool) -> Self` | Require exact edge kinds. |
 | `with_max_matches` | `fn with_max_matches(self, max: usize) -> Self` | Cap the result; `0` means unlimited. |
+| `find_matches_many` | `fn find_matches_many(&self, patterns: &[CodePropertyGraph], target: &CodePropertyGraph) -> Vec<Vec<PatternMatch>>` | Match an ordered pattern batch serially; one inner vector per input pattern. |
+| `find_matches_many_parallel` | `fn find_matches_many_parallel(&self, patterns: &[CodePropertyGraph], target: &CodePropertyGraph) -> Vec<Vec<PatternMatch>>` | Match the batch on the current Rayon pool while preserving outer and inner order. |
 | `find_matches` | *(via `SubgraphMatcher`)* `fn find_matches(&self, pattern, target) -> Vec<PatternMatch>` | Find all embeddings. |
 | `find_matches_limited` | *(via `SubgraphMatcher`)* `fn find_matches_limited(&self, pattern, target, limit) -> Vec<PatternMatch>` | Run with the tighter of the configured cap and `limit`; zero returns immediately. |
 | `contains_pattern` | *(via `SubgraphMatcher`)* `fn contains_pattern(&self, pattern, target) -> bool` | Stop at the first positive match. |
@@ -164,6 +166,11 @@ AST/CFG/DFG/call family. Turning strictness on requires exact tag/kind equality.
 Relaxed matching is what powers GoF detection (below). Worst-case cost is
 $`O(N!\,N)`$ in the pattern size $`N`$, but feasibility pruning makes
 it practical on the sparse graphs typical of code.
+
+The batch methods do not change VF2 semantics or caps. Indexed parallel
+collection retains input-pattern order, and each worker runs the same
+stack-safe deterministic matcher. For pool sizing and the measured 16-worker
+plateau, see the [parallel-analysis usage guide](../usage/29-parallel-analysis.md).
 
 ![A path pattern matched against a diamond target graph](../diagrams/vf2-pattern-target.svg)
 

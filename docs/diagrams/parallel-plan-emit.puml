@@ -1,0 +1,49 @@
+@startuml
+!include _libcpg-theme.iuml
+title Deterministic parallel analysis — immutable plans, indexed reduction, ordered emission
+
+actor "caller" as CALLER #FFE8CC
+database "immutable CPG snapshot\nAST + CFG + DFG + call evidence" as CPG #DBE4FF
+collections "canonical work list\n[f0, f1, ..., fn] or [p0, p1, ..., pn]" as WORK #FFF3BF
+cloud "current Rayon pool\nwork stealing, bounded worker stacks" as RAYON #E5DBFF
+rectangle "worker 0\nheap-owned plan" as W0 #D3F9D8
+rectangle "worker 1\nheap-owned plan" as W1 #D3F9D8
+rectangle "worker n\nheap-owned plan" as WN #D3F9D8
+collections "indexed collect\n[plan0, plan1, ..., plann]" as COLLECT #C3FAE8
+rectangle "single ordered emitter\nconnect_unique + entry/exit updates" as EMIT #FFD8A8
+database "exact serial-equivalent CPG\nor ordered VF2 result batch" as RESULT #B2F2BB
+
+CALLER --> CPG : choose serial or parallel API
+CPG --> WORK : enumerate stable NodeId / slice order
+WORK --> RAYON : indexed parallel iterator
+RAYON --> W0 : read only
+RAYON --> W1 : read only
+RAYON --> WN : read only
+W0 --> COLLECT : slot 0
+W1 --> COLLECT : slot 1
+WN --> COLLECT : slot n
+COLLECT --> EMIT : deterministic sequence
+CPG --> EMIT : mutable borrow begins only here
+EMIT --> RESULT : same nodes, edges, and ordering
+
+note bottom of RAYON
+  No graph clone, lock, shared mutable plan,
+  or input-shaped native recursion is admitted.
+end note
+
+note bottom of COLLECT
+  Rayon may schedule work in any order;
+  indexed collection restores input order.
+end note
+
+legend right
+  |= colour |= role |
+  |<#DBE4FF>| authoritative immutable evidence |
+  |<#FFF3BF>| canonical work decomposition |
+  |<#E5DBFF>| scheduler |
+  |<#D3F9D8>| independent heap-owned computation |
+  |<#C3FAE8>| deterministic reduction |
+  |<#FFD8A8>| ordered mutation boundary |
+  |<#B2F2BB>| exact public result |
+endlegend
+@enduml

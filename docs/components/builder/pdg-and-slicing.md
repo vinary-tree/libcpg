@@ -196,6 +196,18 @@ The traversal is $`O(V + E)`$ in the visited PDG subgraph, capped at `max_nodes`
 
 ---
 
+## Parallel all-function planning
+
+For every function, `PdgBuilder::build_all` uses one shared existing-edge
+snapshot and ordered plan emission. `build_all_parallel` computes the same plans
+on the current Rayon pool before that identical emitter. This is preferable to
+looping over `build` when the caller wants every function: it avoids one
+whole-edge idempotency scan per function. Both methods require CFG and DFG
+construction to have completed first. See the
+[parallel-analysis guide](../../usage/29-parallel-analysis.md).
+
+---
+
 ## Worked example
 
 ![Slice example: a backward slice highlighting the definition that reaches a use, plus the branch it is control-dependent on.](../../diagrams/slice-example.svg)
@@ -240,6 +252,8 @@ constructed by hand or via [Mode B](../../GLOSSARY.md#mode-b--build_from_tree).
   `backward_slice`, and `forward_slice` signatures.
 - [`../../theory/04-program-dependence-and-slicing.md`](../../theory/04-program-dependence-and-slicing.md)
   — dominators, dominance frontiers, and slicing theory in full.
+- [Scientific validation 54](../../scientific/54-parallel-analysis-validation.md)
+  — exact all-function equivalence, scaling, and profile evidence.
 
 ---
 
