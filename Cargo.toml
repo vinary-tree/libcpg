@@ -294,6 +294,10 @@ harness = false
 required-features = ["lang-rust"]
 
 [[bench]]
+name = "dominator_analysis"
+harness = false
+
+[[bench]]
 name = "pattern_vf2"
 harness = false
 

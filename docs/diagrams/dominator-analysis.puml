@@ -5,22 +5,24 @@ title Dominator analysis — one deterministic engine, two directions
 rectangle "CodePropertyGraph\ntyped CFG overlay" as CPG #F1F3F5
 rectangle "GraphProjection\nforward + reverse CSR" as PROJECTION #DBE4FF
 rectangle "FunctionCfgView\nreachable CFG · entry · exit_like" as SCOPE #D8F5A2
+rectangle "borrowed DenseAdjacency\nCSR slices · no edge copy" as BORROWED #C5F6FA
 rectangle "iterative reverse postorder\nsorted adjacency" as RPO #FFE8CC
 rectangle "Cooper–Harvey–Kennedy\nbounded idom fixed point" as CHK #FFF3BF
 rectangle "tree + Cytron frontier\niterative Euler intervals" as RESULTS #D3F9D8
 rectangle "DominatorTree\nidom · dominates · frontier" as DOM #C3FAE8
-rectangle "function CFG reversed\nsynthetic exit root" as REVERSE #E5DBFF
+rectangle "post-dominator overlay\nswapped CSR · virtual row · bit mask" as REVERSE #E5DBFF
 rectangle "PostDominatorTree\nipdom · reverse frontier" as POSTDOM #D0BFFF
 rectangle "PdgBuilder\nControlDependence edges" as PDG #FFC9C9
 
-PROJECTION --> RPO : dominator_tree(root)
+PROJECTION --> BORROWED : dominator_tree(root)
+BORROWED --> RPO : forward CSR
 RPO --> CHK
 CHK --> RESULTS
 RESULTS --> DOM
 
 CPG --> SCOPE : post_dominator_tree(function)
-SCOPE --> REVERSE : projection + exits
-REVERSE --> RPO
+SCOPE --> REVERSE : one projection + exits
+REVERSE --> RPO : borrowed reverse CSR
 RESULTS --> POSTDOM
 POSTDOM --> PDG : sorted controller → dependent
 
@@ -28,6 +30,7 @@ note bottom of CHK
   Pass cap: analyzed vertices + 2.
   Production code is feature-free;
   petgraph is a test oracle only.
+  DFS and Euler continuations live on the heap.
 end note
 
 legend right
@@ -35,6 +38,7 @@ legend right
   |<#F1F3F5>| source CPG |
   |<#DBE4FF>| deterministic graph substrate |
   |<#D8F5A2>| shared function scope |
+  |<#C5F6FA>| borrowed adjacency view |
   |<#FFE8CC>| traversal order |
   |<#FFF3BF>| bounded fixed point |
   |<#D3F9D8>| shared derived relations |

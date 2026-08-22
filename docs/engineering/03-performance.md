@@ -146,11 +146,11 @@ once, loop bodies twice, and a path set cuts malformed AST cycles.
 
 ## Benchmark coverage and remaining gaps
 
-Twenty-eight explicitly declared Criterion targets are active. Forty operation
+Twenty-nine explicitly declared Criterion targets are active. Forty-one operation
 groups are feature-free; three more require the parser-language features used
 by DFG, PDG, and corpus measurement; `induction_analysis` registers one
 additional `algorithm-detection`-gated operation. A full-feature measurement
-therefore exposes forty-four groups. Every
+therefore exposes forty-five groups. Every
 active group constructs and checks a deterministic oracle
 before Criterion enters the timed loop:
 
@@ -170,6 +170,9 @@ before Criterion enters the timed loop:
   templates after requiring represented data-flow evidence;
 - `pdg_construction` measures PDG construction for every function in those
   parser-built Rust templates after requiring represented dependence evidence;
+- `dominator_analysis` measures direct dominator and post-dominator construction
+  over 256- and 2,048-stage diamond ladders after checking exact tree,
+  post-dominator, exit, and control-dependence cardinalities;
 - `pattern_matching` measures bounded VF2 matching over 256- and 4,096-node
   paths;
 - `pattern_vf2` is the T9 canonical VF2 search benchmark over the same size
@@ -391,6 +394,7 @@ cargo bench --bench pattern_vf2 --no-default-features
 cargo bench --bench similarity_wl --no-default-features
 cargo bench --bench dfg_extraction --features lang-rust
 cargo bench --bench pdg_construction --features lang-rust
+cargo bench --bench dominator_analysis --no-default-features
 cargo bench --bench analyze_corpus \
   --features lang-rust,lang-python,lang-javascript,lang-go,lang-c
 cargo bench --no-default-features --features algorithm-detection \

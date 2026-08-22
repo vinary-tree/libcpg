@@ -30,6 +30,8 @@ Fix a CFG with a single $`\mathit{entry}`$ and a single $`\mathit{exit}`$.
 Cooper–Harvey–Kennedy iterative dominator algorithm. `dominator_tree` runs it
 on any [`GraphProjection`](../components/graph/projections.md);
 `post_dominator_tree` runs it on a reversed CFG rooted at a synthetic exit.
+The implementation represents that reversal as borrowed forward/reverse CSR
+slices plus one synthetic-root overlay; it does not copy a second graph.
 Post-dominators are the prerequisite for control dependence. See the
 [component contract](../components/graph/dominator-analysis.md) for the public
 result types, exit modeling, convergence cap, and complexity.
@@ -85,13 +87,13 @@ Following §2, the builder computes $`\mathrm{RDF}`$ directly:
 post_dominator_tree(cpg, function):
  1. NODES ← intraprocedural CFG nodes reachable from `function` over ControlFlow
             edges, EXCLUDING `Call` edges (they cross into callees).
- 2. Build a deterministic projection and reverse it. Add a synthetic exit as
-    the next dense index, outside the stable NodeId domain. For every forward
-    edge a→b add the reverse edge b→a.
- 3. Connect the synthetic exit to every real exit: recorded function exits (e.g. a loop
-    guard's false branch), structural sinks, and Return/Throw nodes. Ensure
-    every node can reach the synthetic root so post-dominance is total.
- 4. POSTDOM ← bounded deterministic CHK(reverse CFG, synthetic exit)
+ 2. Build one deterministic forward/reverse-CSR projection. Borrow its reverse
+    rows as successors and its forward rows as predecessors; do not copy edges.
+ 3. Overlay a synthetic exit at the next dense index, outside the stable NodeId
+    domain. Its sorted row contains recorded exits, structural sinks,
+    Return/Throw nodes, and nodes that cannot reach one of those modeled exits.
+ 4. POSTDOM ← bounded deterministic CHK(borrowed reverse-CSR overlay,
+                                        synthetic exit)
  5. RDF walk (Cytron et al.): for each join b with ≥ 2 reverse-CFG predecessors,
     walk each predecessor up the post-dominator tree until ipdom(b); every node
     visited is control-dependent on b. Record ControlDependence b → dependent.

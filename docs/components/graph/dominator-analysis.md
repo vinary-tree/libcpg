@@ -79,6 +79,10 @@ $`DF(x) = \{ y \mid \exists p \in \operatorname{pred}(y): x\ \mathrm{dom}\ p \la
 where $`\mathrm{dom}`$ denotes dominance and $`\mathrm{sdom}`$ denotes strict
 dominance (dominance between distinct nodes).
 
+The distinguished root follows the same definition. A self-loop or reachable
+backedge into the root therefore places the root in its own frontier: the root
+dominates the predecessor but does not strictly dominate itself.
+
 It identifies the join points immediately outside the region strictly
 dominated by $`x`$. Map and vector order is ascending by `NodeId`, independent
 of edge insertion or hash-table iteration order.
@@ -149,8 +153,9 @@ directly, preserving its graceful behavior on malformed inputs.
 ## Algorithm
 
 Both APIs use the Cooper–Harvey–Kennedy (CHK) iterative immediate-dominator
-algorithm. `GraphProjection` supplies canonical forward and reverse adjacency,
-and all additional adjacency vectors are sorted and deduplicated.
+algorithm. `GraphProjection` supplies canonical forward and reverse compressed-
+sparse-row (CSR) adjacency. A private `DenseAdjacency` borrows those slices;
+ordinary dominance copies no edge row.
 
 ```text
 CHK(graph, root):
@@ -168,13 +173,17 @@ CHK(graph, root):
         stop when not changed
 
     children = invert(idom)
-    frontier = cytron_frontier(predecessors, idom)
+    frontier = flat_cytron_frontier(borrowed_predecessors, idom, root)
     intervals = iterative_euler_tour(children)
 ```
 
 `dominator_tree` applies CHK directly. `post_dominator_tree` obtains the
-canonical reachable CFG and exit-like set from `analysis::cfg_scope`, reverses
-that projection, adds the synthetic exit root, and invokes the same engine.
+canonical reachable CFG and exit-like set from `analysis::cfg_scope`, swaps the
+borrowed CSR directions, and overlays one synthetic-exit successor row plus a
+bit-packed synthetic-predecessor marker. It never materializes a reversed
+`Vec<Vec<_>>` graph. The shared CFG view validates and computes the AST scope
+directly, so this boundary constructs one canonical projection rather than a
+discarded scope projection followed by the real projection.
 An iterative DFS computes reverse postorder, and an iterative Euler tour assigns
 private entry/exit timestamps. Therefore deep paths do not consume the native
 call stack, while interval containment implements `dominates` and
@@ -198,17 +207,19 @@ With the `serde` feature, both tree types serialize their public relation and
 private ancestry index together. Round-tripping therefore preserves constant-
 time dominance queries as well as visible maps.
 
-Validation includes exact diamond and conditional examples, unknown and
-non-function errors, singleton and exit-free CFGs, mixed finite/infinite
-regions, a 25,000-node path, serde round-tripping, and three 256-case
-property-based suites. The shared CFG view is invariant under node, edge, and
-exit insertion permutations and is checked against the former PDG scope rules
-over a parsed Rust corpus. Forward immediate dominators are checked against
-`petgraph::algo::dominators::simple_fast`; post-dominators and control
-dependence are checked against the former production PDG algorithm. Parsed-Rust
-integration tests also prove that `PdgBuilder` emits exactly the public tree's
-control-dependence relation. `petgraph` is an independent test oracle only; the
-production analysis uses `GraphProjection`.
+Validation includes exact diamond, conditional, loop, multiple-backedge,
+irreducible, root-cycle, unreachable-entry, singleton, exit-free, and mixed
+finite/infinite examples. Every rooted directed graph through four vertices
+(4,165 graphs) is compared with an independent vertex-removal dominance and
+frontier oracle; 4,164 exit-reachable CFGs are compared with the former PDG
+oracle. Four 256-case properties cover the same independent relations and
+storage permutations. The shared CFG view is checked against the former scope
+rules over parsed Rust, and parser-backed tests prove `PdgBuilder` emits exactly
+the public control-dependence relation. Public 100,000-node deep-projection,
+wide-projection, exit-plus-infinite-region, and 99,999-exit function shapes run
+and drop on a 256 KiB stack. `petgraph` remains a test
+oracle only. Measurement and falsification details are in
+[scientific validation 53](../../scientific/53-dominator-optimization-validation.md).
 
 ## References
 

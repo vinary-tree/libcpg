@@ -4,11 +4,11 @@
 //! sorted dense adjacency. Post-dominators reuse the same engine on a reversed
 //! function CFG with a synthetic exit root.
 
-use std::collections::{BTreeMap, BTreeSet};
+use std::collections::BTreeMap;
 
 use crate::{CodePropertyGraph, NodeId};
 
-use super::{cfg_scope::function_cfg_view, AnalysisError, GraphProjection};
+use super::{cfg_scope::function_cfg_view, scc::heap_sorted, AnalysisError, GraphProjection};
 
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
@@ -94,13 +94,13 @@ impl PostDominatorTree {
 
     /// Returns sorted `(controller, dependent)` control-dependence edges.
     pub fn control_dependence_edges(&self) -> Vec<(NodeId, NodeId)> {
-        let mut edges = BTreeSet::new();
-        for (&dependent, controllers) in &self.frontier {
-            for &controller in controllers {
-                edges.insert((controller, dependent));
-            }
-        }
-        edges.into_iter().collect()
+        let mut edges = heap_sorted(self.frontier.iter().flat_map(|(&dependent, controllers)| {
+            controllers
+                .iter()
+                .map(move |&controller| (controller, dependent))
+        }));
+        edges.dedup();
+        edges
     }
 
     /// Returns true when post-dominance is undefined for the selected CFG.
@@ -123,15 +123,9 @@ pub fn dominator_tree(
     let root_dense = graph
         .dense_index(root)
         .ok_or(AnalysisError::UnknownNode(root))?;
-    let adjacency: Vec<Vec<u32>> = (0..graph.node_count() as u32)
-        .map(|node| graph.successors(node).to_vec())
-        .collect();
-    let predecessors: Vec<Vec<u32>> = (0..graph.node_count() as u32)
-        .map(|node| graph.predecessors(node).to_vec())
-        .collect();
+    let adjacency = DenseAdjacency::projection(graph);
     let computed = compute_dominators(
         &adjacency,
-        &predecessors,
         root_dense,
         graph.node_count() as u64 + 2,
         "dominators",
@@ -142,7 +136,13 @@ pub fn dominator_tree(
     let mut frontier = BTreeMap::new();
     let mut entry_time = BTreeMap::new();
     let mut exit_time = BTreeMap::new();
-    for &dense in &computed.reverse_postorder {
+    // Dense identifiers follow ascending NodeId order. Converting in that
+    // order gives BTreeMap its append path while retaining only reachable
+    // nodes, rather than repeatedly searching for RPO-ordered insertions.
+    for dense in 0..graph.node_count() as u32 {
+        let Some((entry, exit)) = computed.intervals[dense as usize] else {
+            continue;
+        };
         let node = graph.node_id(dense);
         children.insert(
             node,
@@ -163,10 +163,8 @@ pub fn dominator_tree(
                 .expect("every reachable non-root node has an immediate dominator");
             idom.insert(node, graph.node_id(immediate));
         }
-        if let Some((entry, exit)) = computed.intervals[dense as usize] {
-            entry_time.insert(node, entry);
-            exit_time.insert(node, exit);
-        }
+        entry_time.insert(node, entry);
+        exit_time.insert(node, exit);
     }
 
     Ok(DominatorTree {
@@ -202,24 +200,9 @@ pub fn post_dominator_tree(
 
     let node_count = view.projection.node_count();
     let virtual_exit = node_count as u32;
-    let mut adjacency = vec![Vec::new(); node_count + 1];
-    for node in 0..node_count as u32 {
-        adjacency[node as usize].extend_from_slice(view.projection.predecessors(node));
-    }
-    adjacency[virtual_exit as usize].extend(view.exit_like.iter().copied());
-    normalize_adjacency(&mut adjacency);
-
-    let initially_reachable = reachable_dense(&adjacency, virtual_exit);
-    for node in 0..node_count as u32 {
-        if !initially_reachable[node as usize] {
-            adjacency[virtual_exit as usize].push(node);
-        }
-    }
-    normalize_adjacency(&mut adjacency);
-    let predecessors = reverse_adjacency(&adjacency);
+    let adjacency = DenseAdjacency::post_dominators(&view.projection, &view.exit_like);
     let computed = compute_dominators(
         &adjacency,
-        &predecessors,
         virtual_exit,
         node_count as u64 + 3,
         "post-dominators",
@@ -253,8 +236,6 @@ pub fn post_dominator_tree(
             exit_time.insert(node, exit);
         }
     }
-    virtual_children.sort_unstable();
-
     Ok(PostDominatorTree {
         exits: view
             .exit_like
@@ -286,32 +267,139 @@ struct ComputedDominators {
     children: Vec<Vec<u32>>,
     frontier: Vec<Vec<u32>>,
     intervals: Vec<Option<(u64, u64)>>,
-    reverse_postorder: Vec<u32>,
+}
+
+/// Borrowed CSR adjacency with an optional synthetic root overlay.
+///
+/// Ordinary dominators borrow both CSR directions without copying a single
+/// edge. Post-dominators swap the directions and represent `virtual EXIT`
+/// with one sorted successor row plus a bit-packed marker for its matching
+/// predecessor edges. The overlay is exact but never materializes a second
+/// graph or a `Vec<Vec<_>>` adjacency.
+#[derive(Debug)]
+struct DenseAdjacency<'a> {
+    successor_offsets: &'a [u32],
+    successor_targets: &'a [u32],
+    predecessor_offsets: &'a [u32],
+    predecessor_targets: &'a [u32],
+    real_node_count: usize,
+    synthetic_root: Option<u32>,
+    synthetic_successors: Vec<u32>,
+    has_synthetic_predecessor: Vec<bool>,
+}
+
+impl<'a> DenseAdjacency<'a> {
+    fn projection(graph: &'a GraphProjection) -> Self {
+        Self {
+            successor_offsets: &graph.offsets,
+            successor_targets: &graph.targets,
+            predecessor_offsets: &graph.rev_offsets,
+            predecessor_targets: &graph.rev_targets,
+            real_node_count: graph.node_count(),
+            synthetic_root: None,
+            synthetic_successors: Vec::new(),
+            has_synthetic_predecessor: Vec::new(),
+        }
+    }
+
+    fn post_dominators(graph: &'a GraphProjection, exit_like: &[u32]) -> Self {
+        let mut can_reach_exit = vec![false; graph.node_count()];
+        let mut stack: Vec<_> = exit_like.iter().rev().copied().collect();
+        while let Some(node) = stack.pop() {
+            if can_reach_exit[node as usize] {
+                continue;
+            }
+            can_reach_exit[node as usize] = true;
+            // Push in reverse so the explicit heap traversal observes the
+            // projection's canonical ascending order.
+            stack.extend(graph.predecessors(node).iter().rev().copied());
+        }
+
+        let mut synthetic_successors = exit_like.to_vec();
+        synthetic_successors.extend(
+            can_reach_exit
+                .iter()
+                .enumerate()
+                .filter_map(|(node, &reachable)| (!reachable).then_some(node as u32)),
+        );
+        synthetic_successors = heap_sorted(synthetic_successors);
+        synthetic_successors.dedup();
+        let mut has_synthetic_predecessor = vec![false; graph.node_count()];
+        for &node in &synthetic_successors {
+            has_synthetic_predecessor[node as usize] = true;
+        }
+
+        Self {
+            // Dominators of the reverse CFG are post-dominators of the CFG.
+            successor_offsets: &graph.rev_offsets,
+            successor_targets: &graph.rev_targets,
+            predecessor_offsets: &graph.offsets,
+            predecessor_targets: &graph.targets,
+            real_node_count: graph.node_count(),
+            synthetic_root: Some(graph.node_count() as u32),
+            synthetic_successors,
+            has_synthetic_predecessor,
+        }
+    }
+
+    fn node_count(&self) -> usize {
+        self.real_node_count + usize::from(self.synthetic_root.is_some())
+    }
+
+    fn successors(&self, node: u32) -> &[u32] {
+        if self.synthetic_root == Some(node) {
+            return &self.synthetic_successors;
+        }
+        csr_row(self.successor_offsets, self.successor_targets, node)
+    }
+
+    fn predecessors(
+        &self,
+        node: u32,
+    ) -> std::iter::Chain<std::iter::Copied<std::slice::Iter<'_, u32>>, std::option::IntoIter<u32>>
+    {
+        if self.synthetic_root == Some(node) {
+            return [].iter().copied().chain(None);
+        }
+        let synthetic = self.synthetic_root.filter(|_| {
+            self.has_synthetic_predecessor
+                .get(node as usize)
+                .copied()
+                .unwrap_or(false)
+        });
+        csr_row(self.predecessor_offsets, self.predecessor_targets, node)
+            .iter()
+            .copied()
+            .chain(synthetic)
+    }
+}
+
+fn csr_row<'a>(offsets: &[u32], targets: &'a [u32], node: u32) -> &'a [u32] {
+    let start = offsets[node as usize] as usize;
+    let end = offsets[node as usize + 1] as usize;
+    &targets[start..end]
 }
 
 fn compute_dominators(
-    adjacency: &[Vec<u32>],
-    predecessors: &[Vec<u32>],
+    adjacency: &DenseAdjacency<'_>,
     root: u32,
     pass_limit: u64,
     analysis: &'static str,
 ) -> Result<ComputedDominators, AnalysisError> {
-    debug_assert_eq!(adjacency.len(), predecessors.len());
     let reverse_postorder = reverse_postorder(adjacency, root);
-    let mut rpo_position = vec![u32::MAX; adjacency.len()];
+    let mut rpo_position = vec![u32::MAX; adjacency.node_count()];
     for (position, &node) in reverse_postorder.iter().enumerate() {
         rpo_position[node as usize] = position as u32;
     }
 
-    let mut idom = vec![None; adjacency.len()];
+    let mut idom = vec![None; adjacency.node_count()];
     idom[root as usize] = Some(root);
     let mut converged = false;
     for _ in 0..pass_limit {
         let mut changed = false;
         for &node in reverse_postorder.iter().skip(1) {
-            let mut processed_predecessors = predecessors[node as usize]
-                .iter()
-                .copied()
+            let mut processed_predecessors = adjacency
+                .predecessors(node)
                 .filter(|&predecessor| idom[predecessor as usize].is_some());
             let Some(mut candidate) = processed_predecessors.next() else {
                 continue;
@@ -336,14 +424,14 @@ fn compute_dominators(
         });
     }
 
-    let mut children = vec![Vec::new(); adjacency.len()];
+    let mut children = vec![Vec::new(); adjacency.node_count()];
     for &node in reverse_postorder.iter().skip(1) {
         let parent =
             idom[node as usize].expect("every reachable non-root node has an immediate dominator");
         children[parent as usize].push(node);
     }
-    normalize_adjacency(&mut children);
-    let frontier = dominance_frontier(predecessors, &idom, &reverse_postorder);
+    normalize_rows(&mut children);
+    let frontier = dominance_frontier(adjacency, &idom, &reverse_postorder, root);
     let intervals = euler_intervals(&children, root);
 
     Ok(ComputedDominators {
@@ -351,7 +439,6 @@ fn compute_dominators(
         children,
         frontier,
         intervals,
-        reverse_postorder,
     })
 }
 
@@ -369,14 +456,15 @@ fn intersect(idom: &[Option<u32>], rpo_position: &[u32], mut left: u32, mut righ
     left
 }
 
-fn reverse_postorder(adjacency: &[Vec<u32>], root: u32) -> Vec<u32> {
-    let mut visited = vec![false; adjacency.len()];
+fn reverse_postorder(adjacency: &DenseAdjacency<'_>, root: u32) -> Vec<u32> {
+    let mut visited = vec![false; adjacency.node_count()];
     let mut postorder = Vec::new();
     let mut stack = vec![(root, 0usize)];
     visited[root as usize] = true;
     while let Some((node, next_successor)) = stack.last_mut() {
-        if *next_successor < adjacency[*node as usize].len() {
-            let successor = adjacency[*node as usize][*next_successor];
+        let successors = adjacency.successors(*node);
+        if *next_successor < successors.len() {
+            let successor = successors[*next_successor];
             *next_successor += 1;
             if !visited[successor as usize] {
                 visited[successor as usize] = true;
@@ -392,26 +480,38 @@ fn reverse_postorder(adjacency: &[Vec<u32>], root: u32) -> Vec<u32> {
 }
 
 fn dominance_frontier(
-    predecessors: &[Vec<u32>],
+    adjacency: &DenseAdjacency<'_>,
     idom: &[Option<u32>],
     reachable: &[u32],
+    root: u32,
 ) -> Vec<Vec<u32>> {
-    let mut frontier = vec![BTreeSet::new(); predecessors.len()];
+    let mut frontier = vec![Vec::new(); adjacency.node_count()];
     for &join in reachable {
-        let incoming: Vec<u32> = predecessors[join as usize]
-            .iter()
-            .copied()
+        let reachable_incoming = adjacency
+            .predecessors(join)
             .filter(|&predecessor| idom[predecessor as usize].is_some())
-            .collect();
-        if incoming.len() < 2 {
+            .take(2)
+            .count();
+        // The distinguished entry has an implicit external predecessor. One
+        // explicit self-loop or backedge is therefore enough to place entry
+        // in a dominance frontier; unlike every other reachable node, its
+        // immediate dominator is itself rather than a strict dominator.
+        let minimum_incoming = if join == root { 1 } else { 2 };
+        if reachable_incoming < minimum_incoming {
             continue;
         }
         let join_idom = idom[join as usize]
             .expect("every reachable dominance-frontier join has an immediate dominator");
-        for predecessor in incoming {
+        for predecessor in adjacency
+            .predecessors(join)
+            .filter(|&predecessor| idom[predecessor as usize].is_some())
+        {
             let mut runner = predecessor;
             while runner != join_idom {
-                frontier[runner as usize].insert(join);
+                let members = &mut frontier[runner as usize];
+                if members.last() != Some(&join) {
+                    members.push(join);
+                }
                 let Some(parent) = idom[runner as usize] else {
                     break;
                 };
@@ -421,11 +521,12 @@ fn dominance_frontier(
                 runner = parent;
             }
         }
+        if join == root {
+            frontier[root as usize].push(root);
+        }
     }
+    normalize_rows(&mut frontier);
     frontier
-        .into_iter()
-        .map(|members| members.into_iter().collect())
-        .collect()
 }
 
 fn euler_intervals(children: &[Vec<u32>], root: u32) -> Vec<Option<(u64, u64)>> {
@@ -470,35 +571,9 @@ fn interval_contains(
     ancestor_entry <= descendant_entry && descendant_exit <= ancestor_exit
 }
 
-fn reverse_adjacency(adjacency: &[Vec<u32>]) -> Vec<Vec<u32>> {
-    let mut reverse = vec![Vec::new(); adjacency.len()];
-    for (source, targets) in adjacency.iter().enumerate() {
-        for &target in targets {
-            reverse[target as usize].push(source as u32);
-        }
-    }
-    normalize_adjacency(&mut reverse);
-    reverse
-}
-
-fn reachable_dense(adjacency: &[Vec<u32>], root: u32) -> Vec<bool> {
-    let mut visited = vec![false; adjacency.len()];
-    let mut stack = vec![root];
-    while let Some(node) = stack.pop() {
-        if visited[node as usize] {
-            continue;
-        }
-        visited[node as usize] = true;
-        for &successor in adjacency[node as usize].iter().rev() {
-            stack.push(successor);
-        }
-    }
-    visited
-}
-
-fn normalize_adjacency(adjacency: &mut [Vec<u32>]) {
-    for neighbors in adjacency {
-        neighbors.sort_unstable();
+fn normalize_rows(rows: &mut [Vec<u32>]) {
+    for neighbors in rows {
+        *neighbors = heap_sorted(std::mem::take(neighbors));
         neighbors.dedup();
     }
 }
@@ -720,6 +795,27 @@ mod tests {
     }
 
     #[test]
+    fn control_dependence_edges_sort_and_deduplicate_public_frontier_rows() {
+        let mut tree = empty_post_dominator_tree(Vec::new());
+        tree.frontier = BTreeMap::from([
+            (
+                NodeId::new(2),
+                vec![NodeId::new(3), NodeId::new(1), NodeId::new(3)],
+            ),
+            (NodeId::new(1), vec![NodeId::new(2)]),
+        ]);
+
+        assert_eq!(
+            tree.control_dependence_edges(),
+            vec![
+                (NodeId::new(1), NodeId::new(2)),
+                (NodeId::new(2), NodeId::new(1)),
+                (NodeId::new(3), NodeId::new(2)),
+            ]
+        );
+    }
+
+    #[test]
     fn post_dominator_scope_errors_remain_typed() {
         let mut cpg = CodePropertyGraph::new(Language::Rust);
         let block = cpg.add_node(node(CpgNodeKind::Block {
@@ -830,6 +926,258 @@ mod tests {
         edges
     }
 
+    #[derive(Debug)]
+    struct RemovalDominanceOracle {
+        reachable: Vec<bool>,
+        dominates: Vec<Vec<bool>>,
+        idom: BTreeMap<NodeId, NodeId>,
+        frontier: BTreeMap<NodeId, Vec<NodeId>>,
+    }
+
+    fn reachable_without(
+        node_count: usize,
+        edges: &[(usize, usize)],
+        root: usize,
+        excluded: Option<usize>,
+    ) -> Vec<bool> {
+        let mut reachable = vec![false; node_count];
+        if excluded == Some(root) {
+            return reachable;
+        }
+        let mut stack = vec![root];
+        while let Some(node) = stack.pop() {
+            if excluded == Some(node) || reachable[node] {
+                continue;
+            }
+            reachable[node] = true;
+            for &(source, target) in edges.iter().rev() {
+                if source == node && excluded != Some(target) {
+                    stack.push(target);
+                }
+            }
+        }
+        reachable
+    }
+
+    /// Independent exact oracle: `candidate` dominates `node` precisely when
+    /// deleting `candidate` makes a previously reachable `node` unreachable.
+    /// Immediate dominators and frontiers are then derived from that complete
+    /// dominance relation rather than by another CHK-style fixed point.
+    fn removal_dominance_oracle(
+        node_count: usize,
+        raw_edges: &[(usize, usize)],
+    ) -> RemovalDominanceOracle {
+        let mut edges: Vec<_> = raw_edges
+            .iter()
+            .copied()
+            .filter(|&(source, target)| source < node_count && target < node_count)
+            .collect();
+        edges.sort_unstable();
+        edges.dedup();
+
+        let reachable = reachable_without(node_count, &edges, 0, None);
+        let mut dominates = vec![vec![false; node_count]; node_count];
+        for (candidate, dominance_row) in dominates.iter_mut().enumerate() {
+            let without_candidate = reachable_without(node_count, &edges, 0, Some(candidate));
+            for node in 0..node_count {
+                dominance_row[node] =
+                    reachable[node] && (candidate == node || !without_candidate[node]);
+            }
+        }
+
+        let mut idom = BTreeMap::new();
+        for node in 1..node_count {
+            if !reachable[node] {
+                continue;
+            }
+            let strict: Vec<_> = (0..node_count)
+                .filter(|&candidate| candidate != node && dominates[candidate][node])
+                .collect();
+            let immediate: Vec<_> = strict
+                .iter()
+                .copied()
+                .filter(|&candidate| {
+                    strict
+                        .iter()
+                        .all(|&other| other == candidate || dominates[other][candidate])
+                })
+                .collect();
+            assert_eq!(immediate.len(), 1, "unique exact idom for node {node}");
+            idom.insert(NodeId::new(node as u32), NodeId::new(immediate[0] as u32));
+        }
+
+        let mut frontier = BTreeMap::new();
+        for candidate in 0..node_count {
+            if !reachable[candidate] {
+                continue;
+            }
+            let members = (0..node_count)
+                .filter(|&join| reachable[join])
+                .filter(|&join| {
+                    edges.iter().any(|&(predecessor, target)| {
+                        target == join
+                            && reachable[predecessor]
+                            && dominates[candidate][predecessor]
+                    }) && (candidate == join || !dominates[candidate][join])
+                })
+                .map(|join| NodeId::new(join as u32))
+                .collect();
+            frontier.insert(NodeId::new(candidate as u32), members);
+        }
+
+        RemovalDominanceOracle {
+            reachable,
+            dominates,
+            idom,
+            frontier,
+        }
+    }
+
+    fn assert_matches_removal_oracle(node_count: usize, edges: &[(usize, usize)]) {
+        let graph = projection(node_count, edges);
+        let actual = dominator_tree(&graph, NodeId::new(0)).expect("valid oracle root");
+        let oracle = removal_dominance_oracle(node_count, edges);
+        assert_eq!(actual.idom, oracle.idom);
+        assert_eq!(actual.frontier, oracle.frontier);
+        for candidate in 0..node_count {
+            for node in 0..node_count {
+                assert_eq!(
+                    actual.dominates(NodeId::new(candidate as u32), NodeId::new(node as u32)),
+                    oracle.dominates[candidate][node],
+                    "dominance mismatch for {candidate} -> {node}; reachable={:?}; edges={edges:?}",
+                    oracle.reachable,
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn all_directed_graphs_through_four_nodes_match_vertex_removal_oracle() {
+        for node_count in 1..=4 {
+            let possible_edges: Vec<_> = (0..node_count)
+                .flat_map(|source| {
+                    (0..node_count)
+                        .filter(move |&target| source != target)
+                        .map(move |target| (source, target))
+                })
+                .collect();
+            for mask in 0u64..(1u64 << possible_edges.len()) {
+                let edges: Vec<_> = possible_edges
+                    .iter()
+                    .enumerate()
+                    .filter_map(|(bit, &edge)| ((mask >> bit) & 1 == 1).then_some(edge))
+                    .collect();
+                assert_matches_removal_oracle(node_count, &edges);
+            }
+        }
+    }
+
+    #[test]
+    fn loops_multiple_backedges_irreducible_region_and_unreachable_entry_are_exact() {
+        let edges = [
+            (0, 1),
+            (0, 2),
+            (1, 3),
+            (2, 3),
+            (3, 1),
+            (3, 4),
+            (4, 2),
+            (4, 5),
+            (2, 5),
+            (6, 3),
+            (6, 7),
+            (7, 6),
+        ];
+        assert_matches_removal_oracle(8, &edges);
+        let tree = dominator_tree(&projection(8, &edges), NodeId::new(0)).expect("loop graph");
+        assert!(!tree.idom.contains_key(&NodeId::new(6)));
+        assert!(!tree.idom.contains_key(&NodeId::new(7)));
+    }
+
+    #[test]
+    fn entry_self_loop_and_backedge_produce_the_exact_root_frontier() {
+        let edges = [(0, 0), (0, 1), (1, 0)];
+        assert_matches_removal_oracle(2, &edges);
+        let tree = dominator_tree(&projection(2, &edges), NodeId::new(0)).expect("root cycle");
+        assert_eq!(tree.frontier[&NodeId::new(0)], vec![NodeId::new(0)]);
+        assert_eq!(tree.frontier[&NodeId::new(1)], vec![NodeId::new(0)]);
+    }
+
+    fn generated_postdom_cpg(
+        node_count: usize,
+        raw_edges: &[(usize, usize)],
+        reverse_insertion: bool,
+    ) -> (CodePropertyGraph, NodeId) {
+        let mut cpg = CodePropertyGraph::new(Language::Rust);
+        let mut insertion_order: Vec<_> = (0..node_count).collect();
+        if reverse_insertion {
+            insertion_order.reverse();
+        }
+        for index in insertion_order {
+            let kind = if index == 0 {
+                function("f")
+            } else if index + 1 == node_count {
+                CpgNodeKind::Return
+            } else {
+                CpgNodeKind::Block {
+                    scope: ScopeId::GLOBAL,
+                }
+            };
+            cpg.add_node_with_id(CpgNode::new(
+                NodeId::new(index as u32),
+                kind,
+                SourceRange::default(),
+            ));
+        }
+
+        let mut edges: Vec<_> = (0..node_count - 1)
+            .map(|source| (source, source + 1))
+            .chain(raw_edges.iter().copied())
+            .filter(|&(source, target)| source < node_count && target < node_count)
+            .collect();
+        if reverse_insertion {
+            edges.reverse();
+        }
+        for (source, target) in edges {
+            connect_cfg(
+                &mut cpg,
+                NodeId::new(source as u32),
+                NodeId::new(target as u32),
+            );
+        }
+        (cpg, NodeId::new(0))
+    }
+
+    #[test]
+    fn all_exit_reachable_cfgs_through_four_nodes_match_postdominator_oracle() {
+        for node_count in 2..=4 {
+            let possible_edges: Vec<_> = (0..node_count)
+                .flat_map(|source| {
+                    (0..node_count)
+                        .filter(move |&target| source != target)
+                        .map(move |target| (source, target))
+                })
+                .collect();
+            for mask in 0u64..(1u64 << possible_edges.len()) {
+                let edges: Vec<_> = possible_edges
+                    .iter()
+                    .enumerate()
+                    .filter_map(|(bit, &edge)| ((mask >> bit) & 1 == 1).then_some(edge))
+                    .collect();
+                let (cpg, function) = generated_postdom_cpg(node_count, &edges, false);
+                let expected = legacy_control_dependence(&cpg, function);
+                let tree = post_dominator_tree(&cpg, function).expect("exhaustive postdominator");
+                assert_eq!(
+                    tree.control_dependence_edges()
+                        .into_iter()
+                        .collect::<BTreeSet<_>>(),
+                    expected,
+                    "node_count={node_count}; edges={edges:?}",
+                );
+            }
+        }
+    }
+
     proptest! {
         #![proptest_config(ProptestConfig::with_cases(256))]
 
@@ -874,6 +1222,34 @@ mod tests {
                 prop_assert!(actual.dominates(idom, node));
                 prop_assert!(actual.dominates(actual.root, node));
             }
+        }
+
+        #[test]
+        fn chk_tree_and_frontier_match_vertex_removal_oracle(
+            node_count in 1usize..11,
+            raw_edges in prop::collection::vec((0usize..11, 0usize..11), 0..72),
+        ) {
+            let edges: Vec<_> = raw_edges
+                .into_iter()
+                .filter(|(source, target)| *source < node_count && *target < node_count)
+                .collect();
+            assert_matches_removal_oracle(node_count, &edges);
+        }
+
+        #[test]
+        fn post_dominator_results_are_node_and_edge_insertion_deterministic(
+            node_count in 2usize..14,
+            raw_edges in prop::collection::vec((0usize..14, 0usize..14), 0..64),
+        ) {
+            let edges: Vec<_> = raw_edges
+                .into_iter()
+                .filter(|(source, target)| *source < node_count && *target < node_count)
+                .collect();
+            let (forward, function) = generated_postdom_cpg(node_count, &edges, false);
+            let (reverse, _) = generated_postdom_cpg(node_count, &edges, true);
+            let forward = post_dominator_tree(&forward, function).expect("forward postdominator");
+            let reverse = post_dominator_tree(&reverse, function).expect("reverse postdominator");
+            prop_assert_eq!(forward, reverse);
         }
 
         #[test]

@@ -2,7 +2,7 @@
 
 use libcpg::{
     CfgEdgeKind, CodePropertyGraph, CpgEdgeKind, CpgNode, CpgNodeKind, DfgEdgeKind, Language,
-    MethodSignature, NodeId, SourceRange, Visibility,
+    MethodSignature, NodeId, ProjectionKind, SourceRange, Visibility,
 };
 
 /// Stable seed used by every synthetic performance fixture.
@@ -310,4 +310,109 @@ pub fn assert_linear_graph(graph: &CodePropertyGraph, node_count: usize) {
             "path adjacency oracle"
         );
     }
+}
+
+/// Construct a chain of CFG diamonds as a feature-free dominator workload.
+///
+/// Every stage adds two branch arms and one join. The stable node order is
+/// `entry, left, right, join, ...`; the final join is the sole `Return` node
+/// in the CPG fixture. This shape exercises immediate dominators, dominance
+/// frontiers, post-dominators, and control dependence without parser costs.
+pub fn dominator_diamond_fixture(
+    stages: usize,
+) -> (libcpg::GraphProjection, CodePropertyGraph, NodeId) {
+    assert!(stages > 0, "dominator fixtures require at least one stage");
+    let node_count = stages
+        .checked_mul(3)
+        .and_then(|count| count.checked_add(1))
+        .expect("dominator fixture node count overflow");
+    let dense_node_count = u32::try_from(node_count)
+        .expect("dominator fixture node count exceeds the dense-index domain");
+    let edge_count = stages
+        .checked_mul(4)
+        .expect("dominator fixture edge count overflow");
+    let stable_nodes: Vec<_> = (0..dense_node_count).map(NodeId::new).collect();
+    let mut edges = Vec::with_capacity(edge_count);
+    let mut current = 0usize;
+    for stage in 0..stages {
+        let left = stage * 3 + 1;
+        let right = left + 1;
+        let join = left + 2;
+        edges.extend([
+            (current, left),
+            (current, right),
+            (left, join),
+            (right, join),
+        ]);
+        current = join;
+    }
+    let projection = libcpg::GraphProjection::from_edges(
+        ProjectionKind::External,
+        stable_nodes.iter().copied(),
+        edges
+            .iter()
+            .map(|&(source, target)| (stable_nodes[source], stable_nodes[target], 1.0)),
+    );
+
+    let mut cpg = CodePropertyGraph::new(Language::Rust);
+    let function = cpg.add_node(function_node("dominator_fixture".into()));
+    let mut cpg_nodes = Vec::with_capacity(node_count);
+    cpg_nodes.push(function);
+    for index in 1..node_count {
+        let kind = if index + 1 == node_count {
+            CpgNodeKind::Return
+        } else {
+            CpgNodeKind::Block {
+                scope: libcpg::ScopeId::GLOBAL,
+            }
+        };
+        cpg_nodes.push(cpg.add_node(CpgNode::new(0.into(), kind, SourceRange::default())));
+    }
+    for &(source, target) in &edges {
+        cpg.connect(
+            cpg_nodes[source],
+            cpg_nodes[target],
+            CpgEdgeKind::ControlFlow(CfgEdgeKind::Sequential),
+        );
+    }
+
+    (projection, cpg, function)
+}
+
+/// Validate all structural facts relied on by dominator benchmarks.
+pub fn assert_dominator_diamond_fixture(
+    projection: &libcpg::GraphProjection,
+    cpg: &CodePropertyGraph,
+    function: NodeId,
+    stages: usize,
+) {
+    let node_count = stages * 3 + 1;
+    assert_eq!(
+        projection.node_count(),
+        node_count,
+        "projection node oracle"
+    );
+    assert_eq!(
+        projection.edge_count(),
+        stages * 4,
+        "projection edge oracle"
+    );
+    assert!(projection.is_well_formed(), "projection CSR oracle");
+    assert_eq!(cpg.node_count(), node_count, "CPG node oracle");
+    assert_eq!(cpg.edge_count(), stages * 4, "CPG edge oracle");
+
+    let dominators =
+        libcpg::dominator_tree(projection, NodeId::new(0)).expect("dominator fixture analysis");
+    assert_eq!(dominators.idom.len(), node_count - 1, "idom oracle");
+    assert!(dominators.dominates(NodeId::new(0), NodeId::new((node_count - 1) as u32)));
+
+    let post_dominators =
+        libcpg::post_dominator_tree(cpg, function).expect("post-dominator fixture analysis");
+    assert_eq!(post_dominators.exits.len(), 1, "exit oracle");
+    assert_eq!(post_dominators.ipdom.len(), node_count - 1, "ipdom oracle");
+    assert_eq!(
+        post_dominators.control_dependence_edges().len(),
+        stages * 2,
+        "control-dependence oracle"
+    );
 }

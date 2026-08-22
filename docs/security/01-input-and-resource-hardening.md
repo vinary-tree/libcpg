@@ -909,10 +909,12 @@ symbolic bound, or suitability for a security decision.
 `post_dominator_tree` run the deterministic CHK fixed point for at most the
 analyzed vertex count plus two passes. A non-converging analysis returns
 `AnalysisError::IterationLimitExceeded`; it cannot spin indefinitely. Reverse
-postorder and Euler intervals use explicit work stacks, so an adversarially deep
-CFG grows heap storage instead of the native call stack. The worst-case work is
-still $`O(VE)`$, so callers processing untrusted inputs should continue to cap
-source and CPG size.
+postorder, exit reachability, frontier walks, and Euler intervals use explicit
+work stacks, so an adversarially deep CFG grows heap storage instead of the
+native call stack. Forward/reverse CSR is borrowed and the synthetic exit is an
+$`O(V)`$ overlay, so no second $`O(V+E)`$ graph is materialized. The worst-case
+work is still $`O(VE)`$, so callers processing untrusted inputs should continue
+to cap source and CPG size.
 
 ## Slicing: `max_nodes`
 
@@ -1013,6 +1015,7 @@ correctness**: an analysis may return a meaningless answer, but it must
 | `control_flow_sccs` / `call_graph_sccs` | a visited set guards AST scope discovery; dense discovery/low-link arrays and explicit DFS/component stacks make iterative Tarjan visit every projected vertex and normalized edge without consuming native stack per path element |
 | `analyze_dsm` / `classify_core_periphery` | validates public CSR and exact result provenance, caps vertices before work, and uses iterative queues plus the iterative shared SCC engine; no path depth consumes native stack |
 | `martin_metrics` / `sdp_violations` | validate projection CSR before indexed traversal; invalid assignment indices are inert; enclosing-module walks inherit bounded `ast_ancestors`; invalid metric slices produce no verdict |
+| `dominator_tree` / `post_dominator_tree` | borrowed CSR plus explicit DFS/Euler/exit-reachability heap continuations avoid recursion; 100,000-node deep projection, wide projection, exit-plus-infinite-region CFG, and 99,999-exit function CFG shapes complete and drop on a 256 KiB stack |
 | `loop_forest` | the shared visited function scope, iterative dominator/SCC/DFS walks, iterative reverse-body closure, and iterative nesting walk avoid recursion; a 25,000-node natural loop is regression-tested |
 | `unreachable_code` | visited function-scope and dense CFG sets bound discovery; iterative DFS is stack-safe on a 25,000-node reachable/disconnected graph |
 | `block_cfg` / `solve` | iterative CFG traversal and work queues avoid native-stack growth; `solve` also caps extractions per block and ignores inconsistent public loop-header mappings |

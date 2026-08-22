@@ -428,7 +428,7 @@ condensation DAG. See
 
 ### Dominator / Post-dominator
 
-Node $`d`$ **dominates** node $`n`$ if every path from entry to $`n`$ passes through $`d`$; $`p`$ **post-dominates** $`n`$ if every modeled path from $`n`$ to exit passes through $`p`$. Post-dominators are dominators computed on the *reversed* CFG. `libcpg` exposes deterministic `DominatorTree` and `PostDominatorTree` results from one feature-free Cooper–Harvey–Kennedy engine. Prerequisite for [control dependence](#control-dependence). See [`components/graph/dominator-analysis.md`](components/graph/dominator-analysis.md).
+Node $`d`$ **dominates** node $`n`$ if every path from entry to $`n`$ passes through $`d`$; $`p`$ **post-dominates** $`n`$ if every modeled path from $`n`$ to exit passes through $`p`$. Post-dominators are dominators computed on the *reversed* CFG. `libcpg` exposes deterministic `DominatorTree` and `PostDominatorTree` results from one feature-free Cooper–Harvey–Kennedy engine over borrowed CSR and a synthetic-exit overlay. Prerequisite for [control dependence](#control-dependence). See [`components/graph/dominator-analysis.md`](components/graph/dominator-analysis.md).
 
 ### Dead branch / Unreachable code
 
@@ -451,7 +451,7 @@ write. See
 
 ### Dominance frontier / Reverse dominance frontier
 
-The **dominance frontier** of node $`d`$ is the set of nodes where $`d`$'s dominance "stops" — the join points just beyond $`d`$'s dominated region (Cytron et al. [[3]](#references)). Computing it on the *reversed* CFG (the **reverse dominance frontier**) yields exactly the [control-dependence](#control-dependence) relation. See [`components/graph/dominator-analysis.md`](components/graph/dominator-analysis.md) and [`theory/04-program-dependence-and-slicing.md`](theory/04-program-dependence-and-slicing.md).
+The **dominance frontier** of node $`d`$ is the set of nodes where $`d`$'s dominance "stops" — the points just beyond $`d`$'s strictly dominated region (Cytron et al. [[3]](#references)). A root self-loop or reachable backedge can therefore place the root in its own frontier because a node does not strictly dominate itself. Computing the frontier on the *reversed* CFG (the **reverse dominance frontier**) yields exactly the [control-dependence](#control-dependence) relation. See [`components/graph/dominator-analysis.md`](components/graph/dominator-analysis.md) and [`theory/04-program-dependence-and-slicing.md`](theory/04-program-dependence-and-slicing.md).
 
 ### DPML (Design-Pattern Markup Language)
 

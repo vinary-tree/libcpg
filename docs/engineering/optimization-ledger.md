@@ -61,6 +61,7 @@ property-based tests.
 | `traversal_primitives` | `node`, `ast_children`, `cfg_successors`, `dfg_successors`, and `edges_between` at 1,024/8,192 nodes | Exact three-overlay adjacency and edge multiplicity for every path step |
 | `dfg_extraction` | DFG extraction on parser-built, DFG-free Rust templates | Input has no DFG edges; output has represented data-flow evidence |
 | `pdg_construction` | PDGs for every function in parser-built Rust templates | Functions exist, input has no PDG edges, output has dependence evidence |
+| `dominator_analysis` | Direct dominance and function post-dominance over 256/2,048-stage diamond ladders | Exact nodes/edges, well-formed CSR, complete idom/ipdom relations, one exit, and two control dependences per stage |
 | `scc_analysis` | Path, ring, and eight-node clustered call graphs at 1,000/10,000 functions | Exact partition node and component counts |
 | `pattern_vf2` | Bounded VF2 matching of a four-node path into 256/4,096 nodes | Exactly one retained match |
 | `similarity_wl` | Four-round WL labels and clone classes on 1,024/8,192-node rings | Exact label cardinality, ring symmetry, and one canonical clone class |
@@ -556,6 +557,49 @@ or the established existential multiedge relation. Full counters, properties, st
 and falsification boundaries are in
 [validation 52](../scientific/52-dense-vf2-validation.md).
 
+### T9.2 H09 — borrowed-CSR CHK and PDG boundary
+
+The H08 headless profile attributed only 3.61% of sampled cycles to the CHK
+fixed point. The dominant costs were edge-row cloning into `Vec<Vec<u32>>`,
+materializing and reversing a post-dominator graph, per-join frontier vectors
+and tree sets, public map construction, and a discarded first function CFG
+projection. H09 retains bounded deterministic CHK and changes the ownership
+boundary: direct analysis borrows both CSR directions, post-dominance swaps them
+behind a virtual-exit row/bit-mask overlay, frontier rows are flat and
+heap-sorted, and function scope produces one projection.
+
+**Direct Criterion result against committed H08:**
+
+| Target | H08 | H09 | Criterion change |
+|---|---:|---:|---:|
+| dominators / 256 stages | 309.97 µs | 258.32 µs | -16.75% |
+| post-dominators / 256 stages | 509.03 µs | 437.02 µs | -15.28% |
+| dominators / 2,048 stages | 2.6160 ms | 2.2259 ms | -15.06% |
+| post-dominators / 2,048 stages | 4.2222 ms | 3.7292 ms | -11.71% |
+
+**Parser-backed PDG consumer result against committed H08:**
+
+| Corpus | H08 | H09 | Criterion change |
+|---|---:|---:|---:|
+| Rust small (49 lines) | 57.992 µs | 40.804 µs | -29.76% |
+| Rust medium (514 lines) | 3.1532 ms | 2.3207 ms | -27.09% |
+
+**Headless retained-fixture profile, 100 repetitions:** allocated bytes fall
+19.03%, allocation blocks 31.66%, peak live bytes 9.89%, Massif page peak
+5.06%, RSS 9.22%, cycles 13.57%, retired instructions 15.88%, cache references
+29.08%, cache misses 13.81%, and dTLB loads 17.62%. dTLB misses rise 2.84% and
+page faults rise 50.93% despite the lower allocation/live-memory counters;
+both are retained as adverse startup-sensitive observations. VTune CLI
+collectors were unavailable; perf used the headless DWARF fallback. No GUI or
+heaptrack process was used.
+
+Replacing CHK with Lengauer–Tarjan was rejected because the measured fixed
+point was not the bottleneck. Weakening the independent frontier oracle was
+also rejected: it exposed and now guards the root self-loop/backedge semantics.
+Full exhaustive/property evidence, stack gate, counters, and falsification
+boundaries are in
+[validation 53](../scientific/53-dominator-optimization-validation.md).
+
 ## Reproduce and compare
 
 The benchmark wrapper defaults to CPUs 0 and 1 and stores logs under
@@ -564,7 +608,8 @@ The benchmark wrapper defaults to CPUs 0 and 1 and stores logs under
 ```sh
 features=lang-rust,lang-python,lang-javascript,lang-go,lang-c
 for bench in cpg_construction traversal_primitives dfg_extraction \
-  pdg_construction scc_analysis pattern_vf2 similarity_wl analyze_corpus
+  pdg_construction dominator_analysis scc_analysis pattern_vf2 similarity_wl \
+  analyze_corpus
 do
   taskset -c 0,1 cargo bench --bench "$bench" --features "$features" -- \
     --save-baseline main

@@ -9,7 +9,7 @@ use rustc_hash::FxHashSet;
 
 use crate::{CfgEdgeKind, CodePropertyGraph, CpgEdgeKind, CpgNodeKind, NodeId};
 
-use super::{cfg_projection, AnalysisError, GraphProjection, ProjectionError};
+use super::{function_scope_nodes, AnalysisError, GraphProjection, ProjectionKind};
 
 /// Canonical function-scoped CFG consumed by exact intraprocedural analyses.
 #[derive(Debug, Clone, PartialEq)]
@@ -33,10 +33,12 @@ pub(crate) fn function_cfg_view(
     cpg: &CodePropertyGraph,
     function: NodeId,
 ) -> Result<FunctionCfgView, AnalysisError> {
-    let base = cfg_projection(cpg, function).map_err(|error| match error {
-        ProjectionError::UnknownNode(node) => AnalysisError::UnknownNode(node),
-        ProjectionError::NotAFunction(node) => AnalysisError::NotAFunction(node),
-    })?;
+    let Some(function_node) = cpg.node(function) else {
+        return Err(AnalysisError::UnknownNode(function));
+    };
+    if !matches!(function_node.kind, CpgNodeKind::Function { .. }) {
+        return Err(AnalysisError::NotAFunction(function));
+    }
 
     let mut reachable = FxHashSet::default();
     let mut stack = vec![function];
@@ -46,23 +48,22 @@ pub(crate) fn function_cfg_view(
     // CFG reachability as the fallback scope rather than collapsing the view to
     // an isolated function node.
     let has_ast_scope = !cpg.ast_children(function).is_empty();
+    let ast_scope = has_ast_scope.then(|| function_scope_nodes(cpg, function));
     while let Some(node) = stack.pop() {
         if !reachable.insert(node) {
             continue;
         }
-        let mut successors: Vec<_> = cpg
-            .cfg_successors(node)
-            .into_iter()
-            .filter(|(successor, kind)| {
-                !matches!(kind, CfgEdgeKind::Call)
-                    && (!has_ast_scope || base.dense_index(*successor).is_some())
-            })
-            .map(|(successor, _)| successor)
-            .collect();
-        successors.sort_unstable();
-        successors.dedup();
-        successors.reverse();
-        stack.extend(successors);
+        stack.extend(
+            cpg.cfg_successors(node)
+                .into_iter()
+                .filter(|(successor, kind)| {
+                    !matches!(kind, CfgEdgeKind::Call)
+                        && ast_scope
+                            .as_ref()
+                            .is_none_or(|scope| scope.contains(successor))
+                })
+                .map(|(successor, _)| successor),
+        );
     }
 
     let edges = cpg.edges().filter_map(|edge| {
@@ -72,7 +73,11 @@ pub(crate) fn function_cfg_view(
             && reachable.contains(&edge.target))
         .then_some((edge.source, edge.target, 1.0))
     });
-    let projection = GraphProjection::from_edges(base.kind, reachable.iter().copied(), edges);
+    let projection = GraphProjection::from_edges(
+        ProjectionKind::ControlFlow { function },
+        reachable.iter().copied(),
+        edges,
+    );
     let entry = projection
         .dense_index(function)
         .expect("the function entry is retained in its CFG projection");

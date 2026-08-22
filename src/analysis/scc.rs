@@ -269,7 +269,7 @@ pub(crate) fn sorted_nodes(nodes: impl IntoIterator<Item = NodeId>) -> Vec<NodeI
 /// Rust's slice sorting implementation may use native-stack recursion. Graph
 /// projections deliberately support deep inputs on small stacks, so the SCC
 /// substrate uses a binary heap for every input-sized canonicalization step.
-fn heap_sorted<T: Ord>(values: impl IntoIterator<Item = T>) -> Vec<T> {
+pub(crate) fn heap_sorted<T: Ord>(values: impl IntoIterator<Item = T>) -> Vec<T> {
     let iterator = values.into_iter();
     let mut heap = BinaryHeap::with_capacity(iterator.size_hint().0);
     for value in iterator {

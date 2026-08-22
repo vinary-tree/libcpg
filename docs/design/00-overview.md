@@ -101,8 +101,9 @@ alternatives is folklore, and a decision without its costs is marketing.
 | [0055 — Deterministic dependence-aware CPG diff](0055-deterministic-dependence-aware-cpg-diff.md) | Reuse bounded GED correspondence for exact canonical node/edge edit scripts and classify only represented PDG-edge changes as behavior-changing. | Accepted |
 | [0056 — Lazy deterministic exact-edge projection cache](0056-lazy-deterministic-edge-projection-cache.md) | Cache exact edge indices in deterministic forward/reverse/endpoint CSR rows, invalidate on mutation, and retain `GraphProjection` as a separate owned abstraction. | Accepted |
 | [0057 — Dense stack-safe VF2 state](0057-dense-stack-safe-vf2-state.md) | Replace hash-owned candidates with lazy dense graph metadata, Fenwick-ordered sets, flat undo logs, cursor-only heap frames, and a sound distinct-degree prune without changing canonical match semantics. | Accepted |
+| [0058 — Borrowed-CSR dominator overlay](0058-borrowed-csr-dominator-overlay.md) | Run bounded CHK over borrowed forward/reverse CSR, model post-dominance with a synthetic-root overlay, flatten frontier ownership, and eliminate the duplicate function projection while preserving exact public relations. | Accepted |
 
-These fifty-seven are not independent. ADR-0001 fixes the substrate that all analyses
+These fifty-eight are not independent. ADR-0001 fixes the substrate that all analyses
 write onto; ADR-0002 and ADR-0005 together explain how a language reaches that
 substrate and what you must switch on to get there; ADR-0003 and ADR-0004 are
 two analyses *over* the substrate (one always-on, one feature-gated) that each
@@ -259,6 +260,10 @@ ADR-0057 consumes ADR-0056's stable node/edge indexes for fully lazy dense VF2
 metadata. It preserves ADR-0004's canonical non-induced match relation while
 moving candidate order, mapping, terminal membership, and exact restoration
 into compact heap structures with constant native call depth.
+ADR-0058 consumes ADR-0016's owned forward/reverse CSR and ADR-0007's shared
+function scope without adding another graph owner. It preserves bounded CHK and
+the public dominance/PDG contracts while making the synthetic exit, traversal
+continuations, and frontier canonicalization explicit heap data.
 
 ![Module architecture of libcpg, showing the graph core and the analysis modules layered over it](../diagrams/module-architecture.svg)
 
@@ -270,7 +275,7 @@ into compact heap structures with constant native call depth.
   (`0001`…). Numbers are never reused; a reversed decision is marked
   *Superseded* and a new record supersedes it, so history stays legible.
 - **Status lifecycle.** `Proposed → Accepted → (Superseded by NNNN | Deprecated)`.
-  All fifty-seven current records are **Accepted** and reflect the shipped `v0.1.1`
+  All fifty-eight current records are **Accepted** and reflect the shipped `v0.1.1`
   code.
 - **Grounding.** Every claim here is traceable to source: the
   [`Cargo.toml`](../engineering/01-build-and-features.md) feature block, the

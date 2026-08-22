@@ -5,9 +5,10 @@ use std::mem::size_of;
 
 use libcpg::pattern::Vf2Matcher;
 use libcpg::{
-    call_graph_projection, call_graph_sccs, structural_clone_classes, wl_labels, CodePropertyGraph,
-    CpgBuilder, CpgBuilderConfig, CpgEdge, CpgNode, DfgExtractor, GraphProjection, NodeId,
-    PdgBuilder, SubgraphMatcher, TreeSitterCpgBuilder,
+    call_graph_projection, call_graph_sccs, dominator_tree, post_dominator_tree,
+    structural_clone_classes, wl_labels, CodePropertyGraph, CpgBuilder, CpgBuilderConfig, CpgEdge,
+    CpgNode, DfgExtractor, GraphProjection, NodeId, PdgBuilder, SubgraphMatcher,
+    TreeSitterCpgBuilder,
 };
 
 use support::{
@@ -54,6 +55,38 @@ fn pdg() -> usize {
         PdgBuilder::new().build(&mut graph, function);
     }
     graph.edges().filter(|edge| edge.kind.is_pdg()).count()
+}
+
+fn dominators_fixture() -> (GraphProjection, CodePropertyGraph, NodeId) {
+    let (projection, cpg, function) = support::dominator_diamond_fixture(2_048);
+    support::assert_dominator_diamond_fixture(&projection, &cpg, function, 2_048);
+    (projection, cpg, function)
+}
+
+fn repeated_dominators(
+    projection: &GraphProjection,
+    cpg: &CodePropertyGraph,
+    function: NodeId,
+    repetitions: usize,
+) -> usize {
+    let mut checksum = 0usize;
+    for _ in 0..repetitions {
+        let dominators =
+            dominator_tree(black_box(projection), NodeId::new(0)).expect("profile dominators");
+        let post_dominators = post_dominator_tree(black_box(cpg), black_box(function))
+            .expect("profile post-dominators");
+        checksum = checksum
+            .wrapping_add(dominators.idom.len())
+            .wrapping_add(post_dominators.ipdom.len())
+            .wrapping_add(
+                post_dominators
+                    .frontier
+                    .values()
+                    .map(Vec::len)
+                    .sum::<usize>(),
+            );
+    }
+    checksum
 }
 
 fn scc() -> usize {
@@ -120,6 +153,10 @@ fn run(name: &str) -> usize {
         "traversal_primitives" => traversal(),
         "dfg_extraction" => dfg(),
         "pdg_construction" => pdg(),
+        "dominator_analysis" => {
+            let (projection, cpg, function) = dominators_fixture();
+            repeated_dominators(&projection, &cpg, function, 1)
+        }
         "scc_analysis" => scc(),
         "pattern_vf2" => vf2(),
         "similarity_wl" => wl(),
@@ -148,14 +185,21 @@ fn main() {
     // Keep the VF2 graphs alive across repetitions so this workload measures
     // search-state construction and traversal rather than graph construction.
     // The aggregate `all` workload intentionally retains its end-to-end shape.
-    let checksum = if workload == "pattern_vf2" {
-        repeated_vf2(repetitions)
-    } else {
-        let mut checksum = 0usize;
-        for _ in 0..repetitions {
-            checksum = checksum.wrapping_add(black_box(run(black_box(&workload))));
+    let checksum = match workload.as_str() {
+        "pattern_vf2" => repeated_vf2(repetitions),
+        "dominator_analysis" => {
+            // Retain the immutable CSR/CPG fixture across repetitions so the
+            // workload isolates analysis rather than fixture construction.
+            let (projection, cpg, function) = dominators_fixture();
+            repeated_dominators(&projection, &cpg, function, repetitions)
         }
-        checksum
+        _ => {
+            let mut checksum = 0usize;
+            for _ in 0..repetitions {
+                checksum = checksum.wrapping_add(black_box(run(black_box(&workload))));
+            }
+            checksum
+        }
     };
     println!("workload={workload} repetitions={repetitions} checksum={checksum}");
 }
