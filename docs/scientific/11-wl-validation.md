@@ -153,7 +153,24 @@ cargo +nightly cov-branch
 Validation output is captured to diagnostic logs and those temporary files are
 removed after the stable commit.
 
-## 9. Interpretation boundary
+## 9. H12 compatibility extension
+
+ADR-0061 replaces per-round label/vocabulary allocation with two alternating
+call-local dense matrices and capacity-retaining canonical/incident vectors.
+It leaves every semantic step above unchanged. A separately implemented copy
+of the committed fresh-allocation predecessor now compares exact production
+bits across fixed fixtures and 256 generated isomorphic cases; a second
+256-case campaign covers repeatability, insertion permutation, self-similarity,
+symmetry, and the unit interval. Parser-backed integration and 100,000-node
+path/star lifecycles on a 256 KiB native stack extend the public boundary.
+
+The separable Criterion, DHAT, Massif, RSS, perf-stat, rejected zero-fill, and
+rejected `FxHasher` experiments are reported in
+[Scientific validation 56](56-wl-buffer-reuse-validation.md). That extension
+optimizes ownership and allocation frequency; it does not widen any correctness
+claim made by this base record.
+
+## 10. Interpretation boundary
 
 The evidence establishes deterministic bounded refinement for a supplied
 valid projection, ordering/threshold behavior, safe malformed-input handling,

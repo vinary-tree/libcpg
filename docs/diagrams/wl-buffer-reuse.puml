@@ -1,0 +1,50 @@
+@startuml
+!include _libcpg-theme.iuml
+title Stack-safe Weisfeiler--Lehman refinement with reusable dense buffers
+
+rectangle "Validated GraphProjection list\nforward + reverse CSR" as INPUT #F1F3F5
+rectangle "Seed labels matrix A\n<latex>\ell_0(v)=mix(mix(A,d^-(v)),d^+(v))</latex>" as SEED #DBE4FF
+rectangle "Allocate matrix B capacities once\nallocate canonical vocabulary once" as ALLOC #FFE8CC
+rectangle "Clear each B row\nretain its allocation" as CLEAR #FFF3BF
+rectangle "Iterate vertices in dense order\nsort one reusable incident-label buffer" as REFINE #D3F9D8
+rectangle "Push fixed-mixer raw labels into B" as MIX #C3FAE8
+rectangle "Clear + refill vocabulary\nsort, deduplicate, binary-search ranks" as CANON #E5DBFF
+rectangle "Swap matrices A and B\nno graph state or native recursion" as SWAP #FFD8A8
+rectangle "Return matrix A\npublic bits equal committed predecessor" as RESULT #B2F2BB
+rectangle "Return seed matrix A\nzero rounds allocate no scratch buffers" as ZERO #C3FAE8
+
+INPUT --> SEED
+SEED --> ZERO : requested rounds = 0
+SEED --> ALLOC : one or more rounds
+ALLOC --> CLEAR
+CLEAR --> REFINE
+REFINE --> MIX
+MIX --> CANON
+CANON --> SWAP
+SWAP --> CLEAR : another bounded round
+SWAP --> RESULT : complete
+
+note right of ALLOC
+  Scratch ownership is call-local.
+  Capacity is proportional to supplied vertices;
+  nothing survives the public call.
+end note
+
+note bottom of SWAP
+  Heap-resident vectors are the explicit state machine.
+  Graph depth and width do not increase native call depth.
+end note
+
+legend right
+  |= colour |= role |
+  |<#F1F3F5>| immutable validated input |
+  |<#DBE4FF>| compatibility-stable seed |
+  |<#FFE8CC>| bounded call-local allocation |
+  |<#FFF3BF>| allocation-retaining reset |
+  |<#D3F9D8>| iterative neighborhood work |
+  |<#C3FAE8>| fixed mixing or zero-round result |
+  |<#E5DBFF>| deterministic canonicalization |
+  |<#FFD8A8>| explicit buffer-state transition |
+  |<#B2F2BB>| unchanged public result |
+endlegend
+@enduml

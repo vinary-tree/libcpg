@@ -685,6 +685,67 @@ and Serde-byte oracles, and depth-100,000/256 KiB parser gate are detailed in
 [validation 55](../scientific/55-string-storage-validation.md). ADR-0060 records
 the rejected global atom, mutex, whole-graph sweep, and AHash alternatives.
 
+### T9.3 H12 -- reusable deterministic WL buffers
+
+**Hypothesis.** Four-round projection Weisfeiler--Lehman (WL) refinement
+allocated a new label matrix and canonical vocabulary at every round. Reusing
+call-local capacities should reduce allocation traffic and isolated latency
+while preserving the fixed public numeric labels, malformed behavior, and
+constant native call depth. `FxHasher` was a separate candidate only if it
+could meet that compatibility boundary.
+
+**Controlled change.** Nonzero-round calls now allocate one capacity-matched
+next-label row per graph and one total-node canonical vocabulary. Every round
+clears and refills them, then swaps current and next matrices. Zero-round calls
+return their seed matrix before scratch allocation. The incident vector remains
+call-local and reused. There is no global/thread-local cache, graph mutation,
+unsafe initialization, or recursive traversal.
+
+**Criterion against committed H11:**
+
+| Case | H11 | H12 | Central change |
+|---|---:|---:|---:|
+| WL labels, 1,024-node ring | 53.517 µs | 52.794 µs | -1.37% |
+| clone classes, 1,024-node ring | 56.744 µs | 55.890 µs | -1.51% |
+| WL labels, 8,192-node ring | 425.66 µs | 420.20 µs | -1.26% |
+| clone classes, 8,192-node ring | 451.51 µs | 444.34 µs | -1.65% |
+
+A first safe zero-filled scratch prototype regressed the two 8,192-node cases
+by 1.31% and 1.26%; it was removed. Capacity-retaining clear-and-push avoids
+those redundant initialization writes and improves all isolated cases. Four
+end-to-end parser/corpus controls remained within Criterion's noise threshold
+or reported no change (-0.25% to +1.04%).
+
+**Headless ten-repetition profile:**
+
+| Measure | Isolated WL change | Whole-corpus change |
+|---|---:|---:|
+| DHAT total bytes | -124,320 (-0.237%) | -75,040 (-0.015%) |
+| DHAT allocation blocks | -180 (-1.719%) | -540 (-0.019%) |
+| DHAT peak live bytes/blocks | unchanged | unchanged |
+| maximum RSS | -44 KiB (-0.802%) | -492 KiB (-2.076%) |
+| Massif page peak | unchanged | +4,096 B (+0.014%) |
+
+Nine allocations disappear from each four-round call; the isolated driver
+performs 20 calls, exactly explaining its 180-block reduction. Perf-stat
+elapsed time was -0.66%/+0.80% for WL/corpus, while instructions were
++0.13%/-0.02%; cache/TLB variation is not treated as causal. DWARF supplied the
+headless call-graph fallback. VTune CLI was attempted without a GUI and rejected
+by host `ptrace_scope` and AMD/driver availability.
+
+**Hasher decision.** A removed 30-sample prototype measured 8,192 three-word
+signatures at 32.169 µs with the fixed mixer and 8.315 µs with `FxHasher`.
+Fx is rejected despite its 3.87x isolated speed because raw digest ordering
+defines public sorted ranks. Changing it can change exact labels and violates
+the cross-release contract.
+
+Two 256-case generated campaigns, an independent fresh-allocation predecessor
+oracle, exact topology/boundary cases, parser composition, and 100,000-node
+path/star lifecycles on 256 KiB are detailed in
+[validation 56](../scientific/56-wl-buffer-reuse-validation.md). ADR-0061
+records the ownership proof and rejected zero-fill, hasher, global-cache, and
+unsafe alternatives.
+
 ## Reproduce and compare
 
 The benchmark wrapper defaults to CPUs 0 and 1 and stores logs under

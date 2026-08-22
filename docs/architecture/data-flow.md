@@ -388,8 +388,10 @@ directed in/out degrees, and performs at most 16 incident-neighborhood
 refinement rounds. `structural_clone_classes` converts equal final labels to
 deterministically ordered stable `NodeId` groups. This path reads no source
 payload, edge weight, or parser state; equal classes are candidate evidence
-rather than an exact-isomorphism claim. See the [WL component
-guide](../components/graph/wl-analysis.md).
+rather than an exact-isomorphism claim. Refinement alternates two call-local
+dense vectors and reuses canonical/incident workspaces, preserving exact label
+bits without graph mutation, cross-call cache state, or native recursion. See
+the [WL component guide](../components/graph/wl-analysis.md).
 
 The [centrality family](../components/graph/centrality-analysis.md) also reads
 that validated projection. Directed forward/reverse CSR drives PageRank,

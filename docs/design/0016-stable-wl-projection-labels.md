@@ -102,6 +102,8 @@ matching when proof is needed.
   semantic identifiers or cryptographic hashes.
 - Candidate classes can contain false positives and require semantic or exact
   matching when a stronger claim is needed.
+- ADR-0061 preserves this decision's exact mixer and public ranks while
+  alternating call-local dense buffers; it does not amend label semantics.
 
 ## Verification
 
@@ -109,7 +111,10 @@ The decision is locked by fixed triangle/star examples, exact mixer vectors,
 iteration-bound and malformed-input tests, a 256-case isomorphic-relabeling
 property with reordered/duplicated edges, feature-free public integration, the
 repository corruption campaign, and oracle-guarded Criterion benchmarks. See
-[Scientific validation 11](../scientific/11-wl-validation.md).
+[Scientific validation 11](../scientific/11-wl-validation.md). The H12
+compatibility oracle, second property campaign, parser case, small-stack gate,
+and measured buffer reuse are in
+[Scientific validation 56](../scientific/56-wl-buffer-reuse-validation.md).
 
 ## References
 

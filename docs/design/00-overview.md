@@ -104,8 +104,9 @@ alternatives is folklore, and a decision without its costs is marketing.
 | [0058 — Borrowed-CSR dominator overlay](0058-borrowed-csr-dominator-overlay.md) | Run bounded CHK over borrowed forward/reverse CSR, model post-dominance with a synthetic-root overlay, flatten frontier ownership, and eliminate the duplicate function projection while preserving exact public relations. | Accepted |
 | [0059 — Deterministic parallel plan emission](0059-deterministic-parallel-plan-emission.md) | Compute immutable per-function and per-pattern plans with indexed Rayon collection, then retain one serial ordered graph emitter for exact deterministic identities. | Accepted |
 | [0060 — Build-local string canonicalization](0060-build-local-string-canonicalization.md) | Canonicalize equal mapper-produced `Arc<str>` contents within one CPG build using a temporary Fx set, without global state or public representation changes. | Accepted |
+| [0061 — Reusable WL refinement buffers](0061-reusable-wl-refinement-buffers.md) | Alternate call-local dense label matrices and reuse canonical/incident capacities across bounded rounds while preserving the fixed public labels and constant native call depth. | Accepted |
 
-These sixty are not independent. ADR-0001 fixes the substrate that all analyses
+These sixty-one are not independent. ADR-0001 fixes the substrate that all analyses
 write onto; ADR-0002 and ADR-0005 together explain how a language reaches that
 substrate and what you must switch on to get there; ADR-0003 and ADR-0004 are
 two analyses *over* the substrate (one always-on, one feature-gated) that each
@@ -275,6 +276,10 @@ strings: one temporary per-build Fx set collapses equal `Arc<str>` allocations
 before graph insertion, then disappears before analysis. It preserves the
 public representation while rejecting global atoms, locks, and cross-graph
 lifetime coupling.
+ADR-0061 applies that ownership discipline inside ADR-0016's bounded WL
+refinement: two dense label matrices, a canonical vocabulary, and an incident
+buffer retain capacity only within one call. The fixed mixer remains unchanged,
+so allocation reuse cannot redefine public numeric ranks.
 
 ![Module architecture of libcpg, showing the graph core and the analysis modules layered over it](../diagrams/module-architecture.svg)
 
@@ -286,7 +291,7 @@ lifetime coupling.
   (`0001`…). Numbers are never reused; a reversed decision is marked
   *Superseded* and a new record supersedes it, so history stays legible.
 - **Status lifecycle.** `Proposed → Accepted → (Superseded by NNNN | Deprecated)`.
-  All sixty current records are **Accepted** and reflect the shipped `v0.1.1`
+  All sixty-one current records are **Accepted** and reflect the shipped `v0.1.1`
   code.
 - **Grounding.** Every claim here is traceable to source: the
   [`Cargo.toml`](../engineering/01-build-and-features.md) feature block, the

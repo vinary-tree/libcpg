@@ -685,6 +685,14 @@ and edge counts before projection construction. Equal 64-bit labels are
 candidate evidence and must not authorize security-sensitive equivalence or
 code transformation without exact semantic validation.
 
+Refinement scratch ownership is local to one call. Two dense label matrices,
+one canonical vocabulary, and one incident-neighbor buffer retain their
+capacity only between bounded rounds and are dropped at return. There is no
+global or thread-local high-water cache for an attacker to inflate, no unsafe
+uninitialized storage, and no recursive traversal. The 100,000-node path/star
+gate on a 256 KiB native stack establishes depth/width stack independence; it
+does not replace caller-side heap admission limits.
+
 ## Centrality: iteration ceilings, traversal budgets, and safe numerics
 
 [Projection centrality](../components/graph/centrality-analysis.md) validates

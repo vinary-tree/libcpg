@@ -128,6 +128,7 @@ Because `default = []`, many tests are **feature-gated**. The end-to-end reachin
 | [53 — Borrowed-CSR dominator validation](53-dominator-optimization-validation.md) | Exact dominance/frontier/post-dominance relations, insertion determinism, borrowed-overlay performance, PDG consumer effect, and constant native call depth | 8,329 exhaustive graphs, four 256-case properties, petgraph/former-PDG/removal oracles, parser integration, Criterion/headless profiles, depth-100,000/256 KiB gate | feature-free / `lang-rust` |
 | [54 — Deterministic parallel-analysis validation](54-parallel-analysis-validation.md) | Exact serial/parallel CFG, DFG, PDG, and ordered VF2-batch equality; worker-count invariance; scaling; allocation and counter effects; constant native call depth | four 128-case properties, 1/2/4/8/16/32-worker integration, serde-byte equality, parser integration, Criterion/headless profiles, depth-100,000/256 KiB gate | feature-free / `serde` / `lang-rust` |
 | [55 — Build-local string-storage validation](55-string-storage-validation.md) | One allocation per distinct mapped value within a build; unchanged contents/clone/Serde behavior; measured live-memory and hasher effects; constant native call depth | 256 generated ownership cases, Unicode/large examples, public clone/Serde/parser integration, real-source inventory, Criterion/headless profiles, depth-100,000/256 KiB gate | feature-free pool / `serde` / `lang-rust` integration |
+| [56 — Reusable WL-buffer validation](56-wl-buffer-reuse-validation.md) | Exact committed-predecessor compatibility; deterministic similarity laws; measured allocation/latency effects; rejected hasher/zero-fill prototypes; constant native call depth | two 256-case properties, independent fresh-allocation oracle, exact topology/parser cases, Criterion/headless profiles, depth/wide-100,000/256 KiB gate | feature-free / `lang-rust` parser integration |
 
 ## 5. What is proven, and what is advisory
 
@@ -140,7 +141,9 @@ Scientific honesty requires separating the two:
   are regression-locked as well.
   Projection-WL label multisets and logical clone partitions are invariant
   under 256 generated isomorphic relabelings, reordered input, and duplicate
-  input edges; fixed vectors lock the mixer and boundary behavior.
+  input edges; fixed vectors lock the mixer and boundary behavior. A second
+  256-case campaign and independent fresh-allocation predecessor additionally
+  lock H12's reused buffers to exact public bits and similarity laws.
   Centrality vectors are aligned, exact-repeat deterministic, and checked on
   analytic fixtures; directed Brandes agrees with naive simple-path
   enumeration and composes across source partitions.

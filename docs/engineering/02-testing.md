@@ -22,7 +22,7 @@ think to write down.
 
 | Kind | Count | Where |
 | --- | ---: | --- |
-| Maximal-matrix library tests | 1,220 | inline `#[cfg(test)] mod …` next to the code; includes examples and properties |
+| Maximal-matrix library tests | 1,267 | inline `#[cfg(test)] mod …` next to the code; includes examples and properties |
 | Public-API integration tests | 22 | `tests/integration.rs` |
 | Malformed-input robustness tests | 5 | `tests/robustness.rs` |
 | SCCP public/parser integration tests | 3 | `tests/sccp_integration.rs` |
@@ -32,7 +32,8 @@ think to write down.
 | Condensation public/parser integration tests | 2 | `tests/condensation_integration.rs` |
 | Layering public/serialization integration tests | 2 | `tests/layering_integration.rs` |
 | DSM public/parser integration tests | 2 | `tests/dsm_integration.rs` |
-| WL public integration tests | 1 | `tests/wl_integration.rs` |
+| WL public/parser integration tests | 2 | `tests/wl_integration.rs` |
+| WL deep/wide stack-safety tests | 1 | `tests/wl_stack_safety.rs` |
 | Centrality public integration tests | 2 | `tests/centrality_integration.rs` |
 | Community public/parser integration tests | 2 | `tests/community_integration.rs` |
 | Cohesion public/parser integration tests | 2 | `tests/cohesion_integration.rs` |
@@ -70,8 +71,8 @@ think to write down.
 | ML-export stack-safety tests | 1 | `tests/ml_export_stack_safety.rs` |
 | CPG-diff public/parser integration tests | 2 | `tests/cpg_diff_integration.rs` |
 | CPG-diff stack-safety tests | 1 | `tests/cpg_diff_stack_safety.rs` |
-| **Executable test cases** | **1,364** | measured by the all-features test inventory: 1,220 library, 141 integration/robustness, and 3 rustdoc examples |
-| `proptest!` blocks (subset of the library/robustness rows) | 96 | exact source-level macro count in `src/` and `tests/` |
+| **Executable test cases** | **1,420** | measured by the all-features test inventory: 1,267 library, 150 integration/robustness, and 3 rustdoc examples |
+| `proptest!` blocks (subset of the library/robustness rows) | 100 | exact source-level macro count in `src/` and `tests/` |
 
 The maximal-matrix library count is up from **99** inline tests and **zero**
 property tests before this work.
@@ -227,7 +228,7 @@ The invariants fall into complementary families.
 | **Reflexion-model conformance** | an exact layered oracle pins same-layer/allowed convergence, path-sorted divergences, uncovered edges, realized pairs, and absences; 256 generated dependency multisets preserve complete summaries under reversal and satisfy exhaustive classification; examples cover prefix precedence, empty/duplicate public values, serde, the feature-free crate-root boundary, and caller-input non-mutation |
 | **Architectural layering** | an exact four-component oracle pins bottom-first reversal, cyclic-component and skip-layer witnesses, and one-step descent for every unflagged edge; a stale-level oracle covers lateral/upward edges; 256 generated DAGs require deterministic reports and the descent invariant; examples cover empty, out-of-domain, capped, impossible-level, duplicate-edge, invalid-cycle-flag, serde, public composition, and graph non-mutation behavior |
 | **Architectural smells** | four isolated fixtures pin exact cycle, two-sided-hub, less-stable-share, and module-size-outlier evidence while a clean chain/self-loop emits none; 256 generated projections require insertion-order determinism, in-graph sorted nodes, finite evidence, and canonical result order; hostile tables cover every option/metric boundary, stale SCC, malformed CSR, partial assignment, duplicate/missing metrics, serde, public composition, and non-mutation |
-| **WL labels / structural clones** | 256 isomorphic stable-id relabelings preserve final label multisets and logical clone partitions under reversed and duplicate edge input; exact examples pin triangle/star behavior, mixer vectors, direction/weight semantics, the 16-round cap, malformed handling, class thresholds/order, public composition, and graph non-mutation |
+| **WL labels / structural clones** | two 256-case campaigns compare exact production bits to an independent fresh-allocation predecessor, preserve logical partitions under isomorphic sparse-id relabeling and reversed/duplicate edge input, and prove repeat/permutation/self-similarity/symmetry/unit-interval laws; exact examples pin empty/singleton/path/ring/disconnected/repeated/self/parallel topology, mixer vectors, direction/weight semantics, the 16-round cap, malformed handling, class thresholds/order, feature-free/parser composition, and graph non-mutation; 100,000-node path/star lifecycles complete on a 256 KiB stack |
 | **Projection centrality** | 128 generated topologies check exact repeat and input-permutation equality plus stable-id reversal equivalence for PageRank, personalized/reverse PageRank, eigenvector, Katz, distance, HITS, Burt, vertex Brandes, and edge Brandes; fixed ring/path/star/triangle/disconnected examples pin closed forms; petgraph PageRank and dominator differentials, naive simple-path Brandes, source-partition composition, malformed/budget/invalid-option behavior, public feature-free composition, and graph non-mutation cover independent boundaries |
 | **Community detection** | generated weighted projections check exact repeat and reversed-input equality, canonical labels, independent generalized modularity, and the singleton score baseline; fixed planted cliques, complete/self-loop graphs, a ring-of-cliques multi-level witness, aggregation conservation, caps, numeric/CSR rejection, and byte-identical serde cover the Louvain boundary; generated arbitrary partitions prove every refined group connected and canonical; public/parser integration and the corruption harness prove alignment and non-mutation |
 | **Cohesion and robustness** | 96 generated graphs through 20 vertices compare k-core to naïve threshold peeling; 96 simple graphs through 12 vertices compare k-truss to independent fixed-point triangle peeling, cuts to brute vertex/edge removal, and robust blocks to independent bridge-deletion BFS; 96 weighted graphs through 10 vertices compare Stoer–Wagner to exhaustive bipartitions; 64 attack cases compare every LCC/AUC step to independent BFS and bound assortativity; every order-insensitive family is repeated over reversed edge insertion; examples cover cliques, paths, triangles, bridges, weighted seams, degree-skew stars, deep stack-safe paths, exact caps, malformed CSR/numerics/orders, serde bytes, public/parser composition, and graph non-mutation |
@@ -442,7 +443,11 @@ The new `analysis/wl.rs` module measures **100.00 %** line, region, function,
 and branch coverage, clearing the same thresholds. Its relabeling property,
 fixed mixer vectors, malformed-input matrix, public integration, and benchmark
 oracles are catalogued in
-[`scientific/11-wl-validation.md`](../scientific/11-wl-validation.md).
+[`scientific/11-wl-validation.md`](../scientific/11-wl-validation.md). H12 adds
+an independent committed-predecessor oracle, a second 256-case similarity and
+insertion-permutation campaign, parser composition, deep/wide 100,000-node
+small-stack lifecycle, and allocation/timing experiments catalogued in
+[`scientific/56-wl-buffer-reuse-validation.md`](../scientific/56-wl-buffer-reuse-validation.md).
 The new `analysis/centrality.rs` module measures **98.32 %** line,
 **97.47 %** region, **100.00 %** function, and **88.95 %** branch coverage,
 clearing the same thresholds. Its analytic fixtures, independent PageRank and

@@ -114,6 +114,12 @@ scoped to that graph and round count; applications should persist stable
 similarity jointly canonicalizes both projections' raw signatures at every
 round, creating a comparison-local shared vocabulary before histogram cosine.
 
+The digest ordering is therefore observable even though raw digests are not
+returned directly: changing the mixer can permute sorted ranks. `FxHasher` and
+other implementation-selected hashers cannot replace the fixed mixer without a
+public compatibility change. H12 measured such a prototype, rejected it, and
+retained the exact mixer vectors.
+
 ## 6. Bounded refinement and convergence
 
 Exact color refinement can stop when its partition no longer changes and must
@@ -132,6 +138,18 @@ O\!\left(n\log n+m+\sum_{v\in V}d(v)\log d(v)\right),
 
 and its reusable auxiliary storage is $`O(n+d_{\max})`$. The implementation is
 iterative and never materializes a dense adjacency matrix.
+
+Two one-dimensional label buffers alternate roles. One is read-only for a
+round while the other is cleared, filled, canonicalized, and then swapped into
+the current role. Clearing preserves allocated capacity, so the number of
+rounds does not multiply label-buffer allocations. A graph-wide vocabulary and
+one maximum-degree incident buffer follow the same call-local reuse policy.
+
+![Current and next label matrices alternate through an explicit, heap-resident refinement state machine.](../diagrams/wl-buffer-reuse.svg)
+
+*Figure 2 -- allocation ownership and state transitions for bounded
+refinement. Source:
+[`diagrams/wl-buffer-reuse.puml`](../diagrams/wl-buffer-reuse.puml).*
 
 ## 7. Proper use of clone candidates
 

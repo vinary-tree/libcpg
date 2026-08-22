@@ -1029,6 +1029,17 @@ The separate `GraphSimilarity` metric starts from CPG node kinds and compares
 three-round label histograms. See
 [`theory/11-weisfeiler-lehman-structural-clones.md`](theory/11-weisfeiler-lehman-structural-clones.md).
 
+### WL refinement buffer
+
+A call-local, one-dimensional `Vec<u64>` row aligned with one
+`GraphProjection`'s dense node order. Projection-level WL alternates a current
+and next label matrix, clearing and refilling the next rows while retaining
+their capacities between the at-most-16 rounds. The canonical-vocabulary and
+incident-neighbor vectors follow the same lifetime. These are explicit
+heap-resident state-machine buffers, not a dense adjacency matrix, global
+cache, thread-local high-water mark, or serialized result. See
+[`design/0061-reusable-wl-refinement-buffers.md`](design/0061-reusable-wl-refinement-buffers.md).
+
 ### Strong update / Weak update
 
 When a reaching-definitions sweep processes a definition of $`x`$ in **straight-line** context it performs a **strong update** — it [kills](#kill--gen-data-flow) prior definitions of $`x`$ and gens the new one. Inside a **conditional region** (where the definition may or may not execute) it performs a **weak update** — it adds the new definition without killing the old, since both may reach later uses. See [`theory/03-data-flow-and-reaching-definitions.md`](theory/03-data-flow-and-reaching-definitions.md).

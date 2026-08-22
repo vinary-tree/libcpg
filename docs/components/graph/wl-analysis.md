@@ -87,9 +87,10 @@ on stable-identifier relabeling.
 
 ## Literate algorithm
 
-The implementation keeps labels in dense-projection order and reuses one
-temporary neighbor buffer. The following pseudocode makes every normalization
-step explicit:
+The implementation keeps labels in dense-projection order. It alternates two
+call-local label matrices and reuses their capacities together with one
+canonical-vocabulary vector and one neighbor vector. The following pseudocode
+makes every normalization and ownership step explicit:
 
 ```text
 WL_LABELS(graph, requested_rounds):
@@ -99,15 +100,25 @@ WL_LABELS(graph, requested_rounds):
     for each dense vertex v in canonical order:
         label[v] = mix(mix(0xABCD, indegree(v)), outdegree(v))
 
+    if min(requested_rounds, 16) = 0:
+        return label
+
+    next = one empty capacity-matched row per graph
+    vocabulary = empty vector with total-node capacity
+
     for round in 0 .. min(requested_rounds, 16):
+        clear every next row without releasing its allocation
         for each dense vertex v:
+            clear incident without releasing its allocation
             incident = labels of successors(v) followed by predecessors(v)
             sort incident                         // multiset order independence
-            raw[v] = fold mix from mix(0x1234, label[v]) over incident
+            append fold mix from mix(0x1234, label[v]) over incident to next
 
-        vocabulary = sorted unique copy of raw   // traversal-independent ranks
+        clear vocabulary without releasing its allocation
+        vocabulary = sorted unique copy of next  // traversal-independent ranks
         for each dense vertex v:
-            label[v] = binary-search(vocabulary, raw[v])
+            next[v] = binary-search(vocabulary, next[v])
+        swap(label, next)
 
     return label
 
@@ -172,10 +183,12 @@ membership checks. Refinement takes
 O\!\left(k\left(n\log n+m+\sum_{v\in V}d(v)\log d(v)\right)\right)
 ```
 
-time and $`O(n+d_{\max})`$ temporary space. Clone grouping adds
-$`O(n\log n)`$ time and $`O(n)`$ space. The hard round ceiling bounds
-adversarial requests such as `usize::MAX`; the algorithm performs no recursive
-traversal and allocates no matrix.
+time and $`O(n+d_{\max})`$ temporary space. The two dense label matrices are
+one-dimensional vectors, not an adjacency matrix. Their capacities and the
+canonical vocabulary are allocated once per nonzero-round call, cleared and
+reused across rounds, and dropped at return. Clone grouping adds $`O(n\log n)`$
+time and $`O(n)`$ space. The hard round ceiling bounds adversarial requests such
+as `usize::MAX`; the algorithm performs no recursive traversal.
 
 `GraphProjection::is_well_formed` validates sorted unique nodes, both CSR
 shapes, target bounds and ordering, optional weight alignment, and exact
@@ -197,16 +210,19 @@ labels are not interchangeable.
 
 The implementation is guarded by triangle and star fixtures, exact mixer
 vectors, zero/capped iteration examples, malformed projection and external-edge
-cases, clone-ordering examples, a 256-case isomorphic-relabeling property, a
-feature-free crate-root integration test, the repository malformed-CPG
-campaign, and oracle-guarded ring/star benchmarks at 1,024 and 8,192 vertices.
-The property also reverses edge enumeration and duplicates edges before
-projection construction.
+cases, clone-ordering examples, two 256-case generated campaigns, a separately
+implemented fresh-allocation predecessor oracle, feature-free and parser-backed
+crate-root integration, and oracle-guarded ring/star benchmarks at 1,024 and
+8,192 vertices. The properties cover relabeling, reversed/duplicated edge
+enumeration, exact repeatability, similarity laws, and bit-exact compatibility.
+A public 100,000-node path and star complete on a 256 KiB native stack.
 
 See [Scientific validation 11](../../scientific/11-wl-validation.md) for the
-falsifiable claims and reproduction commands. Results describe only the
-provided topology. They do not prove parser completeness, edge semantics,
-behavioral equivalence, clone intent, or exact graph isomorphism.
+base semantics and [Scientific validation 56](../../scientific/56-wl-buffer-reuse-validation.md)
+for compatibility, buffer ownership, stack, and measured H12 evidence. Results
+describe only the provided topology. They do not prove parser completeness,
+edge semantics, behavioral equivalence, clone intent, or exact graph
+isomorphism.
 
 ## References
 

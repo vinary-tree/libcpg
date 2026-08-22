@@ -1062,8 +1062,12 @@ incoming-plus-outgoing neighbor-label multiset through a fixed wrapping mixer,
 then assigns sorted raw-value ranks. `MAX_WL_ITERATIONS = 16` clamps hostile
 requests; `min_class` has an effective floor of two. Edge weights are ignored,
 and malformed public projection values return empty results before indexed
-traversal. Equal labels are structural candidates, not a proof of exact
-isomorphism or behavioral equivalence. See the complete [WL component
+traversal. Nonzero-round calls allocate two call-local dense label matrices and
+reuse their capacities plus the canonical vocabulary across all rounds;
+zero-round calls return the seed vector without that scratch allocation. No
+state survives the call and graph depth does not drive native recursion. Equal
+labels are structural candidates, not a proof of exact isomorphism or
+behavioral equivalence. See the complete [WL component
 guide](../components/graph/wl-analysis.md) for formulas, pseudocode, examples,
 collision limits, properties, and benchmark evidence.
 

@@ -72,11 +72,27 @@ pub(crate) fn comparable_wl_labels(
         })
         .collect::<Vec<_>>();
 
+    let rounds = iterations.min(MAX_WL_ITERATIONS);
+    if rounds == 0 {
+        return Some(labels);
+    }
+
+    // `next` retains one capacity-matched vector per graph. Refinement clears
+    // and refills those vectors before swapping the two matrices, so round
+    // count no longer multiplies label-buffer allocations. The canonical
+    // workspace is likewise cleared without releasing its allocation. All
+    // state remains local to this call and every traversal is iterative.
+    let mut next = labels
+        .iter()
+        .map(|graph_labels| Vec::with_capacity(graph_labels.len()))
+        .collect::<Vec<_>>();
+    let total_nodes = labels.iter().map(Vec::len).sum();
+    let mut canonical = Vec::with_capacity(total_nodes);
     let mut neighbor_labels = Vec::new();
-    for _ in 0..iterations.min(MAX_WL_ITERATIONS) {
-        let mut next = Vec::with_capacity(graphs.len());
-        for (graph, graph_labels) in graphs.iter().zip(&labels) {
-            let mut graph_next = Vec::with_capacity(graph.node_count());
+
+    for _ in 0..rounds {
+        for ((graph, graph_labels), graph_next) in graphs.iter().zip(&labels).zip(next.iter_mut()) {
+            graph_next.clear();
             for dense in 0..graph.node_count() {
                 neighbor_labels.clear();
                 neighbor_labels.extend(
@@ -99,10 +115,10 @@ pub(crate) fn comparable_wl_labels(
                 }
                 graph_next.push(hash);
             }
-            next.push(graph_next);
         }
 
-        let mut canonical = next.iter().flatten().copied().collect::<Vec<_>>();
+        canonical.clear();
+        canonical.extend(next.iter().flatten().copied());
         canonical.sort_unstable();
         canonical.dedup();
         for label in next.iter_mut().flatten() {
@@ -111,7 +127,7 @@ pub(crate) fn comparable_wl_labels(
                 .expect("a raw WL label is present in its canonical set")
                 as u64;
         }
-        labels = next;
+        std::mem::swap(&mut labels, &mut next);
     }
 
     Some(labels)
@@ -211,6 +227,91 @@ mod tests {
                 (NodeId::new(source as u32), NodeId::new(target as u32), 1.0)
             }),
         )
+    }
+
+    fn predecessor_mix(hash: u64, value: u64) -> u64 {
+        let mut mixed = hash
+            .wrapping_mul(0x100000001b3)
+            .wrapping_add(value)
+            .wrapping_add(0x9e3779b97f4a7c15);
+        mixed = (mixed ^ (mixed >> 30)).wrapping_mul(0xbf58476d1ce4e5b9);
+        mixed = (mixed ^ (mixed >> 27)).wrapping_mul(0x94d049bb133111eb);
+        mixed ^ (mixed >> 31)
+    }
+
+    /// Independent bounded oracle for the committed predecessor. It
+    /// deliberately allocates fresh per-round matrices instead of sharing the
+    /// production buffer-reuse machinery.
+    fn predecessor_comparable_wl_labels(
+        graphs: &[&GraphProjection],
+        iterations: usize,
+    ) -> Option<Vec<Vec<u64>>> {
+        if graphs.iter().any(|graph| !graph.is_well_formed()) {
+            return None;
+        }
+
+        let mut labels = graphs
+            .iter()
+            .map(|graph| {
+                (0..graph.node_count())
+                    .map(|dense| {
+                        let incoming = graph.predecessors(dense as u32).len() as u64;
+                        let outgoing = graph.successors(dense as u32).len() as u64;
+                        predecessor_mix(predecessor_mix(0xABCD, incoming), outgoing)
+                    })
+                    .collect::<Vec<_>>()
+            })
+            .collect::<Vec<_>>();
+
+        let mut neighbors = Vec::new();
+        for _ in 0..iterations.min(MAX_WL_ITERATIONS) {
+            let mut next = Vec::with_capacity(graphs.len());
+            for (graph, graph_labels) in graphs.iter().zip(&labels) {
+                let mut graph_next = Vec::with_capacity(graph.node_count());
+                for dense in 0..graph.node_count() {
+                    neighbors.clear();
+                    neighbors.extend(
+                        graph
+                            .successors(dense as u32)
+                            .iter()
+                            .map(|&neighbor| graph_labels[neighbor as usize]),
+                    );
+                    neighbors.extend(
+                        graph
+                            .predecessors(dense as u32)
+                            .iter()
+                            .map(|&neighbor| graph_labels[neighbor as usize]),
+                    );
+                    neighbors.sort_unstable();
+
+                    let mut hash = predecessor_mix(0x1234, graph_labels[dense]);
+                    for &neighbor in &neighbors {
+                        hash = predecessor_mix(hash, neighbor);
+                    }
+                    graph_next.push(hash);
+                }
+                next.push(graph_next);
+            }
+
+            let mut canonical = next.iter().flatten().copied().collect::<Vec<_>>();
+            canonical.sort_unstable();
+            canonical.dedup();
+            for label in next.iter_mut().flatten() {
+                *label = canonical
+                    .binary_search(label)
+                    .expect("oracle raw label is present in its canonical set")
+                    as u64;
+            }
+            labels = next;
+        }
+
+        Some(labels)
+    }
+
+    fn predecessor_wl_labels(graph: &GraphProjection, iterations: usize) -> Vec<u64> {
+        predecessor_comparable_wl_labels(&[graph], iterations)
+            .and_then(|mut labels| labels.pop())
+            .unwrap_or_default()
     }
 
     #[test]
@@ -324,6 +425,34 @@ mod tests {
     }
 
     #[test]
+    fn predecessor_oracle_covers_exact_boundary_topologies() {
+        let fixtures = [
+            graph_from(0, &[]),
+            graph_from(1, &[]),
+            graph_from(1, &[(0, 0), (0, 0)]),
+            graph_from(5, &[(0, 1), (1, 2), (2, 3), (3, 4)]),
+            graph_from(5, &[(0, 1), (1, 2), (2, 3), (3, 4), (4, 0)]),
+            graph_from(6, &[(0, 1), (1, 0), (3, 4), (4, 3)]),
+        ];
+
+        for graph in &fixtures {
+            for iterations in [0, 1, 4, MAX_WL_ITERATIONS, usize::MAX] {
+                assert_eq!(
+                    wl_labels(graph, iterations),
+                    predecessor_wl_labels(graph, iterations),
+                    "buffer reuse changed the committed labels for {graph:?} at {iterations} rounds"
+                );
+            }
+        }
+
+        let isolated = &fixtures[1];
+        let self_loop = &fixtures[2];
+        assert_ne!(wl_labels(isolated, 0), wl_labels(self_loop, 0));
+        assert_eq!(self_loop.edge_count(), 1, "parallel edges are merged");
+        assert_eq!(wl_labels(self_loop, 4), vec![0]);
+    }
+
+    #[test]
     fn joint_vocabulary_compares_isomorphic_graphs_without_local_rank_aliasing() {
         let original = graph_from(5, &[(0, 1), (1, 2), (1, 3), (3, 4)]);
         let relabeled = GraphProjection::from_edges(
@@ -405,6 +534,10 @@ mod tests {
             );
 
             let original_labels = wl_labels(&original, iterations);
+            prop_assert_eq!(
+                &original_labels,
+                &predecessor_wl_labels(&original, iterations),
+            );
             let mut original_multiset = original_labels.clone();
             original_multiset.sort_unstable();
             let mut relabeled_multiset = wl_labels(&relabeled, iterations);
@@ -438,6 +571,52 @@ mod tests {
                 wl_multiset_cosine(&original, &relabeled, iterations),
                 wl_multiset_cosine(&relabeled, &original, iterations),
             );
+            prop_assert_eq!(
+                comparable_wl_labels(&[&original, &relabeled], iterations),
+                predecessor_comparable_wl_labels(&[&original, &relabeled], iterations),
+            );
+        }
+
+        #[test]
+        fn similarity_and_insertion_permutation_laws_hold_for_generated_pairs(
+            node_count in 0usize..10,
+            left_raw in prop::collection::vec((0usize..10, 0usize..10), 0..80),
+            right_raw in prop::collection::vec((0usize..10, 0usize..10), 0..80),
+            iterations in 0usize..24,
+        ) {
+            let left_edges = left_raw
+                .into_iter()
+                .filter(|&(source, target)| source < node_count && target < node_count)
+                .collect::<Vec<_>>();
+            let right_edges = right_raw
+                .into_iter()
+                .filter(|&(source, target)| source < node_count && target < node_count)
+                .collect::<Vec<_>>();
+            let left = graph_from(node_count, &left_edges);
+            let right = graph_from(node_count, &right_edges);
+
+            let mut permuted_edges = left_edges
+                .iter()
+                .rev()
+                .copied()
+                .collect::<Vec<_>>();
+            permuted_edges.extend(left_edges.iter().copied());
+            let permuted = graph_from(node_count, &permuted_edges);
+            prop_assert_eq!(
+                wl_labels(&left, iterations),
+                wl_labels(&permuted, iterations),
+            );
+
+            let self_similarity = wl_multiset_cosine(&left, &left, iterations);
+            prop_assert_eq!(self_similarity, Some(1.0));
+
+            let left_right = wl_multiset_cosine(&left, &right, iterations)
+                .expect("generated projections are well formed");
+            let right_left = wl_multiset_cosine(&right, &left, iterations)
+                .expect("generated projections are well formed");
+            prop_assert_eq!(left_right.to_bits(), right_left.to_bits());
+            prop_assert!(left_right.is_finite());
+            prop_assert!((0.0..=1.0).contains(&left_right));
         }
     }
 }
