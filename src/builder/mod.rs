@@ -39,6 +39,7 @@ mod dfg;
 mod node_mapper;
 mod parser_registry;
 mod pdg;
+mod string_pool;
 mod tree_sitter;
 
 pub use cfg::{BasicBlockIdentifier, CfgExtractor, CfgExtractorConfig};

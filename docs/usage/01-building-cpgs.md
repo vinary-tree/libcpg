@@ -158,6 +158,39 @@ When would you reach for Mode B?
 
 ---
 
+## Mapped-string ownership
+
+Mode A and Mode B automatically canonicalize equal mapper-produced strings
+within each build. For example, every mapped occurrence of the identifier and
+type spelling `Value` below retains ordinary `Arc<str>` fields but shares one
+allocation in the returned CPG:
+
+```rust
+// requires: features = ["lang-rust"]
+use libcpg::{CpgBuilder, Language, TreeSitterCpgBuilder};
+
+fn main() -> Result<(), libcpg::Error> {
+    let source =
+        "fn repeated(value: Value) -> Value { let value: Value = value; value }";
+    let cpg = TreeSitterCpgBuilder::new().build(source, Language::Rust)?;
+
+    // String contents and all public APIs are unchanged.
+    assert!(cpg.nodes().any(|node| node.name() == Some("value")));
+    Ok(())
+}
+```
+
+There is no setting to enable: the behavior is a private storage optimization.
+The pool is discarded before CFG/DFG work and never becomes process-global.
+Separate calls, `merge_from`, manual graph construction, and deserialization
+may own equal strings separately. Always compare text by content; `Arc` pointer
+identity is not an API contract. Clone and Serde content/order behavior remain
+unchanged. The design and memory measurements are in
+[ADR-0060](../design/0060-build-local-string-canonicalization.md) and
+[scientific validation 55](../scientific/55-string-storage-validation.md).
+
+---
+
 ## `build` ≡ `build_from_tree` are equivalent
 
 Because both modes share the post-parse pipeline, the graphs they produce are identical. libcpg guarantees this with an inline regression test (`test_build_from_tree_matches_build` in `src/builder/tree_sitter.rs`) that parses the *same* source both ways and asserts the results match:

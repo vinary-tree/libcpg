@@ -18,7 +18,7 @@ These are the choices the code actually makes, and why:
 | Lazy exact-edge projection cache | three CSR edge-index orders behind `OnceLock<Box<_>>` | A first stable edge read groups exact edges by source/layer, target/layer, and source/target. Warm outgoing, incoming, CFG, DFG, and endpoint views borrow deterministic exact-size rows without allocating. Every public topology mutation invalidates the derived box; mutation-oriented builders use native petgraph adjacency. |
 | Per-node child lists | `smallvec::SmallVec<[NodeId; 4]>` | `CpgNode::children` stores up to four child ids **inline**, with no heap allocation — the common case for AST fan-out — spilling to the heap only for wider nodes. |
 | Cold metadata | `Option<Box<FxHashMap<…>>>` / `Option<Box<str>>` | Empty node properties and unlabeled edges retain pointer-sized optional fields; maps and label text allocate only when present. |
-| Shared source text | `std::sync::Arc<str>` | `CpgNode::text`, operator strings, and string/regex literal payloads are `Arc<str>`: immutable, shared, and cloned in O(1) by bumping a refcount instead of copying bytes. |
+| Shared mapped text | `std::sync::Arc<str>` plus a build-local `FxHashSet` | Names, types, operators, literals, imports, node text, and allocation types remain immutable `Arc<str>` values. During tree-sitter construction, equal contents in one build share one allocation; the temporary pool is dropped before CFG/DFG work. |
 | Source positions | `text-size` `TextRange` | `SourceRange` stores six `u32` offsets compactly; `to_text_range()` converts to `text_size::TextRange` for callers that use that ecosystem. |
 | Error handling | `thiserror` | Derives the [`Error`](../GLOSSARY.md#code-property-graph-cpg) enum without hand-written boilerplate. |
 
@@ -27,7 +27,7 @@ The upshot: a CPG is one contiguous petgraph arena of compact
 refcounted text, one fast node-id map, and an optional read-optimized exact-edge
 index.
 
-## Parallel execution and remaining unused dependencies
+## Parallel execution and the remaining unused dependency
 
 Rayon is wired only into explicit parallel entry points. Other dependencies in
 this table still have **no call sites in `src/`**; documenting both states keeps
@@ -36,8 +36,6 @@ the performance story bounded to implemented behavior:
 | Dependency | Declared for | Actual state in `src/` |
 | --- | --- | --- |
 | `rayon` | explicit parallel analysis | **Wired.** `CfgExtractor::extract_parallel`, `DfgExtractor::extract_parallel`, `PdgBuilder::build_all_parallel`, and `Vf2Matcher::find_matches_many_parallel` use indexed parallel collection. Serial methods and the default builder configuration remain serial. |
-| `ahash` | an alternative fast hasher | **Unused.** The code hashes with `rustc_hash::FxHash`; `ahash` is never referenced. |
-| `string_cache` | interned string labels | **Unused.** Node labels/text are stored as `Arc<str>`, not `string_cache` atoms. |
 | `regex` | pattern matching | **Unused as a crate.** The only `"regex"` occurrences in `src/` are node-kind string literals mapped to a `Literal` kind, not calls into the `regex` crate. |
 
 Parallel workers borrow one immutable graph and produce heap-owned plans. A
@@ -45,6 +43,10 @@ single ordered emitter applies graph mutations, so the implementation needs no
 graph clone, shared mutation, or scheduling-sensitive edge assignment. The
 controlled worker-count sweep and profiler evidence are reported in
 [scientific validation 54](../scientific/54-parallel-analysis-validation.md).
+Build-local mapped-string storage uses the existing `rustc-hash` dependency;
+controlled string and integer-key comparisons rejected `ahash`, and H11 removed
+both `ahash` and `string_cache`. See
+[scientific validation 55](../scientific/55-string-storage-validation.md).
 
 ## Preallocation
 
@@ -61,7 +63,8 @@ increase peak memory without reducing allocator traffic.
 ## Asymptotic cost of key operations
 
 The table gives *expected* costs. Symbols: $`n`$ = number of tree-sitter /
-AST nodes, $`V`$ and $`E`$ = node and edge counts of the (sub)graph an
+AST nodes, $`B`$ = total UTF-8 bytes across mapped string occurrences, $`u`$ =
+distinct mapped string contents in one build, $`V`$ and $`E`$ = node and edge counts of the (sub)graph an
 operation touches, $`L`$ = GNN layers (`num_layers`), $`d`$ = embedding
 dimension, $`k`$ = whole-graph similarity WL iterations (3), and
 $`q=\min(\mathtt{iterations},16)`$ = projection-WL rounds,
@@ -78,7 +81,7 @@ function scope.
 
 | Operation | Expected cost | Notes |
 | --- | --- | --- |
-| CPG construction (AST walk) | $`O(n)`$ | One depth-first pass over the parse tree, one `CpgNode` per kept tree-sitter node. |
+| CPG construction (AST walk) | expected $`O(n+B)`$ time and $`O(n+u)`$ temporary traversal/pool handles | One explicit heap-stack pass over the parse tree, one `CpgNode` per kept tree-sitter node, and one borrowed-content Fx lookup per mapped string. Native call depth is constant with respect to source depth. |
 | Lazy exact-edge cache build / read | build $`O(V+E+\sum_r d_r\log d_r)`$ time and $`O(V+E)`$ retained space; warm row $`O(1)`$ plus output; layer/endpoint selection $`O(\log d_r)`$ plus output | Three counting/scatter CSR orders preserve exact parallel edges. The first qualifying read pays construction; warm `CpgEdges`, `CfgNeighbors`, and `DfgNeighbors` allocate nothing. Mutation discards the cache. |
 | CFG extraction (per parser-built function) | $`O(n + e_c)`$ | Typed heap continuations visit each AST node once and emit $`e_c`$ unique control-flow edges; heap state is $`O(d+x)`$ for depth $`d`$ and live exit frontier $`x`$, while native call depth is constant. Shared hand-built DAG regions retain path-replay semantics. |
 | DFG reaching-defs (per function) | $`O(W)`$ structural work and $`O(V+E)`$ conservative traversal heap | $`W = O(V\,2^d)`$ for $`V`$ AST nodes at maximum loop nesting $`d`$: one [AST-ordered sweep](../GLOSSARY.md#ast-ordered-reaching-definitions), with every loop body revisited once per enclosing-pass context. Typed `Enter`/`Bind`/`Exit` frames and an active path make native call depth constant. The public 100,000-level 256 KiB gate completes in 0.75 s; retained `max_iterations` is not used by this live algorithm. |

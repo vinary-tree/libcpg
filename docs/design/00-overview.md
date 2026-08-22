@@ -103,8 +103,9 @@ alternatives is folklore, and a decision without its costs is marketing.
 | [0057 — Dense stack-safe VF2 state](0057-dense-stack-safe-vf2-state.md) | Replace hash-owned candidates with lazy dense graph metadata, Fenwick-ordered sets, flat undo logs, cursor-only heap frames, and a sound distinct-degree prune without changing canonical match semantics. | Accepted |
 | [0058 — Borrowed-CSR dominator overlay](0058-borrowed-csr-dominator-overlay.md) | Run bounded CHK over borrowed forward/reverse CSR, model post-dominance with a synthetic-root overlay, flatten frontier ownership, and eliminate the duplicate function projection while preserving exact public relations. | Accepted |
 | [0059 — Deterministic parallel plan emission](0059-deterministic-parallel-plan-emission.md) | Compute immutable per-function and per-pattern plans with indexed Rayon collection, then retain one serial ordered graph emitter for exact deterministic identities. | Accepted |
+| [0060 — Build-local string canonicalization](0060-build-local-string-canonicalization.md) | Canonicalize equal mapper-produced `Arc<str>` contents within one CPG build using a temporary Fx set, without global state or public representation changes. | Accepted |
 
-These fifty-nine are not independent. ADR-0001 fixes the substrate that all analyses
+These sixty are not independent. ADR-0001 fixes the substrate that all analyses
 write onto; ADR-0002 and ADR-0005 together explain how a language reaches that
 substrate and what you must switch on to get there; ADR-0003 and ADR-0004 are
 two analyses *over* the substrate (one always-on, one feature-gated) that each
@@ -269,6 +270,11 @@ ADR-0059 applies the same immutable-view discipline to per-function CFG, DFG,
 and PDG planning and to independent VF2 batches. Indexed collection preserves
 input order; one serial emitter preserves graph identities, duplicate handling,
 and exact serial results without locks or graph clones.
+ADR-0060 applies a similarly narrow ownership boundary to mapper-produced
+strings: one temporary per-build Fx set collapses equal `Arc<str>` allocations
+before graph insertion, then disappears before analysis. It preserves the
+public representation while rejecting global atoms, locks, and cross-graph
+lifetime coupling.
 
 ![Module architecture of libcpg, showing the graph core and the analysis modules layered over it](../diagrams/module-architecture.svg)
 
@@ -280,7 +286,7 @@ and exact serial results without locks or graph clones.
   (`0001`…). Numbers are never reused; a reversed decision is marked
   *Superseded* and a new record supersedes it, so history stays legible.
 - **Status lifecycle.** `Proposed → Accepted → (Superseded by NNNN | Deprecated)`.
-  All fifty-eight current records are **Accepted** and reflect the shipped `v0.1.1`
+  All sixty current records are **Accepted** and reflect the shipped `v0.1.1`
   code.
 - **Grounding.** Every claim here is traceable to source: the
   [`Cargo.toml`](../engineering/01-build-and-features.md) feature block, the

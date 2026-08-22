@@ -112,6 +112,29 @@ For Rust specifically, the grammar's `range_expression` becomes semantic
 identifiers remain uses. This field-aware normalization lets feature-free graph
 analyses consume ranges and definitions without reparsing source text.
 
+### Build-local mapped-string ownership
+
+Both Mode A and Mode B feed the same `build_ast` loop. After `map_kind` returns
+one node and before that node enters the graph, a temporary
+`FxHashSet<Arc<str>>` canonicalizes mapper-produced names, type spellings,
+operators, literals, imports, optional node text, and allocation types. Equal
+contents in one CPG build therefore share one allocation while their public
+types and UTF-8 bytes remain unchanged.
+
+The pool is dropped at the AST/CFG phase boundary. It does not cross files,
+survive in `CodePropertyGraph`, synchronize through a global mutex, or alter
+direct `NodeMapper::map_kind` calls. A clone shares the existing `Arc` handles;
+a separate build, merge, manual graph, or Serde decode may own equal content in
+different allocations. Pointer equality is consequently never frontend
+semantics. The ownership flow and measured boundary are in
+[ADR-0060](../design/0060-build-local-string-canonicalization.md) and
+[scientific validation 55](../scientific/55-string-storage-validation.md).
+
+![One build-local pool canonicalizes mapped strings before node insertion and is dropped before CFG/DFG analysis.](../diagrams/build-local-string-pool.svg)
+
+*Figure — frontend string-ownership lifetime. Source:
+[`diagrams/build-local-string-pool.puml`](../diagrams/build-local-string-pool.puml).*
+
 ## The Rholang frontend (Mode B)
 
 Rholang is the concurrent [process-calculus](../GLOSSARY.md#rholang) language of the F1R3FLY.io ecosystem (`Paradigm::ProcessCalculus`). Its grammar has no imperative anchors of its own, so `map_rholang` normalizes ρ-calculus constructs onto the nearest CPG kind that keeps the CFG/DFG sound:

@@ -600,6 +600,91 @@ Full exhaustive/property evidence, stack gate, counters, and falsification
 boundaries are in
 [validation 53](../scientific/53-dominator-optimization-validation.md).
 
+### T9.3 H10 — deterministic parallel plans and ordered emission
+
+H10 separates per-function CFG/DFG/PDG discovery from graph mutation and maps
+independent plans through indexed Rayon iterators. One serial emitter applies
+plans in canonical function order, preserving exact node/edge identities,
+idempotency, and Serde bytes. Ordered VF2 batches use the same indexed reduction
+without graph mutation. The serial PDG path was also corrected to snapshot
+existing edges once instead of rescanning the complete graph per function.
+
+On the controlled 512-function fixture, the pipeline improves from 144.27 ms
+serial to 12.35 ms at 32 workers (11.68×); the 128-pattern VF2 batch improves
+from 1.1150 ms to 178.71 µs (6.24×). A single worker is 0.4% slower than serial,
+which supports the serial default and explicit opt-in. The headless 32-worker
+profile improves wall time 4.95× while RSS falls 2.3%; DHAT bytes rise 0.63%
+and peak live bytes rise 1.51%, recording the concurrency trade rather than
+hiding it. Complete affinity, counter, property, and depth-100,000 evidence is
+in [validation 54](../scientific/54-parallel-analysis-validation.md).
+
+### T9.3 H11 — build-local mapped-string canonicalization
+
+**Hypothesis.** Parser mapping appeared to allocate one `Arc<str>` per name,
+type, operator, literal, import, or grammar-kind occurrence. A temporary
+content-keyed pool should reduce retained ownership without changing public
+types, bytes, order, cloning, Serde, or stack bounds. Candidate interning and
+hasher choices had to win measured workloads and avoid global mutable state.
+
+**Inventory and controlled change.** Three real Rust modules produce 28,510
+mapped string occurrences, 1,810 distinct values, and initially 28,510 distinct
+allocations. `CpgStringPool` now visits one completed mapped node before graph
+insertion, uses borrowed `&str` lookup in `FxHashSet<Arc<str>>`, and replaces a
+duplicate with a clone of the canonical handle. The fixed-depth match plus flat
+parameter/generic loops introduces no recursive call edge; the pool drops at
+the AST/CFG boundary.
+
+| Retained measure, three graphs alive | Before H11 | H11 | Change |
+|---|---:|---:|---:|
+| mapped string allocations | 28,510 | 2,226 | -92.2% |
+| mapped string payload bytes | 295,920 | 37,767 | -87.2% |
+
+The 416 remaining duplicate allocations are equal values in different
+build-local pools. Each individual file has exactly one allocation per distinct
+content; no process-global table is involved.
+
+**Controlled Criterion result against committed H10:**
+
+| Case | H10 | H11 | Central change |
+|---|---:|---:|---:|
+| parser Rust, 49 lines | 334.22 µs | 326.98 µs | -1.85% |
+| parser Rust, 514 lines | 6.0021 ms | 5.9759 ms | -0.39% |
+| 1,000-node non-parser control | 53.878 µs | 54.382 µs | +1.23% |
+| 10,000-node non-parser control | 638.69 µs | 638.01 µs | +0.03% |
+
+Both parser cases improve. The small non-parser movement executes none of H11
+and remains a noise control.
+
+**Headless ten-repetition profile against committed H10:**
+
+| Measure | Construction change | Whole-corpus change |
+|---|---:|---:|
+| DHAT total bytes | +0.56% | +0.19% |
+| DHAT total blocks | +0.05% | +0.01% |
+| DHAT peak live bytes | -3.68% | -2.93% |
+| DHAT peak live blocks | -26.44% | -20.97% |
+| maximum RSS | -1.94% | -2.33% |
+| Massif page peak | -1.11% | -2.94% |
+
+Total traffic stays flat because the mapper still creates each candidate before
+releasing a duplicate; live ownership is the target and falls materially.
+Perf elapsed is +1.24%/+0.19% on the short construction/whole-corpus controls,
+while retired instructions are -1.27%/-0.08%; Criterion is the timing decision
+boundary. High-variation cache/TLB observations are retained in validation 55
+without a causal claim.
+
+**Hasher and dependency result.** A temporary 30-sample Criterion target modeled
+the observed 28,510/1,810 string distribution and a separate 100,000-key `u32`
+map. Fx completed in 266.76 µs versus AHash's 309.83 µs for strings (13.9%
+faster), and 1.7035 ms versus 2.0340 ms for integer keys (16.2% faster). H11
+retains Fx, removes rejected `ahash`, removes unused `string_cache`, and deletes
+the temporary benchmark/probe after recording their results.
+
+The 256 generated ownership cases, Unicode/229,376-byte examples, public clone
+and Serde-byte oracles, and depth-100,000/256 KiB parser gate are detailed in
+[validation 55](../scientific/55-string-storage-validation.md). ADR-0060 records
+the rejected global atom, mutex, whole-graph sweep, and AHash alternatives.
+
 ## Reproduce and compare
 
 The benchmark wrapper defaults to CPUs 0 and 1 and stores logs under

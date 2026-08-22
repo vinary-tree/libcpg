@@ -97,13 +97,9 @@ rayon = "1.10"
 
 # Efficient hash maps
 rustc-hash = "2.0"
-ahash = "0.8"
 
 # Small vector optimization
 smallvec = { version = "1.13", features = ["serde"] }
-
-# Interned strings for node labels
-string_cache = "0.8"
 
 # Source code positions
 text-size = "1.1"

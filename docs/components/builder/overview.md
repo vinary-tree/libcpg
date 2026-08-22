@@ -244,8 +244,11 @@ while work is not empty:
         # 2. Map the grammar kind string to the language-agnostic CpgNodeKind.
         cpg_kind ← mapper.map_kind(kind_str, ts_node, source)
 
-        # 3. Create the CPG node over the tree-sitter byte/point range.
-        node_id ← cpg.add_node(CpgNode(cpg_kind, SourceRange(ts_node)))
+        # 3. Create the CPG node, then canonicalize its flat string fields
+        #    through this build's temporary pool before graph insertion.
+        node ← CpgNode(cpg_kind, SourceRange(ts_node))
+        string_pool.intern_node(node)
+        node_id ← cpg.add_node(node)
 
         # 4. Wire the AST edge. connect maintains both navigation indices.
         if parent_id is Some(parent):
@@ -264,7 +267,17 @@ while work is not empty:
     reverse(work[first_child..])
 ```
 
-Three details are worth emphasising:
+Four details are worth emphasising:
+
+- **Build-local string ownership.** Names, types, operators, literals, imports,
+  optional node text, and allocation types remain public `Arc<str>` values, but
+  equal contents within one build share one allocation. The temporary
+  `FxHashSet` is dropped before CFG construction; it is neither a global
+  interner nor part of the returned graph. Separate builds, manual graphs,
+  merges, and deserialized graphs need not share pointers, so consumers compare
+  string contents rather than `Arc` addresses. See
+  [ADR-0060](../../design/0060-build-local-string-canonicalization.md) and
+  [validation 55](../../scientific/55-string-storage-validation.md).
 
 - **One invariant-owning insertion.** `cpg.connect(parent, child, AstChild)`
   appends `child` to the parent's ascending-edge-id child index and maintains
@@ -321,6 +334,8 @@ for pool configuration, exactness, and resource guidance.
   where the builder sits in the overall architecture.
 - [`../../design/0002-mode-b-build-from-tree.md`](../../design/0002-mode-b-build-from-tree.md)
   — the design rationale for Mode B.
+- [`../../design/0060-build-local-string-canonicalization.md`](../../design/0060-build-local-string-canonicalization.md)
+  — why mapper-produced strings share only within one build.
 
 ---
 

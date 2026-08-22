@@ -33,7 +33,10 @@
 //! # }
 //! ```
 
-use super::{CfgExtractor, CpgBuilder, CpgBuilderConfig, DfgExtractor, NodeMapper, ParserRegistry};
+use super::{
+    string_pool::CpgStringPool, CfgExtractor, CpgBuilder, CpgBuilderConfig, DfgExtractor,
+    NodeMapper, ParserRegistry,
+};
 use crate::{
     resolve_calls, CodePropertyGraph, CpgEdgeKind, CpgNode, CpgNodeKind, Error, Language, NodeId,
     ResolveConfig, Result, SourceRange,
@@ -214,6 +217,7 @@ impl TreeSitterCpgBuilder {
         cpg: &mut CodePropertyGraph,
     ) -> Result<()> {
         let mut work = Vec::new();
+        let mut strings = CpgStringPool::default();
         work.try_reserve(1).map_err(|error| {
             Error::Construction(format!(
                 "failed to allocate the AST traversal work stack: {error}"
@@ -252,6 +256,7 @@ impl TreeSitterCpgBuilder {
                 cpg_node.allocation_type = mapper
                     .allocation_type(ts_kind, &ts_node, source)
                     .map(Box::new);
+                strings.intern_node(&mut cpg_node);
                 let node_id = cpg.add_node(cpg_node);
 
                 // Maintain the AST edge and parent pointer as one invariant.

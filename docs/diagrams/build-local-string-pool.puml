@@ -1,0 +1,36 @@
+@startuml
+!include _libcpg-theme.iuml
+title Build-local mapped-string canonicalization
+
+start
+:Receive a Mode-A parse tree or caller-owned Mode-B tree;<<#DBE4FF>>
+:Push the root onto the explicit heap work stack;<<#E5DBFF>>
+
+while (another syntax frame?) is (yes)
+  :Map one included tree-sitter node to CpgNodeKind;<<#FFE8CC>>
+  :Visit its flat Arc<str> fields and nested TypeInfo vectors;<<#FFF3BF>>
+  if (equal content already in the build-local FxHashSet?) then (yes)
+    :Clone the canonical Arc handle\nand release the duplicate allocation;<<#D3F9D8>>
+  else (no)
+    :Retain one Arc handle as this value's canonical owner;<<#C3FAE8>>
+  endif
+  :Append the node and ordered AST edge to the CPG;<<#DBE4FF>>
+  :Push children in reverse source order;<<#E5DBFF>>
+endwhile (no)
+
+:Drop the temporary pool;\nthe CPG remains the sole long-lived owner;<<#FFE3E3>>
+:Run configured CFG, resolution, and DFG phases;\nreturn the unchanged public CPG shape;<<#B2F2BB>>
+stop
+
+legend right
+  |= colour |= role |
+  |<#DBE4FF>| caller tree and persistent CPG |
+  |<#E5DBFF>| explicit heap traversal state |
+  |<#FFE8CC>| language mapping boundary |
+  |<#FFF3BF>| fixed-depth string visitor |
+  |<#D3F9D8>| duplicate ownership collapse |
+  |<#C3FAE8>| first-value canonical ownership |
+  |<#FFE3E3>| temporary pool lifetime boundary |
+  |<#B2F2BB>| unchanged public result |
+endlegend
+@enduml
