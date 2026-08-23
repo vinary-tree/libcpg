@@ -304,6 +304,13 @@ ambiguous calls, external calls, and unresolved calls. See the complete
 the evidence matrix, ordering and cap contracts, pseudocode, complexity,
 examples, and validation.
 
+Names are exact, case-sensitive `str` values. The table is call-local; the API
+does not expose prefix or fuzzy lookup, normalization, a retained global index,
+or index invalidation. `max_candidates_per_name` limits only retained node ids;
+`candidate_count` remains the ambiguity authority. See
+[Usage 32](../usage/32-exact-call-resolution.md) and
+[ADR-0064](../design/0064-retain-ordered-resolver-symbol-index.md).
+
 ### IFDS/IDE procedure summaries
 
 The feature-free interprocedural framework evaluates a caller-defined

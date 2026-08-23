@@ -1,0 +1,62 @@
+@startuml
+!include _libcpg-theme.iuml
+title Resolver symbol index — semantics first, measurement second
+
+actor "parser-backed frontend" as FRONTEND #F1F3F5
+rectangle "exact valid str name\nlexical scope + import evidence" as NAME #DBE4FF
+rectangle "call-local BTreeMap\ncanonical NodeId buckets" as BTREE #B2F2BB
+hexagon "full exact candidate count" as COUNT #FFF3BF
+rectangle "one authorized C1 target\nlabelled unique topology" as TOPOLOGY #C3FAE8
+rectangle "ambiguous / external / unresolved\nno graph mutation" as CLOSED #FFE3E3
+
+package "measured alternatives" #F8F9FA {
+  rectangle "DoubleArrayTrie\nfast retained exact lookup" as DAT #E5DBFF
+  rectangle "DynamicDawg\nexact dictionary" as DAWG #E5DBFF
+  rectangle "prefix range / zipper" as PREFIX #FFE8CC
+  rectangle "distance-two ordered automaton" as FUZZY #D0EBFF
+  rectangle "reject DAT\ncold build + memory adverse" as RDAT #FFA8A8
+  rectangle "reject DynamicDawg\nall exact operations adverse" as RDAWG #FFA8A8
+  rectangle "retain BTreeMap range if needed\nno resolver prefix semantic" as RPREFIX #B2F2BB
+  rectangle "reject resolver fuzzy topology\nsemantic + heap boundary" as RFUZZY #FFA8A8
+
+  DAT --> RDAT
+  DAWG --> RDAWG
+  PREFIX --> RPREFIX
+  FUZZY --> RFUZZY
+}
+
+FRONTEND --> NAME
+NAME --> BTREE
+BTREE --> COUNT
+COUNT --> TOPOLOGY : exactly one + emitting tier
+COUNT --> CLOSED : zero or more than one
+
+BTREE ..> DAT : checksum oracle
+BTREE ..> DAWG : checksum oracle
+BTREE ..> PREFIX : full-scan oracle
+BTREE ..> FUZZY : bounded-distance oracle
+
+note bottom of TOPOLOGY
+  An index may preserve exact evidence.
+  Performance never widens evidence.
+end note
+
+note bottom of RFUZZY
+  Fast advisory candidates are valid evidence
+  for a different, explicitly fuzzy API.
+end note
+
+legend right
+  |= colour |= role |
+  |<#F1F3F5>| source actor |
+  |<#DBE4FF>| represented exact evidence |
+  |<#B2F2BB>| retained implementation |
+  |<#FFF3BF>| evidence decision |
+  |<#C3FAE8>| authorized topology |
+  |<#FFE3E3>| conservative negative result |
+  |<#E5DBFF>| exact candidate structure |
+  |<#FFE8CC>| prefix experiment |
+  |<#D0EBFF>| fuzzy experiment |
+  |<#FFA8A8>| rejected production path |
+endlegend
+@enduml

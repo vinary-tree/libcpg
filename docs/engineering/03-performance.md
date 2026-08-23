@@ -152,7 +152,7 @@ once, loop bodies twice, and a path set cuts malformed AST cycles.
 
 ## Benchmark coverage and remaining gaps
 
-Thirty-two explicitly declared Criterion targets are active. Most groups are
+Thirty-three explicitly declared Criterion targets are active. Most groups are
 feature-free; DFG, PDG, corpus, and reanalysis groups request their parser
 features, while `induction_analysis` additionally registers an
 `algorithm-detection`-gated group. Every active group constructs and checks a
@@ -456,6 +456,27 @@ is why `bitset_domain` is the kernel diagnosis and `dataflow_liveness` is the
 end-to-end acceptance control. See
 [validation 58](../scientific/58-runtime-dispatched-bitset-validation.md) and
 [ADR-0063](../design/0063-runtime-dispatched-bitset-kernels.md).
+
+### Exact resolver symbol-index finding
+
+The `resolve_calls` target now measures standalone symbol construction and
+complete exact, unresolved, ambiguous, and deep-scope resolution. Every case
+asserts its complete report and graph topology before timing. Headless
+workloads expose the same four causal paths at 32,768 symbols.
+
+A 100,000-symbol controlled comparison rejected external DAT and DynamicDawg
+indices for the cold resolver. DAT build was 6.31 times slower; build plus one
+exact pass regressed about 30%, RSS rose 26.6%, and total allocation rose
+81.6%. DynamicDawg was 2.74 times slower to build and roughly twice as slow for
+exact and absent passes. For prefix work, the existing ordered lower-bound
+range was 8.70 times faster than the DAT zipper.
+
+An ordered fuzzy automaton did beat a complete bounded scan by roughly 880
+times, but fuzzy spelling is not a resolver semantic and its long-query dense
+transition table retained quadratic heap. The production outcome is therefore
+the exact call-local ordered map with no new dependency. See
+[validation 59](../scientific/59-resolver-symbol-index-validation.md) and
+[ADR-0064](../design/0064-retain-ordered-resolver-symbol-index.md).
 
 ### How to add a benchmark
 

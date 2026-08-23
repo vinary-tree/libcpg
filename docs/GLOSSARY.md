@@ -1017,6 +1017,30 @@ without AVX2, and non-x86 targets use the scalar oracle. See
 [ADR-0063](design/0063-runtime-dispatched-bitset-kernels.md) and
 [scientific validation 58](scientific/58-runtime-dispatched-bitset-validation.md).
 
+### Resolver symbol index / DAT / DAWG
+
+A **resolver symbol index** maps an exact represented identifier spelling and
+its lexical/import context to canonically ordered declaration candidates. A
+**double-array trie** (DAT) places trie transitions in parallel BASE/CHECK
+arrays; a **directed acyclic word graph** (DAWG) merges nodes with equivalent
+right languages. Both can accelerate dictionary operations, but neither
+changes libcpg's evidence boundary: names remain exact, case-sensitive `str`
+values and ambiguity uses the full pre-cap candidate count. libcpg retains its
+call-local ordered map after the measured candidates lost the cold resolver or
+resource controls. See
+[ADR-0064](design/0064-retain-ordered-resolver-symbol-index.md) and
+[scientific validation 59](scientific/59-resolver-symbol-index-validation.md).
+
+### Fuzzy resolver candidate
+
+A **fuzzy candidate** is a name admitted by an explicitly selected edit metric
+and bound, such as Levenshtein distance two. It is not an exact identifier and
+does not authorize a `Call::target` or call edge. libcpg exposes no fuzzy
+resolver API; an exact miss remains unresolved. A separate advisory interface
+would need to expose its metric, work/candidate caps, ordering, and
+completeness. See
+[`usage/32-exact-call-resolution.md`](usage/32-exact-call-resolution.md).
+
 ### Structural clone class
 
 A deterministically ordered set of at least two stable `NodeId` values that

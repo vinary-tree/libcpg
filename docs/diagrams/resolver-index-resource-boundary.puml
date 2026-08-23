@@ -1,0 +1,58 @@
+@startuml
+!include _libcpg-theme.iuml
+title Resolver index resource boundary — fixed native stack, measured heap
+
+rectangle "untrusted deep name\n<latex>q</latex> query units" as INPUT #DBE4FF
+
+package "256 KiB native stack" #D3F9D8 {
+  rectangle "DAT builder / lookup / drop\nexplicit queues and loops" as DAT #B2F2BB
+  rectangle "DynamicDawg builder / lookup / drop\nexplicit pending Vec + iterative Drop" as DAWG #B2F2BB
+  rectangle "transducer traversal\nconstant native call depth" as STACK #C3FAE8
+}
+
+package "transducer query-local heap" #FFE8CC {
+  rectangle "generated positional states\n<latex>g = \mathcal{O}(q)</latex>" as STATES #FFF3BF
+  rectangle "power-of-two dense row stride\n<latex>s = 2^{\lceil \log_2(q+1) \rceil}</latex>" as STRIDE #FFF3BF
+  rectangle "DenseGeneratedTargets\n<latex>M = g s |\mathrm{target}| = \mathcal{O}(q^2)</latex>" as DENSE #FFE3E3
+  rectangle "64 segments\n23 MiB RSS" as D64 #D3F9D8
+  rectangle "256 segments\n69 MiB RSS" as D256 #D3F9D8
+  rectangle "512 segments\n262 MiB RSS" as D512 #FFE8CC
+  rectangle "1,024 segments\n1.01 GiB RSS" as D1024 #FFD8A8
+  rectangle "2,048 segments\n4 GiB cgroup ceiling" as D2048 #FFA8A8
+}
+
+rectangle "systemd-run scope\nMemoryMax=4G\nMemorySwapMax=0" as CGROUP #D0EBFF
+rectangle "reject fuzzy resolver dependency\nno workstation-wide OOM\nno graph mutation" as REJECT #FFA8A8
+
+INPUT --> DAT
+INPUT --> DAWG
+INPUT --> STACK
+STACK --> STATES
+STATES --> DENSE
+STRIDE --> DENSE
+DENSE --> D64
+D64 --> D256
+D256 --> D512
+D512 --> D1024
+D1024 --> D2048
+CGROUP --> DENSE
+D2048 --> REJECT : killed locally
+
+note bottom of STACK
+  Stack safety and heap boundedness
+  are independent obligations.
+end note
+
+legend right
+  |= colour |= meaning |
+  |<#DBE4FF>| untrusted input |
+  |<#B2F2BB>| passing index lifecycle |
+  |<#C3FAE8>| constant native call depth |
+  |<#FFF3BF>| allocation factors |
+  |<#D3F9D8>| low measured RSS |
+  |<#FFE8CC>| growing heap |
+  |<#FFD8A8>| high measured RSS |
+  |<#D0EBFF>| enforced process boundary |
+  |<#FFA8A8>| ceiling / rejected path |
+endlegend
+@enduml

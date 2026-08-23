@@ -231,6 +231,33 @@ DFG extraction. That ordering lets parameter and return-value DFG helpers see
 resolved callers. The flag remains `false` by default, so existing construction
 shape and edge-count contracts are unchanged.
 
+## Exact index and non-semantics
+
+The resolver's `BTreeMap` indices compare complete, case-sensitive `str`
+values. libcpg performs no case folding, Unicode normalization, delimiter
+parsing, prefix expansion, or edit correction. Frontends own identifier
+spelling; differently encoded graph properties remain different names.
+
+The index is local to one table/resolver invocation and is dropped afterward.
+This avoids a cross-graph ownership or invalidation protocol. An application
+may retain the returned `CallGraphResolution` only alongside the same immutable
+graph snapshot.
+
+H14B evaluated a double-array trie (DAT), DynamicDawg, ordered prefix ranges,
+and bounded Levenshtein-automaton intersection against independent oracles.
+DAT lookup improved only after enough complete reuse to amortize a 6.31-times
+slower build; cold build plus one exact pass regressed about 30%. DynamicDawg
+lost build, hit, and miss controls; DAT prefix traversal was 8.70 times slower
+than the existing ordered range. Fuzzy intersection was much faster than a
+full scan but is not an exact resolver semantic and its long-query transition
+cache reached an enforced 4 GiB heap ceiling.
+
+Consequently there is no external dictionary dependency or hidden fuzzy path.
+[ADR-0064](../../design/0064-retain-ordered-resolver-symbol-index.md) records
+the decision, [validation 59](../../scientific/59-resolver-symbol-index-validation.md)
+records the experiments, and [Usage 32](../../usage/32-exact-call-resolution.md)
+shows the operational boundary.
+
 ## Determinism and validation
 
 Node and call enumeration is sorted by `NodeId`; candidate vectors are sorted
@@ -246,6 +273,12 @@ names over generated well-formed CPGs add zero call edges and leave the SCC
 partition unchanged. A parsed-Rust integration test proves that the opt-in
 builder resolves an in-file call before interprocedural parameter/return DFG
 edges are constructed.
+
+The committed `resolve_calls` Criterion target additionally asserts complete
+symbol-table/report/topology oracles before exact, unresolved, ambiguous, and
+deep timed workloads. Headless profiles separate table construction from full
+resolution. Disposable external-index probes are absent from the production
+manifest and tree.
 
 ## Reference
 

@@ -322,6 +322,10 @@ development, or jump to the layer you need:
     Exact canonical function keys, local-coordinate plans, conservative
     dependency boundaries, and deterministic bounded replacement define safe
     revision-to-revision CFG/DFG/PDG reuse.
+47. **[47 — Exact contextual name indexing](47-exact-contextual-name-indexing.md).**
+    Scope-indexed exact relations, first-non-empty shadowing, full-count
+    ambiguity, whole-lifecycle index economics, automaton non-semantics, and
+    independent stack/heap bounds define lawful resolver acceleration.
 
 The later chapters define deterministic projection structure, architecture
 metrics, inspectable evidence, and their interpretation limits.

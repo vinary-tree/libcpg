@@ -564,7 +564,7 @@ dependencies and are not part of the `full` feature set.
 | Surface | State |
 | --- | --- |
 | Doctests | Three examples compile under both default and all-feature configurations with rustdoc warnings denied. The feature-free crate-root example executes against a real typed CPG; the two parser snippets are `no_run` because the empty default feature set intentionally has no built-in grammar. |
-| Benchmarks | Thirty explicit Criterion targets cover construction, traversal, DFG, PDG, SCC, VF2, liveness, induction, graph metrics, clones, advisory/security analyses, exports, CPG differencing, and controlled parallel scaling. Each active group asserts a deterministic oracle before timing. See [performance](03-performance.md) and the [optimization ledger](optimization-ledger.md). |
+| Benchmarks | Thirty-three explicit Criterion targets cover construction, traversal, DFG, PDG, SCC, VF2, liveness, induction, graph metrics, clones, advisory/security analyses, exact call-resolution families, exports, CPG differencing, and controlled parallel scaling. Each active group asserts a deterministic oracle before timing. See [performance](03-performance.md) and the [optimization ledger](optimization-ledger.md). |
 | `ml-linfa`, `gpu` | not exercised: optional heavy dependencies outside the `full` feature set. |
 
 The feature-free [`population_anomalies`](../../examples/population_anomalies.rs)
@@ -584,6 +584,16 @@ The feature-free [`cwe_templates`](../../examples/cwe_templates.rs) example
 asserts one qualified CWE-89 request-to-SQL flow through the complete shipped
 registry. Run it with
 `cargo run --example cwe_templates --no-default-features`.
+
+The feature-free `resolve_calls` benchmark uses deterministic exact,
+unresolved, ambiguous, and deep-scope fixtures. Its setup validates complete
+symbol buckets, confidence classifications, candidate counts, idempotent
+topology, and stable `NodeId` order before Criterion enters the timed loop.
+Scientific validation 59 additionally records independent 100,000-name
+exact/prefix/fuzzy oracles, insertion-order alternation, dependency release
+correctness, 256 KiB construction/lookup/drop gates, and an RSS-limited
+geometric long-query campaign. The rejected prototypes are not test-only
+production code and do not appear in `Cargo.toml`.
 
 ## Related pages
 

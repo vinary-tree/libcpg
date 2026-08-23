@@ -211,6 +211,9 @@ You now have a CPG and can read its shape. The rest of the usage guide builds on
 - **[Program Slicing](04-program-slicing.md)** — build a PDG and take backward/forward slices.
 - **[Serialization](05-serialization.md)** — round-trip a CPG through `serde_json`.
 - **[F1R3FLY.io: Rholang & MeTTa](06-f1r3fly-rholang-metta.md)** — Mode-B integration for process-calculus and S-expression code.
+- **[Exact call resolution](32-exact-call-resolution.md)** — add only uniquely
+  evidenced call topology and interpret ambiguity, caps, exact spelling, and
+  the intentionally absent fuzzy fallback.
 
 For the conceptual foundations, start at the [theory overview](../theory/00-overview.md); for the corrected API surface, see the [graph reference](../api/graph-reference.md) and [builder reference](../api/builder-reference.md).
 

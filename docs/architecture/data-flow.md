@@ -120,6 +120,14 @@ records. Running this stage before the DFG activates its existing parameter and
 return-value construction without guessing call topology. The option defaults
 to `false`, so prior construction shape is unchanged.
 
+The stage constructs one call-local ordered symbol index and drops it after
+resolution. Exact `str` equality is the only lookup relation; prefix and edit
+distance are not fallback channels. A measured DAT/DynamicDawg/fuzzy
+evaluation retained this architecture because candidates either regressed the
+cold stage, lost exact operations, lacked a publishable correct release, or
+failed the required heap bound. See
+[ADR-0064](../design/0064-retain-ordered-resolver-symbol-index.md).
+
 #### Optional post-C1 virtual-call type refinement
 
 After the graph carries nominal ownership, `Inherits`/`Implements`, receiver

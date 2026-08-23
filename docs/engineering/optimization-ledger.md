@@ -840,6 +840,55 @@ portability, and 100,000-wide/deep 256 KiB stack gates are detailed in
 ADR-0063 records the dispatch and unsafe boundary. No GUI or heaptrack process
 was used, and no build/profile artifact was placed under `/tmp`.
 
+### T9.4 H14B -- exact resolver symbol-index evaluation
+
+**Hypothesis.** A double-array trie (DAT), DynamicDawg, prefix zipper, or
+Levenshtein automaton may reduce evidence-bounded resolver cost without
+changing exact names, ambiguity, ordering, topology, ownership, portability,
+or stack/resource bounds. A dependency is retained only when the cold complete
+resolver improves; a checksum-exact measured rejection is complete.
+
+**Committed control.** `resolve_calls` supplies nine oracle-guarded Criterion
+cases: symbol construction and exact/unresolved/ambiguous resolution at 256 and
+4,096 symbols, plus 1,024 symbols at lexical depth 64. Medians range from
+182.71 us for the small table to 8.2835 ms for the 4,096-symbol exact resolver.
+The headless 32,768-symbol workloads separate table, exact, unresolved, and
+ambiguous paths. In the 434 ms exact profile, table construction and complete
+resolution account for 15.56% and 14.85% of named samples; exact key comparison
+is not an isolated hotspot.
+
+**Exact candidate results.** Current `libdictenstein` 4.0.0-rc.1 DAT is exact,
+but its 100,000-symbol build is 6.31 times slower and makes cold build plus one
+exact pass about 30% slower. It improves eight retained exact passes by 52.8%,
+crossing over after about 1.66 complete passes, a reuse/ownership contract the
+resolver does not have. DAT prefix traversal is 8.70 times slower than the
+existing ordered range. DynamicDawg loses build, exact, and miss arms by 2.74,
+1.93, and 2.15 times. DAT raises RSS 26.6% and total DHAT allocation 81.6%.
+
+**Fuzzy and SIMD boundary.** Exact ordered automaton intersection is roughly
+880 times faster than a bounded 100,000-term distance-two scan, but the
+resolver has no fuzzy semantic and the transducer's generated target table
+retains quadratic long-query heap. Direct standard-distance SIMD regresses the
+representative 32/128/512-byte controls; production transducer SIMD remains an
+operation-specific small-state reduction, and positive packed-kernel results
+are not generalized away.
+
+**Correctness, release, and resource rejection.** Registry
+`libdictenstein` 0.2.0 fails the independent exact checksum; current RC source
+is not available through a version-only dependency. DAT and DynamicDawg each
+construct/query/drop a 4,096-segment key on a 256 KiB stack. The transducer
+uses the same fixed stack but rises from 23 MiB RSS at depth 64 to 1.01 GiB at
+depth 1,024 and meets an enforced 4 GiB/no-swap ceiling at depth 2,048. The
+root cause is one power-of-two `query_length + 1` dense target row per generated
+state, yielding quadratic heap on a linear exact path.
+
+The confirmed-negative production result retains the exact call-local
+`BTreeMap`, adds no dependency or fuzzy edge, and removes the disposable
+probe. [ADR-0064](../design/0064-retain-ordered-resolver-symbol-index.md),
+[validation 59](../scientific/59-resolver-symbol-index-validation.md), and
+[Security 22](../security/22-resolver-symbol-index-boundary.md) record the full
+semantics and evidence.
+
 ## Reproduce and compare
 
 The benchmark wrapper defaults to CPUs 0 and 1 and stores logs under
