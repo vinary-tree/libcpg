@@ -212,6 +212,10 @@ name = "dataflow_liveness"
 harness = false
 
 [[bench]]
+name = "bitset_domain"
+harness = false
+
+[[bench]]
 name = "induction_analysis"
 harness = false
 

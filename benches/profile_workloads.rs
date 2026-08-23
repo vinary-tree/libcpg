@@ -7,10 +7,11 @@ use std::mem::size_of;
 use libcpg::builder::{FunctionAnalysisCache, FunctionAnalysisCacheLimits};
 use libcpg::pattern::Vf2Matcher;
 use libcpg::{
-    call_graph_projection, call_graph_sccs, dominator_tree, post_dominator_tree,
-    structural_clone_classes, wl_labels, CfgExtractor, CodePropertyGraph, CpgBuilder,
-    CpgBuilderConfig, CpgEdge, CpgNode, DfgExtractor, GraphProjection, Language, NodeId,
-    PdgBuilder, SubgraphMatcher, TreeSitterCpgBuilder,
+    call_graph_projection, call_graph_sccs, dominator_tree, liveness, post_dominator_tree,
+    structural_clone_classes, wl_labels, BitSetDomain, CfgEdgeKind, CfgExtractor,
+    CodePropertyGraph, CpgBuilder, CpgBuilderConfig, CpgEdge, CpgEdgeKind, CpgNode, CpgNodeKind,
+    DfgExtractor, GraphProjection, Language, Lattice, MethodSignature, NodeId, PdgBuilder, ScopeId,
+    SourceRange, SubgraphMatcher, TreeSitterCpgBuilder, Visibility,
 };
 
 use support::{
@@ -186,6 +187,111 @@ fn analyze(files: &[CorpusFile]) -> usize {
 
 fn corpus() -> usize {
     analyze(&RUST_LARGE) + analyze(&CROSS_LANGUAGE)
+}
+
+fn repeated_bitset_primitives(repetitions: usize) -> usize {
+    const WIDTH: usize = 65_536;
+    const PASSES_PER_REPETITION: usize = 2_000_000;
+    let left = BitSetDomain::from_indices(
+        WIDTH,
+        (0..WIDTH)
+            .filter(|index| index % 2 == 0)
+            .map(|index| index as u32),
+    );
+    let right = BitSetDomain::from_indices(
+        WIDTH,
+        (0..WIDTH)
+            .filter(|index| index % 2 == 1)
+            .map(|index| index as u32),
+    );
+    let mut state = left.clone();
+    let mut checksum = 0usize;
+    for _ in 0..repetitions.saturating_mul(PASSES_PER_REPETITION) {
+        checksum = checksum.wrapping_add(usize::from(state.join(black_box(&right))));
+        checksum = checksum.wrapping_add(usize::from(state.intersect_with(black_box(&left))));
+    }
+    assert_eq!(state, left);
+    checksum.wrapping_add(state.len())
+}
+
+fn profile_node(kind: CpgNodeKind) -> CpgNode {
+    CpgNode::new(NodeId::new(0), kind, SourceRange::default())
+}
+
+fn wide_liveness_fixture() -> (CodePropertyGraph, NodeId) {
+    const VARIABLES: usize = 4_096;
+    let mut cpg = CodePropertyGraph::new(Language::Rust);
+    let function = cpg.add_node(profile_node(CpgNodeKind::Function {
+        signature: Box::new(MethodSignature {
+            name: "profile_wide_liveness".into(),
+            params: Default::default(),
+            return_type: None,
+            is_static: false,
+            is_async: false,
+            visibility: Visibility::Private,
+        }),
+    }));
+    for index in 0..VARIABLES {
+        let variable = cpg.add_node(profile_node(CpgNodeKind::Variable {
+            name: format!("wide_{index}").into(),
+            var_type: None,
+            is_mutable: true,
+            scope: ScopeId::GLOBAL,
+        }));
+        cpg.connect(function, variable, CpgEdgeKind::AstChild);
+    }
+    let guard = cpg.add_node(profile_node(CpgNodeKind::Identifier {
+        name: "guard".into(),
+        definition: None,
+    }));
+    let left = cpg.add_node(profile_node(CpgNodeKind::Identifier {
+        name: "wide_4094".into(),
+        definition: None,
+    }));
+    let right = cpg.add_node(profile_node(CpgNodeKind::Identifier {
+        name: "wide_4095".into(),
+        definition: None,
+    }));
+    let exit = cpg.add_node(profile_node(CpgNodeKind::Return));
+    for child in [guard, left, right, exit] {
+        cpg.connect(function, child, CpgEdgeKind::AstChild);
+    }
+    for (source, target, kind) in [
+        (function, guard, CfgEdgeKind::Sequential),
+        (guard, left, CfgEdgeKind::ConditionalTrue),
+        (guard, right, CfgEdgeKind::ConditionalFalse),
+        (left, exit, CfgEdgeKind::Sequential),
+        (right, exit, CfgEdgeKind::Sequential),
+    ] {
+        cpg.connect(source, target, CpgEdgeKind::ControlFlow(kind));
+    }
+    (cpg, function)
+}
+
+fn repeated_wide_liveness(repetitions: usize) -> usize {
+    const PASSES_PER_REPETITION: usize = 256;
+    let (cpg, function) = wide_liveness_fixture();
+    let oracle = liveness(&cpg, function).expect("wide liveness profile oracle");
+    assert!(oracle
+        .live_in
+        .values()
+        .flatten()
+        .any(|name| &**name == "wide_4094"));
+    assert!(oracle
+        .live_in
+        .values()
+        .flatten()
+        .any(|name| &**name == "wide_4095"));
+
+    let mut checksum = 0usize;
+    for _ in 0..repetitions.saturating_mul(PASSES_PER_REPETITION) {
+        let report =
+            liveness(black_box(&cpg), black_box(function)).expect("wide liveness profile run");
+        checksum = checksum
+            .wrapping_add(report.live_in.len())
+            .wrapping_add(report.live_out.len());
+    }
+    checksum
 }
 
 const REANALYZE_FUNCTIONS: usize = 64;
@@ -400,6 +506,8 @@ fn main() {
         | "reanalyze_eviction"
         | "reanalyze_disabled" => repeated_reanalysis(&workload, repetitions),
         "pattern_vf2" => repeated_vf2(repetitions),
+        "bitset_primitives" => repeated_bitset_primitives(repetitions),
+        "dataflow_liveness_wide" => repeated_wide_liveness(repetitions),
         "parallel_analysis_serial" => repeated_parallel_analysis(false, repetitions),
         "parallel_analysis_parallel" => repeated_parallel_analysis(true, repetitions),
         "dominator_analysis" => {

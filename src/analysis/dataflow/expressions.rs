@@ -916,6 +916,73 @@ mod tests {
         false
     }
 
+    #[test]
+    fn wide_must_analyses_are_exact_across_kernel_dispatch() {
+        let mut cpg = CodePropertyGraph::new(Language::Rust);
+        let function = cpg.add_node_with_id(node(0, function_kind()));
+        let branch = cpg.add_node_with_id(node(1, identifier("condition")));
+        let exit = cpg.add_node_with_id(node(2, CpgNodeKind::Return));
+        connect_ast(&mut cpg, function, branch);
+        connect_ast(&mut cpg, function, exit);
+
+        let mut expressions = Vec::new();
+        for index in 0..1_100u32 {
+            let expression = cpg.add_node_with_id(node(
+                10 + index,
+                CpgNodeKind::BinaryOp {
+                    operator: format!("wide_operator_{index}").into(),
+                },
+            ));
+            connect_ast(&mut cpg, function, expression);
+            let variable = cpg.add_node_with_id(node(
+                10_000 + index * 2,
+                identifier(&format!("wide_variable_{index}")),
+            ));
+            let literal = cpg.add_node_with_id(node(
+                10_001 + index * 2,
+                CpgNodeKind::Literal {
+                    kind: LiteralKind::Integer(i64::from(index)),
+                },
+            ));
+            connect_ast(&mut cpg, expression, variable);
+            connect_ast(&mut cpg, expression, literal);
+            expressions.push(expression);
+        }
+        connect_cfg(&mut cpg, function, branch, CfgEdgeKind::Sequential);
+        connect_cfg(
+            &mut cpg,
+            branch,
+            expressions[0],
+            CfgEdgeKind::ConditionalTrue,
+        );
+        connect_cfg(
+            &mut cpg,
+            branch,
+            expressions[1],
+            CfgEdgeKind::ConditionalFalse,
+        );
+        connect_cfg(&mut cpg, expressions[0], exit, CfgEdgeKind::Sequential);
+        connect_cfg(&mut cpg, expressions[1], exit, CfgEdgeKind::Sequential);
+
+        let facts = expression_facts(&cpg, function).expect("wide expression facts");
+        assert_eq!(facts.universe.len(), 1_100);
+        let scalar =
+            super::super::with_test_bitset_kernel(super::super::BitSetKernel::Scalar, || {
+                (
+                    available_expressions(&cpg, function).expect("scalar availability"),
+                    very_busy_expressions(&cpg, function).expect("scalar anticipability"),
+                )
+            });
+        let selected =
+            super::super::with_test_bitset_kernel(super::super::detected_bitset_kernel(), || {
+                (
+                    available_expressions(&cpg, function).expect("selected availability"),
+                    very_busy_expressions(&cpg, function).expect("selected anticipability"),
+                )
+            });
+        assert_eq!(selected, scalar);
+    }
+
     proptest! {
         #![proptest_config(ProptestConfig::with_cases(96))]
 

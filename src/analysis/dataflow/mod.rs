@@ -14,6 +14,14 @@ mod sccp;
 
 use std::{cmp::Reverse, collections::BinaryHeap, fmt::Debug};
 
+#[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
+use std::sync::OnceLock;
+
+#[cfg(target_arch = "x86")]
+use std::arch::x86 as bitset_arch;
+#[cfg(target_arch = "x86_64")]
+use std::arch::x86_64 as bitset_arch;
+
 #[cfg(test)]
 use std::collections::VecDeque;
 
@@ -79,6 +87,202 @@ pub trait Lattice: Clone + PartialEq + Debug {
 pub struct BitSetDomain {
     width: usize,
     words: Vec<u64>,
+}
+
+// Criterion crossover measurements retain scalar execution below eight words:
+// a four-word vector improves, but its five-word tail regresses, whereas every
+// measured width from eight words onward is neutral or faster under AVX2.
+const AVX2_MIN_WORDS: usize = 8;
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum BitSetKernel {
+    Scalar,
+    #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
+    Avx2,
+}
+
+#[inline(always)]
+fn scalar_union_words(into: &mut [u64], from: &[u64]) -> bool {
+    let mut changed = false;
+    for (into, from) in into.iter_mut().zip(from) {
+        let next = *into | *from;
+        changed |= next != *into;
+        *into = next;
+    }
+    changed
+}
+
+#[inline(always)]
+fn scalar_intersection_words(into: &mut [u64], from: &[u64]) -> bool {
+    let mut changed = false;
+    for (into, from) in into.iter_mut().zip(from) {
+        let next = *into & *from;
+        changed |= next != *into;
+        *into = next;
+    }
+    changed
+}
+
+#[inline(always)]
+fn scalar_subset_words(left: &[u64], right: &[u64]) -> bool {
+    left.iter()
+        .zip(right)
+        .all(|(left, right)| left & !right == 0)
+}
+
+#[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
+fn detected_bitset_kernel() -> BitSetKernel {
+    static KERNEL: OnceLock<BitSetKernel> = OnceLock::new();
+    *KERNEL.get_or_init(|| {
+        if std::is_x86_feature_detected!("avx2") {
+            BitSetKernel::Avx2
+        } else {
+            BitSetKernel::Scalar
+        }
+    })
+}
+
+#[cfg(not(any(target_arch = "x86", target_arch = "x86_64")))]
+const fn detected_bitset_kernel() -> BitSetKernel {
+    BitSetKernel::Scalar
+}
+
+#[cfg(test)]
+std::thread_local! {
+    static TEST_BITSET_KERNEL: std::cell::Cell<Option<BitSetKernel>> = const {
+        std::cell::Cell::new(None)
+    };
+}
+
+#[inline]
+fn selected_bitset_kernel() -> BitSetKernel {
+    #[cfg(test)]
+    if let Some(kernel) = TEST_BITSET_KERNEL.with(std::cell::Cell::get) {
+        return kernel;
+    }
+    detected_bitset_kernel()
+}
+
+#[cfg(test)]
+fn with_test_bitset_kernel<R>(kernel: BitSetKernel, operation: impl FnOnce() -> R) -> R {
+    #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
+    if kernel == BitSetKernel::Avx2 {
+        assert!(
+            std::is_x86_feature_detected!("avx2"),
+            "a forced AVX2 test requires AVX2 hardware"
+        );
+    }
+
+    struct Restore(Option<BitSetKernel>);
+    impl Drop for Restore {
+        fn drop(&mut self) {
+            TEST_BITSET_KERNEL.with(|selected| selected.set(self.0));
+        }
+    }
+
+    let previous = TEST_BITSET_KERNEL.with(|selected| selected.replace(Some(kernel)));
+    let restore = Restore(previous);
+    let result = operation();
+    drop(restore);
+    result
+}
+
+#[inline(always)]
+fn union_words(into: &mut [u64], from: &[u64]) -> bool {
+    if into.len() < AVX2_MIN_WORDS {
+        return scalar_union_words(into, from);
+    }
+    match selected_bitset_kernel() {
+        BitSetKernel::Scalar => scalar_union_words(into, from),
+        #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
+        BitSetKernel::Avx2 => {
+            // SAFETY: the cached dispatcher returns `Avx2` only after runtime
+            // feature detection (or a test-only override that checks it).
+            unsafe { avx2_union_words(into, from) }
+        }
+    }
+}
+
+#[inline(always)]
+fn intersection_words(into: &mut [u64], from: &[u64]) -> bool {
+    if into.len() < AVX2_MIN_WORDS {
+        return scalar_intersection_words(into, from);
+    }
+    match selected_bitset_kernel() {
+        BitSetKernel::Scalar => scalar_intersection_words(into, from),
+        #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
+        BitSetKernel::Avx2 => {
+            // SAFETY: the cached dispatcher returns `Avx2` only after runtime
+            // feature detection (or a test-only override that checks it).
+            unsafe { avx2_intersection_words(into, from) }
+        }
+    }
+}
+
+/// Applies four `u64` lanes per iteration with unaligned loads and stores.
+///
+/// # Safety
+///
+/// The caller must establish AVX2 support. Rust slice validity supplies the
+/// pointer, length, initialization, and exclusive-destination requirements;
+/// the loop processes only complete four-word chunks and delegates its tail to
+/// the scalar oracle.
+#[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
+#[target_feature(enable = "avx2")]
+unsafe fn avx2_union_words(into: &mut [u64], from: &[u64]) -> bool {
+    debug_assert_eq!(into.len(), from.len());
+    let vector_words = into.len() / 4 * 4;
+    let mut changed = false;
+    let mut offset = 0;
+    while offset < vector_words {
+        // SAFETY: `offset..offset + 4` lies in both slices. Unaligned AVX2
+        // loads/stores accept the allocation alignment supplied by `Vec<u64>`.
+        let equality_mask = unsafe {
+            let into_pointer = into.as_mut_ptr().add(offset).cast::<bitset_arch::__m256i>();
+            let from_pointer = from.as_ptr().add(offset).cast::<bitset_arch::__m256i>();
+            let current = bitset_arch::_mm256_loadu_si256(into_pointer);
+            let incoming = bitset_arch::_mm256_loadu_si256(from_pointer);
+            let next = bitset_arch::_mm256_or_si256(current, incoming);
+            bitset_arch::_mm256_storeu_si256(into_pointer, next);
+            bitset_arch::_mm256_cmpeq_epi64(current, next)
+        };
+        changed |= bitset_arch::_mm256_movemask_epi8(equality_mask) != -1;
+        offset += 4;
+    }
+    changed | scalar_union_words(&mut into[vector_words..], &from[vector_words..])
+}
+
+/// Applies four `u64` lanes per iteration with unaligned loads and stores.
+///
+/// # Safety
+///
+/// The caller must establish AVX2 support. Rust slice validity supplies the
+/// pointer, length, initialization, and exclusive-destination requirements;
+/// the loop processes only complete four-word chunks and delegates its tail to
+/// the scalar oracle.
+#[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
+#[target_feature(enable = "avx2")]
+unsafe fn avx2_intersection_words(into: &mut [u64], from: &[u64]) -> bool {
+    debug_assert_eq!(into.len(), from.len());
+    let vector_words = into.len() / 4 * 4;
+    let mut changed = false;
+    let mut offset = 0;
+    while offset < vector_words {
+        // SAFETY: `offset..offset + 4` lies in both slices. Unaligned AVX2
+        // loads/stores accept the allocation alignment supplied by `Vec<u64>`.
+        let equality_mask = unsafe {
+            let into_pointer = into.as_mut_ptr().add(offset).cast::<bitset_arch::__m256i>();
+            let from_pointer = from.as_ptr().add(offset).cast::<bitset_arch::__m256i>();
+            let current = bitset_arch::_mm256_loadu_si256(into_pointer);
+            let incoming = bitset_arch::_mm256_loadu_si256(from_pointer);
+            let next = bitset_arch::_mm256_and_si256(current, incoming);
+            bitset_arch::_mm256_storeu_si256(into_pointer, next);
+            bitset_arch::_mm256_cmpeq_epi64(current, next)
+        };
+        changed |= bitset_arch::_mm256_movemask_epi8(equality_mask) != -1;
+        offset += 4;
+    }
+    changed | scalar_intersection_words(&mut into[vector_words..], &from[vector_words..])
 }
 
 impl BitSetDomain {
@@ -175,13 +379,7 @@ impl BitSetDomain {
     /// Panics when the domains have different widths.
     pub fn intersect_with(&mut self, other: &Self) -> bool {
         self.assert_same_width(other);
-        let mut changed = false;
-        for (into, from) in self.words.iter_mut().zip(&other.words) {
-            let next = *into & *from;
-            changed |= next != *into;
-            *into = next;
-        }
-        changed
+        intersection_words(&mut self.words, &other.words)
     }
 
     /// Iterates present dense fact identifiers in ascending order.
@@ -209,21 +407,12 @@ impl BitSetDomain {
 impl Lattice for BitSetDomain {
     fn join(&mut self, other: &Self) -> bool {
         self.assert_same_width(other);
-        let mut changed = false;
-        for (into, from) in self.words.iter_mut().zip(&other.words) {
-            let next = *into | *from;
-            changed |= next != *into;
-            *into = next;
-        }
-        changed
+        union_words(&mut self.words, &other.words)
     }
 
     fn leq(&self, other: &Self) -> bool {
         self.assert_same_width(other);
-        self.words
-            .iter()
-            .zip(&other.words)
-            .all(|(left, right)| left & !right == 0)
+        scalar_subset_words(&self.words, &other.words)
     }
 }
 
@@ -821,6 +1010,26 @@ mod tests {
         )
     }
 
+    fn bitset_kernel_outcome(
+        kernel: BitSetKernel,
+        left: &BitSetDomain,
+        right: &BitSetDomain,
+    ) -> (bool, BitSetDomain, bool, BitSetDomain, bool) {
+        with_test_bitset_kernel(kernel, || {
+            let mut union = left.clone();
+            let union_changed = union.join(right);
+            let mut intersection = left.clone();
+            let intersection_changed = intersection.intersect_with(right);
+            (
+                union_changed,
+                union,
+                intersection_changed,
+                intersection,
+                left.leq(right),
+            )
+        })
+    }
+
     proptest! {
         #[test]
         fn union_lattice_is_idempotent_commutative_and_associative(
@@ -887,6 +1096,95 @@ mod tests {
             let mut right = a;
             right.join(&bc);
             prop_assert_eq!(left, right);
+        }
+
+        #[test]
+        fn selected_word_kernels_match_the_scalar_oracle(
+            pairs in prop::collection::vec((any::<u64>(), any::<u64>()), 0..260),
+        ) {
+            let width = pairs.len() * u64::BITS as usize;
+            let left = BitSetDomain {
+                width,
+                words: pairs.iter().map(|(left, _)| *left).collect(),
+            };
+            let right = BitSetDomain {
+                width,
+                words: pairs.iter().map(|(_, right)| *right).collect(),
+            };
+            let scalar = bitset_kernel_outcome(BitSetKernel::Scalar, &left, &right);
+            let selected = bitset_kernel_outcome(detected_bitset_kernel(), &left, &right);
+            prop_assert_eq!(selected, scalar);
+        }
+    }
+
+    #[test]
+    fn selected_word_kernels_cover_boundaries_tails_and_change_flags() {
+        for width in [
+            0usize, 1, 63, 64, 65, 255, 256, 257, 511, 512, 513, 767, 768, 769, 1_023, 1_024,
+            1_025, 8_191, 8_192, 8_193, 100_000,
+        ] {
+            let left = BitSetDomain::from_indices(
+                width,
+                (0..width)
+                    .filter(|index| index % 2 == 0 || index % 17 == 0)
+                    .map(|index| index as u32),
+            );
+            let right = BitSetDomain::from_indices(
+                width,
+                (0..width)
+                    .filter(|index| index % 3 == 0 || index % 19 == 0)
+                    .map(|index| index as u32),
+            );
+            let scalar = bitset_kernel_outcome(BitSetKernel::Scalar, &left, &right);
+            let selected = bitset_kernel_outcome(detected_bitset_kernel(), &left, &right);
+            assert_eq!(selected, scalar, "selected kernel differs at width {width}");
+
+            let unchanged_union = bitset_kernel_outcome(BitSetKernel::Scalar, &left, &left);
+            let selected_unchanged = bitset_kernel_outcome(detected_bitset_kernel(), &left, &left);
+            assert_eq!(
+                selected_unchanged, unchanged_union,
+                "unchanged flags differ at width {width}"
+            );
+            assert!(!selected_unchanged.0);
+            assert!(!selected_unchanged.2);
+        }
+    }
+
+    #[test]
+    fn selected_word_kernel_dispatch_is_thread_safe_and_stack_bounded() {
+        let mut threads = Vec::new();
+        for thread_index in 0..8usize {
+            threads.push(
+                std::thread::Builder::new()
+                    .name(format!("bitset-kernel-{thread_index}"))
+                    .stack_size(256 * 1024)
+                    .spawn(move || {
+                        let width = 100_000;
+                        let left = BitSetDomain::from_indices(
+                            width,
+                            (0..width)
+                                .filter(|index| (index + thread_index) % 5 == 0)
+                                .map(|index| index as u32),
+                        );
+                        let right = BitSetDomain::from_indices(
+                            width,
+                            (0..width)
+                                .filter(|index| (index + thread_index) % 7 == 0)
+                                .map(|index| index as u32),
+                        );
+                        let scalar = bitset_kernel_outcome(BitSetKernel::Scalar, &left, &right);
+                        for _ in 0..64 {
+                            assert_eq!(
+                                bitset_kernel_outcome(detected_bitset_kernel(), &left, &right),
+                                scalar
+                            );
+                        }
+                    })
+                    .expect("spawn bounded-stack bit-set worker"),
+            );
+        }
+        for thread in threads {
+            thread.join().expect("bounded-stack bit-set worker");
         }
     }
 

@@ -541,6 +541,99 @@ mod tests {
         (cpg, root)
     }
 
+    fn compare_liveness_kernels(cpg: &CodePropertyGraph, function: NodeId) {
+        let scalar =
+            super::super::with_test_bitset_kernel(super::super::BitSetKernel::Scalar, || {
+                liveness(cpg, function).expect("scalar liveness")
+            });
+        let selected =
+            super::super::with_test_bitset_kernel(super::super::detected_bitset_kernel(), || {
+                liveness(cpg, function).expect("selected-kernel liveness")
+            });
+        assert_eq!(selected, scalar);
+    }
+
+    #[test]
+    fn deep_and_wide_liveness_dispatch_is_stack_bounded_and_exact() {
+        std::thread::Builder::new()
+            .name("liveness-kernel-stack-safety".into())
+            .stack_size(256 * 1024)
+            .spawn(|| {
+                let mut deep = CodePropertyGraph::new(Language::Rust);
+                let deep_function = deep.add_node_with_id(node(0, function()));
+                let mut predecessor = deep_function;
+                for index in 1..=100_000u32 {
+                    let current = deep.add_node_with_id(node(index, identifier("deep")));
+                    connect_ast(&mut deep, deep_function, current);
+                    connect_cfg(&mut deep, predecessor, current, CfgEdgeKind::Sequential);
+                    predecessor = current;
+                }
+                compare_liveness_kernels(&deep, deep_function);
+                drop(deep);
+
+                let mut wide = CodePropertyGraph::new(Language::Rust);
+                let wide_function = wide.add_node_with_id(node(0, function()));
+                for index in 1..=100_000u32 {
+                    let variable =
+                        wide.add_node_with_id(node(index, variable(&format!("wide_{index}"))));
+                    connect_ast(&mut wide, wide_function, variable);
+                }
+                let left = wide.add_node_with_id(node(100_001, identifier("wide_99999")));
+                let right = wide.add_node_with_id(node(100_002, identifier("wide_100000")));
+                let exit = wide.add_node_with_id(node(100_003, CpgNodeKind::Return));
+                for child in [left, right, exit] {
+                    connect_ast(&mut wide, wide_function, child);
+                }
+                for (source, target, kind) in [
+                    (wide_function, left, CfgEdgeKind::ConditionalTrue),
+                    (wide_function, right, CfgEdgeKind::ConditionalFalse),
+                    (left, exit, CfgEdgeKind::Sequential),
+                    (right, exit, CfgEdgeKind::Sequential),
+                ] {
+                    connect_cfg(&mut wide, source, target, kind);
+                }
+                compare_liveness_kernels(&wide, wide_function);
+            })
+            .expect("spawn 256 KiB liveness thread")
+            .join()
+            .expect("deep and wide liveness must not overflow the native stack");
+    }
+
+    #[cfg(feature = "lang-rust")]
+    #[test]
+    fn parser_built_rust_liveness_is_exact_across_kernel_dispatch() {
+        use crate::{CpgBuilder, TreeSitterCpgBuilder};
+
+        let source = r#"
+            fn choose(flag: bool, input: i64) -> i64 {
+                let mut result = input;
+                if flag {
+                    result = input + 1;
+                } else {
+                    result = input - 1;
+                }
+                result
+            }
+        "#;
+        let cpg = TreeSitterCpgBuilder::new()
+            .build(source, Language::Rust)
+            .expect("build parser-backed CPG");
+        let function = cpg.functions().next().expect("choose function").id;
+        compare_liveness_kernels(&cpg, function);
+
+        let result = liveness(&cpg, function).expect("parser-backed liveness");
+        assert!(result
+            .live_in
+            .values()
+            .flatten()
+            .any(|variable| &**variable == "input"));
+        assert!(result
+            .live_in
+            .values()
+            .flatten()
+            .any(|variable| &**variable == "flag"));
+    }
+
     proptest! {
         #![proptest_config(ProptestConfig::with_cases(96))]
 
