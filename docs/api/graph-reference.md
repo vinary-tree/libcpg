@@ -311,6 +311,23 @@ or index invalidation. `max_candidates_per_name` limits only retained node ids;
 [Usage 32](../usage/32-exact-call-resolution.md) and
 [ADR-0064](../design/0064-retain-ordered-resolver-symbol-index.md).
 
+### Datalog EDB export
+
+`export_datalog(&CodePropertyGraph) -> DatalogFacts` is a feature-free,
+immutable export of represented graph relations. `DatalogFacts`
+contains typed `nodes`, `edges`, `ast_child`,
+`cfg`, `dfg`, dependence, call, type, reference, scope,
+import/export, and embedded declared-type vectors.
+
+`DatalogFacts::souffle_files` returns twenty canonical in-memory RFC 4180
+tab-separated fact files; consuming Soufflé input directives must set
+`rfc4180=true` and `delimiter="\t"`. It performs no I/O.
+`DatalogFacts::cpg_edges` and
+`DatalogEdgeFact::to_cpg_edge` reconstruct the lossless ordered edge
+snapshot. See [Usage 33](../usage/33-datalog-export.md), the
+[component contract](../components/graph/datalog-export.md), and
+[ADR-0065](../design/0065-feature-free-datalog-edb-export.md).
+
 ### IFDS/IDE procedure summaries
 
 The feature-free interprocedural framework evaluates a caller-defined

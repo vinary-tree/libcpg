@@ -326,6 +326,10 @@ development, or jump to the layer you need:
     Scope-indexed exact relations, first-non-empty shadowing, full-count
     ambiguity, whole-lifecycle index economics, automaton non-semantics, and
     independent stack/heap bounds define lawful resolver acceleration.
+48. **[48 — Datalog and relational CPG semantics](48-datalog-relational-semantics.md).**
+    Typed EDB relations, least fixed points, composition in **Rel**, exact edge
+    reconstruction, and the distinct equality-saturation boundary define the
+    declarative query surface.
 
 The later chapters define deterministic projection structure, architecture
 metrics, inspectable evidence, and their interpretation limits.

@@ -63,6 +63,9 @@ PDG). A query can therefore mix syntax, control flow, and data flow freely.
 - **IFDS/IDE procedure summaries** — feature-free generic facts and summary
   lattices, validated callee-first SCC scheduling, bounded recursive fixed
   points, and explicit external/unresolved/capped evidence.
+- **Datalog fact export** — feature-free deterministic EDB relations for every
+  represented CPG overlay, plus lossless edge snapshots and caller-owned
+  Soufflé buffers; external engines retain rule evaluation and fixed points.
 - **Interprocedural effect summaries** — feature-free global, parameter, and
   field read/write places; transitive purity; parameter-to-return flow; and
   checked constant returns over the same bounded call-SCC schedule, with

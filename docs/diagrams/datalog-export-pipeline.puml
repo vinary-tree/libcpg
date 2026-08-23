@@ -1,0 +1,33 @@
+@startuml
+!include _libcpg-theme.iuml
+
+title Feature-free Datalog EDB export
+
+rectangle "Immutable typed CPG\n<latex>G=(V,E,s,t,k,\ell)</latex>" as CPG #DBE4FF
+rectangle "Iterative exporter\nnode scan · edge scan\nexplicit heap iteration" as Export #D3F9D8
+database "Canonical EDB bundle" as EDB #FFF3BF {
+  rectangle "query relations\nast_child · cfg · dfg · cdep\ncall · type · scope · import" as Query #FFF3BF
+  rectangle "lossless master\ncpg_edge(id, s, t, kind, detail, label)" as Master #FFE8CC
+}
+file "In-memory .facts buffers\nRFC 4180 symbols · stable rows" as Buffers #E5DBFF
+cloud "External Datalog engine\ncaller-owned IDB rules\nleast fixed point" as Engine #C3FAE8
+rectangle "Derived relations\nVarPointsTo · flow · violation" as Results #FCC2D7
+
+CPG -[#4C6EF5,bold]-> Export : borrow only
+Export -[#2F9E44,bold]-> Query : classify + set-sort
+Export -[#E8590C,bold]-> Master : preserve multiplicity
+EDB -[#7048E8,bold]-> Buffers : render without I/O
+Buffers -[#0CA678,bold]-> Engine : caller writes/adopts
+Engine -[#C2255C,bold]-> Results : evaluate rules
+
+note bottom of Export
+  Constant native call depth
+  No parser · no subprocess · no graph mutation
+end note
+
+note bottom of Engine
+  External trust, time, memory,
+  and output limits remain caller-owned
+end note
+
+@enduml

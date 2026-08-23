@@ -439,6 +439,9 @@ So the safe pattern is: build (single-threaded, `&mut`), then analyse
 - [Deterministic CPG diff](cpg-diff.md) — feature-free symmetric GED alignment,
   exact translated node/typed-edge edits, and represented-PDG change
   classification under explicit complete-or-error budgets.
+- [Datalog EDB export](datalog-export.md) — feature-free canonical AST, CFG,
+  DFG, PDG, call, type, scope, and import relations plus a lossless typed edge
+  snapshot for external rule engines.
 - [Advisory session-protocol analysis](session-analysis.md) — definition-
   resolved per-channel endpoint traces, shallow payload types, and conservative
   three-valued binary linear-duality evidence under the `rholang` feature.

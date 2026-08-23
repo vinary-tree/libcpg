@@ -214,6 +214,8 @@ You now have a CPG and can read its shape. The rest of the usage guide builds on
 - **[Exact call resolution](32-exact-call-resolution.md)** — add only uniquely
   evidenced call topology and interpret ambiguity, caps, exact spelling, and
   the intentionally absent fuzzy fallback.
+- **[Datalog export](33-datalog-export.md)** — turn represented overlays into
+  canonical typed EDB relations for a caller-selected external rule engine.
 
 For the conceptual foundations, start at the [theory overview](../theory/00-overview.md); for the corrected API surface, see the [graph reference](../api/graph-reference.md) and [builder reference](../api/builder-reference.md).
 

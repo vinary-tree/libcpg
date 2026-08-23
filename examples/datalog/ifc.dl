@@ -1,0 +1,19 @@
+// Explicit and implicit information flow over DFG and control dependence.
+.decl dfg(source:number, target:number, kind:symbol)
+.input dfg(IO=file, rfc4180=true, delimiter="\t")
+.decl cdep(source:number, target:number)
+.input cdep(IO=file, rfc4180=true, delimiter="\t")
+.decl high(node:number)
+.input high(IO=file, rfc4180=true, delimiter="\t")
+.decl low(node:number)
+.input low(IO=file, rfc4180=true, delimiter="\t")
+
+.decl flow(source:number, sink:number)
+flow(source, sink) :- dfg(source, sink, _).
+flow(source, sink) :- cdep(source, sink).
+flow(source, sink) :- flow(source, middle), flow(middle, sink).
+
+.decl violation(source:number, sink:number)
+violation(source, sink) :- high(source), low(sink), flow(source, sink).
+
+.output violation

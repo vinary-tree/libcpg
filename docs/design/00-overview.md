@@ -108,8 +108,9 @@ alternatives is folklore, and a decision without its costs is marketing.
 | [0062 — Bounded exact function-analysis cache](0062-bounded-function-analysis-cache.md) | Reuse canonical function-local CFG/DFG/PDG plans across revisions through caller-owned hard bounds, full-key equality, deterministic LRU eviction, and exact cross-boundary bypasses. | Accepted |
 | [0063 — Runtime-dispatched dense bit-set kernels](0063-runtime-dispatched-bitset-kernels.md) | Preserve one portable lattice API while selecting measured AVX2 union/intersection kernels on capable x86/x86-64 hosts, with scalar tails, non-x86 fallback, and scalar early-exit subset. | Accepted |
 | [0064 — Retain the ordered exact resolver symbol index](0064-retain-ordered-resolver-symbol-index.md) | Keep call-local exact `BTreeMap` semantics after DAT, DynamicDawg, prefix, fuzzy, SIMD, version, and resource controls reject a production dependency. | Accepted |
+| [0065 — Feature-free Datalog EDB export](0065-feature-free-datalog-edb-export.md) | Emit canonical typed relations and a lossless edge snapshot while leaving rule parsing, evaluation, I/O, and resource policy to an external engine. | Accepted |
 
-These sixty-four are not independent. ADR-0001 fixes the substrate that all analyses
+These sixty-five are not independent. ADR-0001 fixes the substrate that all analyses
 write onto; ADR-0002 and ADR-0005 together explain how a language reaches that
 substrate and what you must switch on to get there; ADR-0003 and ADR-0004 are
 two analyses *over* the substrate (one always-on, one feature-gated) that each
@@ -296,6 +297,10 @@ prefix, fuzzy, DynamicDawg, SIMD, release, and resource campaigns distinguish
 lookup-only gains from the cold resolver lifecycle. The ordered call-local map
 remains because it preserves topology semantics, wins whole-resolver cost, and
 requires no hidden ownership or invalidation epoch.
+ADR-0065 translates ADR-0001's immutable typed overlays into canonical
+relational EDBs. It retains a lossless master edge relation, exposes convenient
+typed query relations, and leaves Datalog parsing and fixed-point execution
+outside libcpg's feature and trust boundaries.
 
 ![Module architecture of libcpg, showing the graph core and the analysis modules layered over it](../diagrams/module-architecture.svg)
 
@@ -307,7 +312,7 @@ requires no hidden ownership or invalidation epoch.
   (`0001`…). Numbers are never reused; a reversed decision is marked
   *Superseded* and a new record supersedes it, so history stays legible.
 - **Status lifecycle.** `Proposed → Accepted → (Superseded by NNNN | Deprecated)`.
-  All sixty-four current records are **Accepted** and reflect the shipped `v0.1.1`
+  All sixty-five current records are **Accepted** and reflect the shipped `v0.1.1`
   code.
 - **Grounding.** Every claim here is traceable to source: the
   [`Cargo.toml`](../engineering/01-build-and-features.md) feature block, the

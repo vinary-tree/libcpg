@@ -1,0 +1,17 @@
+// Doop-lite allocation propagation over libcpg's canonical EDB.
+.decl dfg(source:number, target:number, kind:symbol)
+.input dfg(IO=file, rfc4180=true, delimiter="\t")
+.decl declared_type(node:number, role:symbol, name:symbol, is_reference:number, is_mutable:number)
+.input declared_type(IO=file, rfc4180=true, delimiter="\t")
+
+.decl Assign(source:number, target:number)
+Assign(source, target) :- dfg(source, target, "def_use").
+
+.decl Allocation(heap:number)
+Allocation(heap) :- declared_type(heap, "allocation", _, _, _).
+
+.decl VarPointsTo(variable:number, heap:number)
+VarPointsTo(variable, heap) :- Allocation(heap), Assign(heap, variable).
+VarPointsTo(dst, heap) :- VarPointsTo(src, heap), Assign(src, dst).
+
+.output VarPointsTo

@@ -128,6 +128,20 @@ cold stage, lost exact operations, lacked a publishable correct release, or
 failed the required heap bound. See
 [ADR-0064](../design/0064-retain-ordered-resolver-symbol-index.md).
 
+### Stage 4 — optional relational export
+
+The feature-free [Datalog EDB exporter](../components/graph/datalog-export.md)
+borrows the completed immutable CPG and scans nodes and edges into canonical
+AST, CFG, DFG, dependence, call, type, reference, scope, and import relations.
+It also retains a lossless master edge relation, so Datalog set semantics do
+not erase parallel overlay edges. Explicit iteration keeps native call depth
+independent of graph depth.
+
+The architecture boundary ends at typed tuples and in-memory `.facts`
+buffers. Caller-owned file I/O, Soufflé parsing, IDB fixed points, rule trust,
+and engine resource controls stay outside libcpg. See
+[ADR-0065](../design/0065-feature-free-datalog-edb-export.md).
+
 #### Optional post-C1 virtual-call type refinement
 
 After the graph carries nominal ownership, `Inherits`/`Implements`, receiver

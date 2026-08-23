@@ -14,6 +14,7 @@ pub mod concurrency;
 mod condensation;
 mod cycles;
 pub mod dataflow;
+mod datalog;
 mod diff;
 mod dominators;
 mod dsm;
@@ -112,6 +113,12 @@ pub use condensation::{
 };
 
 pub use cycles::{simple_cycles, CycleOptions, CycleSet, MAX_CYCLE_LENGTH, MAX_SIMPLE_CYCLES};
+
+pub use datalog::{
+    export_datalog, BinaryFact, CallFact, CfgFact, DatalogCallKind, DatalogEdgeFact, DatalogFacts,
+    DeclaredTypeFact, DeclaredTypeRole, DfgFact, NodeFact, SouffleFactFile, DOOP_LITE_RULES,
+    IFC_RULES,
+};
 
 pub use diff::{
     cpg_diff, ChangeKind, CpgChange, CpgDiff, CpgDiffOptions, CpgElement, DiffEdge, DiffNode,

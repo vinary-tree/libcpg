@@ -1,6 +1,6 @@
 # Diagram catalog
 
-Every figure in the `libcpg` documentation is a **committed source** (`.puml` for PlantUML, `.dot` for Graphviz) rendered to a **committed `.svg`** that the Markdown pages embed. Sources are version-controlled so figures are reproducible and reviewable; SVGs are committed so they render on GitHub (which does not render PlantUML/Graphviz inline). This directory holds all 132 figures plus the shared theme.
+Every figure in the `libcpg` documentation is a **committed source** (`.puml` for PlantUML, `.dot` for Graphviz) rendered to a **committed `.svg`** that the Markdown pages embed. Sources are version-controlled so figures are reproducible and reviewable; SVGs are committed so they render on GitHub (which does not render PlantUML/Graphviz inline). This directory holds all 137 figures plus the shared theme.
 
 ## Conventions
 
@@ -143,6 +143,7 @@ Grouped by subject. Each row: the source (its `.svg` sibling is embedded by the 
 | `bitset-kernel-dispatch.puml` | activity/decision flow | dense union/intersection → measured width gate → cached runtime AVX2 or portable scalar → exact scalar tail and change flag | components/graph/dataflow-framework, design/0063, architecture/data-flow, scientific/58 |
 | `resolver-index-decision.puml` | activity/evidence decision | exact scope/import names → ordered symbol buckets → unique topology or conservative negative result, with measured DAT/DAWG/prefix/fuzzy rejection paths | components/graph/call-resolution, design/0064, security/22, usage/32 |
 | `resolver-index-resource-boundary.puml` | component/resource growth | 256 KiB iterative index lifecycles versus query-local dense transducer rows, geometric RSS observations, and the 4 GiB no-swap ceiling | design/0064, scientific/59, security/22 |
+| `datalog-export-pipeline.puml` | component/ownership flow | immutable typed CPG → iterative canonical EDB and lossless edge snapshot → in-memory fact buffers → external caller-owned fixed point | components/graph/datalog-export, theory/48, design/0065, usage/33, scientific/60, security/23 |
 | `bitset-crossover-evidence.puml` | experiment/decision flow | scalar control → four/eight-word candidate measurements → rejected tail regression, retained crossover, and scalar subset policy | design/0063, engineering/optimization-ledger, scientific/58 |
 | `member-field-flow.puml` | typed topology | member/index reads and writes plus evidence-bounded member-to-field resolution | theory/03, design/0028, components/builder/dfg, components/graph/edges, architecture/data-flow, scientific/23 |
 | `def-use-example.dot` | graph | Def-use / reaching-def edges | theory/03, components/graph/edges, components/builder/dfg, scientific/02 |

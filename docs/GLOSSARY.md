@@ -385,6 +385,14 @@ M = E - N + 2
 
 where $`E`$ is the number of CFG edges and $`N`$ the number of CFG nodes (for a single connected component with one entry and one exit). See [`theory/02-control-flow-and-complexity.md`](theory/02-control-flow-and-complexity.md).
 
+### Datalog EDB / IDB
+
+An **extensional database** (EDB) is the finite set of input relation facts
+given to a Datalog program. An **intensional database** (IDB) is the set of
+relations derived by rules at the program's least fixed point. libcpg exports
+canonical EDBs and leaves IDB evaluation to an external engine. See
+[Theory 48](theory/48-datalog-relational-semantics.md).
+
 ### Data dependence
 
 A [PDG](#program-dependence-graph-pdg) edge kind (`DataDependence`): node $`u`$ (a use) is data-dependent on node $`d`$ (a definition) when $`d`$ defines a value that $`u`$ reads and the definition can reach the use. `libcpg` derives these by re-projecting DFG `DefUse`/`ReachingDef` edges within a function. See [`theory/04-program-dependence-and-slicing.md`](theory/04-program-dependence-and-slicing.md).
@@ -975,9 +983,26 @@ from repeated graph searches without storing the $`n\times n`$ matrix. See
 
 A definition of a variable that reaches a program point with no intervening redefinition on some path. The `ReachingDef` DFG edge connects such a definition to the use it reaches. Computed by [AST-ordered reaching definitions](#ast-ordered-reaching-definitions). See [`theory/03-data-flow-and-reaching-definitions.md`](theory/03-data-flow-and-reaching-definitions.md).
 
+### Rel
+
+**Rel** is the category whose objects are sets and whose morphisms are binary
+relations. Identity is the diagonal relation and composition is existential
+join. It supplies a precise compositional interpretation for binary CPG
+relations without turning libcpg into a general category-theory framework.
+See [Theory 48](theory/48-datalog-relational-semantics.md).
+
 ### ReLU
 
 The **Rectified Linear Unit** activation $`\mathrm{ReLU}(x) = \max(0, x)`$, applied element-wise after each GNN [aggregation](#aggregation-gnn) to introduce nonlinearity. See [Message passing](#message-passing-gnn).
+
+### RFC 4180 tab-separated values
+
+**Request for Comments (RFC) 4180** defines a quoted delimited-field format.
+libcpg uses its quoting rules with a tab delimiter for Soufflé `.facts`
+buffers: every symbol is quoted, and a double quote inside a symbol is doubled.
+The consuming `.input` directive must opt into `rfc4180=true` with the
+same tab delimiter. See the
+[Datalog-export contract](components/graph/datalog-export.md).
 
 ### Rholang
 
