@@ -7,17 +7,18 @@ use std::mem::size_of;
 use libcpg::builder::{FunctionAnalysisCache, FunctionAnalysisCacheLimits};
 use libcpg::pattern::Vf2Matcher;
 use libcpg::{
-    call_graph_projection, call_graph_sccs, dominator_tree, liveness, post_dominator_tree,
-    structural_clone_classes, wl_labels, BitSetDomain, CfgEdgeKind, CfgExtractor,
-    CodePropertyGraph, CpgBuilder, CpgBuilderConfig, CpgEdge, CpgEdgeKind, CpgNode, CpgNodeKind,
-    DfgExtractor, GraphProjection, Language, Lattice, MethodSignature, NodeId, PdgBuilder, ScopeId,
-    SourceRange, SubgraphMatcher, TreeSitterCpgBuilder, Visibility,
+    build_symbol_table, call_graph_projection, call_graph_sccs, dominator_tree, liveness,
+    post_dominator_tree, resolve_calls, structural_clone_classes, wl_labels, BitSetDomain,
+    CfgEdgeKind, CfgExtractor, CodePropertyGraph, CpgBuilder, CpgBuilderConfig, CpgEdge,
+    CpgEdgeKind, CpgNode, CpgNodeKind, DfgExtractor, GraphProjection, Language, Lattice,
+    MethodSignature, NodeId, PdgBuilder, ScopeId, SourceRange, SubgraphMatcher,
+    TreeSitterCpgBuilder, Visibility,
 };
 
 use support::{
-    assert_synthetic_graph, assert_traversal_graph, linear_graph, parallel_analysis_graph,
-    synthetic_graph, traversal_graph, CorpusFile, SyntheticShape, CROSS_LANGUAGE, FIXTURE_SEED,
-    RUST_LARGE, RUST_MEDIUM,
+    assert_resolver_fixture, assert_synthetic_graph, assert_traversal_graph, linear_graph,
+    parallel_analysis_graph, resolver_fixture, synthetic_graph, traversal_graph, CorpusFile,
+    ResolverCase, SyntheticShape, CROSS_LANGUAGE, FIXTURE_SEED, RUST_LARGE, RUST_MEDIUM,
 };
 
 fn construction() -> usize {
@@ -294,6 +295,42 @@ fn repeated_wide_liveness(repetitions: usize) -> usize {
     checksum
 }
 
+fn repeated_resolver(case: ResolverCase, repetitions: usize) -> usize {
+    const SYMBOLS: usize = 32_768;
+    let fixture = resolver_fixture(SYMBOLS, SYMBOLS, case);
+    let mut oracle_graph = fixture.graph.clone();
+    let oracle = resolve_calls(&mut oracle_graph, &fixture.config);
+    assert_resolver_fixture(&fixture, &oracle_graph, &oracle);
+
+    let mut checksum = 0usize;
+    for _ in 0..repetitions {
+        let mut graph = fixture.graph.clone();
+        let result = resolve_calls(black_box(&mut graph), black_box(&fixture.config));
+        checksum = checksum
+            .wrapping_add(result.resolutions.len())
+            .wrapping_add(result.topology_edges)
+            .wrapping_add(result.ambiguous)
+            .wrapping_add(result.unresolved);
+    }
+    checksum
+}
+
+fn repeated_resolver_symbol_table(repetitions: usize) -> usize {
+    const SYMBOLS: usize = 32_768;
+    let fixture = resolver_fixture(SYMBOLS, SYMBOLS, ResolverCase::Exact);
+    let mut checksum = 0usize;
+    for _ in 0..repetitions {
+        let mut graph = fixture.graph.clone();
+        let table = build_symbol_table(black_box(&mut graph), black_box(&fixture.config));
+        assert_eq!(table.functions_by_name.len(), SYMBOLS + 1);
+        checksum = checksum
+            .wrapping_add(table.enclosing_scope.len())
+            .wrapping_add(table.functions_by_name.len())
+            .wrapping_add(table.functions_by_scope.len());
+    }
+    checksum
+}
+
 const REANALYZE_FUNCTIONS: usize = 64;
 const REANALYZE_STATEMENTS: usize = 32;
 
@@ -508,6 +545,10 @@ fn main() {
         "pattern_vf2" => repeated_vf2(repetitions),
         "bitset_primitives" => repeated_bitset_primitives(repetitions),
         "dataflow_liveness_wide" => repeated_wide_liveness(repetitions),
+        "resolver_symbol_table" => repeated_resolver_symbol_table(repetitions),
+        "resolver_exact" => repeated_resolver(ResolverCase::Exact, repetitions),
+        "resolver_unresolved" => repeated_resolver(ResolverCase::Unresolved, repetitions),
+        "resolver_ambiguous" => repeated_resolver(ResolverCase::Ambiguous, repetitions),
         "parallel_analysis_serial" => repeated_parallel_analysis(false, repetitions),
         "parallel_analysis_parallel" => repeated_parallel_analysis(true, repetitions),
         "dominator_analysis" => {

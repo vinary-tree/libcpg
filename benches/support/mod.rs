@@ -529,7 +529,7 @@ pub struct ResolverFixture {
 fn add_ast_node(graph: &mut CodePropertyGraph, parent: NodeId, kind: CpgNodeKind) -> NodeId {
     let node = graph
         .add_node(CpgNode::new(NodeId::new(0), kind, SourceRange::default()).with_parent(parent));
-    graph.connect_unique(parent, node, CpgEdgeKind::AstChild);
+    graph.connect(parent, node, CpgEdgeKind::AstChild);
     node
 }
 

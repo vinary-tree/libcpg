@@ -15,7 +15,9 @@ case "$workload" in
         parallel_analysis_parallel | similarity_wl | analyze_corpus | \
         reanalyze_fresh | reanalyze_cold | reanalyze_all_hit | reanalyze_edit_one | \
         reanalyze_shared | reanalyze_half_churn | reanalyze_eviction | \
-        reanalyze_disabled | bitset_primitives | dataflow_liveness_wide | all) ;;
+        reanalyze_disabled | bitset_primitives | dataflow_liveness_wide | \
+        resolver_symbol_table | resolver_exact | resolver_unresolved | \
+        resolver_ambiguous | all) ;;
     *)
         echo "unknown workload: $workload" >&2
         echo "expected cpg_construction, traversal_primitives, dfg_extraction," >&2
@@ -24,7 +26,8 @@ case "$workload" in
         echo "similarity_wl, analyze_corpus, reanalyze_fresh, reanalyze_cold," >&2
         echo "reanalyze_all_hit, reanalyze_edit_one, reanalyze_shared," >&2
         echo "reanalyze_half_churn, reanalyze_eviction, reanalyze_disabled," >&2
-        echo "bitset_primitives, dataflow_liveness_wide, or all" >&2
+        echo "bitset_primitives, dataflow_liveness_wide, resolver_symbol_table," >&2
+        echo "resolver_exact, resolver_unresolved, resolver_ambiguous, or all" >&2
         exit 2
         ;;
 esac
