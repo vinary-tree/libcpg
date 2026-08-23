@@ -319,6 +319,10 @@ name = "reanalyze"
 harness = false
 required-features = ["lang-rust"]
 
+[[bench]]
+name = "resolve_calls"
+harness = false
+
 [[example]]
 name = "profile_workloads"
 path = "benches/profile_workloads.rs"

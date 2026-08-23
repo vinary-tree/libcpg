@@ -1,8 +1,9 @@
 #![allow(dead_code)]
 
 use libcpg::{
-    CfgEdgeKind, CodePropertyGraph, CpgEdgeKind, CpgNode, CpgNodeKind, DfgEdgeKind, Language,
-    MethodSignature, NodeId, ProjectionKind, ScopeId, SourceRange, Visibility,
+    CallGraphResolution, CfgEdgeKind, CodePropertyGraph, Confidence, CpgEdgeKind, CpgNode,
+    CpgNodeKind, DfgEdgeKind, Language, MethodSignature, NodeId, ProjectionKind, ResolveConfig,
+    ScopeId, SourceRange, Visibility,
 };
 
 /// Stable seed used by every synthetic performance fixture.
@@ -471,4 +472,228 @@ pub fn assert_dominator_diamond_fixture(
         stages * 2,
         "control-dependence oracle"
     );
+}
+
+/// Resolver behavior isolated by the H14B benchmark and profile fixtures.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ResolverCase {
+    /// Every call has one exact declaration at the root scope.
+    Exact,
+    /// Every call names a symbol absent from the complete graph.
+    Unresolved,
+    /// Every call name has two exact declarations in the same scope.
+    Ambiguous,
+    /// Exact declarations are reached through a caller-selected scope depth.
+    DeepExact { scope_depth: usize },
+}
+
+impl ResolverCase {
+    pub const fn name(self) -> &'static str {
+        match self {
+            Self::Exact => "exact",
+            Self::Unresolved => "unresolved",
+            Self::Ambiguous => "ambiguous",
+            Self::DeepExact { .. } => "deep_exact",
+        }
+    }
+
+    const fn declarations_per_name(self) -> usize {
+        match self {
+            Self::Ambiguous => 2,
+            Self::Exact | Self::Unresolved | Self::DeepExact { .. } => 1,
+        }
+    }
+
+    const fn scope_depth(self) -> usize {
+        match self {
+            Self::DeepExact { scope_depth } => scope_depth,
+            Self::Exact | Self::Unresolved | Self::Ambiguous => 1,
+        }
+    }
+
+    const fn creates_topology(self) -> bool {
+        matches!(self, Self::Exact | Self::DeepExact { .. })
+    }
+}
+
+/// Deterministic exact-name resolver fixture with an analytical oracle.
+pub struct ResolverFixture {
+    pub graph: CodePropertyGraph,
+    pub calls: Vec<NodeId>,
+    pub expected_targets: Vec<Option<NodeId>>,
+    pub case: ResolverCase,
+    pub symbol_count: usize,
+    pub config: ResolveConfig,
+}
+
+fn add_ast_node(graph: &mut CodePropertyGraph, parent: NodeId, kind: CpgNodeKind) -> NodeId {
+    let node = graph
+        .add_node(CpgNode::new(NodeId::new(0), kind, SourceRange::default()).with_parent(parent));
+    graph.connect_unique(parent, node, CpgEdgeKind::AstChild);
+    node
+}
+
+/// Construct one feature-free resolver workload.
+pub fn resolver_fixture(
+    symbol_count: usize,
+    call_count: usize,
+    case: ResolverCase,
+) -> ResolverFixture {
+    assert!(symbol_count > 0, "resolver fixtures require a symbol");
+    let mut graph = CodePropertyGraph::new(Language::Rust);
+    let root = graph.add_node(CpgNode::new(
+        NodeId::new(0),
+        CpgNodeKind::Root,
+        SourceRange::default(),
+    ));
+
+    let mut first_targets = Vec::with_capacity(symbol_count);
+    for symbol in 0..symbol_count {
+        let name = format!("resolver_symbol_{symbol:06}");
+        let mut first = None;
+        for _ in 0..case.declarations_per_name() {
+            let declaration = add_ast_node(
+                &mut graph,
+                root,
+                CpgNodeKind::Function {
+                    signature: Box::new(MethodSignature {
+                        name: name.clone().into(),
+                        params: Default::default(),
+                        return_type: None,
+                        is_static: false,
+                        is_async: false,
+                        visibility: Visibility::Private,
+                    }),
+                },
+            );
+            first.get_or_insert(declaration);
+        }
+        first_targets.push(first.expect("each resolver name has a declaration"));
+    }
+
+    let caller = add_ast_node(
+        &mut graph,
+        root,
+        CpgNodeKind::Function {
+            signature: Box::new(MethodSignature {
+                name: "resolver_caller".into(),
+                params: Default::default(),
+                return_type: None,
+                is_static: false,
+                is_async: false,
+                visibility: Visibility::Private,
+            }),
+        },
+    );
+    let mut call_scope = caller;
+    for _ in 0..case.scope_depth() {
+        call_scope = add_ast_node(
+            &mut graph,
+            call_scope,
+            CpgNodeKind::Block {
+                scope: ScopeId::GLOBAL,
+            },
+        );
+    }
+
+    let mut calls = Vec::with_capacity(call_count);
+    let mut expected_targets = Vec::with_capacity(call_count);
+    for call_index in 0..call_count {
+        let symbol = call_index % symbol_count;
+        let call = add_ast_node(
+            &mut graph,
+            call_scope,
+            CpgNodeKind::Call {
+                target: None,
+                is_method: false,
+            },
+        );
+        let name = if case == ResolverCase::Unresolved {
+            format!("missing_symbol_{symbol:06}")
+        } else {
+            format!("resolver_symbol_{symbol:06}")
+        };
+        add_ast_node(
+            &mut graph,
+            call,
+            CpgNodeKind::Identifier {
+                name: name.into(),
+                definition: None,
+            },
+        );
+        calls.push(call);
+        expected_targets.push(case.creates_topology().then_some(first_targets[symbol]));
+    }
+
+    let max_scope_depth = u32::try_from(case.scope_depth().saturating_add(4))
+        .expect("resolver benchmark scope depth exceeds u32");
+    ResolverFixture {
+        graph,
+        calls,
+        expected_targets,
+        case,
+        symbol_count,
+        config: ResolveConfig {
+            max_scope_depth,
+            max_candidates_per_name: 64,
+            max_calls: call_count,
+            resolve_methods: true,
+        },
+    }
+}
+
+/// Check every result dimension relied on by the resolver performance harness.
+pub fn assert_resolver_fixture(
+    fixture: &ResolverFixture,
+    graph: &CodePropertyGraph,
+    result: &CallGraphResolution,
+) {
+    assert_eq!(
+        graph.node_count(),
+        fixture.graph.node_count(),
+        "node oracle"
+    );
+    assert_eq!(result.resolutions.len(), fixture.calls.len(), "call oracle");
+    let expected_confidence = match fixture.case {
+        ResolverCase::Exact | ResolverCase::DeepExact { .. } => Confidence::ExactInFile,
+        ResolverCase::Unresolved => Confidence::Unresolved,
+        ResolverCase::Ambiguous => Confidence::BareNameAmbiguous,
+    };
+    let expected_candidate_count = usize::from(fixture.case != ResolverCase::Unresolved)
+        * fixture.case.declarations_per_name();
+    for (((&call, resolution), expected_target), expected_call) in result
+        .resolutions
+        .iter()
+        .zip(&fixture.expected_targets)
+        .zip(&fixture.calls)
+    {
+        assert_eq!(call, *expected_call, "call ordering oracle");
+        assert_eq!(resolution.confidence, expected_confidence);
+        assert_eq!(resolution.target, *expected_target);
+        assert_eq!(resolution.candidate_count, expected_candidate_count);
+        assert_eq!(
+            resolution.candidates.len(),
+            expected_candidate_count.min(fixture.config.max_candidates_per_name),
+        );
+        assert!(!resolution.candidates_truncated);
+        assert!(matches!(
+            graph.node(call).map(|node| &node.kind),
+            Some(CpgNodeKind::Call { target, .. }) if target == expected_target
+        ));
+    }
+    let expected_topology = if fixture.case.creates_topology() {
+        fixture.calls.len() * 2
+    } else {
+        0
+    };
+    assert_eq!(result.topology_edges, expected_topology);
+    assert_eq!(
+        result.ambiguous,
+        usize::from(fixture.case == ResolverCase::Ambiguous) * fixture.calls.len()
+    );
+    assert_eq!(
+        result.unresolved,
+        usize::from(fixture.case == ResolverCase::Unresolved) * fixture.calls.len()
+    );
+    assert_eq!(result.external, 0);
 }
