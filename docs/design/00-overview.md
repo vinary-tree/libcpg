@@ -106,6 +106,7 @@ alternatives is folklore, and a decision without its costs is marketing.
 | [0060 — Build-local string canonicalization](0060-build-local-string-canonicalization.md) | Canonicalize equal mapper-produced `Arc<str>` contents within one CPG build using a temporary Fx set, without global state or public representation changes. | Accepted |
 | [0061 — Reusable WL refinement buffers](0061-reusable-wl-refinement-buffers.md) | Alternate call-local dense label matrices and reuse canonical/incident capacities across bounded rounds while preserving the fixed public labels and constant native call depth. | Accepted |
 | [0062 — Bounded exact function-analysis cache](0062-bounded-function-analysis-cache.md) | Reuse canonical function-local CFG/DFG/PDG plans across revisions through caller-owned hard bounds, full-key equality, deterministic LRU eviction, and exact cross-boundary bypasses. | Accepted |
+| [0063 — Runtime-dispatched dense bit-set kernels](0063-runtime-dispatched-bitset-kernels.md) | Preserve one portable lattice API while selecting measured AVX2 union/intersection kernels on capable x86/x86-64 hosts, with scalar tails, non-x86 fallback, and scalar early-exit subset. | Accepted |
 
 These sixty-two are not independent. ADR-0001 fixes the substrate that all analyses
 write onto; ADR-0002 and ADR-0005 together explain how a language reaches that
@@ -285,6 +286,10 @@ ADR-0062 extends that ownership discipline across caller-defined revision
 lifetimes. Exact canonical bytes and local ordinals permit reuse without
 retaining graph identities; boundary crossings deliberately recompute through
 the ordinary planners, and deterministic LRU limits both entry and byte growth.
+ADR-0063 narrows hardware specialization beneath the same public data-flow
+algebra. A measured width threshold and cached runtime capability select direct
+AVX2 word chunks, while scalar tails, subset early exit, and non-x86 fallback
+preserve exact behavior and portability.
 
 ![Module architecture of libcpg, showing the graph core and the analysis modules layered over it](../diagrams/module-architecture.svg)
 

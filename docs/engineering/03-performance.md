@@ -100,6 +100,7 @@ function scope.
 | Reflexion-model conformance | $`O(RHP+R\log R+A\log A)`$ time and $`O(R+A)`$ output/auxiliary space | First textual prefix mapping, ordered allowed/realized pairs, and path-sorted divergences; no parser, graph search, or I/O. |
 | Variable liveness | conventional $`O(H(B + E_b)W)`$ solve plus $`O(NW)`$ report replay | $`B`$ blocks, $`E_b`$ block edges, $`N`$ reachable CFG nodes, lattice height $`H \le F`$ for $`F`$ variables, and $`W = \lceil F/64 \rceil`$ machine words per state. |
 | Available / very-busy expressions | shared postorder fact construction is $`O((N_e+O_e)\log C)`$ for physical expression nodes $`N_e`$, operands $`O_e`$, and exact structural classes $`C`$; each solve has conventional $`O(H(B + E_b)W)`$ plus $`O(NW)`$ report replay; advisory candidate filtering adds dominance and bounded kill-reachability checks | $`F`$ structural expressions, $`H \le F`$, and $`W = \lceil F/64 \rceil`$; arena ownership is linear in physical syntax, while standalone CEK1 correctly charges occurrence-expanded logical size. |
+| Dense bit-set union/intersection | $`O(W)`$ time and $`O(1)`$ auxiliary space | Scalar for $`W<8`$; runtime AVX2 processes four `u64` words per iteration on supported x86/x86-64, then a scalar tail. Subset remains scalar with early exit. Kernel choice changes constants, not semantics or asymptotic cost. |
 | Interval value ranges | at most 64 visits per block plus two narrowing sweeps; $`O(D)`$ local expression heap state | Pointwise sorted environments drive the fixed point. Typed `Enter/Unary/BinaryLeft/BinaryRight/Exit` frames retain expression depth $`D`$ on the heap with constant native call depth. The exact public 100,000-level 256 KiB regression completed in 1.17 s on the recorded development host. |
 | Loop induction | at most $`C+1`$ invariant rounds after candidate-use summary construction; $`O(D)`$ expression heap state | Typed postorder frames memoize ordinary nested use summaries independent of node-id order; malformed cycles use exact iterative reachability. Typed affine/sign continuations retain logical depth $`D`$ on the heap, while the affine semantic budget remains three. A parent-before-child public 100,000-operator step completes on 256 KiB. |
 | Evidence-aware complexity | provider cost plus $`O(L + R)`$ composition | Computes the legacy AST fallback, validated function scope, loop forest/dominance, and induction report; then formats $`L`$ loops and combines $`R`$ recursion sites. Provider worst cases are documented with loop and induction analysis. |
@@ -151,14 +152,11 @@ once, loop bodies twice, and a path set cuts malformed AST cycles.
 
 ## Benchmark coverage and remaining gaps
 
-Thirty explicitly declared Criterion targets are active. Forty-one operation
-groups are feature-free; three more require the parser-language features used
-by DFG, PDG, and corpus measurement; `induction_analysis` registers one
-additional `algorithm-detection`-gated operation; `parallel_analysis` adds two
-feature-free operation groups. A full-feature measurement therefore exposes
-forty-seven groups. Every
-active group constructs and checks a deterministic oracle
-before Criterion enters the timed loop:
+Thirty-two explicitly declared Criterion targets are active. Most groups are
+feature-free; DFG, PDG, corpus, and reanalysis groups request their parser
+features, while `induction_analysis` additionally registers an
+`algorithm-detection`-gated group. Every active group constructs and checks a
+deterministic oracle before Criterion enters the timed loop:
 
 - `scc_analysis` measures public call-graph decomposition over 1,000- and
   10,000-function paths, rings, and cyclic clusters;
@@ -192,6 +190,10 @@ before Criterion enters the timed loop:
 - `dataflow_liveness` measures backward-May liveness over 512- and 4,096-node
   chains, 64- and 512-rung diamond ladders, and 128- and 1,024-node nested-loop
   families;
+- `bitset_domain` isolates union, intersection, and subset over 17 widths from
+  zero through 65,536 bits. Exact full/striped-set oracles run before timing;
+  the 511--769-bit cases expose vector/tail crossover, while subset is the
+  early-exit scalar control;
 - `induction_analysis` measures DFG-backed invariant and induction analysis on
   single counted loops with 64, 512, and 2,048 invariant definitions; with
   `algorithm-detection`, its `complexity_evidence` group measures the public
@@ -291,6 +293,10 @@ name = "dataflow_liveness"
 harness = false
 
 [[bench]]
+name = "bitset_domain"
+harness = false
+
+[[bench]]
 name = "induction_analysis"
 harness = false
 
@@ -384,6 +390,7 @@ cargo bench --bench scc_analysis --no-default-features -- --baseline before
 ./scripts/bench.sh cpg_construction --save-baseline before
 ./scripts/bench.sh pattern_matching --save-baseline before
 ./scripts/bench.sh dataflow_liveness --save-baseline before
+./scripts/bench.sh bitset_domain --save-baseline before
 ./scripts/bench.sh induction_analysis --save-baseline before
 cargo bench --bench dsm --no-default-features
 cargo bench --bench wl --no-default-features
@@ -432,6 +439,23 @@ $`O(N^2W)`$ replay. Replacing it with one reverse replay per block measured
 about 4.80 ms in the same harness and environment: approximately 92.6 times the
 throughput. The measurement supports the algorithmic diagnosis for this named
 shape and machine; it is not generalized to other inputs or hardware.
+
+### Runtime-dispatched bit-set finding
+
+The H14A primitive target showed that direct four-word AVX2 union and
+intersection amortize their machinery at eight storage words. A four-word
+minimum was rejected because a five-word input regressed union 12.75% and
+intersection 9.74%. The retained path improved the 8,192-bit operations by
+roughly 22--33% and the matched primitive profile by about 48% elapsed/cycles,
+while exact DHAT allocation remained identical.
+
+The established liveness families moved from -2.25% to +1.28%, all neutral or
+modestly favorable under the measurement threshold. A 100,000-variable
+profile was dominated by `variable_facts`, ordered maps, and the worklist. This
+is why `bitset_domain` is the kernel diagnosis and `dataflow_liveness` is the
+end-to-end acceptance control. See
+[validation 58](../scientific/58-runtime-dispatched-bitset-validation.md) and
+[ADR-0063](../design/0063-runtime-dispatched-bitset-kernels.md).
 
 ### How to add a benchmark
 

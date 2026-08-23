@@ -1,0 +1,49 @@
+@startuml
+!include _libcpg-theme.iuml
+title SIMD crossover — measured admission rather than assumed width
+
+rectangle "Scalar H13 control\nLLVM SSE2 auto-vectorization" as BASE #DBE4FF
+rectangle "Candidate: 4-word AVX2 minimum" as FOUR #FFF3BF
+rectangle "4 words\nUnion -2.92%\nIntersection -2.08% (noise)" as FOUR_EXACT #D3F9D8
+rectangle "5 words\nUnion +12.75%\nIntersection +9.74%" as FIVE #FFE3E3
+rectangle "Reject 4-word policy\none vector + tail is adverse" as REJECT #FFA8A8
+rectangle "Candidate: 8-word AVX2 minimum" as EIGHT #FFF3BF
+rectangle "511/512 bits\nabout 13–15% faster" as EIGHT_EXACT #D3F9D8
+rectangle "513-bit tail\nwithin noise" as EIGHT_TAIL #FFE8CC
+rectangle "767–769 bits\nabout 12–23% faster" as WIDER #D3F9D8
+rectangle "Retain 8-word threshold" as KEEP #B2F2BB
+rectangle "Subset predicate\nprofitable scalar early exit" as SUBSET #E5DBFF
+rectangle "Keep subset scalar" as SUBSET_KEEP #B2F2BB
+
+BASE --> FOUR : compare identical fixture
+FOUR --> FOUR_EXACT : exact vector width
+FOUR --> FIVE : one-word tail
+FOUR_EXACT --> REJECT : positive case is insufficient
+FIVE --> REJECT : falsifying case
+BASE --> EIGHT : compare identical fixture
+EIGHT --> EIGHT_EXACT
+EIGHT --> EIGHT_TAIL
+EIGHT --> WIDER
+EIGHT_EXACT --> KEEP
+EIGHT_TAIL --> KEEP
+WIDER --> KEEP
+BASE --> SUBSET : independent control
+SUBSET --> SUBSET_KEEP
+
+note bottom of KEEP
+  The threshold is eight storage words
+  (512 stored bits), not eight logical bits.
+end note
+
+legend right
+  |= colour |= meaning |
+  |<#DBE4FF>| immutable control |
+  |<#FFF3BF>| candidate policy |
+  |<#D3F9D8>| supporting measurement |
+  |<#FFE8CC>| neutral boundary |
+  |<#FFE3E3>| adverse measurement |
+  |<#FFA8A8>| rejected policy |
+  |<#E5DBFF>| distinct early-exit operation |
+  |<#B2F2BB>| retained decision |
+endlegend
+@enduml

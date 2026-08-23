@@ -1,0 +1,45 @@
+@startuml
+!include _libcpg-theme.iuml
+title Dense bit-set join — portable runtime dispatch and exact tail
+
+start
+:Receive equal-width `u64` slices\nand Union or Intersection; <<#DBE4FF>>
+if (fewer than 8 words?) then (yes)
+  :Scalar word loop\nupdate + exact changed flag; <<#FFE8CC>>
+else (no)
+  if (target is x86 or x86-64?) then (yes)
+    :Read cached `OnceLock` decision; <<#E5DBFF>>
+    if (runtime AVX2 detected?) then (yes)
+      :Select largest prefix divisible by 4; <<#FFF3BF>>
+      while (complete 4-word chunk remains?) is (yes)
+        :Unaligned 256-bit loads; <<#DBE4FF>>
+        :Bitwise OR or AND\ncompare old with new; <<#B2F2BB>>
+        :Unaligned destination store\nOR lane result into changed; <<#C3FAE8>>
+      endwhile (no)
+      :Scalar loop over 0..3 tail words\nOR exact tail result into changed; <<#FFE8CC>>
+    else (no)
+      :Scalar word loop\nupdate + exact changed flag; <<#FFE8CC>>
+    endif
+  else (no)
+    :Compile only scalar implementation; <<#FFE8CC>>
+  endif
+endif
+:Return unchanged public lattice value\nand semantic change Boolean; <<#B2F2BB>>
+stop
+
+floating note right
+  Subset is a separate scalar lane:
+  it returns at the first word for which
+  <latex>a_i \mathbin{\&} \neg b_i \ne 0</latex>.
+end note
+
+legend right
+  |= colour |= role |
+  |<#DBE4FF>| valid slice input / loads |
+  |<#E5DBFF>| one cached runtime decision |
+  |<#FFF3BF>| vector partition |
+  |<#B2F2BB>| equivalent bitwise semantics |
+  |<#C3FAE8>| exact store and change reduction |
+  |<#FFE8CC>| portable scalar oracle and tail |
+endlegend
+@enduml

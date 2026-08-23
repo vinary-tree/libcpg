@@ -1005,6 +1005,18 @@ definitions. libcpg implements Wegman–Zadeck SCCP [[22]](#references) and can
 refine structural reachability without mutating the CPG. See
 [`components/graph/sccp-analysis.md`](components/graph/sccp-analysis.md).
 
+### SIMD / AVX2 / runtime feature dispatch
+
+**Single instruction, multiple data** (SIMD) applies one operation to several
+independent lanes. **Advanced Vector Extensions 2** (AVX2) is the x86/x86-64
+256-bit integer-vector instruction set used by libcpg's private dense bit-set
+union and intersection kernels. **Runtime feature dispatch** checks the actual
+CPU before calling target-feature code; it differs from compiling the whole
+crate for that CPU. Widths below the measured crossover, subset checks, CPUs
+without AVX2, and non-x86 targets use the scalar oracle. See
+[ADR-0063](design/0063-runtime-dispatched-bitset-kernels.md) and
+[scientific validation 58](scientific/58-runtime-dispatched-bitset-validation.md).
+
 ### Structural clone class
 
 A deterministically ordered set of at least two stable `NodeId` values that

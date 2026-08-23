@@ -263,6 +263,14 @@ and `DataflowSolution::state_at` replays transfers inside a block. The engine
 reads the CPG but never materializes edges or mutates payloads. See the
 [monotone data-flow component guide](../components/graph/dataflow-framework.md).
 
+Dense May-union and Must-intersection joins retain one portable public
+semantics while a private width/runtime dispatcher selects scalar loops or
+four-word AVX2 chunks on supported x86/x86-64 hosts. All tails and non-x86
+targets use the scalar oracle; subset stays scalar for early exit. This is a
+storage-kernel decision beneath the analysis architecture, not a distinct
+analysis mode or feature configuration. See
+[ADR-0063](../design/0063-runtime-dispatched-bitset-kernels.md).
+
 The built-in `liveness(&cpg, function)` instance propagates canonical variable
 facts backward with union and returns sorted per-node `live_in` / `live_out`
 states. `dead_stores` then reports reachable non-parameter definitions whose

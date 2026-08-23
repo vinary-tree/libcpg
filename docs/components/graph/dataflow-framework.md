@@ -182,6 +182,45 @@ Both bit domains expose fixed width, membership, insertion, removal, and
 ascending iteration. Combining different widths is a caller error and panics;
 an analysis must derive every state from one fact universe.
 
+### Dense word kernels
+
+The domains store $`W = \lceil F/64 \rceil`$ words for $`F`$ facts. Their
+public algebra is portable and kernel-independent, but wide union and
+intersection use a private measured dispatcher:
+
+```text
+if W < 8: use the scalar loop
+else if x86/x86-64 runtime detection reports AVX2:
+    transform four u64 words per vector
+    transform the zero-to-three-word suffix with the scalar loop
+else: use the scalar loop
+```
+
+**Advanced Vector Extensions 2** (AVX2) is the x86 256-bit integer-vector
+instruction set; **single instruction, multiple data** (SIMD) is the general
+execution model. Runtime detection is cached once. Non-x86 builds contain only
+the scalar selection. Direct unaligned slice loads require no copied staging
+buffer, and the scalar tail preserves every width.
+
+For union, the returned change flag is
+$`\bigvee_i ((a_i \mathbin{\vert} b_i) \ne a_i)`$; intersection replaces
+$`\mathbin{\vert}`$ with $`\mathbin{\&}`$. Subset remains scalar because
+$`a_i \mathbin{\&} \neg b_i \ne 0`$ permits an immediate false result. The
+eight-word crossover is a benchmark result: a four-word minimum improved an
+exact vector but regressed five-word tails and was rejected.
+
+![Runtime and width dispatch from a lawful bit-set operation to scalar or AVX2 chunks and an exact scalar tail.](../../diagrams/bitset-kernel-dispatch.svg)
+
+*Figure -- private dense-kernel dispatch beneath the unchanged lattice API.
+Source: [`bitset-kernel-dispatch.puml`](../../diagrams/bitset-kernel-dispatch.puml).*
+
+The unsafe boundary is limited to two target-feature functions whose callers
+have established AVX2 support. Complete differential, sanitizer, target,
+crossover, and profile evidence is in
+[scientific validation 58](../../scientific/58-runtime-dispatched-bitset-validation.md);
+[ADR-0063](../../design/0063-runtime-dispatched-bitset-kernels.md) records the
+decision and rejected alternatives.
+
 `variable_facts(cpg, function)` returns `VarFacts`:
 
 - `universe`: sorted variable names;

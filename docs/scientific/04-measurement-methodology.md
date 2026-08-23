@@ -1,6 +1,6 @@
 # Measurement methodology
 
-`libcpg` ships thirty runnable Criterion targets. Their baseline groups are
+`libcpg` ships thirty-two runnable Criterion targets. Their baseline groups are
 feature-free; the `induction_analysis` target also registers an
 `algorithm-detection`-gated complexity-evidence group. Each active group
 asserts a deterministic correctness oracle **before** entering the timed loop.
@@ -44,6 +44,10 @@ harness = false
 
 [[bench]]
 name = "dataflow_liveness"
+harness = false
+
+[[bench]]
+name = "bitset_domain"
 harness = false
 
 [[bench]]
@@ -119,6 +123,7 @@ harness = false
 | `pattern_matching` | bounded `Vf2Matcher::find_matches` | paths at 256 and 4,096 nodes | exact bounded embedding set |
 | `parallel_analysis` | serial/parallel CFG, DFG, and PDG construction; serial/parallel ordered VF2 batches | 512 functions with 16 definition/use pairs each and 128 repeated patterns; worker counts 1/2/4/8/16/32 on 256 KiB stacks | exact edge-stream and match-sequence equality with the serial oracle before every worker-count timing |
 | `dataflow_liveness` | `liveness` | chains at 512/4,096 nodes, diamond ladders at 64/512 rungs, nested loops at 128/1,024 nodes | exact per-node equality with an independent round-robin solver |
+| `bitset_domain` | `BitSetDomain::{join, intersect_with, leq}` | 17 bit widths from 0 through 65,536, including 511/512/513 and 767/768/769 crossover triplets | exact full/striped union and intersection values plus true-subset control before timing |
 | `induction_analysis` | `loop_induction` | single counted loops with 64/512/2,048 invariant definitions | exact IV, bound, intended-invariant, DFG-contract, subset, and non-mutation checks |
 | `induction_analysis` with `algorithm-detection` | `ComplexityAnalyzer::estimate_time_complexity_with_evidence` | the same single counted loops at 64/512/2,048 invariant definitions | exact class/confidence, header/comparison/bound provenance, IV name, and non-mutation checks |
 | `dsm` | `analyze_dsm`, `classify_core_periphery` | directed paths and rings at 256 and 1,024 vertices | exact visibility vectors, propagation cost, roles, completion, and cyclic core |
@@ -183,6 +188,8 @@ tees Criterion output to one timestamped log:
 ./scripts/bench.sh dataflow_liveness
 ./scripts/bench.sh dataflow_liveness --save-baseline before
 ./scripts/bench.sh dataflow_liveness --baseline before
+./scripts/bench.sh bitset_domain --save-baseline scalar
+./scripts/bench.sh bitset_domain --baseline scalar
 ./scripts/bench.sh condensation --save-baseline before
 ./scripts/bench.sh induction_analysis --save-baseline before
 ./scripts/bench.sh centrality --save-baseline before
@@ -307,6 +314,7 @@ $`d`$ is embedding dimension.
 | CPG arena construction | $`O(V + E)`$ insertion work | active path target |
 | bounded VF2 | factorial worst case; pruning-dependent [[3]](#references) | active bounded path target |
 | variable liveness | $`O(H(B + E_b)W + NW)`$ conventional bound | active chain/diamond/nested-loop target |
+| dense bit-set union/intersection/subset | $`O(W)`$ word work; retained AVX2 changes the constant for union/intersection at $`W\ge8`$ | active 17-width primitive target plus liveness end-to-end control |
 | taint summaries | $`O(W+I(N_f+E_f)D_f\log D_f)`$ within shared/domain caps | active path/ring/clustered call-graph target |
 | DSM visibility / classification | $`O(V(V+E))`$ visibility plus SCC and median classification | active path/ring target |
 | Martin package metrics / SDP | $`O(E\log V+T\log K)`$ metrics plus $`O(E\log K)`$ SDP aggregation | benchmark deliberately deferred; exact oracle/property/integration validation is active |

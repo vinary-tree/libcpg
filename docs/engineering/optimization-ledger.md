@@ -796,6 +796,50 @@ composition, deterministic collision/eviction checks, and deep and wide
 ADR-0062 records the key inventory, dependency boundary, ownership model, and
 rejected partial/global/persistent cache alternatives.
 
+### T9.4 H14A -- runtime-dispatched dense bit-set kernels
+
+**Hypothesis.** Wide liveness and expression fixed points repeatedly apply
+contiguous word-wise union and intersection. Runtime-selected AVX2 should
+reduce instruction work without changing lattice bits, change flags, public
+configuration, non-x86 behavior, allocation, or native-stack depth. Short
+widths and subset early exit were explicit falsification boundaries.
+
+**Controlled change.** Union and intersection retain their scalar oracle and
+select four-`u64` AVX2 chunks only for at least eight words on a runtime-capable
+x86/x86-64 CPU. One `OnceLock` caches the feature decision. Unaligned direct
+slice loads avoid staging copies; zero-to-three-word tails return to the scalar
+loop. Non-x86 builds compile scalar selection only. Subset remains scalar.
+The only unsafe functions have a documented target-feature, slice-validity,
+complete-chunk, and scalar-tail contract.
+
+**Crossover and rejected candidate.** A four-word minimum improved its exact
+width but a five-word input regressed union 12.75% and intersection 9.74%, so
+that policy was removed. The retained eight-word threshold improved the
+511/512-bit cases about 13--15%, left the 513-bit tail within noise, and
+improved the 767--769-bit cases about 12--23%. At 8,192 bits, union improved
+29.5--32.6% and intersection 21.9--24.6%; at 65,536 bits the ranges were
+32--38% and 30--31%.
+
+**Matched headless primitive profile.** Scalar and selected executions had the
+same checksum and exact DHAT result: 28,327 bytes in 17 blocks, with identical
+reads/writes. Elapsed fell from 0.934740747 s to 0.486038945 s (-48.0%), cycles
+from 3,954,848,216 to 2,054,858,196 (-48.0%), and retired instructions from
+21,720,722,213 to 7,951,624,980 (-63.39%). RSS moved by +8 KiB. Union and
+intersection accounted for 96.52% of samples.
+
+**Whole-analysis boundary.** Six established liveness families ranged from
+-2.25% to +1.28%, all neutral or modestly favorable. In a deliberately wide
+case, `variable_facts`, `BTreeMap` insertion, and `BinaryHeap::pop` dominated;
+the AVX2 functions were each below the 0.5% report threshold. The primitive
+gain is retained without an unsupported whole-analysis speedup claim.
+
+Arbitrary-vector differential properties, named tail/boundary examples,
+parser-built May/Must analyses, Miri, native AddressSanitizer, wasm scalar
+portability, and 100,000-wide/deep 256 KiB stack gates are detailed in
+[validation 58](../scientific/58-runtime-dispatched-bitset-validation.md).
+ADR-0063 records the dispatch and unsafe boundary. No GUI or heaptrack process
+was used, and no build/profile artifact was placed under `/tmp`.
+
 ## Reproduce and compare
 
 The benchmark wrapper defaults to CPUs 0 and 1 and stores logs under

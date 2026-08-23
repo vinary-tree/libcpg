@@ -178,6 +178,14 @@ and nested-loop CFG families. Run it through the environment-control wrapper:
 The wrapper records the performance governor, pins CPU affinity with `taskset`,
 and tees Criterion output to one timestamped log.
 
+Liveness inherits the framework's private runtime-dispatched dense union. A
+separate `bitset_domain` target measures scalar/AVX2 crossover without mixing
+fact discovery or report materialization into the timed closure; the liveness
+target remains the required end-to-end control. Scalar-versus-selected
+integration cases include parser-built Rust, 100,000-node depth, and
+100,000-variable width on 256 KiB worker stacks. See
+[scientific validation 58](../../scientific/58-runtime-dispatched-bitset-validation.md).
+
 ## See also
 
 - [Monotone data-flow framework](dataflow-framework.md) — solver and lattice
