@@ -9,6 +9,7 @@ mod authz;
 mod crypto;
 mod cwe;
 mod extrapolate;
+mod ifc;
 mod secrets;
 
 pub use authz::{
@@ -31,6 +32,10 @@ pub use extrapolate::{
     analyze_vulnerability_extrapolation, extrapolate, ExtrapolationAnalysis,
     ExtrapolationCandidate, ExtrapolationIssue, ExtrapolationOptions, MAX_EXTRAPOLATION_FUNCTIONS,
     MAX_EXTRAPOLATION_PDG_NODES, MAX_EXTRAPOLATION_RESULTS, MAX_EXTRAPOLATION_VF2_INVOCATIONS,
+};
+pub use ifc::{
+    constant_time, noninterference, FlowViolation, FlowViolationKind, InformationFlowEdgeKind,
+    InformationFlowStep, InformationFlowWitness, LeakSite, LeakSiteKind, SecurityLabels,
 };
 pub use secrets::{
     analyze_builtin_secrets, analyze_secret_flows, builtin_secret_rules, SecretAnalysis,
