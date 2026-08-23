@@ -770,6 +770,31 @@ mod tests {
     }
 
     #[test]
+    fn rejected_out_of_graph_edges_never_become_facts() {
+        let mut cpg = CodePropertyGraph::new(Language::Rust);
+        cpg.add_node_with_id(node(
+            0,
+            CpgNodeKind::Unknown {
+                kind: "fixture".into(),
+            },
+        ));
+        assert_eq!(
+            cpg.add_edge_with_id(CpgEdge::new(
+                EdgeId::new(0),
+                NodeId::new(0),
+                NodeId::new(99),
+                CpgEdgeKind::AstChild,
+            )),
+            None
+        );
+
+        let facts = export_datalog(&cpg);
+        assert!(facts.edges.is_empty());
+        assert!(facts.ast_child.is_empty());
+        assert_eq!(facts.nodes.len(), 1);
+    }
+
+    #[test]
     fn symbols_use_rfc4180_tsv_and_rule_assets_opt_in() {
         let mut cpg = CodePropertyGraph::new(Language::Rust);
         cpg.add_node(

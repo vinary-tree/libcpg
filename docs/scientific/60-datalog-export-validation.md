@@ -17,10 +17,12 @@ overlay multiplicity, graph immutability, or stack safety.
 
 ## Method and results
 
-The focused unit suite contains five examples/properties:
+The focused unit suite contains six examples/properties:
 
 - all seventeen relation families are exercised and the exact `CpgEdge`
   vector is reconstructed;
+- a rejected edge whose target is outside the graph never enters either the
+  lossless master relation or a relation-specific fact vector;
 - RFC 4180 symbol rendering quotes every symbol, doubles internal quotes, and
   preserves control separators inside the field;
 - an independent queue-based oracle derives exactly three expected
@@ -29,7 +31,7 @@ The focused unit suite contains five examples/properties:
   insertion, typed bundle equality, and byte-identical file buffers;
 - a 100,001-node AST path is exported and rendered on a 256 KiB stack.
 
-All five passed. The parser-built Rust integration parsed a conditional
+All six passed. The parser-built Rust integration parsed a conditional
 function, exported it twice, observed non-empty AST/CFG relations, preserved
 node/edge counts, and obtained equal bundles. Strict all-target/all-feature
 Clippy and warning-denied all-feature rustdoc passed.
