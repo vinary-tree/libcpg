@@ -13,6 +13,7 @@ The related component pages drill into each construction stage:
 
 | Stage | Page | What it adds |
 |-------|------|--------------|
+| Incremental plan reuse | [`incremental-analysis-cache.md`](incremental-analysis-cache.md) | caller-owned exact CFG/DFG/PDG plans with hard bounds |
 | Control flow | [`cfg.md`](cfg.md) | `ControlFlow(CfgEdgeKind)` edges |
 | Call resolution | [`../graph/call-resolution.md`](../graph/call-resolution.md) | scoped symbols plus uniquely supported reference/call edges |
 | Data flow | [`dfg.md`](dfg.md) | `DataFlow(DfgEdgeKind)` edges (AST-ordered reaching defs) |
@@ -118,7 +119,9 @@ when no grammar is registered, or `Error::Construction` on a parse failure. (The
 ## `TreeSitterCpgBuilder`
 
 `TreeSitterCpgBuilder` is the one shipped implementation. It holds a
-`CpgBuilderConfig` and nothing else, so it is cheap to clone.
+`CpgBuilderConfig` and nothing else, so it is cheap to clone. Incremental state
+is deliberately external in a caller-owned `FunctionAnalysisCache`; cloning a
+builder neither duplicates nor implicitly shares a cache.
 
 ```rust
 use libcpg::{CpgBuilderConfig, TreeSitterCpgBuilder};
@@ -146,10 +149,11 @@ let builder = TreeSitterCpgBuilder::with_config(config);
 | `include_comments` | `false` | Emit `Comment` nodes instead of dropping them. |
 | `max_file_size` | `10 * 1024 * 1024` (10 MB) | Reject larger sources in `build` (see the security note). |
 | `resolve_imports` | `false` | Run evidence-bounded in-file/import call resolution as phase 4. |
+| `parallel_analysis` | `false` | Plan independent per-function CFG/DFG work on the current Rayon pool and emit in stable order. |
 
 The builder API for the config is fluent: `CpgBuilderConfig::new()` then any of
 `with_source`, `with_cfg`, `with_dfg`, `with_comments`, `with_max_file_size`,
-`with_import_resolution`.
+`with_import_resolution`, `with_parallel_analysis`.
 
 ---
 
@@ -186,10 +190,10 @@ assert!(cpg.node_count() > 1);
 # Ok::<(), libcpg::Error>(())
 ```
 
-Internally, `build` is a thin wrapper: it enforces `max_file_size`, looks up the grammar in
-the [`ParserRegistry`](node-mapper.md#parser-registry), parses, and then **delegates to
-`build_from_tree`** so both paths share one implementation of AST/CFG/DFG construction.
-Because they share that code, the two paths are guaranteed to produce structurally
+Internally, `build` enforces `max_file_size`, looks up the grammar in the
+[`ParserRegistry`](node-mapper.md#parser-registry), parses, and enters the same
+private AST/CFG/DFG pipeline used by `build_from_tree`. Because they share that
+code, the two paths are guaranteed to produce structurally
 identical graphs — an invariant pinned by the inline test
 `test_build_from_tree_matches_build`, which asserts equal `node_count()`, `edge_count()`,
 `language()`, and canonical typed edge triples for the same source (see
@@ -217,6 +221,30 @@ identical graphs — an invariant pinned by the inline test
 > **not**, because the caller already produced the tree and is expected to have bounded it.
 > A host feeding untrusted code through Mode B must impose its own limits (parser timeout,
 > input size). See [`../../security/01-input-and-resource-hardening.md`](../../security/01-input-and-resource-hardening.md).
+
+## Reusing unchanged function analysis
+
+The opt-in `build_with_analysis_cache` and
+`build_from_tree_with_analysis_cache` variants accept a mutable
+`FunctionAnalysisCache` owned by the caller. Parsing and AST construction still
+run for every revision. Only exact function-local CFG/DFG plans are reused;
+PDG reuse is exposed separately by `PdgBuilder` because the PDG remains an
+on-demand overlay.
+
+![Exact cache lifecycle from source revision through full-key comparison, local-plan replay, and deterministic eviction](../../diagrams/function-analysis-cache-lifecycle.svg)
+
+*Figure — a digest selects candidates, full canonical bytes decide equality,
+local ordinals are expanded into fresh node identities, and deterministic LRU
+eviction enforces both limits. Source:
+[`diagrams/function-analysis-cache-lifecycle.puml`](../../diagrams/function-analysis-cache-lifecycle.puml).*
+
+The cache rejects partial reuse whenever represented evidence crosses the
+function boundary, including external callers, preceding lexical definitions,
+nested scopes, nominal field ownership, or crossing PDG overlay edges. This is
+an exactness rule, not a heuristic. See the
+[incremental-analysis-cache component](incremental-analysis-cache.md) for key
+dimensions and the [usage guide](../../usage/31-incremental-analysis-cache.md)
+for lifecycle examples.
 
 ---
 
@@ -336,6 +364,8 @@ for pool configuration, exactness, and resource guidance.
   — the design rationale for Mode B.
 - [`../../design/0060-build-local-string-canonicalization.md`](../../design/0060-build-local-string-canonicalization.md)
   — why mapper-produced strings share only within one build.
+- [`../../design/0062-bounded-function-analysis-cache.md`](../../design/0062-bounded-function-analysis-cache.md)
+  — why unchanged-function reuse is exact, caller-owned, and bounded.
 
 ---
 

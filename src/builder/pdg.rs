@@ -64,14 +64,18 @@ pub struct PdgBuilder {
     _private: (),
 }
 
-#[derive(Debug)]
-struct PdgPlan {
-    control_edges: Vec<(NodeId, NodeId)>,
-    data_edges: Vec<(NodeId, NodeId)>,
+#[derive(Debug, Clone)]
+pub(super) struct PdgPlan {
+    pub(super) control_edges: Vec<(NodeId, NodeId)>,
+    pub(super) data_edges: Vec<(NodeId, NodeId)>,
 }
 
 impl PdgPlan {
-    fn emit(self, cpg: &mut CodePropertyGraph, existing: &mut FxHashSet<(u32, u32, bool)>) {
+    pub(super) fn emit(
+        self,
+        cpg: &mut CodePropertyGraph,
+        existing: &mut FxHashSet<(u32, u32, bool)>,
+    ) {
         for (controller, dependent) in self.control_edges {
             if existing.insert((controller.0, dependent.0, true)) {
                 cpg.connect(controller, dependent, CpgEdgeKind::ControlDependence);
@@ -104,6 +108,20 @@ impl PdgBuilder {
         self.plan(cpg, function).emit(cpg, &mut existing);
     }
 
+    /// Adds one function's PDG while reusing an exact local plan from `cache`.
+    ///
+    /// The key includes the function-local AST plus its ordered CFG and DFG
+    /// overlays. Cross-boundary overlay edges cause a fresh plan rather than a
+    /// partial cache hit.
+    pub fn build_with_analysis_cache(
+        &self,
+        cpg: &mut CodePropertyGraph,
+        function: NodeId,
+        cache: &mut super::FunctionAnalysisCache,
+    ) {
+        super::incremental::build_pdg_cached(self, cpg, vec![function], false, cache);
+    }
+
     /// Builds PDG edges for every function in stable graph order.
     pub fn build_all(&self, cpg: &mut CodePropertyGraph) {
         let functions: Vec<NodeId> = cpg.functions().map(|node| node.id).collect();
@@ -115,6 +133,17 @@ impl PdgBuilder {
         for plan in plans {
             plan.emit(cpg, &mut existing);
         }
+    }
+
+    /// Builds every function PDG in stable graph order with bounded exact plan
+    /// reuse from `cache`.
+    pub fn build_all_with_analysis_cache(
+        &self,
+        cpg: &mut CodePropertyGraph,
+        cache: &mut super::FunctionAnalysisCache,
+    ) {
+        let functions: Vec<NodeId> = cpg.functions().map(|node| node.id).collect();
+        super::incremental::build_pdg_cached(self, cpg, functions, false, cache);
     }
 
     /// Builds every function PDG concurrently on the current Rayon pool.
@@ -136,7 +165,18 @@ impl PdgBuilder {
         }
     }
 
-    fn plan(&self, cpg: &CodePropertyGraph, function: NodeId) -> PdgPlan {
+    /// Builds every function PDG concurrently for misses while consuming cache
+    /// hits in deterministic function order.
+    pub fn build_all_parallel_with_analysis_cache(
+        &self,
+        cpg: &mut CodePropertyGraph,
+        cache: &mut super::FunctionAnalysisCache,
+    ) {
+        let functions: Vec<NodeId> = cpg.functions().map(|node| node.id).collect();
+        super::incremental::build_pdg_cached(self, cpg, functions, true, cache);
+    }
+
+    pub(super) fn plan(&self, cpg: &CodePropertyGraph, function: NodeId) -> PdgPlan {
         PdgPlan {
             control_edges: compute_control_dependence(cpg, function),
             data_edges: compute_data_dependence(cpg, function),
@@ -144,7 +184,7 @@ impl PdgBuilder {
     }
 }
 
-fn existing_pdg_edges(cpg: &CodePropertyGraph) -> FxHashSet<(u32, u32, bool)> {
+pub(super) fn existing_pdg_edges(cpg: &CodePropertyGraph) -> FxHashSet<(u32, u32, bool)> {
     cpg.edges()
         .filter_map(|edge| match edge.kind {
             CpgEdgeKind::ControlDependence => Some((edge.source.0, edge.target.0, true)),

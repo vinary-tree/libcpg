@@ -12,14 +12,18 @@ language_features=lang-rust,lang-python,lang-javascript,lang-go,lang-c
 case "$workload" in
     cpg_construction | traversal_primitives | dfg_extraction | pdg_construction | \
         scc_analysis | dominator_analysis | pattern_vf2 | parallel_analysis_serial | \
-        parallel_analysis_parallel | similarity_wl | analyze_corpus | all) ;;
+        parallel_analysis_parallel | similarity_wl | analyze_corpus | \
+        reanalyze_fresh | reanalyze_cold | reanalyze_all_hit | reanalyze_edit_one | \
+        reanalyze_shared | reanalyze_half_churn | reanalyze_eviction | \
+        reanalyze_disabled | all) ;;
     *)
         echo "unknown workload: $workload" >&2
         echo "expected cpg_construction, traversal_primitives, dfg_extraction," >&2
         echo "pdg_construction, scc_analysis, dominator_analysis, pattern_vf2," >&2
         echo "parallel_analysis_serial, parallel_analysis_parallel," >&2
-        echo "similarity_wl," >&2
-        echo "analyze_corpus, or all" >&2
+        echo "similarity_wl, analyze_corpus, reanalyze_fresh, reanalyze_cold," >&2
+        echo "reanalyze_all_hit, reanalyze_edit_one, reanalyze_shared," >&2
+        echo "reanalyze_half_churn, reanalyze_eviction, reanalyze_disabled, or all" >&2
         exit 2
         ;;
 esac

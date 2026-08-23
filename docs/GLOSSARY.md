@@ -659,6 +659,26 @@ requires `join` and `leq`; built-in may and must bit domains use union/subset an
 intersection/reverse-subset respectively. See
 [`theory/03-data-flow-and-reaching-definitions.md`](theory/03-data-flow-and-reaching-definitions.md).
 
+### Least-recently-used replacement (LRU)
+
+A deterministic cache replacement policy that evicts the entry with the
+oldest successful access or insertion stamp. `FunctionAnalysisCache` uses LRU
+only after full canonical-key equality has established identity; the digest is
+an index, not an identity proof. Entry and estimated resident-byte limits are
+both hard bounds. See
+[`components/builder/incremental-analysis-cache.md`](components/builder/incremental-analysis-cache.md).
+
+### Function-analysis cache / Canonical analysis key / Function-local ordinal
+
+A **function-analysis cache** is the caller-owned bounded store used by the
+cached builder and PDG APIs. A **canonical analysis key** is a versioned exact
+byte encoding of every represented input dimension for one overlay, including
+language/configuration, local tree identity, and required dependency evidence.
+A **function-local ordinal** is the position of a node in that function's
+stable local order; cached plans store ordinals rather than build-specific
+`NodeId` values. Cross-boundary evidence that cannot be represented exactly
+causes an observable bypass and fresh planning.
+
 ### Leiden algorithm / Leiden-style refinement
 
 The Leiden algorithm improves [Louvain](#louvain-algorithm) by interleaving

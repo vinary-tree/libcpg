@@ -1,14 +1,16 @@
 mod support;
 
+use std::fmt::Write as _;
 use std::hint::black_box;
 use std::mem::size_of;
 
+use libcpg::builder::{FunctionAnalysisCache, FunctionAnalysisCacheLimits};
 use libcpg::pattern::Vf2Matcher;
 use libcpg::{
     call_graph_projection, call_graph_sccs, dominator_tree, post_dominator_tree,
     structural_clone_classes, wl_labels, CfgExtractor, CodePropertyGraph, CpgBuilder,
-    CpgBuilderConfig, CpgEdge, CpgNode, DfgExtractor, GraphProjection, NodeId, PdgBuilder,
-    SubgraphMatcher, TreeSitterCpgBuilder,
+    CpgBuilderConfig, CpgEdge, CpgNode, DfgExtractor, GraphProjection, Language, NodeId,
+    PdgBuilder, SubgraphMatcher, TreeSitterCpgBuilder,
 };
 
 use support::{
@@ -186,6 +188,168 @@ fn corpus() -> usize {
     analyze(&RUST_LARGE) + analyze(&CROSS_LANGUAGE)
 }
 
+const REANALYZE_FUNCTIONS: usize = 64;
+const REANALYZE_STATEMENTS: usize = 32;
+
+fn reanalysis_source(edited: impl Fn(usize) -> bool) -> String {
+    let mut source = String::new();
+    for function in 0..REANALYZE_FUNCTIONS {
+        writeln!(&mut source, "fn function_{function}(seed: i64) -> i64 {{")
+            .expect("writing to a String cannot fail");
+        writeln!(&mut source, "    let mut value = seed;")
+            .expect("writing to a String cannot fail");
+        for statement in 0..REANALYZE_STATEMENTS {
+            writeln!(
+                &mut source,
+                "    value = value.wrapping_add({});",
+                function * REANALYZE_STATEMENTS + statement
+            )
+            .expect("writing to a String cannot fail");
+        }
+        if edited(function) {
+            writeln!(&mut source, "    value = value.wrapping_mul(3);")
+                .expect("writing to a String cannot fail");
+        }
+        writeln!(&mut source, "    value\n}}").expect("writing to a String cannot fail");
+    }
+    source
+}
+
+fn shared_dependency_source(offset: i64) -> String {
+    let mut source = format!("const OFFSET: i64 = {offset};\n");
+    for function in 0..REANALYZE_FUNCTIONS {
+        writeln!(
+            &mut source,
+            "fn shared_{function}(seed: i64) -> i64 {{ seed + OFFSET + {function} }}"
+        )
+        .expect("writing to a String cannot fail");
+    }
+    source
+}
+
+fn graph_checksum(graph: &CodePropertyGraph) -> usize {
+    graph.node_count().wrapping_add(graph.edge_count())
+}
+
+fn seed_reanalysis_cache(builder: &TreeSitterCpgBuilder, source: &str) -> FunctionAnalysisCache {
+    let mut cache = FunctionAnalysisCache::new();
+    let graph = builder
+        .build_with_analysis_cache(source, Language::Rust, &mut cache)
+        .expect("profile cache seed parses");
+    assert_eq!(graph.functions().count(), REANALYZE_FUNCTIONS);
+    cache.reset_stats();
+    cache
+}
+
+fn repeated_reanalysis(workload: &str, repetitions: usize) -> usize {
+    let original = reanalysis_source(|_| false);
+    let edited = reanalysis_source(|function| function == REANALYZE_FUNCTIONS / 2);
+    let churned = reanalysis_source(|function| function % 2 == 0);
+    let shared_before = shared_dependency_source(1);
+    let shared_after = shared_dependency_source(2);
+    let builder =
+        TreeSitterCpgBuilder::with_config(CpgBuilderConfig::default().with_import_resolution(true));
+    let mut checksum = 0usize;
+    let mut footprint = None;
+
+    match workload {
+        "reanalyze_fresh" => {
+            for _ in 0..repetitions {
+                let graph = builder
+                    .build(black_box(&edited), Language::Rust)
+                    .expect("fresh profile source parses");
+                checksum = checksum.wrapping_add(graph_checksum(black_box(&graph)));
+            }
+        }
+        "reanalyze_cold" => {
+            for _ in 0..repetitions {
+                let mut cache = FunctionAnalysisCache::new();
+                let graph = builder
+                    .build_with_analysis_cache(black_box(&edited), Language::Rust, &mut cache)
+                    .expect("cold profile source parses");
+                checksum = checksum
+                    .wrapping_add(graph_checksum(black_box(&graph)))
+                    .wrapping_add(cache.stats().entries);
+                footprint = Some(cache.stats());
+            }
+        }
+        "reanalyze_all_hit" => {
+            let mut cache = seed_reanalysis_cache(&builder, &original);
+            footprint = Some(cache.stats());
+            for _ in 0..repetitions {
+                let graph = builder
+                    .build_with_analysis_cache(black_box(&original), Language::Rust, &mut cache)
+                    .expect("all-hit profile source parses");
+                checksum = checksum.wrapping_add(graph_checksum(black_box(&graph)));
+            }
+            assert_eq!(
+                cache.stats().cfg_hits,
+                (REANALYZE_FUNCTIONS * repetitions) as u64
+            );
+        }
+        "reanalyze_edit_one" | "reanalyze_shared" | "reanalyze_half_churn" => {
+            let (before, after) = match workload {
+                "reanalyze_edit_one" => (&original, &edited),
+                "reanalyze_shared" => (&shared_before, &shared_after),
+                "reanalyze_half_churn" => (&original, &churned),
+                _ => unreachable!("matched reanalysis edit workload"),
+            };
+            for _ in 0..repetitions {
+                let mut cache = seed_reanalysis_cache(&builder, before);
+                let graph = builder
+                    .build_with_analysis_cache(black_box(after), Language::Rust, &mut cache)
+                    .expect("edited profile source parses");
+                checksum = checksum
+                    .wrapping_add(graph_checksum(black_box(&graph)))
+                    .wrapping_add(cache.stats().cfg_hits as usize)
+                    .wrapping_add(cache.stats().dfg_hits as usize);
+                footprint = Some(cache.stats());
+            }
+        }
+        "reanalyze_eviction" => {
+            for _ in 0..repetitions {
+                let mut cache = FunctionAnalysisCache::with_limits(
+                    FunctionAnalysisCacheLimits::new(16, 2 * 1024 * 1024),
+                );
+                let _ = builder
+                    .build_with_analysis_cache(black_box(&original), Language::Rust, &mut cache)
+                    .expect("eviction profile seed parses");
+                cache.reset_stats();
+                let graph = builder
+                    .build_with_analysis_cache(black_box(&edited), Language::Rust, &mut cache)
+                    .expect("eviction profile edit parses");
+                assert!(cache.stats().evictions > 0);
+                checksum = checksum.wrapping_add(graph_checksum(black_box(&graph)));
+                footprint = Some(cache.stats());
+            }
+        }
+        "reanalyze_disabled" => {
+            let mut cache =
+                FunctionAnalysisCache::with_limits(FunctionAnalysisCacheLimits::new(0, 0));
+            for _ in 0..repetitions {
+                let graph = builder
+                    .build_with_analysis_cache(black_box(&edited), Language::Rust, &mut cache)
+                    .expect("disabled-cache profile source parses");
+                checksum = checksum.wrapping_add(graph_checksum(black_box(&graph)));
+            }
+            assert_eq!(cache.stats().entries, 0);
+            footprint = Some(cache.stats());
+        }
+        _ => unreachable!("validated reanalysis profile workload"),
+    }
+    if let Some(stats) = footprint {
+        println!(
+            "cache entries={} resident_bytes={} key_bytes={} artifact_bytes={} metadata_bytes={}",
+            stats.entries,
+            stats.resident_bytes,
+            stats.resident_key_bytes,
+            stats.resident_artifact_bytes,
+            stats.resident_metadata_bytes,
+        );
+    }
+    checksum
+}
+
 fn run(name: &str) -> usize {
     match name {
         "cpg_construction" => construction(),
@@ -227,6 +391,14 @@ fn main() {
     // search-state construction and traversal rather than graph construction.
     // The aggregate `all` workload intentionally retains its end-to-end shape.
     let checksum = match workload.as_str() {
+        "reanalyze_fresh"
+        | "reanalyze_cold"
+        | "reanalyze_all_hit"
+        | "reanalyze_edit_one"
+        | "reanalyze_shared"
+        | "reanalyze_half_churn"
+        | "reanalyze_eviction"
+        | "reanalyze_disabled" => repeated_reanalysis(&workload, repetitions),
         "pattern_vf2" => repeated_vf2(repetitions),
         "parallel_analysis_serial" => repeated_parallel_analysis(false, repetitions),
         "parallel_analysis_parallel" => repeated_parallel_analysis(true, repetitions),

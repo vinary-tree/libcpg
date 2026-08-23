@@ -1,0 +1,62 @@
+@startuml
+!include _libcpg-theme.iuml
+title Exact per-function analysis cache — rebuild, compare, replay, and bound
+
+actor "caller\nowns lifetime + limits" as CALLER #FFE8CC
+file "source revision\n+ language/options" as SOURCE #DBE4FF
+rectangle "tree-sitter + explicit\nAST construction worklist" as AST #DBE4FF
+collections "stable function contexts\nlocal nodes + dependency boundary" as CONTEXT #C3FAE8
+rectangle "canonical encoder\nschema + exact bytes + dimensions" as KEY #FFF3BF
+database "digest index\nfull keys + local plans\nbounded LRU" as CACHE #E5DBFF
+rectangle "full key equal\nand local plan valid?" as HIT #FFD8A8
+rectangle "ordinary CFG/DFG/PDG\nheap-owned planner" as PLAN #FFE3E3
+rectangle "expand local ordinals\nor localize fresh endpoints" as LOCAL #D3F9D8
+rectangle "ordered graph emitter\nfresh NodeId domain" as EMIT #C3FAE8
+database "new exact CPG" as CPG #B2F2BB
+rectangle "deterministic LRU eviction\nuntil entry and byte bounds hold" as EVICT #F1F3F5
+
+CALLER --> SOURCE : pass cache by mutable reference
+SOURCE --> AST : always rebuild
+AST --> CONTEXT : one-pass ownership scan\nor explicit Mode-B traversal
+CONTEXT --> KEY : represented dependencies
+KEY --> CACHE : digest selects bucket\nbytes decide equality
+CACHE --> HIT : candidate or miss
+HIT --> LOCAL : yes — retained local plan
+HIT --> PLAN : no / bypass
+PLAN --> LOCAL : prevalidate locality\nthen emit + translate
+LOCAL --> EMIT : validated endpoints
+EMIT --> CPG : stable ordered mutation
+LOCAL --> CACHE : insert eligible miss
+CACHE --> EVICT : capacity exceeded
+EVICT --> CACHE : remove oldest exact entry
+CPG --> CALLER : result + observable statistics
+
+note right of HIT
+  A digest collision cannot create a hit.
+  Every retained canonical byte is compared.
+end note
+
+note bottom of AST
+  Source/tree depth is heap state,
+  never input-shaped native recursion.
+end note
+
+note bottom of CACHE
+  Zero capacity selects the ordinary path.
+  No global, thread-local, or persistent state.
+end note
+
+legend right
+  |= colour |= role |
+  |<#FFE8CC>| caller ownership / ordinary planner |
+  |<#DBE4FF>| authoritative source and AST |
+  |<#C3FAE8>| canonical context / ordered emission |
+  |<#FFF3BF>| exact key material |
+  |<#E5DBFF>| bounded retained state |
+  |<#FFD8A8>| exact admission decision |
+  |<#D3F9D8>| coordinate transport |
+  |<#FFE3E3>| fresh recomputation |
+  |<#F1F3F5>| resource enforcement |
+  |<#B2F2BB>| exact public result |
+endlegend
+@enduml

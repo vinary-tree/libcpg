@@ -36,6 +36,7 @@
 
 mod cfg;
 mod dfg;
+mod incremental;
 mod node_mapper;
 mod parser_registry;
 mod pdg;
@@ -47,6 +48,9 @@ pub(crate) use dfg::call_arguments;
 pub use dfg::{
     build_def_use_chains, DefUseChain, Definition, DefinitionKind, DfgExtractor,
     DfgExtractorConfig, Use, UseKind,
+};
+pub use incremental::{
+    FunctionAnalysisCache, FunctionAnalysisCacheLimits, FunctionAnalysisCacheStats,
 };
 pub use node_mapper::NodeMapper;
 pub use parser_registry::ParserRegistry;

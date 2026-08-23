@@ -49,11 +49,11 @@ type CfgExits = SmallVec<[NodeId; 4]>;
 /// Keeping the plan heap-owned separates independent per-function analysis
 /// from ordered graph mutation. The same representation serves serial and
 /// Rayon execution, so parallelism cannot change edge, entry, or exit order.
-#[derive(Debug)]
-struct CfgPlan {
-    function: NodeId,
-    edges: Vec<(NodeId, NodeId, CpgEdgeKind)>,
-    exits: CfgExits,
+#[derive(Debug, Clone)]
+pub(super) struct CfgPlan {
+    pub(super) function: NodeId,
+    pub(super) edges: Vec<(NodeId, NodeId, CpgEdgeKind)>,
+    pub(super) exits: CfgExits,
 }
 
 impl CfgPlan {
@@ -69,7 +69,7 @@ impl CfgPlan {
         self.edges.push((source, target, kind));
     }
 
-    fn emit(self, cpg: &mut CodePropertyGraph) {
+    pub(super) fn emit(self, cpg: &mut CodePropertyGraph) {
         cpg.add_cfg_entry(self.function);
         for (source, target, kind) in self.edges {
             cpg.connect_unique(source, target, kind);
@@ -225,7 +225,7 @@ impl CfgExtractor {
         self.plan_function_cfg(cpg, function).emit(cpg);
     }
 
-    fn plan_function_cfg(&self, cpg: &CodePropertyGraph, function: NodeId) -> CfgPlan {
+    pub(super) fn plan_function_cfg(&self, cpg: &CodePropertyGraph, function: NodeId) -> CfgPlan {
         let mut plan = CfgPlan::new(function);
 
         // Build CFG using a context that tracks loop and try structures

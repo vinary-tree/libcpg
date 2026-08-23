@@ -1,6 +1,6 @@
 # Diagram catalog
 
-Every figure in the `libcpg` documentation is a **committed source** (`.puml` for PlantUML, `.dot` for Graphviz) rendered to a **committed `.svg`** that the Markdown pages embed. Sources are version-controlled so figures are reproducible and reviewable; SVGs are committed so they render on GitHub (which does not render PlantUML/Graphviz inline). This directory holds all 129 figures plus the shared theme.
+Every figure in the `libcpg` documentation is a **committed source** (`.puml` for PlantUML, `.dot` for Graphviz) rendered to a **committed `.svg`** that the Markdown pages embed. Sources are version-controlled so figures are reproducible and reviewable; SVGs are committed so they render on GitHub (which does not render PlantUML/Graphviz inline). This directory holds all 132 figures plus the shared theme.
 
 ## Conventions
 
@@ -50,6 +50,8 @@ Grouped by subject. Each row: the source (its `.svg` sibling is embedded by the 
 | `cpg-vs-traditional.dot` | graph | Three separate views vs one unified CPG | theory/00, architecture/overview |
 | `module-architecture.puml` | component | Crate modules, always-on projections/block-CFG/data-flow/liveness/induction/reachability/dominator/loop/SCC/condensation/layering/DSM/Martin/smell/WL/centrality/community/cohesion/spectral/cycle/motif analysis, and feature gates | architecture/overview, design/00 |
 | `construction-pipeline.puml` | activity | parse → AST → CFG → optional definite-call resolution → DFG | architecture/data-flow, components/builder/overview, api/builder-reference, usage/01 |
+| `function-analysis-cache-lifecycle.puml` | activity/data flow | caller-owned cache → exact key comparison → local plan replay or fresh planning → ordered emission → bounded deterministic eviction | architecture/data-flow, components/builder/overview, design/0062, theory/46, usage/31 |
+| `function-analysis-cache-boundary.puml` | component/evidence boundary | admitted function-local key dimensions and plans versus cross-boundary evidence that forces exact recomputation | architecture/data-flow, components/builder/incremental-analysis-cache, design/0062, security/21 |
 | `build-local-string-pool.puml` | activity/ownership flow | Mode-A/Mode-B tree → explicit AST work stack → per-node mapped-string canonicalization → pool drop → unchanged public CPG | architecture/language-frontends, design/0060, scientific/55 |
 | `analysis-pipeline.puml` | activity | CPG → blocks/data-flow/liveness/induction/reachability/dominance/loops/SCC/condensation/layering/DSM/Martin/smells/WL/centrality/community/cohesion/spectral/cycles/motifs, PDG/slice, VF2/GoF, algorithm, GNN | architecture/data-flow |
 | `feature-flag-map.puml` | mindmap | Cargo feature taxonomy (`default = []`) | design/0005, engineering/01, usage/00 |

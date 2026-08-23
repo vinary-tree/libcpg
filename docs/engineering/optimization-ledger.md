@@ -746,6 +746,56 @@ path/star lifecycles on 256 KiB are detailed in
 records the ownership proof and rejected zero-fill, hasher, global-cache, and
 unsafe alternatives.
 
+### T9.4 H13 -- bounded exact function-analysis cache
+
+**Hypothesis.** Repeated whole-file builds paid the complete CFG/DFG/PDG
+planning cost even when most functions were byte-identical. A caller-owned
+cache of exact function-local plans should improve unchanged and locally edited
+revisions without changing the ordinary API, graph bytes, determinism, or
+native-stack bound.
+
+**Controlled change.** The cache retains versioned canonical key bytes and
+plans expressed only in function-local ordinals. Its FNV-1a digest selects a
+bucket; full bytes decide identity, including under an injected constant-digest
+collision. Represented external callers, preceding lexical bindings, nested
+functions, nominal field ownership, or crossing PDG edges bypass reuse. A
+deterministic LRU enforces caller-selected entry and estimated resident-byte
+limits. Zero capacity executes the ordinary pipeline. All traversal and drop
+paths use heap-owned worklists or flat containers.
+
+**Criterion timing against the ordinary fresh path:**
+
+| Revision case | Median | Change from 52.752 ms fresh |
+|---|---:|---:|
+| cold cache | 51.125 ms | within noise; no claimed improvement |
+| exact hit | 41.733 ms | -20.89% |
+| one edited function | 41.366 ms | -21.58% |
+| half-cache churn | 45.982 ms | -14.86% |
+| forced eviction | 50.500 ms | -4.27% |
+| shared-dependency bypass | 1.7979 ms | +4.57% versus its 1.7194 ms fresh control |
+
+The last row is an adverse small-case result and confirms that exact bypasses
+are not presented as hits. A 100-build immutable-H12 control retired
+47,455,981,663 instructions; current ordinary construction retired
+47,555,957,577 (+0.211%) while elapsed time fell 4.08% and RSS fell 56 KiB.
+With a zero-capacity cache, the 100-build instruction difference from the
+ordinary path was 8,519 instructions (+0.000018%).
+
+**Allocation and residency boundary.** A one-scenario DHAT run measured
+36,200,614 bytes in 191,950 blocks for fresh construction and 37,630,032 bytes
+in 193,453 blocks for a cold insertion. Disabled mode had the same block count
+as fresh. The normal 128-entry cache retained an estimated 467,850 bytes:
+177,670 key bytes, 284,036 artifact bytes, and 6,144 metadata bytes. Forced
+16-entry eviction retained 36,720 bytes. Massif page peaks were 26,767,360
+bytes fresh/disabled and 27,648,000 bytes cold.
+
+Exact examples, the 32-case generated revision campaign, Mode-A/Mode-B parser
+composition, deterministic collision/eviction checks, and deep and wide
+100,000-node runs on a 256 KiB stack are detailed in
+[validation 57](../scientific/57-function-analysis-cache-validation.md).
+ADR-0062 records the key inventory, dependency boundary, ownership model, and
+rejected partial/global/persistent cache alternatives.
+
 ## Reproduce and compare
 
 The benchmark wrapper defaults to CPUs 0 and 1 and stores logs under

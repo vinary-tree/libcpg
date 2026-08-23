@@ -196,7 +196,7 @@ same graph. Errors are the crate's own [`libcpg::Error`](../api/graph-reference.
 
 ## 6. Map of the theory pillar
 
-This overview sits above forty-four formal chapters. Read them in order for a ground-up
+This overview sits above forty-six formal chapters. Read them in order for a ground-up
 development, or jump to the layer you need:
 
 1. **[01 — Code Property Graphs](01-code-property-graphs.md).** The formal model:
@@ -318,6 +318,10 @@ development, or jump to the layer you need:
     Symmetric bounded GED correspondence, exact translated node/edge evidence,
     canonical multiset edits, and a represented-PDG classification boundary
     define the feature-free version comparison contract.
+46. **[46 — Content-addressed incremental analysis](46-content-addressed-incremental-analysis.md).**
+    Exact canonical function keys, local-coordinate plans, conservative
+    dependency boundaries, and deterministic bounded replacement define safe
+    revision-to-revision CFG/DFG/PDG reuse.
 
 The later chapters define deterministic projection structure, architecture
 metrics, inspectable evidence, and their interpretation limits.

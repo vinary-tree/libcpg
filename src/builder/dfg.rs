@@ -46,9 +46,9 @@ pub struct DfgExtractor {
 }
 
 /// Immutable-computation result for one function's data-flow graph.
-#[derive(Debug, Default)]
-struct DfgPlan {
-    edges: Vec<(NodeId, NodeId, CpgEdgeKind)>,
+#[derive(Debug, Clone, Default)]
+pub(super) struct DfgPlan {
+    pub(super) edges: Vec<(NodeId, NodeId, CpgEdgeKind)>,
 }
 
 impl DfgPlan {
@@ -56,7 +56,7 @@ impl DfgPlan {
         self.edges.push((source, target, kind));
     }
 
-    fn emit(self, cpg: &mut CodePropertyGraph) {
+    pub(super) fn emit(self, cpg: &mut CodePropertyGraph) {
         for (source, target, kind) in self.edges {
             cpg.connect_unique(source, target, kind);
         }
@@ -71,13 +71,13 @@ impl DfgPlan {
 type NamedCandidates = FxHashMap<Arc<str>, SmallVec<[NodeId; 2]>>;
 
 #[derive(Debug, Default)]
-struct FieldResolutionIndex {
+pub(super) struct FieldResolutionIndex {
     types: FxHashMap<Option<NodeId>, NamedCandidates>,
     fields: FxHashMap<NodeId, NamedCandidates>,
 }
 
 impl FieldResolutionIndex {
-    fn new(cpg: &CodePropertyGraph) -> Self {
+    pub(super) fn new(cpg: &CodePropertyGraph) -> Self {
         let mut index = Self::default();
         for id in cpg.node_ids() {
             match cpg.node(id).map(|node| &node.kind) {
@@ -191,7 +191,7 @@ impl DfgExtractor {
             .emit(cpg);
     }
 
-    fn plan_function_dfg(
+    pub(super) fn plan_function_dfg(
         &self,
         cpg: &CodePropertyGraph,
         function: NodeId,

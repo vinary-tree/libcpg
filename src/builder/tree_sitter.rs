@@ -34,8 +34,13 @@
 //! ```
 
 use super::{
-    string_pool::CpgStringPool, CfgExtractor, CpgBuilder, CpgBuilderConfig, DfgExtractor,
-    NodeMapper, ParserRegistry,
+    incremental::{
+        extract_cfg_cached, extract_dfg_cached, prepare_builder_contexts,
+        prepare_source_builder_contexts,
+    },
+    string_pool::CpgStringPool,
+    CfgExtractor, CpgBuilder, CpgBuilderConfig, DfgExtractor, FunctionAnalysisCache, NodeMapper,
+    ParserRegistry,
 };
 use crate::{
     resolve_calls, CodePropertyGraph, CpgEdgeKind, CpgNode, CpgNodeKind, Error, Language, NodeId,
@@ -97,6 +102,65 @@ impl TreeSitterCpgBuilder {
         source: &str,
         language: Language,
     ) -> Result<CodePropertyGraph> {
+        self.build_from_tree_impl(tree, source, language, None, false)
+    }
+
+    /// Builds from a caller-supplied tree while reusing exact unchanged
+    /// per-function analysis plans from `cache`.
+    ///
+    /// The AST is always rebuilt. Cache entries carry function-local ordinals,
+    /// never graph-specific [`NodeId`] values, and nonlocal DFG dependencies
+    /// automatically use the ordinary fresh analysis path.
+    pub fn build_from_tree_with_analysis_cache(
+        &self,
+        tree: &tree_sitter::Tree,
+        source: &str,
+        language: Language,
+        cache: &mut FunctionAnalysisCache,
+    ) -> Result<CodePropertyGraph> {
+        self.build_from_tree_impl(tree, source, language, Some(cache), false)
+    }
+
+    /// Parses `source` and reuses exact unchanged per-function analysis plans
+    /// from `cache`.
+    ///
+    /// File-size checks and parser selection are identical to
+    /// [`CpgBuilder::build`]. The caller controls the cache lifetime and hard
+    /// bounds; no process-global state is used.
+    pub fn build_with_analysis_cache(
+        &self,
+        source: &str,
+        language: Language,
+        cache: &mut FunctionAnalysisCache,
+    ) -> Result<CodePropertyGraph> {
+        if source.len() > self.config.max_file_size {
+            return Err(Error::Construction(format!(
+                "Source file exceeds maximum size of {} bytes",
+                self.config.max_file_size
+            )));
+        }
+
+        let ts_language = ParserRegistry::global()
+            .get(language)
+            .ok_or_else(|| Error::UnsupportedLanguage(language.name().to_string()))?;
+        let mut parser = tree_sitter::Parser::new();
+        parser.set_language(&ts_language).map_err(|error| {
+            Error::Construction(format!("Failed to set parser language: {error}"))
+        })?;
+        let tree = parser
+            .parse(source, None)
+            .ok_or_else(|| Error::Construction("Failed to parse source code".to_string()))?;
+        self.build_from_tree_impl(&tree, source, language, Some(cache), true)
+    }
+
+    fn build_from_tree_impl(
+        &self,
+        tree: &tree_sitter::Tree,
+        source: &str,
+        language: Language,
+        mut cache: Option<&mut FunctionAnalysisCache>,
+        source_determines_tree: bool,
+    ) -> Result<CodePropertyGraph> {
         // Tree-sitter counts the root itself. The mapper may omit punctuation,
         // comments, or transparent syntax nodes, so this is an upper bound that
         // avoids a second tree walk while preventing graph and id-map growth on
@@ -113,11 +177,41 @@ impl TreeSitterCpgBuilder {
         // Phase 1: Build AST from tree-sitter parse tree
         let mapper = NodeMapper::new(language);
         self.build_ast(tree, source, &mapper, &mut cpg)?;
+        let cache_active = match cache.as_deref_mut() {
+            Some(cache) if cache.is_disabled() => {
+                if self.config.build_cfg || self.config.build_dfg {
+                    cache.record_capacity_bypass();
+                }
+                false
+            }
+            Some(_) => true,
+            None => false,
+        };
+        let mut cache_contexts = cache_active.then(|| {
+            if source_determines_tree {
+                prepare_source_builder_contexts(&cpg, source, language, &self.config)
+            } else {
+                prepare_builder_contexts(&cpg, source, language, &self.config, false)
+            }
+        });
 
         // Phase 2: Extract CFG
         if self.config.build_cfg {
             let cfg_extractor = CfgExtractor::new();
-            if self.config.parallel_analysis {
+            if cache_active {
+                let cache = cache
+                    .as_deref_mut()
+                    .expect("an active analysis cache is caller supplied");
+                extract_cfg_cached(
+                    &cfg_extractor,
+                    &mut cpg,
+                    &self.config,
+                    cache_contexts
+                        .as_ref()
+                        .expect("cache contexts exist with a cache"),
+                    cache,
+                );
+            } else if self.config.parallel_analysis {
                 cfg_extractor.extract_parallel(&mut cpg);
             } else {
                 cfg_extractor.extract(&mut cpg);
@@ -133,7 +227,18 @@ impl TreeSitterCpgBuilder {
         // Phase 4: Extract DFG
         if self.config.build_dfg {
             let dfg_extractor = DfgExtractor::new();
-            if self.config.parallel_analysis {
+            if cache_active {
+                let cache = cache.expect("an active analysis cache is caller supplied");
+                extract_dfg_cached(
+                    &dfg_extractor,
+                    &mut cpg,
+                    &self.config,
+                    cache_contexts
+                        .as_mut()
+                        .expect("cache contexts exist with a cache"),
+                    cache,
+                );
+            } else if self.config.parallel_analysis {
                 dfg_extractor.extract_parallel(&mut cpg);
             } else {
                 dfg_extractor.extract(&mut cpg);

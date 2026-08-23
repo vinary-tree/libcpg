@@ -5,7 +5,7 @@ This page traces how information moves through libcpg in two phases:
 1. the **construction pipeline** — source text becomes a [Code Property Graph](../GLOSSARY.md#code-property-graph-cpg) (Yamaguchi et al. [[1]](#references)) with AST, [CFG](../GLOSSARY.md#control-flow-graph-cfg), and [DFG](../GLOSSARY.md#data-flow-graph-dfg) overlays; and
 2. the **analysis pipeline** — a constructed CPG is queried by exact [dominator/post-dominator](../components/graph/dominator-analysis.md), [natural-loop](../components/graph/loop-analysis.md), [loop-induction](../components/graph/induction-analysis.md), [liveness](../components/graph/liveness-analysis.md), [available/very-busy expression](../components/graph/expression-analysis.md), [SCCP](../components/graph/sccp-analysis.md), [interval value-range](../components/graph/interval-analysis.md), [SCC](../GLOSSARY.md#strongly-connected-component-scc), [condensation/layering](../components/graph/layering-analysis.md), [DSM visibility](../components/graph/dsm-analysis.md), [Martin package-metric](../components/graph/martin-metrics.md), [code-metric](../components/graph/code-metrics.md), [architectural-smell](../components/graph/architecture-smells.md), [reflexion-model](../components/graph/reflexion-model.md), [WL structural-clone](../components/graph/wl-analysis.md), [centrality](../components/graph/centrality-analysis.md), [community](../components/graph/community-detection.md), [cohesion/robustness](../components/graph/cohesion-analysis.md), [spectral connectivity](../components/graph/spectral-analysis.md), [bounded simple-cycle](../components/graph/cycle-analysis.md), [directed-motif](../components/graph/motif-analysis.md), and [deterministic CPG-diff](../components/graph/cpg-diff.md) analyses, the [PDG](../GLOSSARY.md#program-dependence-graph-pdg)/slicer, [function clone detector](../components/patterns/clone-detection.md), [VF2](../GLOSSARY.md#vf2), bounded bipartite [GED](../components/patterns/ged-analysis.md), and [GoF](../GLOSSARY.md#gang-of-four-gof) detectors, the algorithm/complexity heuristics, and the [GNN](../GLOSSARY.md#graph-neural-network-gnn).
 
-"Data flow" here means both the program's own data-flow overlay *and* the flow of data through libcpg's stages. This is a rewrite of an earlier draft that invented `BranchTrue`/`UseUse`/`Phi` edge kinds, an SSA-based DFG, a parse/embedding cache, and a whole-graph bincode format — none of which exist. The real edge model is [`CpgEdgeKind::ControlFlow(CfgEdgeKind)`](../GLOSSARY.md#control-flow-graph-cfg) / [`DataFlow(DfgEdgeKind)`](../GLOSSARY.md#data-flow-graph-dfg), the DFG is [AST-ordered reaching definitions](../GLOSSARY.md#ast-ordered-reaching-definitions), and the caller chooses the outer Serde format. Logical recursion inside `PropertyValue` uses the versioned flat CPV1 inner representation described in [ADR-0040](../design/0040-flat-property-value-arena.md); standalone structural `ExprKey` values use the shared-arena/CEK1 boundary in [ADR-0041](../design/0041-shared-flat-expression-facts.md).
+"Data flow" here means both the program's own data-flow overlay *and* the flow of data through libcpg's stages. This is a rewrite of an earlier draft that invented `BranchTrue`/`UseUse`/`Phi` edge kinds, an SSA-based DFG, a parse/embedding cache, and a whole-graph bincode format — none of which exist. The real edge model is [`CpgEdgeKind::ControlFlow(CfgEdgeKind)`](../GLOSSARY.md#control-flow-graph-cfg) / [`DataFlow(DfgEdgeKind)`](../GLOSSARY.md#data-flow-graph-dfg), the DFG is [AST-ordered reaching definitions](../GLOSSARY.md#ast-ordered-reaching-definitions), and the caller chooses the outer Serde format. The later, opt-in [`FunctionAnalysisCache`](../components/builder/incremental-analysis-cache.md) retains only exact function-local analysis plans; it does not cache parse trees, CPGs, or serialized graphs. Logical recursion inside `PropertyValue` uses the versioned flat CPV1 inner representation described in [ADR-0040](../design/0040-flat-property-value-arena.md); standalone structural `ExprKey` values use the shared-arena/CEK1 boundary in [ADR-0041](../design/0041-shared-flat-expression-facts.md).
 
 ## The construction pipeline
 
@@ -16,7 +16,11 @@ tree (Mode B), build the AST, then run config-gated CFG, call-resolution, and
 DFG passes. Source:
 [`diagrams/construction-pipeline.puml`](../diagrams/construction-pipeline.puml).*
 
-Both entry points share one post-parse pipeline. `TreeSitterCpgBuilder::build` parses internally then delegates to `build_from_tree`, so the two paths are byte-for-byte equivalent (a regression test asserts identical `node_count`, `edge_count`, and `language`).
+Both entry points share one private post-parse pipeline.
+`TreeSitterCpgBuilder::build` parses internally; `build_from_tree` accepts the
+caller's tree. They then execute the same AST/CFG/resolution/DFG implementation,
+so the two paths are byte-for-byte equivalent (a regression test asserts
+identical node payloads and canonical typed edges).
 
 ```rust
 // requires: features = ["lang-rust"]   (build() needs a grammar; default = [] has none)
@@ -32,7 +36,7 @@ fn demo() -> libcpg::Result<()> {
 
 ### Stage 0 — parse
 
-`build(source, language)` looks the language up in the [`ParserRegistry`](../GLOSSARY.md#tree-sitter), enforces `config.max_file_size` (default 10 MiB), parses with tree-sitter, and forwards the tree to `build_from_tree`. `build_from_tree(&tree, source, language)` skips the size check (the caller already owns the tree) and is the only path for [Rholang](../GLOSSARY.md#rholang)/[MeTTa](../GLOSSARY.md#metta). If no grammar is registered for `language` — the situation for *every* language under `default = []` — `build` returns `Error::UnsupportedLanguage`. The two modes are detailed in [`language-frontends.md`](language-frontends.md).
+`build(source, language)` looks the language up in the [`ParserRegistry`](../GLOSSARY.md#tree-sitter), enforces `config.max_file_size` (default 10 MiB), and parses with tree-sitter before entering the shared pipeline. `build_from_tree(&tree, source, language)` skips the size check (the caller already owns the tree) and is the only path for [Rholang](../GLOSSARY.md#rholang)/[MeTTa](../GLOSSARY.md#metta). If no grammar is registered for `language` — the situation for *every* language under `default = []` — `build` returns `Error::UnsupportedLanguage`. The two modes are detailed in [`language-frontends.md`](language-frontends.md).
 
 ### Stage 1 — AST construction
 
@@ -211,6 +215,27 @@ Public helpers expose the same information as [def-use chains](../GLOSSARY.md#de
 ### Config gating and idempotency
 
 `CpgBuilderConfig.build_cfg` and `build_dfg` (both default `true`) decide whether stages 2 and 3 run during `build`/`build_from_tree`; disable one to get a cheaper partial graph, or run the extractors yourself later. Because all three of `CfgExtractor::extract`, `DfgExtractor::extract`, and `PdgBuilder::build` are [idempotent](../GLOSSARY.md#idempotent), re-applying them never duplicates edges.
+
+### Optional exact per-function plan reuse
+
+The cached Mode-A/Mode-B entry points always repeat parsing and AST
+construction, then derive a canonical key for each function and requested
+overlay. A digest selects a bucket, but full key bytes decide equality. A hit
+contains only function-local ordinals, which are validated and expanded into
+the newly built graph before the ordinary ordered emitter mutates it. A miss or
+cross-boundary dependency uses the same fresh stack-safe planner as the
+non-cache API.
+
+![Boundary between function-local admitted evidence and dependencies that require exact recomputation](../diagrams/function-analysis-cache-boundary.svg)
+
+*Figure — local source/tree/overlay evidence may form a reusable plan;
+cross-function evidence takes the ordinary exact path. Source:
+[`diagrams/function-analysis-cache-boundary.puml`](../diagrams/function-analysis-cache-boundary.puml).*
+
+The caller owns cache lifetime and hard entry/byte bounds. There is no global
+state, background worker, parser cache, persistence format, or hidden I/O. See
+[ADR-0062](../design/0062-bounded-function-analysis-cache.md) and the
+[security boundary](../security/21-incremental-cache-boundary.md).
 
 ## The analysis pipeline
 
@@ -467,6 +492,11 @@ let fwd = forward_slice(&cpg, criterion, 256);            // nodes `criterion` c
 ```
 
 The full construction and worked slices are in [`../components/builder/pdg-and-slicing.md`](../components/builder/pdg-and-slicing.md) and [`../usage/04-program-slicing.md`](../usage/04-program-slicing.md).
+
+For revision-to-revision reuse, `build_with_analysis_cache`,
+`build_all_with_analysis_cache`, and
+`build_all_parallel_with_analysis_cache` retain exact function-local PDG plans.
+Any CFG/DFG edge that crosses the local ordinal domain causes recomputation.
 
 ### System dependence and context-sensitive slicing (feature-free)
 

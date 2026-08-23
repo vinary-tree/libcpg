@@ -29,6 +29,7 @@ Re-exported from the crate root:
 ```rust
 use libcpg::{
     CpgBuilder, CpgBuilderConfig, TreeSitterCpgBuilder,
+    FunctionAnalysisCache, FunctionAnalysisCacheLimits, FunctionAnalysisCacheStats,
     CfgExtractor, CfgExtractorConfig, BasicBlockIdentifier,
     DfgExtractor, DfgExtractorConfig,
     Definition, DefinitionKind, Use, UseKind, DefUseChain, build_def_use_chains,
@@ -149,6 +150,8 @@ pub struct TreeSitterCpgBuilder { /* private: config: CpgBuilderConfig */ }
 | `set_config` | `fn set_config(&mut self, config: CpgBuilderConfig)` | Replace the configuration. |
 | `build` | *(via `CpgBuilder`)* `fn build(&self, source: &str, language: Language) -> Result<CodePropertyGraph>` | **Mode A**: internal parse. |
 | `build_from_tree` | `fn build_from_tree(&self, tree: &tree_sitter::Tree, source: &str, language: Language) -> Result<CodePropertyGraph>` | **Mode B**: caller-supplied tree. |
+| `build_with_analysis_cache` | `fn build_with_analysis_cache(&self, source: &str, language: Language, cache: &mut FunctionAnalysisCache) -> Result<CodePropertyGraph>` | Mode A with bounded exact CFG/DFG-plan reuse. |
+| `build_from_tree_with_analysis_cache` | `fn build_from_tree_with_analysis_cache(&self, tree: &tree_sitter::Tree, source: &str, language: Language, cache: &mut FunctionAnalysisCache) -> Result<CodePropertyGraph>` | Mode B with bounded exact CFG/DFG-plan reuse. |
 | `build_file` | *(via `CpgBuilder`)* `fn build_file(&self, path: &Path) -> Result<CodePropertyGraph>` | Infers language from the extension. |
 
 ### Mode A — `build` (internal parse)
@@ -217,6 +220,45 @@ Comments and pure punctuation are filtered per
 `build` rejects `source.len() > config.max_file_size` (default 10 MiB) with
 `Error::Construction`. `build_from_tree` performs **no** such check — a Mode-B
 caller feeding untrusted input must bound the source (and parse time) itself.
+
+### `FunctionAnalysisCache`
+
+`FunctionAnalysisCache` is a caller-owned, deterministic least-recently-used
+(LRU) cache of exact function-local CFG, DFG, and PDG plans. It never caches a
+tree or a whole CPG: both cached builder methods rebuild the AST and allocate a
+fresh `NodeId` domain, then expand retained function-local ordinals into that
+domain. The default limits are 4,096 entries and 64 MiB of estimated resident
+key, artifact, and metadata bytes.
+
+```rust
+// requires: features = ["lang-rust"]
+use libcpg::{
+    CpgBuilderConfig, FunctionAnalysisCache, FunctionAnalysisCacheLimits,
+    Language, TreeSitterCpgBuilder,
+};
+
+let builder = TreeSitterCpgBuilder::with_config(CpgBuilderConfig::new());
+let mut cache = FunctionAnalysisCache::with_limits(
+    FunctionAnalysisCacheLimits::new(512, 8 * 1024 * 1024),
+);
+let source = "fn stable(x: i32) -> i32 { x + 1 }";
+
+let first = builder.build_with_analysis_cache(source, Language::Rust, &mut cache)?;
+let second = builder.build_with_analysis_cache(source, Language::Rust, &mut cache)?;
+assert_eq!(first.node_count(), second.node_count());
+assert!(cache.stats().cfg_hits > 0);
+# Ok::<(), libcpg::Error>(())
+```
+
+`new`, `with_limits`, `limits`, `stats`, `reset_stats`, and `clear` are the
+public cache operations. `FunctionAnalysisCacheStats` separates CFG/DFG/PDG
+hits, misses, dependency/key/capacity bypasses, evictions, occupancy, and
+resident key/artifact/metadata estimates. A zero entry or byte bound disables
+reuse while preserving the ordinary construction result. Digest equality is
+only an index lookup: a hit also requires full canonical-key byte equality and
+a valid local plan. See the [component contract](../components/builder/incremental-analysis-cache.md),
+[usage guide](../usage/31-incremental-analysis-cache.md), and
+[security boundary](../security/21-incremental-cache-boundary.md).
 
 ---
 
@@ -433,8 +475,11 @@ pub struct PdgBuilder { /* private */ }
 |--------|-----------|-------|
 | `new` | `fn new() -> Self` | Constructor. |
 | `build` | `fn build(&self, cpg: &mut CodePropertyGraph, function: NodeId)` | Add `ControlDependence` + `DataDependence` edges for `function`. Idempotent. |
+| `build_with_analysis_cache` | `fn build_with_analysis_cache(&self, cpg: &mut CodePropertyGraph, function: NodeId, cache: &mut FunctionAnalysisCache)` | Reuse an exact local PDG plan or recompute on a boundary crossing. |
 | `build_all` | `fn build_all(&self, cpg: &mut CodePropertyGraph)` | Plan and emit every function in stable order with one shared existing-edge snapshot. |
+| `build_all_with_analysis_cache` | `fn build_all_with_analysis_cache(&self, cpg: &mut CodePropertyGraph, cache: &mut FunctionAnalysisCache)` | Cached serial planning with stable ordered emission. |
 | `build_all_parallel` | `fn build_all_parallel(&self, cpg: &mut CodePropertyGraph)` | Plan every function on the current Rayon pool, then emit in exact serial order. |
+| `build_all_parallel_with_analysis_cache` | `fn build_all_parallel_with_analysis_cache(&self, cpg: &mut CodePropertyGraph, cache: &mut FunctionAnalysisCache)` | Consume hits in function order and plan misses on the current Rayon pool. |
 
 `build` requires that `function`'s CFG and DFG already exist. It computes
 [control dependence](../GLOSSARY.md#control-dependence) [[1]](#references) as the

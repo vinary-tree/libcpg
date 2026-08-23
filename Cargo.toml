@@ -310,6 +310,11 @@ name = "analyze_corpus"
 harness = false
 required-features = ["lang-rust", "lang-python", "lang-javascript", "lang-go", "lang-c"]
 
+[[bench]]
+name = "reanalyze"
+harness = false
+required-features = ["lang-rust"]
+
 [[example]]
 name = "profile_workloads"
 path = "benches/profile_workloads.rs"

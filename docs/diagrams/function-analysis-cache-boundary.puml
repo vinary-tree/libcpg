@@ -1,0 +1,64 @@
+@startuml
+!include _libcpg-theme.iuml
+title Function-analysis cache boundary — represent locally or recompute exactly
+
+package "function-local admitted evidence" #D3F9D8 {
+  rectangle "exact function source\nlanguage + builder options" as SOURCE #DBE4FF
+  rectangle "local AST order\nnode count + nested marker" as TREE #DBE4FF
+  rectangle "local recursive calls\ncall + argument ordinals" as LOCALCALL #C3FAE8
+  rectangle "sorted local CFG/DFG\noverlay tuples" as OVERLAY #E5DBFF
+  rectangle "canonical full key" as KEY #FFF3BF
+  rectangle "CFG / DFG / PDG plan\nlocal ordinals only" as PLAN #B2F2BB
+
+  SOURCE --> KEY
+  TREE --> KEY
+  LOCALCALL --> KEY
+  OVERLAY --> KEY
+  KEY --> PLAN : full-byte hit
+}
+
+package "cross-boundary evidence" #FFE3E3 {
+  rectangle "external caller\nor argument" as EXTCALL #FFE8CC
+  rectangle "preceding lexical\ndefinition" as LEXICAL #FFE8CC
+  rectangle "nested function\nscope" as NESTED #FFE8CC
+  rectangle "self/this field +\nnominal owner" as FIELD #FFE8CC
+  rectangle "crossing CFG/DFG\nPDG overlay edge" as CROSS #FFE8CC
+  rectangle "ordinary exact planner\n(no cache insertion)" as BYPASS #FFE3E3
+
+  EXTCALL --> BYPASS
+  LEXICAL --> BYPASS
+  NESTED --> BYPASS
+  FIELD --> BYPASS
+  CROSS --> BYPASS
+}
+
+actor "caller" as CALLER #F1F3F5
+database "fresh graph" as GRAPH #B2F2BB
+
+CALLER --> KEY : eligible context
+CALLER --> BYPASS : unrepresented dependency
+PLAN --> GRAPH : validate all ordinals\nthen ordered replay
+BYPASS --> GRAPH : ordinary ordered emission
+
+note bottom of KEY
+  FNV-1a is an index only.
+  Canonical bytes establish equality.
+end note
+
+note bottom of BYPASS
+  Bypass is exact recomputation,
+  not an approximate or partial result.
+end note
+
+legend right
+  |= colour |= role |
+  |<#DBE4FF>| exact local syntax/configuration |
+  |<#C3FAE8>| local call evidence |
+  |<#E5DBFF>| local dependence overlay |
+  |<#FFF3BF>| retained equality witness |
+  |<#B2F2BB>| exact plan/result |
+  |<#FFE8CC>| nonlocal dependency |
+  |<#FFE3E3>| conservative fresh path |
+  |<#F1F3F5>| caller / trust boundary |
+endlegend
+@enduml
