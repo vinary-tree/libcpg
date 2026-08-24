@@ -11,6 +11,8 @@ mod facts;
 mod intervals;
 mod liveness;
 mod octagon;
+#[cfg(feature = "abstract-domains")]
+mod polyhedra;
 mod reduced_product;
 mod sccp;
 
@@ -52,6 +54,8 @@ pub use octagon::{
     IntervalOctagonReduction, Octagon, OctagonBound, OctagonConstraint, OctagonError, OctagonSign,
     OctagonTerm,
 };
+#[cfg(feature = "abstract-domains")]
+pub use polyhedra::{LinearConstraint, Polyhedron, PolyhedronError, Rational};
 pub use reduced_product::{NoReduction, ReducedProduct, Reduction};
 pub(crate) use sccp::{fold_binary, fold_unary, literal_value};
 pub use sccp::{sccp, ConstLattice, ConstValue, SccpResult};

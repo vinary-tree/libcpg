@@ -34,6 +34,9 @@ design-patterns = ["serde_yaml", "toml_edit", "dep:serde"]
 # Algorithm detection and complexity analysis
 algorithm-detection = []
 
+# Exact arbitrary-precision convex-polyhedral abstract domain.
+abstract-domains = ["dep:num-bigint", "dep:num-rational", "dep:num-traits"]
+
 # Rholang / MeTTa CPG node-mappers (Mode B — no grammar vendoring).
 #
 # These are intentionally EMPTY feature lists: they are pure logical `cfg`
@@ -52,7 +55,12 @@ rholang = []
 metta = []
 
 # Serialization support
-serde = ["dep:serde", "petgraph/serde-1"]
+serde = [
+    "dep:serde",
+    "petgraph/serde-1",
+    "num-bigint?/serde",
+    "num-rational?/serde",
+]
 
 # ML-based pattern classification using linfa
 ml-linfa = ["linfa", "linfa-trees"]
@@ -86,7 +94,15 @@ lang-config = ["lang-json", "lang-yaml", "lang-toml"]
 lang-all = ["lang-systems", "lang-scripting", "lang-web", "lang-config", "lang-bash", "lang-markdown", "lang-java"]
 
 # Full feature set
-full = ["gnn", "design-patterns", "algorithm-detection", "serde", "ml-rules", "lang-all"]
+full = [
+    "gnn",
+    "design-patterns",
+    "algorithm-detection",
+    "abstract-domains",
+    "serde",
+    "ml-rules",
+    "lang-all",
+]
 
 [dependencies]
 # Core graph library
@@ -97,6 +113,12 @@ rayon = "1.10"
 
 # Efficient hash maps
 rustc-hash = "2.0"
+
+# Arbitrary-precision rational arithmetic for optional exact polyhedra.
+# num-rational 0.4 uses the compatible num-bigint 0.4 line.
+num-bigint = { version = "0.4.8", optional = true }
+num-rational = { version = "0.4.2", optional = true }
+num-traits = { version = "0.2.19", optional = true }
 
 # Small vector optimization
 smallvec = { version = "1.13", features = ["serde"] }

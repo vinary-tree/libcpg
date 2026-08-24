@@ -7,6 +7,9 @@ use libcpg::{
     OctagonConstraint, OctagonTerm, ReducedProduct, SolverConfig, SourceRange, Visibility,
 };
 
+#[cfg(feature = "abstract-domains")]
+use libcpg::{Lattice, LinearConstraint, Polyhedron};
+
 type RelationalState = ReducedProduct<IntervalEnv, Octagon, IntervalOctagonReduction>;
 
 fn node(id: u32, kind: CpgNodeKind) -> CpgNode {
@@ -142,4 +145,24 @@ fn public_reduced_product_is_reduced_by_the_real_cfg_merge() {
 
     assert!(block_cfg(&cpg, NodeId::new(999_999)).is_err());
     assert_eq!((cpg.node_count(), cpg.edge_count()), graph_size);
+}
+
+#[cfg(feature = "abstract-domains")]
+#[test]
+fn public_exact_polyhedron_composes_in_the_reduced_product() {
+    let left = Polyhedron::integer_point(&[0, 0]).expect("left exact point");
+    let right = Polyhedron::integer_point(&[4, 4]).expect("right exact point");
+    let hull = left
+        .closed_convex_hull(&right)
+        .expect("exact public closed convex hull");
+    assert!(hull.contains_integers(&[2, 2]));
+    assert!(!hull.contains_integers(&[2, 1]));
+
+    let half_space =
+        Polyhedron::from_constraints(2, [LinearConstraint::from_integers([(0, 1), (1, -1)], 0)])
+            .expect("public x minus y half-space");
+    let precise: ReducedProduct<_, _> = ReducedProduct::new(hull, equality_octagon());
+    let components: ReducedProduct<_, _> = ReducedProduct::new(half_space, Octagon::top(2));
+    assert!(precise.leq(&components));
+    assert!(!components.leq(&precise));
 }

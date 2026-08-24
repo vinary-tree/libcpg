@@ -138,6 +138,9 @@ pub use dataflow::{
     SccpResult, SolverConfig, VarFacts, VariableDefinition, VeryBusyExpressions,
 };
 
+#[cfg(feature = "abstract-domains")]
+pub use dataflow::{LinearConstraint, Polyhedron, PolyhedronError, Rational};
+
 pub use projection::{
     call_graph_projection, cfg_projection, dfg_projection, module_graph_projection, pdg_projection,
     projection_of, GraphProjection, ProjectionError, ProjectionKind, UndirectedProjection,

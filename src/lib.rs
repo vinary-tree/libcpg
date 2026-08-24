@@ -270,6 +270,9 @@ pub use analysis::{
     TRIAD_NAMES,
 };
 
+#[cfg(feature = "abstract-domains")]
+pub use analysis::{LinearConstraint, Polyhedron, PolyhedronError, Rational};
+
 #[cfg(feature = "rholang")]
 pub use analysis::{
     session_sketches, SessionAction, SessionConformance, SessionDirection, SessionEndpoint,

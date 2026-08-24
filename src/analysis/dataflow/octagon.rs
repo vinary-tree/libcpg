@@ -11,7 +11,7 @@ use std::fmt;
 use super::{reduced_product::Reduction, Bound as IntervalBound, Interval, IntervalEnv, Lattice};
 
 #[cfg(feature = "serde")]
-use serde::{Deserialize, Serialize};
+use serde::{de::Error as _, Deserialize, Deserializer, Serialize};
 
 /// Sign of one variable in an octagonal expression.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
@@ -138,7 +138,7 @@ pub enum OctagonError {
 
 /// A canonical integer octagon represented by a coherent, tight DBM.
 #[derive(Clone)]
-#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "serde", derive(Serialize))]
 pub struct Octagon {
     variables: usize,
     empty: bool,
@@ -167,6 +167,47 @@ impl Eq for Octagon {}
 impl Default for Octagon {
     fn default() -> Self {
         Self::top(0)
+    }
+}
+
+#[cfg(feature = "serde")]
+impl<'de> Deserialize<'de> for Octagon {
+    fn deserialize<D: Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+        #[derive(Deserialize)]
+        struct Encoded {
+            variables: usize,
+            empty: bool,
+            matrix: Vec<OctagonBound>,
+        }
+
+        let encoded = Encoded::deserialize(deserializer)?;
+        let signed = encoded
+            .variables
+            .checked_mul(2)
+            .ok_or_else(|| D::Error::custom("octagon signed dimension overflow"))?;
+        let expected = signed
+            .checked_mul(signed)
+            .ok_or_else(|| D::Error::custom("octagon matrix dimension overflow"))?;
+        if encoded.matrix.len() != expected {
+            return Err(D::Error::custom(
+                "octagon matrix length disagrees with its variable count",
+            ));
+        }
+
+        let mut octagon = Self {
+            variables: encoded.variables,
+            empty: encoded.empty,
+            matrix: encoded.matrix,
+        };
+        if octagon.empty {
+            octagon.matrix.fill(OctagonBound::Infinity);
+            for index in 0..signed {
+                octagon.matrix[index * signed + index] = OctagonBound::Finite(0);
+            }
+        } else {
+            octagon.close().map_err(D::Error::custom)?;
+        }
+        Ok(octagon)
     }
 }
 
@@ -399,8 +440,10 @@ impl Octagon {
     /// consequences of the stable bounds.
     pub fn widen(&mut self, incoming: &Self) -> Result<bool, OctagonError> {
         if self.empty {
-            let changed = !incoming.empty;
-            *self = incoming.clone();
+            let variables = self.variables.max(incoming.variables);
+            let next = incoming.expanded(variables);
+            let changed = next != *self;
+            *self = next;
             return Ok(changed);
         }
         if incoming.empty {
@@ -626,7 +669,7 @@ impl Lattice for Octagon {
             if other.empty {
                 return false;
             }
-            *self = other.clone();
+            *self = other.expanded(self.variables.max(other.variables));
             return true;
         }
         if other.empty {
@@ -973,5 +1016,8 @@ mod tests {
         let encoded = serde_json::to_string(&octagon).expect("serialize octagon");
         let decoded: Octagon = serde_json::from_str(&encoded).expect("deserialize octagon");
         assert_eq!(decoded, octagon);
+
+        let malformed = r#"{"variables":2,"empty":false,"matrix":[]}"#;
+        assert!(serde_json::from_str::<Octagon>(malformed).is_err());
     }
 }
