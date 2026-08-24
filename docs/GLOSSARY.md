@@ -158,8 +158,8 @@ A single directed graph that merges several program views onto **one shared node
 ### CPG ML export / PyG edge index / AST path context
 
 A **CPG machine-learning (ML) export** is libcpg's deterministic feature-free
-numerical view: 71 named node columns aligned with ascending stable ids/source
-ranges, plus typed dense edge tuples covering all 53 relation classes. **PyG**
+numerical view: 73 named node columns aligned with ascending stable ids/source
+ranges, plus typed dense edge tuples covering all 60 relation classes. **PyG**
 abbreviates PyTorch Geometric; libcpg's `edge_index` is an ordinary sorted
 `(source_dense, target_dense, relation_class)` vector that a caller may
 transpose for PyG, not a PyG runtime object. An **AST path context** retains two
@@ -818,6 +818,32 @@ evidence—not a source spelling. libcpg groups these events per top-level proce
 and reports structural orphan, blocked, and linear-contention evidence. See
 [Theory 29](theory/29-channel-topology-and-linearity.md) and Meredith–Radestock
 [[43]](#references).
+
+### Capability level / Obligation level / Deadlock freedom / Lock freedom
+
+A channel's **capability level** describes when a matching co-action is
+available; its **obligation level** describes when a process promises to
+perform its own action. libcpg's finite Kobayashi-style model requires the
+capability of an earlier receive channel to be strictly lower than the
+obligation of a later send channel and assigns matching co-actions one
+canonical rank. A cycle makes those strict inequalities unsatisfiable.
+**Deadlock freedom** and **lock freedom** are operational progress properties;
+the latter requires progress for individual pending actions rather than only
+system-level progress. libcpg reports qualified static constraint evidence and
+does not prove either property [[44]](#references), [[74]](#references). See
+[Theory 52](theory/52-rholang-name-flow-and-deadlock-freedom.md).
+
+### NameFlow / Restriction / Scope extrusion
+
+**NameFlow** is libcpg's optional fresh-name provenance overlay. A
+**restriction** creates a fresh binder whose stable `NodeId` is the abstract
+name identity. **Scope extrusion** occurs when communication carries that name
+beyond its original lexical scope; the NameFlow fixed point transfers a send
+payload's origin to a matched receive binder. `Creates`, `References`,
+`Quotes`, `Drops`, `Carries`, `Receives`, and `Communicates` relate the origin
+to existing CPG nodes. The relation is a typed may-analysis, not a complete
+rho-calculus reduction semantics [[43]](#references). See the [NameFlow
+component](components/graph/rholang-name-flow.md).
 
 ### Deadlock candidate / Wait-for graph / Lock-order graph
 
@@ -1517,3 +1543,4 @@ strict tree interpretation. See
 71. Cousot, P., Cousot, R. (1979). *Systematic Design of Program Analysis Frameworks.* DOI: [10.1145/567752.567778](https://doi.org/10.1145/567752.567778).
 72. Calcagno, C., Distefano, D., O'Hearn, P. W., Yang, H. (2011). *Compositional Shape Analysis by Means of Bi-Abduction.* DOI: [10.1145/2049697.2049700](https://doi.org/10.1145/2049697.2049700).
 73. Calcagno, C., Distefano, D., O'Hearn, P. W., Yang, H. (2009). *Compositional Shape Analysis by Means of Bi-Abduction.* DOI: [10.1145/1480881.1480917](https://doi.org/10.1145/1480881.1480917).
+74. Kobayashi, N., Sangiorgi, D. (2010). *A Hybrid Type System for Lock-Freedom of Mobile Processes.* DOI: [10.1145/1745312.1745313](https://doi.org/10.1145/1745312.1745313).

@@ -1,0 +1,42 @@
+@startuml
+!include _libcpg-theme.iuml
+title Stack-safe NameFlow fixed point
+skinparam backgroundColor #FFFFFF
+skinparam componentStyle rectangle
+skinparam shadowing false
+
+component "Rholang Mode-B CPG\nNameOperationKind + MsgKind" as INPUT #DBE4FF
+component "Typed definition evidence\nidentifier + reaching def + DFG" as DEF #FFF3BF
+queue "Heap worklist\n(origin, reached node)" as QUEUE #C3FAE8
+component "Reflection classifier\nquote / drop ancestors" as REFLECT #E5DBFF
+component "Event watchers\nchannel + payload" as WATCH #FFE8CC
+component "Matched communication\npayload -> receive binder" as MATCH #FCC2D7
+database "Ordered origin sets\nand seven relations" as RESULT #D3F9D8
+component "Issues + caps\ncomplete or partial" as QUAL #F1F3F5
+
+INPUT --> DEF : normalized evidence
+INPUT --> QUEUE : fresh binder seeds
+DEF --> QUEUE : direct transfers
+QUEUE --> REFLECT : reached identifier
+QUEUE --> WATCH : reached channel/payload
+WATCH --> MATCH : same fresh channel
+MATCH --> QUEUE : new binder origin
+QUEUE --> RESULT : new assignment
+REFLECT --> RESULT : Quotes / Drops
+WATCH --> RESULT : Carries / Communicates
+MATCH --> RESULT : Receives
+QUEUE --> QUAL : bounded work
+MATCH --> QUAL : arity / match bounds
+
+legend bottom
+|= Colour |= Meaning |
+|<#DBE4FF> | immutable normalized CPG input |
+|<#FFF3BF> | typed identity evidence |
+|<#C3FAE8> | heap-resident fixed-point machine |
+|<#E5DBFF> | reflective-name semantics |
+|<#FFE8CC> | incremental event indexing |
+|<#FCC2D7> | scope-extrusion transfer |
+|<#D3F9D8> | deterministic result |
+|<#F1F3F5> | explicit qualification |
+endlegend
+@enduml

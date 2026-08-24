@@ -430,6 +430,9 @@ So the safe pattern is: build (single-threaded, `&mut`), then analyse
 - [Communication and lock-order deadlocks](deadlock-analysis.md) — initially
   blocked process waits, typed direct/interprocedural lock order, shared SCCs,
   and statement-precise advisory witnesses.
+- [Rholang NameFlow and level analysis](rholang-name-flow.md) — normalized
+  fresh-name provenance, quote/drop reflection, matched payload scope
+  extrusion, and obligation/capability SCC witnesses under `rholang`.
 - [May-happen-in-parallel analysis](mhp-analysis.md) — typed parallel operand
   subtrees, canonical symmetric execution-site pairs, nested-region
   composition, and explicit quadratic-output truncation.

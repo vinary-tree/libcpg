@@ -510,6 +510,30 @@ See the [component guide](../components/graph/channel-topology.md), [usage
 guide](../usage/12-channel-topology.md), and [security
 boundary](../security/04-channel-topology.md).
 
+### Rholang NameFlow and level constraints (`rholang`)
+
+The frontend records restrictions, fresh binders, quote/drop reflection, and
+message roles as typed metadata. The analyzer follows definition identity and
+matched payload scope extrusion without parsing source text.
+
+| Function | Signature | Result |
+|---|---|---|
+| `analyze_name_flow` | `fn(&CodePropertyGraph) -> NameFlowAnalysis` | Qualified fresh-origin fixed point with default caps. |
+| `analyze_name_flow_with_caps` | `fn(&CodePropertyGraph, NameFlowCaps) -> NameFlowAnalysis` | Same analysis with caller-selected origin/relation/match/dependency/work bounds. |
+| `materialize_name_flow_overlay` | `fn(&mut CodePropertyGraph, &NameFlowAnalysis) -> Result<usize, NameFlowOverlayError>` | Transactional, idempotent append of seven typed NameFlow relations. |
+| `analyze_deadlock_freedom` | `fn(&CodePropertyGraph) -> DeadlockFreedomAnalysis` | Qualified fresh-name report, canonical levels, cyclic channels, and witnesses. |
+| `analyze_deadlock_freedom_with_caps` | `fn(&CodePropertyGraph, NameFlowCaps) -> DeadlockFreedomAnalysis` | Same analysis with caller-selected bounds. |
+| `deadlock_freedom` | `fn(&CodePropertyGraph) -> Vec<DeadlockWitness>` | Positive cyclic-witness projection; empty is advisory only. |
+
+`NameFlowAnalysis` retains sorted origins, relations, issues, work, and
+communication-match counts. `DeadlockFreedomAnalysis` adds per-channel equal
+capability/obligation ranks when the dependency graph is acyclic, or `None`
+levels and statement-precise `ObligationCapability` witnesses for cyclic SCCs.
+Every source-shaped traversal uses explicit heap worklists. See the [component
+contract](../components/graph/rholang-name-flow.md), [usage
+guide](../usage/37-rholang-name-flow-deadlock.md), and [security
+boundary](../security/27-rholang-name-flow-boundary.md).
+
 ### Communication and lock-order deadlock candidates
 
 `LockKind::{AcquireRead, AcquireWrite, Release}` is optional typed metadata on a
@@ -609,15 +633,15 @@ pub fn ast_paths(
 
 | Type or registry | Stable contract |
 |---|---|
-| `PygExport::node_features` | 71 finite `f32` columns per canonical node row |
+| `PygExport::node_features` | 73 finite `f32` columns per canonical node row |
 | `PygExport::edge_index` | sorted `(source_dense, target_dense, relation_class)` tuples with parallel multiplicity |
 | `PygExport::node_ids` / `source_ranges` | ascending stable ids and ranges aligned with every row |
 | `PygExport::slice_node_ids` | sorted complete backward-PDG slice, empty without a criterion |
 | `pagerank_converged` / `reverse_pagerank_converged` | convergence qualification for the two structural columns |
 | `PygExport::dense_index` | stable-id lookup into aligned rows |
 | `PygExport::feature_index` | exact schema-name lookup |
-| `PYG_NODE_FEATURE_NAMES` | canonical 71-name registry |
-| `edge_kind_class` / `EDGE_KIND_CLASS_COUNT` | exhaustive 53-relation map and bound |
+| `PYG_NODE_FEATURE_NAMES` | canonical 73-name registry |
+| `edge_kind_class` / `EDGE_KIND_CLASS_COUNT` | exhaustive 60-relation map and bound |
 | `node_kind_class` | exhaustive 45-node-kind map |
 | `PathContext` | exact terminal ids/tokens, complete AST node path, aligned kind classes, ancestor id/index |
 | `AstPathOptions` | length/width filters plus terminal, pair, context, retained-node, and ancestor-step caps |
@@ -1589,6 +1613,7 @@ pub struct CpgNode {
     pub range: SourceRange,
     pub text: Option<Arc<str>>,
     pub message_kind: Option<MsgKind>,
+    pub name_operation: Option<NameOperationKind>,
     pub lock_kind: Option<LockKind>,
     pub allocation_type: Option<Box<TypeInfo>>,
     pub properties: Option<Box<FxHashMap<PropertyKey, PropertyValue>>>,
@@ -1604,6 +1629,7 @@ pub struct CpgNode {
 | `range` | [`SourceRange`](#sourcerange) | Byte/line/column span in source. |
 | `text` | `Option<Arc<str>>` | Verbatim source text (terminals). |
 | `message_kind` | `Option<MsgKind>` | Frontend-normalized channel action, orthogonal to syntax kind. |
+| `name_operation` | `Option<NameOperationKind>` | Frontend-normalized restriction, fresh binder, quote, or drop operation. |
 | `lock_kind` | `Option<LockKind>` | Frontend/adapter-normalized lock action, orthogonal to syntax kind. |
 | `allocation_type` | `Option<Box<TypeInfo>>` | Frontend-normalized nominal type allocated by this expression. |
 | `properties` | `Option<Box<FxHashMap<PropertyKey, PropertyValue>>>` | Extra metadata, allocated only when nonempty. |
@@ -1617,6 +1643,7 @@ pub struct CpgNode {
 | `new` | `fn new(id: NodeId, kind: CpgNodeKind, range: SourceRange) -> Self` | Constructor. |
 | `with_text` | `fn with_text(self, text: impl Into<Arc<str>>) -> Self` | Builder: set source text. |
 | `with_message_kind` | `fn with_message_kind(self, kind: MsgKind) -> Self` | Builder: set normalized channel semantics. |
+| `with_name_operation` | `fn with_name_operation(self, kind: NameOperationKind) -> Self` | Builder: set normalized restriction/reflection semantics. |
 | `with_lock_kind` | `fn with_lock_kind(self, kind: LockKind) -> Self` | Builder: set normalized lock semantics. |
 | `with_allocation_type` | `fn with_allocation_type(self, type_info: TypeInfo) -> Self` | Builder: set normalized constructor type. |
 | `with_property` | `fn with_property(self, key: PropertyKey, value: PropertyValue) -> Self` | Builder: add a property. |
@@ -1747,6 +1774,12 @@ The payload of `CpgNodeKind::Literal { kind }`.
 
 ## Supporting node types
 
+### `NameOperationKind`
+
+The four copy-sized values are `Restriction`, `FreshBinder`, `Quote`, and
+`Drop`. Rholang records them orthogonally on structural nodes so NameFlow can
+consume typed frontend evidence without source-text parsing.
+
 ### `TypeInfo`
 
 ```rust
@@ -1844,14 +1877,14 @@ JSON string used by the former `Option<String>` field.
 
 ## `CpgEdgeKind`
 
-A 23-variant enum. Three variants wrap a finer kind:
-`ControlFlow(CfgEdgeKind)`, `DataFlow(DfgEdgeKind)`, and
-`Heap(HeapEdgeKind)`.
+A 24-variant enum. Four variants wrap a finer kind:
+`ControlFlow(CfgEdgeKind)`, `DataFlow(DfgEdgeKind)`,
+`Heap(HeapEdgeKind)`, and `NameFlow(NameFlowEdgeKind)`.
 
-![Taxonomy of CpgEdgeKind and its CFG/DFG/Heap sub-kinds](../diagrams/edge-kind-taxonomy.svg)
+![Taxonomy of CpgEdgeKind and its CFG/DFG/Heap/NameFlow sub-kinds](../diagrams/edge-kind-taxonomy.svg)
 
-*Figure — the edge-kind taxonomy across the AST, CFG, DFG, PDG, Heap, call,
-type, reference, scope, and import families. Source:
+*Figure — the edge-kind taxonomy across the AST, CFG, DFG, PDG, Heap,
+NameFlow, call, type, reference, scope, and import families. Source:
 [`diagrams/edge-kind-taxonomy.puml`](../diagrams/edge-kind-taxonomy.puml).*
 
 | Family | Variants |
@@ -1861,6 +1894,7 @@ type, reference, scope, and import families. Source:
 | DFG | `DataFlow(DfgEdgeKind)` |
 | PDG | `ControlDependence`, `DataDependence` |
 | Heap | `Heap(HeapEdgeKind)` |
+| NameFlow | `NameFlow(NameFlowEdgeKind)` |
 | Call | `StaticCall`, `DynamicCall`, `CallSite` |
 | Type | `TypeOf`, `Inherits`, `Implements`, `GenericInstance` |
 | Reference | `Reference`, `Definition`, `Declaration` |
@@ -1878,6 +1912,7 @@ Predicates on the kind, useful with `edges_by_kind`:
 | `is_dfg(&self) -> bool` | `DataFlow(_)` |
 | `is_pdg(&self) -> bool` | `ControlDependence`, `DataDependence` |
 | `is_heap(&self) -> bool` | `Heap(_)` |
+| `is_name_flow(&self) -> bool` | `NameFlow(_)` |
 | `is_call(&self) -> bool` | `StaticCall`, `DynamicCall`, `CallSite` |
 | `is_type(&self) -> bool` | `TypeOf`, `Inherits`, `Implements`, `GenericInstance` |
 
@@ -2062,6 +2097,8 @@ pub struct CpgStats {
     pub ast_edges: usize,
     pub cfg_edges: usize,
     pub dfg_edges: usize,
+    pub heap_edges: usize,
+    pub name_flow_edges: usize,
     pub call_edges: usize,
     pub function_count: usize,
     pub class_count: usize,

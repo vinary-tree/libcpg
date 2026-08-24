@@ -194,7 +194,9 @@ So VF2 matching is available with `default = []`; GoF detection requires `--feat
   derives bounded MHP pairs from typed parallel operand subtrees; exact
   field/index/channel access identity and source-ordered locksets then produce
   immutable F6 race and F7 RMW-gap candidates; with
-  `rholang`, it also infers advisory per-channel session sketches.
+  `rholang`, it also infers advisory per-channel session sketches plus
+  stack-safe fresh-name provenance, payload scope extrusion, and
+  obligation/capability level cycles.
 
 ## Error model
 

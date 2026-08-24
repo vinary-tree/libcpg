@@ -57,6 +57,7 @@ pub struct CpgNode {
     pub range: SourceRange,              // byte + line/col span
     pub text: Option<Arc<str>>,          // original source slice, for terminals
     pub message_kind: Option<MsgKind>,   // typed channel operation, if any
+    pub name_operation: Option<NameOperationKind>, // restriction/reflection, if any
     pub lock_kind: Option<LockKind>,     // typed lock operation, if any
     pub allocation_type: Option<Box<TypeInfo>>, // nominal constructor result, if any
     pub properties: Option<Box<FxHashMap<PropertyKey, PropertyValue>>>,
@@ -65,11 +66,13 @@ pub struct CpgNode {
 }
 ```
 
-`message_kind`, `lock_kind`, and `allocation_type` are orthogonal semantic
-annotations: a channel send, lock acquisition, or constructor can remain a
-`Call` while feature-free analyses consume typed evidence without parsing
-source text. JavaScript/TypeScript `new` and Java object creation populate the
-nominal allocation field; unsupported frontends leave it `None`. Convenience
+`message_kind`, `name_operation`, `lock_kind`, and `allocation_type` are
+orthogonal semantic annotations: a channel send, reflective-name operation,
+lock acquisition, or constructor retains its structural kind while analyses
+consume typed evidence without parsing source text. Rholang populates
+restriction/fresh-binder/quote/drop metadata; JavaScript/TypeScript `new` and
+Java object creation populate the nominal allocation field. Unsupported
+frontends leave them `None`. Convenience
 methods layer over the fields: `name() -> Option<&str>` (the bound name for the
 kinds that have one), and the predicates `is_declaration`, `is_statement`,
 `is_expression`, `is_control_flow`, `is_error`.
@@ -148,7 +151,7 @@ Typed constructors keep call sites readable: `CpgEdge::ast_child`, `control_flow
 
 The [edge kind](../GLOSSARY.md#node-kind--edge-kind) both *labels* the overlay and, for CFG/DFG, *wraps* the sub-kind:
 
-![Mind-map of CpgEdgeKind grouped into AST, CFG, DFG, PDG, Heap, call, type, reference, scope, and import edges](../diagrams/edge-kind-taxonomy.svg)
+![Mind-map of CpgEdgeKind grouped into AST, CFG, DFG, PDG, Heap, NameFlow, call, type, reference, scope, and import edges](../diagrams/edge-kind-taxonomy.svg)
 
 *Figure — `CpgEdgeKind` grouped by overlay; control flow is `ControlFlow(CfgEdgeKind)` and data flow is `DataFlow(DfgEdgeKind)`. Source: [`diagrams/edge-kind-taxonomy.puml`](../diagrams/edge-kind-taxonomy.puml).*
 
@@ -159,6 +162,7 @@ The [edge kind](../GLOSSARY.md#node-kind--edge-kind) both *labels* the overlay a
 | DFG | `DataFlow(DfgEdgeKind)` (13 sub-kinds) | `is_dfg()` |
 | PDG | `ControlDependence`, `DataDependence` | `is_pdg()` |
 | Heap | `Heap(HeapEdgeKind)` (6 sub-kinds) | `is_heap()` |
+| NameFlow | `NameFlow(NameFlowEdgeKind)` (7 sub-kinds) | `is_name_flow()` |
 | Call | `StaticCall`, `DynamicCall`, `CallSite` | `is_call()` |
 | Type | `TypeOf`, `Inherits`, `Implements`, `GenericInstance` | `is_type()` |
 | Reference | `Reference`, `Definition`, `Declaration` | — |
@@ -172,7 +176,9 @@ There is **no** `CfgEdge`/`DfgEdge` wrapper type and **no** `BranchTrue`/`UseUse
 The payoff of the shared $`V`$ is that the overlays *co-locate*: the same
 `Call` node can participate in AST child edges, CFG sequencing, DFG argument
 edges, on-demand PDG dependence edges, and an explicitly materialized
-separation-logic Heap relation.
+separation-logic Heap relation. Rholang fresh-name analysis can additionally
+connect that same shared node set with NameFlow provenance, including matched
+payload scope extrusion, without creating a separate name graph.
 
 ![The AST, CFG, and DFG overlays drawn on one shared set of code nodes](../diagrams/cpg-overlay.svg)
 

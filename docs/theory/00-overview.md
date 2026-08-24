@@ -341,6 +341,10 @@ development, or jump to the layer you need:
     Finite separation-logic footprints, bi-abductive anti-frames, callee-first
     call-SCC composition, and heap-resident lifetime machines define qualified
     null-dereference, use-after-free, and leak evidence.
+52. **[52 — Rholang NameFlow and level-based deadlock freedom](52-rholang-name-flow-and-deadlock-freedom.md).**
+    Fresh-binder identity, reflective name operations, matched payload scope
+    extrusion, and Kobayashi-style capability/obligation constraints define a
+    bounded advisory model whose cycles reuse the shared iterative SCC engine.
 
 The later chapters define deterministic projection structure, architecture
 metrics, inspectable evidence, and their interpretation limits.

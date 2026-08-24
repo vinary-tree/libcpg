@@ -426,6 +426,22 @@ guide](../components/graph/compositional-heap-analysis.md), [Theory
 51](../theory/51-compositional-heap-analysis.md), and [security
 boundary](../security/26-compositional-heap-boundary.md).
 
+### Rholang NameFlow and level constraints (`rholang`)
+
+The Rholang frontend normalizes restrictions, fresh binders, quotes, drops, and
+message roles onto existing CPG nodes. `analyze_name_flow` uses typed definition
+evidence and a heap-resident fixed point to follow fresh names through direct
+references and matched payload-to-receive-binder scope extrusion.
+
+`analyze_deadlock_freedom` projects source-ordered receive-before-send evidence
+onto fresh channel identities, reuses the shared iterative SCC decomposition,
+and returns canonical finite ranks or statement-precise cyclic witnesses.
+Reports remain out of graph; `materialize_name_flow_overlay` is a separate
+transactional, idempotent append. See the [component
+contract](../components/graph/rholang-name-flow.md), [Theory
+52](../theory/52-rholang-name-flow-and-deadlock-freedom.md), and [security
+boundary](../security/27-rholang-name-flow-boundary.md).
+
 `condensation_metrics(&sccs, &options)` continues that pipeline without
 revisiting the CPG. A minimum-id Kahn order drives source-oriented longest-path
 levels and an SCC-member-weighted critical path; optional
@@ -681,10 +697,10 @@ See the [component guide](../components/graph/concurrency-bug-detection.md),
 
 `export_pyg` reads the immutable whole CPG and first replaces internal graph
 order with ascending stable `NodeId` coordinates. One typed edge pass produces
-ten-layer in/out degrees and a complete relation-class edge list. Independent
+eleven-layer in/out degrees and a complete relation-class edge list. Independent
 heap-backed passes compute AST depth/knownness/loop depth and canonical
 forward/reverse PageRank. Optional localization traverses the complete backward
-PDG slice before its caller cap is checked. The row assembler then aligns 71
+PDG slice before its caller cap is checked. The row assembler then aligns 73
 named values with stable ids and source ranges.
 
 `ast_paths` takes a separate function-local route. It collects AST descendants

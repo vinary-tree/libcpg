@@ -1,0 +1,45 @@
+@startuml
+!include _libcpg-theme.iuml
+title Rholang NameFlow evidence and mutation boundary
+skinparam backgroundColor #FFFFFF
+skinparam componentStyle rectangle
+skinparam shadowing false
+
+package "Immutable analysis" #F8F9FA {
+  component "Existing CPG\nAST + DFG + definitions + messages" as CPG #DBE4FF
+  component "NameFlow fixed point\nheap worklist + caps" as FLOW #C3FAE8
+  component "Level analysis\nchannel projection + SCC" as LEVEL #E5DBFF
+  component "Qualified reports\norigins + relations + levels + issues" as REPORT #D3F9D8
+}
+
+package "Explicit caller mutation" #FFF9DB {
+  component "Validate every endpoint" as VALIDATE #FFE8CC
+  component "connect_unique" as CONNECT #FFF3BF
+  database "Same node set\n+ NameFlow edges" as OVERLAY #FCC2D7
+}
+
+CPG --> FLOW : typed evidence only
+FLOW --> LEVEL : fresh channel identities
+FLOW --> REPORT
+LEVEL --> REPORT
+REPORT --> VALIDATE : optional materialization
+CPG --> VALIDATE : endpoint membership
+VALIDATE --> CONNECT : all valid
+CONNECT --> OVERLAY : append 7 kinds
+
+note bottom of VALIDATE #F1F3F5
+Unknown source or target returns an error
+before the first edge is appended.
+end note
+
+legend bottom
+|= Colour |= Meaning |
+|<#DBE4FF> | existing shared-node CPG |
+|<#C3FAE8> | stack-safe provenance closure |
+|<#E5DBFF> | level/SCC advisory analysis |
+|<#D3F9D8> | immutable qualified result |
+|<#FFE8CC> | transactional validation |
+|<#FFF3BF> | idempotent mutation primitive |
+|<#FCC2D7> | append-only overlay |
+endlegend
+@enduml

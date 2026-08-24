@@ -11,13 +11,13 @@ skinparam note {
   BorderColor #495057
 }
 
-component "immutable CodePropertyGraph\n45 node kinds + 53 edge relations\nsource ranges + typed overlays" as CPG #DBE4FF
+component "immutable CodePropertyGraph\n45 node kinds + 60 edge relations\nsource ranges + typed overlays" as CPG #DBE4FF
 component "node-id min-heap\nascending stable NodeId\ndense identity map" as IDS #C3FAE8
 component "typed edge scan\n10-layer in/out degrees\nparallel tuple retention" as EDGES #C5F6FA
 component "AST breadth-first machine\ndepth + known bit\nloop nesting" as AST #E5DBFF
 component "canonical topology\nforward + reverse PageRank\nexplicit convergence" as PR #FFF3BF
 component "optional complete\nbackward PDG slice\ncap after completion" as SLICE #FFE8CC
-component "aligned row assembler\n71 named columns\nids + ranges + edges" as ROWS #FFD8A8
+component "aligned row assembler\n73 named columns\nids + ranges + edges" as ROWS #FFD8A8
 component "PygExport\nordinary Rust vectors\noptional serde" as OUT #D3F9D8
 component "external adapter\nPyG / tensor runtime / table" as ADAPTER #FCC2D7
 component "downstream model\ntraining + evaluation\noutside libcpg" as MODEL #FFE3E3

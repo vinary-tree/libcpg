@@ -112,8 +112,9 @@ alternatives is folklore, and a decision without its costs is marketing.
 | [0066 — Deterministic PDG information flow](0066-deterministic-pdg-information-flow.md) | Separate explicit and implicit High-to-Low PDG/SDG witnesses, model declassification as a hard cut, and report secret-dependent branch/index sites without overstating represented evidence. | Accepted |
 | [0067 — Stack-safe relational abstract domains](0067-exact-relational-abstract-domains.md) | Compose feature-free integer octagons and static reduced products with optional exact rational polyhedra, iterative projection, validated invariants, and explicit resource costs. | Accepted |
 | [0068 — Compositional heap summaries](0068-compositional-heap-summaries.md) | Reuse the call-SCC solver for finite separation-logic footprints, qualified null/UAF/leak evidence, heap-resident lifetime machines, and a transactional typed Heap overlay. | Accepted |
+| [0069 — Stack-safe Rholang NameFlow](0069-stack-safe-rholang-name-flow.md) | Normalize reflective-name operations at the frontend, propagate scope extrusion with a bounded heap fixed point, and reuse iterative SCCs for qualified obligation/capability cycles. | Accepted |
 
-These sixty-eight are not independent. ADR-0001 fixes the substrate that all analyses
+These sixty-nine are not independent. ADR-0001 fixes the substrate that all analyses
 write onto; ADR-0002 and ADR-0005 together explain how a language reaches that
 substrate and what you must switch on to get there; ADR-0003 and ADR-0004 are
 two analyses *over* the substrate (one always-on, one feature-gated) that each
@@ -318,6 +319,10 @@ ADR-0068 reuses ADR-0032's validated callee-first call-SCC schedule for finite
 heap footprints. It keeps origin and lifetime propagation in explicit heap
 worklists, marks recursive must-invalidate evidence partial, and preserves
 ADR-0001's shared-node model through a transactional append-only Heap overlay.
+ADR-0069 reuses ADR-0003's typed definition identity, ADR-0036's normalized
+channel events, and ADR-0014's iterative SCC substrate. It extends ADR-0001's
+shared-node model with a transactional NameFlow layer while retaining all
+source-shaped state in explicit heap worklists.
 
 ![Module architecture of libcpg, showing the graph core and the analysis modules layered over it](../diagrams/module-architecture.svg)
 

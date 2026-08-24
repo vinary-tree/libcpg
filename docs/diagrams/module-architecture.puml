@@ -14,6 +14,7 @@ package "feature-gated  (opt-in)" as gated #FFF9DB {
   component "algorithms\nDetector + ComplexityAnalyzer" <<feature "algorithm-detection">> as A #FFF3BF
   component "gnn\nCpgGnn embeddings" <<feature "gnn">> as GN #FCC2D7
   component "analysis::concurrency::session\nendpoint sketches + duality" <<feature "rholang">> as SES #E5DBFF
+  component "analysis::concurrency::name_flow\nfresh-name closure + level SCCs" <<feature "rholang">> as NF #FFE8CC
 }
 
 B  --> G  : builds
@@ -24,6 +25,7 @@ PS --> G  : detects in
 A  --> G  : analyses
 GN --> G  : owns / propagates
 SES --> G : reads typed events
+NF --> G : reads typed names / optional overlay
 
 note bottom of gated
   Feature-gated modules are absent from the build unless
@@ -40,5 +42,6 @@ legend right
   |<#FFF3BF>| algorithms — complexity |
   |<#FCC2D7>| gnn — embeddings |
   |<#E5DBFF>| session — Rholang-gated advisory protocol sketches |
+  |<#FFE8CC>| name_flow — Rholang-gated fresh-name and level evidence |
 endlegend
 @enduml

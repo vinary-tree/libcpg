@@ -29,6 +29,8 @@ pub struct CpgNode {
     pub text: Option<Arc<str>>,
     /// Language-neutral message semantics for a channel event, if any.
     pub message_kind: Option<MsgKind>,
+    /// Frontend-normalized restriction or reflective-name operation, if any.
+    pub name_operation: Option<NameOperationKind>,
     /// Typed lock semantics for a synchronization call, if any.
     pub lock_kind: Option<LockKind>,
     /// Nominal constructor result, when normalized.
@@ -43,7 +45,7 @@ pub struct CpgNode {
 ```
 
 Construct nodes with `CpgNode::new(id, kind, range)` and refine them with the
-chainable builders `with_text`, `with_message_kind`, `with_lock_kind`,
+chainable builders `with_text`, `with_message_kind`, `with_name_operation`, `with_lock_kind`,
 `with_allocation_type`, `with_property`,
 `with_child`, and `with_parent`:
 
@@ -63,6 +65,9 @@ let node = CpgNode::new(
 send remains `CpgNodeKind::Call`, a select remains `Match`, and a parallel
 composition remains `Block`. Frontends populate it; feature-free concurrency
 analysis consumes it. See the [channel-topology component](channel-topology.md).
+`name_operation` preserves Rholang restriction, fresh-binder, quote, and drop
+semantics while nodes retain their structural `Block`, `Variable`, or
+`UnaryOp` kinds. See the [NameFlow component](rholang-name-flow.md).
 `lock_kind` likewise preserves `Call` structure while a semantic adapter records
 shared/exclusive acquisition or release. See the
 [deadlock-analysis component](deadlock-analysis.md).
@@ -394,6 +399,13 @@ fn node_text<'a>(source: &'a str, node: &CpgNode) -> &'a str {
 ## Supporting types
 
 Nodes reference a handful of small value types.
+
+### `NameOperationKind`
+
+Rholang normalizes reflective-name syntax without changing structural node
+kinds: `Restriction`, `FreshBinder`, `Quote`, and `Drop`. Other frontends leave
+`CpgNode::name_operation` as `None`. NameFlow consumes this typed metadata and
+never reparses source.
 
 ### `TypeInfo`
 

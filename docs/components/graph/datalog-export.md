@@ -55,9 +55,14 @@ sorted and deduplicated. `cpg_edge` deliberately retains the edge
 identifier and parallel multiplicity. Calling
 `DatalogFacts::cpg_edges` therefore reconstructs every represented
 overlay edge exactly, including its label.
-The generic relation and `souffle_files()` include all six `HeapEdgeKind`
-details when a caller has explicitly materialized that overlay; heap summaries
-remain absent until that opt-in mutation. No separate heap relation is emitted.
+The generic relation and `souffle_files()` include all six `HeapEdgeKind` and
+all seven `NameFlowEdgeKind` details when a caller has explicitly materialized
+those overlays. The typed family/subtype pairs are `heap` with `allocates`,
+`points_to`, `dereferences`, `releases`, `requires_valid`, or
+`ensures_invalid`; and `name_flow` with `creates`, `references`, `quotes`,
+`drops`, `carries`, `receives`, or `communicates`. Summaries and analysis
+reports remain absent until opt-in mutation; no separate family relation is
+emitted.
 
 ## Export algorithm
 

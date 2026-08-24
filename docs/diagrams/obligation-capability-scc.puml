@@ -1,0 +1,42 @@
+@startuml
+!include _libcpg-theme.iuml
+title Obligation/capability constraints through the shared SCC engine
+skinparam backgroundColor #FFFFFF
+skinparam componentStyle rectangle
+skinparam shadowing false
+
+component "Source-ordered events\nwithin each process" as EVENTS #DBE4FF
+component "recv on c before send on d" as ORDER #FFF3BF
+component "Constraint\ncap(c) < obl(d)" as RULE #FFE8CC
+component "Channel projection\nc -> d" as GRAPH #C3FAE8
+component "Shared iterative\nprojection_sccs" as SCC #E5DBFF
+component "Acyclic\ncanonical longest-path ranks" as RANK #D3F9D8
+component "Cyclic\nNone levels + precise witnesses" as CYCLE #FCC2D7
+component "Qualified report\ncomplete + issues" as REPORT #F1F3F5
+
+EVENTS --> ORDER : exact channel origins
+ORDER --> RULE
+RULE --> GRAPH
+GRAPH --> SCC
+SCC --> RANK : condensation is acyclic
+SCC --> CYCLE : cyclic component
+RANK --> REPORT
+CYCLE --> REPORT
+
+note right of RULE #FFF9DB
+Matching co-actions share one canonical rank.
+A cycle implies k < k by transitivity.
+end note
+
+legend bottom
+|= Colour |= Meaning |
+|<#DBE4FF> | normalized event input |
+|<#FFF3BF> | ordered behavioral evidence |
+|<#FFE8CC> | type-level inequality |
+|<#C3FAE8> | channel graph projection |
+|<#E5DBFF> | reused SCC infrastructure |
+|<#D3F9D8> | finite modeled levels |
+|<#FCC2D7> | cyclic advisory evidence |
+|<#F1F3F5> | completeness boundary |
+endlegend
+@enduml

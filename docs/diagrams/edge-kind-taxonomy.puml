@@ -33,6 +33,7 @@ left side
 ***[#E5DBFF] DataDependence
 
 **[#FFD8A8] Heap(HeapEdgeKind)\n(6)
+**[#E5DBFF] NameFlow(NameFlowEdgeKind)\n(7)
 ***[#FFD8A8] Allocates
 ***[#FFD8A8] PointsTo
 ***[#FFD8A8] Dereferences

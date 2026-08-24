@@ -116,6 +116,11 @@ operands can be process nodes such as sends or wrapper blocks; both layouts have
 the same MHP semantics. With the `rholang` feature,
 [`session_sketches`](15-session-protocol-sketches.md) also groups resolved
 events into shallow endpoint traces and reports conservative binary duality.
+The same feature enables
+[`analyze_name_flow`](37-rholang-name-flow-deadlock.md), which follows fresh
+names through restriction, quote, drop, definitions, and matched payload scope
+extrusion. `analyze_deadlock_freedom` then derives qualified
+capability/obligation levels and cyclic witnesses without reparsing source.
 
 ![Rholang constructs mapped onto CPG node and edge kinds.](../diagrams/rholang-mapping.svg)
 

@@ -216,6 +216,8 @@ let slice = backward_slice(&cpg, func, 256);         // bounded backward slice
 
 [Compositional heap analysis](theory/51-compositional-heap-analysis.md)
 
+[Rholang NameFlow and level-based deadlock freedom](theory/52-rholang-name-flow-and-deadlock-freedom.md)
+
 ### Architecture — the "what / where"
 [Overview](architecture/overview.md) · [Graph data model](architecture/graph-data-model.md) · [Construction & analysis data flow](architecture/data-flow.md) · [Language frontends](architecture/language-frontends.md)
 
@@ -296,6 +298,8 @@ let slice = backward_slice(&cpg, func, 256);         // bounded backward slice
 
 [0068 Compositional heap summaries](design/0068-compositional-heap-summaries.md)
 
+[0069 Stack-safe Rholang NameFlow](design/0069-stack-safe-rholang-name-flow.md)
+
 ### API reference
 [Graph / analysis reference](api/graph-reference.md) · [Builder reference](api/builder-reference.md) · [Pattern / algorithm / GNN reference](api/pattern-reference.md)
 
@@ -309,6 +313,8 @@ let slice = backward_slice(&cpg, func, 256);         // bounded backward slice
 [Interprocedural effect summaries](components/graph/effect-summaries.md)
 
 [Compositional heap analysis](components/graph/compositional-heap-analysis.md)
+
+[Rholang NameFlow and level analysis](components/graph/rholang-name-flow.md)
 
 [Advisory taint and maybe-null analysis](components/graph/taint-analysis.md)
 
@@ -421,6 +427,8 @@ let slice = backward_slice(&cpg, func, 256);         // bounded backward slice
 
 [Analyze compositional heap safety](usage/36-compositional-heap-analysis.md)
 
+[Analyze Rholang NameFlow and level constraints](usage/37-rholang-name-flow-deadlock.md)
+
 ### Engineering
 [Overview](engineering/00-overview.md) · [Build & features](engineering/01-build-and-features.md) · [Testing](engineering/02-testing.md) · [Performance](engineering/03-performance.md) · [Optimization ledger](engineering/optimization-ledger.md) · [Analysis-expansion matrix](engineering/analysis-expansion-matrix.md) · [Contributing](engineering/04-contributing.md)
 
@@ -501,8 +509,10 @@ let slice = backward_slice(&cpg, func, 256);         // bounded backward slice
 
 [Compositional heap-analysis validation](scientific/63-compositional-heap-validation.md)
 
+[Rholang NameFlow and level-analysis validation](scientific/64-rholang-name-flow-validation.md)
+
 ### Security
-[Threat model](security/00-threat-model.md) · [Input & resource hardening](security/01-input-and-resource-hardening.md) · [Taint-analysis security boundary](security/02-taint-analysis.md) · [Interprocedural-slicing security boundary](security/03-system-dependence-slicing.md) · [Channel-topology security boundary](security/04-channel-topology.md) · [Deadlock-analysis security boundary](security/05-deadlock-analysis.md) · [MHP-analysis security boundary](security/06-mhp-analysis.md) · [Session-analysis security boundary](security/07-session-analysis.md) · [Typestate-analysis security boundary](security/08-typestate-analysis.md) · [Bug-detector security boundary](security/09-bug-detectors.md) · [Population-anomaly security boundary](security/10-population-anomaly-detectors.md) · [Clone/feasibility security boundary](security/11-clone-feasibility-detectors.md) · [API-usage protocol-mining security boundary](security/12-api-usage-protocol-mining.md) · [CWE-template security boundary](security/13-cwe-template-analysis.md) · [Cryptographic API-misuse security boundary](security/14-cryptographic-api-misuse.md) · [Secret-flow/access-policy security boundary](security/15-secret-and-access-policy-analysis.md) · [Vulnerability-extrapolation security boundary](security/16-vulnerability-extrapolation.md) · [Virtual-call type-refinement security boundary](security/17-type-refinement-boundary.md) · [Concurrency-bug detection security boundary](security/18-concurrency-bug-detection.md) · [ML-export security boundary](security/19-ml-export-boundary.md) · [CPG-diff security boundary](security/20-cpg-diff-boundary.md) · [Incremental-cache security boundary](security/21-incremental-cache-boundary.md) · [Resolver symbol-index security boundary](security/22-resolver-symbol-index-boundary.md) · [Datalog-export security boundary](security/23-datalog-export-boundary.md) · [PDG information-flow security boundary](security/24-pdg-information-flow-boundary.md) · [Relational-domain security boundary](security/25-relational-abstract-domain-boundary.md) · [Compositional-heap security boundary](security/26-compositional-heap-boundary.md)
+[Threat model](security/00-threat-model.md) · [Input & resource hardening](security/01-input-and-resource-hardening.md) · [Taint-analysis security boundary](security/02-taint-analysis.md) · [Interprocedural-slicing security boundary](security/03-system-dependence-slicing.md) · [Channel-topology security boundary](security/04-channel-topology.md) · [Deadlock-analysis security boundary](security/05-deadlock-analysis.md) · [MHP-analysis security boundary](security/06-mhp-analysis.md) · [Session-analysis security boundary](security/07-session-analysis.md) · [Typestate-analysis security boundary](security/08-typestate-analysis.md) · [Bug-detector security boundary](security/09-bug-detectors.md) · [Population-anomaly security boundary](security/10-population-anomaly-detectors.md) · [Clone/feasibility security boundary](security/11-clone-feasibility-detectors.md) · [API-usage protocol-mining security boundary](security/12-api-usage-protocol-mining.md) · [CWE-template security boundary](security/13-cwe-template-analysis.md) · [Cryptographic API-misuse security boundary](security/14-cryptographic-api-misuse.md) · [Secret-flow/access-policy security boundary](security/15-secret-and-access-policy-analysis.md) · [Vulnerability-extrapolation security boundary](security/16-vulnerability-extrapolation.md) · [Virtual-call type-refinement security boundary](security/17-type-refinement-boundary.md) · [Concurrency-bug detection security boundary](security/18-concurrency-bug-detection.md) · [ML-export security boundary](security/19-ml-export-boundary.md) · [CPG-diff security boundary](security/20-cpg-diff-boundary.md) · [Incremental-cache security boundary](security/21-incremental-cache-boundary.md) · [Resolver symbol-index security boundary](security/22-resolver-symbol-index-boundary.md) · [Datalog-export security boundary](security/23-datalog-export-boundary.md) · [PDG information-flow security boundary](security/24-pdg-information-flow-boundary.md) · [Relational-domain security boundary](security/25-relational-abstract-domain-boundary.md) · [Compositional-heap security boundary](security/26-compositional-heap-boundary.md) · [Rholang NameFlow security boundary](security/27-rholang-name-flow-boundary.md)
 
 ### Reference
 [Glossary](GLOSSARY.md) · [Diagram catalog](diagrams/README.md)

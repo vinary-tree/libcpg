@@ -60,7 +60,7 @@ Grouped by subject. Each row: the source (its `.svg` sibling is embedded by the 
 | Source | Type | Depicts | Embedded by |
 |---|---|---|---|
 | `node-kind-taxonomy.puml` | mindmap | The 45 `CpgNodeKind` variants by group | theory/01, architecture/graph-data-model, api/graph-reference, components/graph/nodes |
-| `edge-kind-taxonomy.puml` | mindmap | `CpgEdgeKind` grouped, including CFG/DFG/Heap sub-kinds | theory/01, architecture/graph-data-model, api/graph-reference, components/graph/edges |
+| `edge-kind-taxonomy.puml` | mindmap | `CpgEdgeKind` grouped, including CFG/DFG/Heap/NameFlow sub-kinds | theory/01, architecture/graph-data-model, api/graph-reference, components/graph/edges |
 | `projection-csr.puml` | component | CPG overlay selection and deterministic forward/reverse CSR construction | components/graph/projections |
 | `projection-cache-lifecycle.puml` | component/lifecycle flow | first exact-edge read → deterministic cached CSR rows → borrowed views → mutation invalidation/rebuild | architecture/graph-data-model, design/0056 |
 | `centrality-pipeline.puml` | component/algorithm flow | validated projection → bounded directed/undirected centrality kernels → aligned node/edge scores | components/graph/centrality-analysis, theory/12, design/0017 |
@@ -102,6 +102,9 @@ Grouped by subject. Each row: the source (its `.svg` sibling is embedded by the 
 | `biabduction-summary-flow.puml` | component/fixed-point flow | typed heap evidence + call SCCs → local footprints and callee composition → qualified findings or typed overlay | theory/51, components/graph/compositional-heap-analysis, design/0068, usage/36 |
 | `heap-lifetime-machine.puml` | finite-state/worklist flow | allocation/live/freed facts through a heap-resident CFG queue → UAF/leak/postcondition evidence | theory/51, components/graph/compositional-heap-analysis, scientific/63 |
 | `heap-overlay-boundary.puml` | transaction boundary | ordered summary relations → complete endpoint validation → idempotent append or zero mutation | design/0068, security/26, usage/36 |
+| `name-flow-fixed-point.puml` | component/fixed-point flow | fresh binders + typed definitions + reflection + matched payload transfer → qualified NameFlow closure | theory/52, components/graph/rholang-name-flow, scientific/64 |
+| `obligation-capability-scc.puml` | constraint/SCC flow | receive-before-send inequalities → channel projection → finite ranks or cyclic witnesses through shared SCCs | theory/52, design/0069, usage/37 |
+| `name-flow-overlay-boundary.puml` | transaction boundary | immutable qualified NameFlow/level reports → complete endpoint validation → idempotent append | design/0069, components/graph/rholang-name-flow, security/27 |
 | `taint-summary-flow.puml` | component/fixed-point flow | typed CPG evidence + caller-owned catalog → origin-sensitive facts → bounded summaries, witnesses, and qualified findings | components/graph/taint-analysis, design/0034, theory/27, scientific/29, security/02 |
 | `taint-witness-sequence.puml` | sequence | source classification, interprocedural propagation, sink matching, and canonical witness emission | components/graph/taint-analysis, usage/10 |
 | `sdg-summary-overlay.puml` | component/overlay flow | call, DFG, PDG, and effect evidence → labeled caller-local summary dependences → bounded slice | components/graph/system-dependence-slicing, theory/28, security/03 |
