@@ -28,15 +28,20 @@ and reference relations, including two identical parallel typed DFG edges.
 | AST depth | `[0, 1, 2, 3, 3]`, all known |
 | loop depth | `[0, 1, 1, 1, 1]` |
 | layer degrees | exact AST, DFG, and reference counts at selected nodes |
-| numerical validity | every one of 73 values in every row is finite |
+| numerical validity | every one of 75 values in every row is finite |
 | immutability | node and edge counts are unchanged |
 
 The class-registry oracle enumerates all four AST relations, all fourteen CFG
-subtypes, all thirteen DFG subtypes, and the twenty-nine remaining relations,
-including all six Heap and seven NameFlow subtypes. Their classes must be
-exactly the contiguous vector `0..60`. Exhaustive `match`
+subtypes, all thirteen DFG subtypes, and the thirty-one remaining relations,
+including all six Heap, seven NameFlow, and two RewriteDep subtypes. Their
+classes must be exactly the contiguous vector `0..62`. Exhaustive `match`
 expressions make a future enum addition a compile failure until the schema is
 updated deliberately.
+
+The compatibility oracle additionally pins columns 0–72 and relation classes
+0–59 byte-for-byte, then requires only `degree.in.rewrite_dep`,
+`degree.out.rewrite_dep`, `DependencyPair`, and `CriticalConflict` at the
+appended positions.
 
 ## Complete localization oracle
 

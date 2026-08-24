@@ -4,7 +4,7 @@
 
 **Accepted.** Specified by the `[features]` block of `Cargo.toml` and consumed
 throughout the crate via `#[cfg(feature = "…")]`. Tightly coupled to
-[ADR-0002](0002-mode-b-build-from-tree.md) (the empty `rholang` / `metta` toggles
+[ADR-0002](0002-mode-b-build-from-tree.md) (the grammar-free `rholang` / `metta` toggles
 and the grammar-pin discipline).
 
 ## Context
@@ -56,9 +56,9 @@ serde               = ["dep:serde", "petgraph/serde-1",
 ml-linfa            = ["linfa", "linfa-trees"] # ML classification (heavy)
 ml-rules            = []                        # rule-based classification (no ML deps)
 
-# ── Mode-B language toggles (empty; see ADR-0002) ────────────────────
+# ── Mode-B language toggles (grammar-free; see ADR-0002) ────────────
 rholang = []
-metta   = []
+metta   = ["dep:libdictenstein"]
 
 # ── 16 per-grammar features ──────────────────────────────────────────
 lang-rust = ["dep:tree-sitter-rust"]           # …python, javascript, typescript,
@@ -78,7 +78,7 @@ full = ["gnn", "design-patterns", "algorithm-detection", "abstract-domains", "se
 ```
 
 The taxonomy has four tiers: **capability** features (one per optional analysis
-family, each also gating its dependencies), the two dependency-free **Mode-B** toggles,
+family, each also gating its dependencies), the two grammar-free **Mode-B** toggles,
 **sixteen per-grammar** `lang-*` features, and **group** features that are simply
 unions of `lang-*` for common bundles. `full` is a convenience umbrella over the
 usual analysis set plus every language.
@@ -94,7 +94,7 @@ out four features:
 | :--- | :--- |
 | `gpu` | Reserved — no code is wired to it yet; enabling it would add `wgpu`/`pollster` for nothing. |
 | `ml-linfa` | Heavy ML dependency stack; `ml-rules` covers rule-based classification with no ML deps, so it is the umbrella's choice. |
-| `rholang`, `metta` | Mode-B toggles ([ADR-0002](0002-mode-b-build-from-tree.md)); they select mappers for caller-supplied trees and are orthogonal to a "build everything" bundle. |
+| `rholang`, `metta` | Mode-B toggles ([ADR-0002](0002-mode-b-build-from-tree.md)); they select mappers for caller-supplied trees and are orthogonal to a "build everything" bundle. `metta` also selects exact rewrite analysis and its dictionary index. |
 
 Selecting features from a consumer is a one-liner:
 
@@ -178,7 +178,7 @@ documents the intent and is future-proof.)
 
 ![The feature-flag map: default empty, per-grammar lang-* features, language groups, capability features, and the full umbrella](../diagrams/feature-flag-map.svg)
 
-*Figure — the feature taxonomy: `default = []` at the root, sixteen `lang-*` grammars bundled into groups, the capability features (including optional exact polyhedra) with their dependencies, the empty Mode-B toggles, and the `full` umbrella (excluding `gpu`, `ml-linfa`, `rholang`, `metta`). Source: [`diagrams/feature-flag-map.puml`](../diagrams/feature-flag-map.puml).*
+*Figure — the feature taxonomy: `default = []` at the root, sixteen `lang-*` grammars bundled into groups, the capability features (including optional exact polyhedra) with their dependencies, the grammar-free Mode-B toggles, and the `full` umbrella (excluding `gpu`, `ml-linfa`, `rholang`, `metta`). Source: [`diagrams/feature-flag-map.puml`](../diagrams/feature-flag-map.puml).*
 
 ## Related decisions and further reading
 

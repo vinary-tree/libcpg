@@ -205,9 +205,10 @@ through [Mode B](#mode-b-rholang-and-metta).
 
 Rholang and MeTTa are **implemented Mode-B mappers**, not planned features and not
 registry-backed `build()` languages. Their `map_kind` arms and mapper routines are gated on
-the dependency-free cfg toggles `rholang` and `metta`: the arms reference only kind strings
-and `tree_sitter::Node` navigation — never a grammar-crate symbol — so enabling the feature
-pulls in no dependency. The caller parses with its own grammar (e.g. `tree-sitter-rholang`,
+the grammar-free features `rholang` and `metta`: the arms reference only kind strings
+and `tree_sitter::Node` navigation—never a grammar-crate symbol. `rholang` is an empty
+logical toggle; `metta` additionally enables the exact `libdictenstein` rewrite-rule
+index, which is not a parser. The caller parses with its own grammar (e.g. `tree-sitter-rholang`,
 `tree-sitter-metta`) and hands the tree to
 [`build_from_tree`](overview.md#two-ways-to-build-build-vs-build_from_tree):
 
@@ -225,7 +226,7 @@ use libcpg::{TreeSitterCpgBuilder, Language};
 //       .build_from_tree(&tree, source, Language::Rholang)?;
 ```
 
-The design rationale (why empty cfg toggles, why the grammar pins are matched to pgmcp to
+The design rationale (why the toggles remain grammar-free, why the grammar pins are matched to pgmcp to
 avoid duplicate C symbols) is recorded in
 [`../../design/0002-mode-b-build-from-tree.md`](../../design/0002-mode-b-build-from-tree.md).
 

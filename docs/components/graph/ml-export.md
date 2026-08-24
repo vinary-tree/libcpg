@@ -20,9 +20,9 @@ tensor, or modify the CPG.
 | `PygExportOptions` | optional criterion and maximum accepted complete slice size |
 | `PygExport::dense_index` | stable `NodeId` to dense-row lookup by binary search |
 | `PygExport::feature_index` | schema-name to feature-column lookup |
-| `PYG_NODE_FEATURE_NAMES` | ordered 73-column schema registry |
+| `PYG_NODE_FEATURE_NAMES` | ordered 75-column schema registry |
 | `node_kind_class` | exhaustive 45-kind stable class map |
-| `edge_kind_class` | exhaustive 60-relation stable class map |
+| `edge_kind_class` | exhaustive 62-relation stable class map |
 | `ast_paths(&CodePropertyGraph, NodeId, AstPathOptions)` | complete retained source-ordered terminal-pair contexts for one function |
 | `AstPathOptions` | semantic length/width filters and explicit resource caps |
 | `PathContext` | terminals, exact path, aligned kinds/tokens, lowest common ancestor, and ancestor index |
@@ -36,7 +36,7 @@ No `gnn`, `ndarray`, `rand`, Python, PyTorch, or PyG dependency is required.
 1. A binary min-order heap canonicalizes stable node ids without source-depth
    recursion.
 2. An ordered map establishes `NodeId -> dense u32` identity.
-3. One edge scan builds eleven-layer in/out degrees and typed dense tuples.
+3. One edge scan builds twelve-layer in/out degrees and typed dense tuples.
 4. A second heap orders tuples while retaining duplicates.
 5. A normalized root-first AST queue computes depth, knownness, and loop depth.
 6. Canonical `GraphProjection` values compute unweighted forward/reverse
@@ -62,6 +62,12 @@ semantics rather than inconsistent normalization.
 | 70 | `centrality.pagerank` | whole-CPG unweighted directed PageRank |
 | 71 | `centrality.reverse_pagerank` | PageRank on reversed topology |
 | 72 | `localization.backward_pdg_slice` | complete-slice membership or zero when no criterion was requested |
+| 73 | `degree.in.rewrite_dep` | incoming `RewriteDep` degree |
+| 74 | `degree.out.rewrite_dep` | outgoing `RewriteDep` degree |
+
+Columns 73–74 are deliberately appended. Columns 0–72 retain their original
+meaning and position, so extending the typed graph did not silently reinterpret
+persisted pre-FT6 feature matrices.
 
 Use `PygExport::feature_index` or `PYG_NODE_FEATURE_NAMES`; numeric positions
 are shown for schema review, not as an invitation to duplicate offsets.
@@ -84,8 +90,8 @@ downward branches.
 ## Invariants
 
 1. `node_features.len() == node_ids.len() == source_ranges.len()`.
-2. Every node row has exactly `PYG_NODE_FEATURE_COUNT == 73` finite values.
-3. Every dense edge endpoint indexes `node_ids`; every class is below 60.
+2. Every node row has exactly `PYG_NODE_FEATURE_COUNT == 75` finite values.
+3. Every dense edge endpoint indexes `node_ids`; every class is below 62.
 4. Parallel typed edge multiplicity is preserved.
 5. `slice_node_ids` is sorted, exact, complete, and empty without a criterion.
 6. Unknown depth is distinguishable from root depth through

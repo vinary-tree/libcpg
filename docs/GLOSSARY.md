@@ -158,8 +158,10 @@ A single directed graph that merges several program views onto **one shared node
 ### CPG ML export / PyG edge index / AST path context
 
 A **CPG machine-learning (ML) export** is libcpg's deterministic feature-free
-numerical view: 73 named node columns aligned with ascending stable ids/source
-ranges, plus typed dense edge tuples covering all 60 relation classes. **PyG**
+numerical view: 75 named node columns aligned with ascending stable ids/source
+ranges, plus typed dense edge tuples covering all 62 relation classes. Columns
+73–74 and classes 60–61 append `RewriteDep` evidence without changing the
+pre-existing positions. **PyG**
 abbreviates PyTorch Geometric; libcpg's `edge_index` is an ordinary sorted
 `(source_dense, target_dense, relation_class)` vector that a caller may
 transpose for PyG, not a PyG runtime object. An **AST path context** retains two
@@ -182,6 +184,18 @@ otherwise it labels it `Refactoring`. That second label is not a behavioral-
 equivalence claim, especially when no PDG was built. See [Theory
 45](theory/45-deterministic-cpg-diff.md) and the [component
 contract](components/graph/cpg-diff.md).
+
+### Critical pair / Local confluence / Joinability
+
+A **critical pair** is the pair of terms produced when one rewrite rule's
+left-hand side overlaps a non-variable position of another after variables are
+renamed apart and the overlap is unified. The pair is **joinable** when both
+branches rewrite to a common term. A rewrite system is **locally confluent**
+when every one-step fork is joinable; for a terminating system, Newman's lemma
+then entails confluence [[76]](#references). libcpg reports only represented,
+complete overlaps and qualifies caps or non-left-linear rules rather than
+treating an empty result as a proof. See [Theory
+53](theory/53-dependency-pairs-and-critical-pair-confluence.md).
 
 ### Cryptographic API misuse
 
@@ -439,6 +453,16 @@ The overlay whose edges track how values move from definitions to uses, typed by
 ### Def-use chain / Definition / Use
 
 A **definition** is a program point that assigns a variable a value; a **use** is a point that reads it. A **def-use chain** links a definition to every use it reaches. `libcpg` models these with `Definition` / `DefinitionKind`, `Use` / `UseKind`, and `DefUseChain`, built by `build_def_use_chains`. See [`components/builder/dfg.md`](components/builder/dfg.md).
+
+### Dependency pair / Dependency graph
+
+For a rewrite rule $`l \to r`$, a **dependency pair** links the defined root of
+$`l`$ to each defined-symbol call represented inside $`r`$. The **dependency
+graph** connects pairs whose marked target can feed another pair's marked
+source. Infinite rewriting requires an infinite path through a cyclic
+dependency-graph SCC, so orienting every cyclic pair strictly under a valid
+reduction pair proves termination [[75]](#references). See [Theory
+53](theory/53-dependency-pairs-and-critical-pair-confluence.md).
 
 ### Degree assortativity
 
@@ -706,6 +730,10 @@ J(A, B) = \frac{|A \cap B|}{|A \cup B|}
 ```
 
 `libcpg`'s default [similarity metric](#similarity-metric) applies it to the multisets of node kinds of two graphs. See [`theory/06-graph-similarity.md`](theory/06-graph-similarity.md).
+
+### Joinability
+
+See [Critical pair / Local confluence / Joinability](#critical-pair--local-confluence--joinability).
 
 ### K-core
 
@@ -1101,6 +1129,16 @@ from repeated graph searches without storing the $`n\times n`$ matrix. See
 
 A definition of a variable that reaches a program point with no intervening redefinition on some path. The `ReachingDef` DFG edge connects such a definition to the use it reaches. Computed by [AST-ordered reaching definitions](#ast-ordered-reaching-definitions). See [`theory/03-data-flow-and-reaching-definitions.md`](theory/03-data-flow-and-reaching-definitions.md).
 
+### Reduction pair / Polynomial interpretation
+
+A **reduction pair** $`(\succeq,\succ)`$ combines a well-founded strict order
+with a compatible weak order. A polynomial interpretation assigns a monotone
+natural-number polynomial to each symbol and induces those orders. libcpg's
+termination certificate uses one fixed interpretation, requires every source
+rule weakly oriented, and requires every dependency pair in a cyclic SCC
+strictly oriented [[75]](#references), [[79]](#references). See [Theory
+53](theory/53-dependency-pairs-and-critical-pair-confluence.md).
+
 ### Rel
 
 **Rel** is the category whose objects are sets and whose morphisms are binary
@@ -1175,7 +1213,7 @@ A **resolver symbol index** maps an exact represented identifier spelling and
 its lexical/import context to canonically ordered declaration candidates. A
 **double-array trie** (DAT) places trie transitions in parallel BASE/CHECK
 arrays; a **directed acyclic word graph** (DAWG) merges nodes with equivalent
-right languages. Both can accelerate dictionary operations, but neither
+right languages [[78]](#references). Both can accelerate dictionary operations, but neither
 changes libcpg's evidence boundary: names remain exact, case-sensitive `str`
 values and ambiguity uses the full pre-cap candidate count. libcpg retains its
 call-local ordered map after the measured candidates lost the cold resolver or
@@ -1272,6 +1310,17 @@ absence claim. This is a classic CPG application (Yamaguchi et al.
 [[1]](#references)). See [Theory 27](theory/27-interprocedural-taint-and-nullflow.md)
 and the [component guide](components/graph/taint-analysis.md).
 
+### Term rewriting / Termination / Confluence
+
+A **term rewrite system** replaces instances of rule left-hand sides with their
+right-hand sides. It **terminates** when no infinite rewrite sequence exists and
+is **confluent** when any two descendants of one term can be joined. Termination
+plus local confluence implies confluence [[76]](#references); a bounded search
+alone establishes neither universal property. libcpg returns a proof, a
+concrete refutation witness where implemented, or `Unknown`, never a heuristic
+Boolean. See [Theory
+53](theory/53-dependency-pairs-and-critical-pair-confluence.md).
+
 ### Maybe-null flow
 
 An advisory flow from a null literal, uninitialized variable, or typed
@@ -1295,6 +1344,16 @@ tie breaks independent of edge insertion order [[24]](#references). See
 ### Tree-sitter
 
 The incremental parser generator `libcpg` uses to turn source text into a concrete syntax tree. `ParserRegistry` holds the feature-gated grammars for the 16 built-in languages; [Mode B](#mode-b--build_from_tree) accepts a tree the caller parsed with its own grammar. See [`architecture/language-frontends.md`](architecture/language-frontends.md).
+
+### Unification / Occurs check
+
+**Unification** computes a substitution that makes two first-order terms equal;
+a most-general unifier represents every solution up to further substitution.
+The **occurs check** rejects binding a variable to a term containing that same
+variable, which would construct an infinite term [[77]](#references). libcpg
+uses an explicit equation worklist and flat term arenas, so input depth does not
+consume native call stack. See [Theory
+53](theory/53-dependency-pairs-and-critical-pair-confluence.md).
 
 ### Very-busy expression / Anticipability
 
@@ -1544,3 +1603,8 @@ strict tree interpretation. See
 72. Calcagno, C., Distefano, D., O'Hearn, P. W., Yang, H. (2011). *Compositional Shape Analysis by Means of Bi-Abduction.* DOI: [10.1145/2049697.2049700](https://doi.org/10.1145/2049697.2049700).
 73. Calcagno, C., Distefano, D., O'Hearn, P. W., Yang, H. (2009). *Compositional Shape Analysis by Means of Bi-Abduction.* DOI: [10.1145/1480881.1480917](https://doi.org/10.1145/1480881.1480917).
 74. Kobayashi, N., Sangiorgi, D. (2010). *A Hybrid Type System for Lock-Freedom of Mobile Processes.* DOI: [10.1145/1745312.1745313](https://doi.org/10.1145/1745312.1745313).
+75. Arts, T., Giesl, J. (2000). *Termination of Term Rewriting Using Dependency Pairs.* DOI: [10.1016/S0304-3975(99)00207-8](https://doi.org/10.1016/S0304-3975(99)00207-8).
+76. Newman, M. H. A. (1942). *On Theories with a Combinatorial Definition of Equivalence.* DOI: [10.2307/1968867](https://doi.org/10.2307/1968867).
+77. Robinson, J. A. (1965). *A Machine-Oriented Logic Based on the Resolution Principle.* DOI: [10.1145/321250.321253](https://doi.org/10.1145/321250.321253).
+78. Aoe, J.-I. (1989). *An Efficient Digital Search Algorithm by Using a Double-Array Structure.* DOI: [10.1109/32.31365](https://doi.org/10.1109/32.31365).
+79. Giesl, J. et al. (2017). *Automated Termination Proofs with AProVE.* DOI: [10.1007/s10817-016-9388-y](https://doi.org/10.1007/s10817-016-9388-y).

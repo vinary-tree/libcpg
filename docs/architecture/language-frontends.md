@@ -199,11 +199,25 @@ MeTTa is a rewriting language over symbolic [S-expressions](../GLOSSARY.md#s-exp
 
 `classify_metta_var` promotes a `$variable` to a `Parameter` definition when it is a rule-LHS binder — the `$x` in `(= (double $x) …)` — and leaves it an `Identifier` use everywhere else. So `(= (double $x) (* $x 2))` becomes a `Function` named `double` with the LHS `$x` (a `Parameter`) linked to the RHS `$x` (a use) by a `DefUse` edge.
 
-## Why Mode B, and why the toggles are empty
+## Why Mode B, and why the toggles are grammar-free
 
-The `rholang` and `metta` features are **empty** feature lists (`rholang = []`, `metta = []`): pure logical `cfg` toggles that gate only the `map_rholang`/`map_metta` arms and their dispatch. Those arms reference only `ts_kind` strings and `tree_sitter::Node` navigation — never a grammar crate symbol — so enabling them pulls in nothing. The ρ-calculus / S-expression CPG is built from a caller-supplied tree via `build_from_tree`.
+The `rholang` and `metta` features are **grammar-free**: their mapper arms
+reference only `ts_kind` strings and `tree_sitter::Node` navigation, never a
+grammar crate symbol. `rholang = []` is a pure logical toggle. `metta` also
+activates the exact `libdictenstein` rule-root index used by rewriting analysis;
+that dependency contains no MeTTa parser. The ρ-calculus / S-expression CPG is
+built from a caller-supplied tree via `build_from_tree`.
 
-The reason is duplicate-symbol avoidance. A consumer such as pgmcp already links the Rholang and MeTTa grammars; if libcpg vendored them as regular dependencies, the shared `tree_sitter_<lang>` C symbol could be defined twice at link time. Instead the grammars are **test-only path `[dev-dependencies]`** (which Cargo never propagates downstream), used solely to drive the Mode-B unit tests, while the runtime features stay dependency-free. The 16 first-class grammars are likewise pinned to versions that match pgmcp's (python/javascript → 0.25, c → 0.24, …) for the same reason. The full rationale is [`../design/0002-mode-b-build-from-tree.md`](../design/0002-mode-b-build-from-tree.md).
+The reason is duplicate-symbol avoidance. A consumer such as pgmcp already
+links the Rholang and MeTTa grammars; if libcpg vendored them as regular
+dependencies, the shared `tree_sitter_<lang>` C symbol could be defined twice
+at link time. Instead the grammars are **test-only path `[dev-dependencies]`**
+(which Cargo never propagates downstream), used solely to drive Mode-B tests.
+The runtime features stay grammar-free; only `metta` has a non-grammar analysis
+dependency. The construction rationale is
+[`../design/0002-mode-b-build-from-tree.md`](../design/0002-mode-b-build-from-tree.md),
+and the exact-index decision is
+[`../design/0070-stack-safe-metta-rewriting-analysis.md`](../design/0070-stack-safe-metta-rewriting-analysis.md).
 
 ## Adding a language
 
@@ -213,7 +227,10 @@ A new first-class frontend is three coordinated changes (walked through in [`../
 2. register the grammar in `ParserRegistry::new` under a `#[cfg(feature = "lang-<lang>")]` block; and
 3. declare the optional grammar dependency and the `lang-<lang>` feature in `Cargo.toml`.
 
-A Mode-B-only frontend (like Rholang/MeTTa) skips step 2 and uses an empty `cfg` toggle in place of step 3, relying on the caller to supply the tree.
+A Mode-B-only frontend (like Rholang/MeTTa) skips step 2 and uses a
+grammar-free feature in place of step 3, relying on the caller to supply the
+tree. That feature may enable a non-grammar analysis dependency when its own
+acceptance contract requires one, as `metta` does for exact rule indexing.
 
 ## Where to go next
 

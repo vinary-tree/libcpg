@@ -57,10 +57,11 @@ identifier and parallel multiplicity. Calling
 overlay edge exactly, including its label.
 The generic relation and `souffle_files()` include all six `HeapEdgeKind` and
 all seven `NameFlowEdgeKind` details when a caller has explicitly materialized
-those overlays. The typed family/subtype pairs are `heap` with `allocates`,
+those overlays, plus both `RewriteDepEdgeKind` details. The typed family/subtype pairs are `heap` with `allocates`,
 `points_to`, `dereferences`, `releases`, `requires_valid`, or
 `ensures_invalid`; and `name_flow` with `creates`, `references`, `quotes`,
-`drops`, `carries`, `receives`, or `communicates`. Summaries and analysis
+`drops`, `carries`, `receives`, or `communicates`; and `rewrite_dep` with
+`dependency_pair` or `critical_conflict`. Summaries and analysis
 reports remain absent until opt-in mutation; no separate family relation is
 emitted.
 

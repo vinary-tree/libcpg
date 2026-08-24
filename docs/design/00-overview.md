@@ -45,7 +45,7 @@ alternatives is folklore, and a decision without its costs is marketing.
 | ADR | Decision | Status |
 | :--- | :--- | :--- |
 | [0001 — Unified overlay graph on petgraph](0001-unified-overlay-graph.md) | One shared node set; AST / CFG / DFG / PDG are typed *edge overlays* over it, stored in a `petgraph` `DiGraph`. | Accepted |
-| [0002 — Mode B: `build_from_tree`](0002-mode-b-build-from-tree.md) | Accept a caller-parsed tree-sitter tree; keep the `rholang` / `metta` features empty `cfg` toggles; match grammar pins to pgmcp to avoid duplicate C symbols. | Accepted |
+| [0002 — Mode B: `build_from_tree`](0002-mode-b-build-from-tree.md) | Accept a caller-parsed tree-sitter tree; keep the `rholang` / `metta` features grammar-free; match grammar pins to pgmcp to avoid duplicate C symbols. | Accepted |
 | [0003 — AST-ordered reaching definitions](0003-ast-ordered-reaching-defs.md) | Build the DFG from a single AST-ordered, flow-sensitive reaching-definitions sweep rather than SSA or a CFG fixed point. | Accepted |
 | [0004 — Relaxed VF2 detection](0004-relaxed-vf2-detection.md) | Detect Gang-of-Four patterns with a *relaxed* (category-level) VF2 matcher plus a completeness-scaled confidence, not strict isomorphism or pure ML. | Accepted |
 | [0005 — Feature-flag taxonomy](0005-feature-flag-taxonomy.md) | `default = []`: every grammar and optional analysis family is opt-in via Cargo features, grouped into `lang-*` sets and an umbrella `full`; core graph analyses remain feature-free. | Accepted |
@@ -113,8 +113,9 @@ alternatives is folklore, and a decision without its costs is marketing.
 | [0067 — Stack-safe relational abstract domains](0067-exact-relational-abstract-domains.md) | Compose feature-free integer octagons and static reduced products with optional exact rational polyhedra, iterative projection, validated invariants, and explicit resource costs. | Accepted |
 | [0068 — Compositional heap summaries](0068-compositional-heap-summaries.md) | Reuse the call-SCC solver for finite separation-logic footprints, qualified null/UAF/leak evidence, heap-resident lifetime machines, and a transactional typed Heap overlay. | Accepted |
 | [0069 — Stack-safe Rholang NameFlow](0069-stack-safe-rholang-name-flow.md) | Normalize reflective-name operations at the frontend, propagate scope extrusion with a bounded heap fixed point, and reuse iterative SCCs for qualified obligation/capability cycles. | Accepted |
+| [0070 — Stack-safe MeTTa rewriting analysis](0070-stack-safe-metta-rewriting-analysis.md) | Flatten normalized rules, index exact roots, reuse iterative SCCs for dependency-pair proofs, and qualify critical-pair joinability through explicit heap worklists. | Accepted |
 
-These sixty-nine are not independent. ADR-0001 fixes the substrate that all analyses
+These seventy are not independent. ADR-0001 fixes the substrate that all analyses
 write onto; ADR-0002 and ADR-0005 together explain how a language reaches that
 substrate and what you must switch on to get there; ADR-0003 and ADR-0004 are
 two analyses *over* the substrate (one always-on, one feature-gated) that each
@@ -323,6 +324,10 @@ ADR-0069 reuses ADR-0003's typed definition identity, ADR-0036's normalized
 channel events, and ADR-0014's iterative SCC substrate. It extends ADR-0001's
 shared-node model with a transactional NameFlow layer while retaining all
 source-shaped state in explicit heap worklists.
+ADR-0070 reuses ADR-0002's grammar-free Mode-B construction and ADR-0014's
+iterative SCC substrate. It keeps terms and continuations in flat heap state,
+uses exact dictionary indexing only as an acceleration, and extends ADR-0001's
+shared-node model through a transactional append-only RewriteDep layer.
 
 ![Module architecture of libcpg, showing the graph core and the analysis modules layered over it](../diagrams/module-architecture.svg)
 

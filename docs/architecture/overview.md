@@ -197,6 +197,10 @@ So VF2 matching is available with `default = []`; GoF detection requires `--feat
   `rholang`, it also infers advisory per-channel session sketches plus
   stack-safe fresh-name provenance, payload scope extrusion, and
   obligation/capability level cycles.
+- `analysis::rewriting` (feature `metta`) — extracts normalized rule terms into
+  flat arenas, indexes exact defined roots, reuses iterative SCC projections
+  for termination evidence, and checks renamed critical overlaps with explicit
+  joinability queues.
 
 ## Error model
 

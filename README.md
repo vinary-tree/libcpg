@@ -187,6 +187,9 @@ PDG). A query can therefore mix syntax, control flow, and data flow freely.
 - **F1R3FLY.io languages** — **Rholang** and **MeTTa** are supported through
   Mode B (`build_from_tree`); their node mappers are implemented (features
   `rholang` / `metta`).
+- **MeTTa rewriting evidence** — `metta` adds stack-safe dependency-pair
+  termination, exact critical-pair joinability, qualified unknown outcomes,
+  and transactional `RewriteDep` overlays over normalized rules.
 
 ## Quick start
 
@@ -255,7 +258,8 @@ versus incomplete report handling.
 | `serde` | `Serialize` / `Deserialize` derives |
 | `gnn` | graph-neural-network embeddings (`gnn::CpgGnn`) |
 | `ml-linfa` / `ml-rules` | ML- / rule-based pattern classification |
-| `rholang` / `metta` | the Rholang / MeTTa Mode-B node mappers |
+| `rholang` | the dependency-free Rholang Mode-B mapper and NameFlow analyses |
+| `metta` | the grammar-free MeTTa Mode-B mapper and exact `libdictenstein`-indexed rewrite analyses |
 | `full` | `gnn + design-patterns + algorithm-detection + abstract-domains + serde + ml-rules + lang-all` |
 
 *(`gpu` is reserved for future work and wires no code yet.)*

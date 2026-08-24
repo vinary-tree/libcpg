@@ -1,0 +1,56 @@
+@startuml
+!include _libcpg-theme.iuml
+title Critical-pair generation and exact finite joinability
+skinparam backgroundColor #FFFFFF
+skinparam componentStyle rectangle
+skinparam shadowing false
+
+component "Outer rule + non-variable\nLHS position p" as OUTER #DBE4FF
+component "Renamed-apart inner rule" as INNER #DBE4FF
+component "Iterative unifier + occurs check\n<latex>\sigma = \operatorname{mgu}(l_1|_p,l_2)</latex>" as UNIFY #FFF3BF
+component "Shared variable normalizer" as SHARED #FFE8CC
+component "Outer reduct\n<latex>\sigma(r_1)</latex>" as LEFT #C3FAE8
+component "Inner reduct\n<latex>\sigma(l_1[r_2]_p)</latex>" as RIGHT #E5DBFF
+queue "Left BFS frontier" as LQ #C3FAE8
+queue "Right BFS frontier" as RQ #E5DBFF
+component "Canonical structural-key\nintersection" as MEET #FFF3BF
+component "Joinable" as JOIN #D3F9D8
+component "Both frontiers\nempty (AND)" as EXHAUST #FFF3BF
+component "Proven non-joinable\nboth finite frontiers exhausted" as CONFLICT #FCC2D7
+component "Incomplete\ncap or non-left-linear rule" as UNKNOWN #FFE3E3
+
+OUTER --> UNIFY
+INNER --> UNIFY
+UNIFY --> SHARED
+SHARED --> LEFT
+SHARED --> RIGHT
+LEFT --> LQ
+RIGHT --> RQ
+LQ --> MEET : explicit rewrite successors
+RQ --> MEET : explicit rewrite successors
+MEET --> JOIN : common key
+LQ --> EXHAUST : empty
+RQ --> EXHAUST : empty
+EXHAUST --> CONFLICT : exact exhaustion
+UNIFY --> UNKNOWN : step cap
+LQ --> UNKNOWN : state/term cap
+RQ --> UNKNOWN : state/term cap
+
+note bottom of SHARED #F1F3F5
+Both branches and every successor preserve the same
+symbolic variable identities; independent alpha-renaming
+would unsoundly collapse pair(x,y) with pair(y,x).
+end note
+
+legend bottom
+|= Colour |= Meaning |
+|<#DBE4FF> | normalized overlap inputs |
+|<#FFF3BF> | exact unification/comparison decision |
+|<#FFE8CC> | cross-branch identity invariant |
+|<#C3FAE8> | outer rewrite branch |
+|<#E5DBFF> | inner rewrite branch |
+|<#D3F9D8> | common reduct found |
+|<#FCC2D7> | exact finite conflict evidence |
+|<#FFE3E3> | qualified incomplete outcome |
+endlegend
+@enduml

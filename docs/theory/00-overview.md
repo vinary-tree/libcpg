@@ -345,6 +345,11 @@ development, or jump to the layer you need:
     Fresh-binder identity, reflective name operations, matched payload scope
     extrusion, and Kobayashi-style capability/obligation constraints define a
     bounded advisory model whose cycles reuse the shared iterative SCC engine.
+53. **[53 — Dependency pairs and critical-pair confluence](53-dependency-pairs-and-critical-pair-confluence.md).**
+    Flat first-order terms, exact unification, DP-graph SCCs, complete
+    reduction-pair obligations, renamed critical overlaps, and finite
+    joinability exhaustion define qualified MeTTa termination/confluence
+    evidence.
 
 The later chapters define deterministic projection structure, architecture
 metrics, inspectable evidence, and their interpretation limits.

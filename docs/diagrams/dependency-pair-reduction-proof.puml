@@ -1,0 +1,47 @@
+@startuml
+!include _libcpg-theme.iuml
+title Dependency-pair termination: proof, refutation, or honest unknown
+skinparam backgroundColor #FFFFFF
+skinparam componentStyle rectangle
+skinparam shadowing false
+
+component "Normalized rules\n<latex>l \to r</latex>" as RULES #DBE4FF
+component "Defined RHS subterms\n<latex>l^\sharp \to u^\sharp</latex>" as PAIRS #FFF3BF
+component "RewriteDependency CSR" as GRAPH #C3FAE8
+component "Shared iterative\nprojection_sccs" as SCC #E5DBFF
+component "Global weak obligation\n<latex>\forall(l\to r)\in R.\ I(l)\succeq I(r)</latex>" as WEAK #FFE8CC
+component "Per-SCC strict obligation\n<latex>\forall(l^\sharp\to u^\sharp)\in C.\ I(l)\succ I(u)</latex>" as STRICT #FFE8CC
+component "Alpha-equivalent\nroot self-cycle" as SELF #FCC2D7
+component "TerminationProof" as PROOF #D3F9D8
+component "NonTerminationWitness" as REFUTE #FCC2D7
+component "TerminationUnknown\nunoriented SCCs + issues" as UNKNOWN #FFE3E3
+
+RULES --> PAIRS : exact trie candidates + unification
+PAIRS --> GRAPH
+GRAPH --> SCC
+RULES --> WEAK
+SCC --> STRICT : each cyclic component
+PAIRS --> SELF : concrete self dependency
+WEAK --> PROOF : all weak
+STRICT --> PROOF : all internal pairs strict
+SELF --> REFUTE : exact repeating rewrite
+SCC --> UNKNOWN : cyclic and not certified
+WEAK --> UNKNOWN : weak obligation fails
+
+note bottom of PROOF #F1F3F5
+The interpretation is <latex>I(f(t_1,\ldots,t_n))=1+\sum_i I(t_i)</latex>.
+An acyclic DP graph needs no cyclic certificate.
+end note
+
+legend bottom
+|= Colour |= Meaning |
+|<#DBE4FF> | normalized rewrite input |
+|<#FFF3BF> | exact dependency-pair extraction |
+|<#C3FAE8> | deterministic graph projection |
+|<#E5DBFF> | reused SCC decomposition |
+|<#FFE8CC> | reduction-pair proof obligation |
+|<#D3F9D8> | proved terminating |
+|<#FCC2D7> | concrete refutation path |
+|<#FFE3E3> | incomplete or unavailable proof |
+endlegend
+@enduml

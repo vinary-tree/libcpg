@@ -433,6 +433,10 @@ So the safe pattern is: build (single-threaded, `&mut`), then analyse
 - [Rholang NameFlow and level analysis](rholang-name-flow.md) — normalized
   fresh-name provenance, quote/drop reflection, matched payload scope
   extrusion, and obligation/capability SCC witnesses under `rholang`.
+- [MeTTa rewriting analysis](metta-rewriting-analysis.md) — flat normalized
+  terms, exact dependency pairs, iterative SCC reduction-pair evidence,
+  renamed critical overlaps, bounded finite joinability, and optional
+  RewriteDep materialization under `metta`.
 - [May-happen-in-parallel analysis](mhp-analysis.md) — typed parallel operand
   subtrees, canonical symmetric execution-site pairs, nested-region
   composition, and explicit quadratic-output truncation.

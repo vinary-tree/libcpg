@@ -12,19 +12,31 @@ The one structural fact to internalise:
 
 ---
 
-## Why Mode B, and why it is (almost) feature-free
+## Why Mode B, and why it remains grammar-free
 
-The `rholang` and `metta` Cargo features are **empty feature lists** — pure logical `cfg` toggles:
+Neither Cargo feature links a language grammar. `rholang` is an empty logical
+toggle; `metta` additionally enables its exact rewrite-rule dictionary index:
 
 ```toml
 # From libcpg's Cargo.toml
 rholang = []
-metta = []
+metta = ["dep:libdictenstein"]
 ```
 
-They gate only the `map_rholang` / `map_metta` arms inside the node-mapper. Those arms reference **only** tree-sitter node-kind *strings* and `tree_sitter::Node` navigation — never a symbol from a grammar crate. So enabling `rholang` or `metta` pulls in **no dependency at all**; it just switches on mapping logic that is already there. The ρ-calculus / S-expression grammar itself is supplied by the **caller**, who parses and hands over an already-built `tree_sitter::Tree`.
+Both gate their `map_rholang` / `map_metta` arms inside the node-mapper. Those
+arms reference **only** tree-sitter node-kind strings and `tree_sitter::Node`
+navigation—never a grammar-crate symbol. The `metta` dependency is the
+canonical exact double-array trie used to narrow dependency-pair candidates;
+it is not a parser and approximate matching does not participate. The
+ρ-calculus / S-expression grammar itself is supplied by the **caller**, who
+parses and hands over an already-built `tree_sitter::Tree`.
 
-This is a deliberate decision (recorded in [ADR-0002](../design/0002-mode-b-build-from-tree.md)) with a concrete payoff: a host such as pgmcp already links the Rholang and MeTTa grammars. If libcpg *also* vendored them, the shared `tree_sitter_<lang>` C symbol would be **duplicated at link time**. Keeping the grammars out of libcpg's dependency graph — they are only *test-only* dev-dependencies, which Cargo never propagates downstream — makes libcpg a clean guest in any host that already speaks these languages.
+This construction decision is recorded in
+[ADR-0002](../design/0002-mode-b-build-from-tree.md); the later exact-index
+exception is [ADR-0070](../design/0070-stack-safe-metta-rewriting-analysis.md).
+A host such as pgmcp already links the language grammars. Keeping those
+grammars out of libcpg's ordinary dependency graph avoids duplicate
+`tree_sitter_<lang>` C symbols while allowing non-grammar analysis dependencies.
 
 The soundness posture of the mappings follows the standard multi-language-CPG discipline of Yamaguchi et al. [[1]](#references): each process-calculus or S-expression construct is normalised onto the nearest imperative CPG anchor that keeps the CFG/DFG **sound** (never asserting an edge the semantics forbid), even where it is necessarily *incomplete*.
 
@@ -215,6 +227,12 @@ MeTTa is a minimal [S-expression](../GLOSSARY.md#s-expression) grammar: a form l
 
 The `$x` classifier (`classify_metta_var`) walks the parent chain to distinguish a rule-LHS binder (definition) from every other occurrence (use), so `(= (double $x) (* $x 2))` yields a `$x` def → use edge — exactly the assertion in the snippet above.
 
+With the same `metta` feature,
+[`dependency_pairs`, `terminates`, and `analyze_critical_pairs`](38-metta-rewriting-analysis.md)
+consume these normalized rule functions. They use flat term arenas, exact
+dictionary lookup plus unification, the shared iterative SCC engine, and
+explicit joinability queues; no analyzer reparses this source text.
+
 ![MeTTa S-expression forms mapped onto CPG node and edge kinds by head-atom dispatch.](../diagrams/metta-mapping.svg)
 
 *Figure — the MeTTa → CPG node/edge mapping. Source: [`diagrams/metta-mapping.dot`](../diagrams/metta-mapping.dot).*
@@ -234,7 +252,7 @@ The `$x` classifier (`classify_metta_var`) walks the parent chain to distinguish
 
 - The per-construct mapping rules in full, including `classify_rholang_var`/`classify_metta_var`, are in [Node Mapper](../components/builder/node-mapper.md).
 - The Mode-B decision and the duplicate-symbol reasoning are in [ADR-0002](../design/0002-mode-b-build-from-tree.md).
-- Once built, a Rholang/MeTTa CPG is an ordinary `CodePropertyGraph`: query it ([Querying and Traversal](02-querying-and-traversal.md)), slice it ([Program Slicing](04-program-slicing.md)), or detect patterns over it ([Pattern Detection](03-pattern-detection.md)).
+- Once built, a Rholang/MeTTa CPG is an ordinary `CodePropertyGraph`: query it ([Querying and Traversal](02-querying-and-traversal.md)), slice it ([Program Slicing](04-program-slicing.md)), or detect patterns over it ([Pattern Detection](03-pattern-detection.md)). MeTTa rules additionally feed the [rewrite-analysis guide](38-metta-rewriting-analysis.md).
 
 ---
 

@@ -103,20 +103,24 @@ the [CPG diff component contract](../components/graph/cpg-diff.md).
 | Feature | Enables (deps) | What it gates |
 | --- | --- | --- |
 | `rholang` | *(none — `= []`)* | the `map_rholang` node-mapper arm, advisory `session_sketches` API, and their `#[cfg(feature = "rholang")]` tests |
-| `metta` | *(none — `= []`)* | the `map_metta` node-mapper arm and its `#[cfg(feature = "metta")]` unit tests |
+| `metta` | exact `libdictenstein` double-array-trie index | the `map_metta` node-mapper arm, dependency-pair termination, critical-pair analysis, RewriteDep materialization, and their tests |
 
-These are intentionally empty. The [Rholang](../GLOSSARY.md#rholang) and
-[MeTTa](../GLOSSARY.md#metta) mappers reference only tree-sitter node-kind strings,
-never a grammar symbol, so there is nothing to pull in: the ρ-calculus /
-S-expression CPG is built from a **caller-supplied** parse tree via
-`build_from_tree`. The grammars themselves are linked only as test-only path
+Both features remain **grammar-free**. The [Rholang](../GLOSSARY.md#rholang)
+and [MeTTa](../GLOSSARY.md#metta) mappers reference only tree-sitter node-kind
+strings, never a grammar symbol: the ρ-calculus / S-expression CPG is built
+from a **caller-supplied** parse tree via `build_from_tree`. `rholang` is an
+empty logical toggle. `metta` additionally pulls the canonical exact
+dictionary crate used to discriminate rewrite-rule roots; it still pulls no
+parser or fuzzy transducer. The grammars themselves are linked only as test-only path
 `[dev-dependencies]` (`rholang-tree-sitter`, `tree-sitter-metta`) to drive the
 Mode-B tests, and Cargo never propagates dev-dependencies downstream. The rationale
 — avoiding a duplicate `tree_sitter_<lang>` C symbol in consumers like pgmcp — is
 recorded in [`design/0002-mode-b-build-from-tree.md`](../design/0002-mode-b-build-from-tree.md).
-The same gate exposes session-protocol sketches because Rholang is currently the
+The `rholang` gate exposes session-protocol sketches because Rholang is currently the
 frontend that supplies the required behavioral message evidence; the analyzer
 still consumes normalized CPG nodes rather than grammar symbols or source text.
+The `metta` gate similarly exposes rewrite analysis because the MeTTa frontend
+supplies normalized rule functions, binders, operators, and def-use evidence.
 
 ### Language grammars (`lang-*`)
 

@@ -80,14 +80,15 @@ work. The difference from Flavour A is that the grammar is **never** a regular
 dependency and the language is **not** registered in `ParserRegistry`.
 
 1. Add the `Language` variant (as above).
-2. Declare an **empty** feature — a pure `cfg` toggle:
+2. Declare a **grammar-free** feature. Keep it empty unless the language's
+   analysis contract justifies a non-grammar optional dependency:
    ```toml
    [features]
    foo = []
    ```
 3. **Do not** register a grammar in `ParserRegistry`; the caller supplies the tree
    to [`build_from_tree`](../GLOSSARY.md#mode-b--build_from_tree).
-4. Add the mapper arm **gated on the empty feature**, referencing only `ts_kind`
+4. Add the mapper arm **gated on the language feature**, referencing only `ts_kind`
    strings and `tree_sitter::Node` navigation (never a grammar symbol):
    ```rust
    // src/builder/node_mapper.rs — inside map_kind

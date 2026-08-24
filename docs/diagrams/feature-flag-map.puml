@@ -11,9 +11,9 @@ caption libcpg cargo features (default = [], nothing enabled)
 ***[#D3F9D8] abstract-domains (exact rational polyhedra)
 **[#FCC2D7] gnn
 **[#FFF3BF] serde
-**[#E5DBFF] Mode-B toggles
-***[#E5DBFF] rholang
-***[#E5DBFF] metta
+**[#E5DBFF] Mode-B (grammar-free)
+***[#E5DBFF] rholang (logical toggle)
+***[#E5DBFF] metta (exact DAT index)
 **[#FFE3E3] experimental
 ***[#FFE3E3] gpu (reserved)
 ***[#FFE3E3] ml-linfa

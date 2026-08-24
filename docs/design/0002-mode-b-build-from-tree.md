@@ -3,7 +3,7 @@
 ## Status
 
 **Accepted.** Realised by `TreeSitterCpgBuilder::build_from_tree` in
-`src/builder/tree_sitter.rs`, the empty `rholang` / `metta` features in
+`src/builder/tree_sitter.rs`, the grammar-free `rholang` / `metta` features in
 `Cargo.toml`, and the `#[cfg(feature = "…")]`-gated `map_rholang` / `map_metta`
 arms in `src/builder/node_mapper.rs`. It is the only construction path for
 [Rholang](../GLOSSARY.md#rholang) and [MeTTa](../GLOSSARY.md#metta), and the
@@ -49,8 +49,8 @@ second-class citizens that need a nonexistent `build()` path.
 ## Decision
 
 **Accept a caller-supplied `tree_sitter::Tree` through a second entry point,
-`build_from_tree` (Mode B), and keep the F1R3FLY language toggles as empty,
-dependency-free `cfg` switches.**
+`build_from_tree` (Mode B), and keep the F1R3FLY language toggles free of
+grammar dependencies.**
 
 ### 1. `build_from_tree` — the Mode-B entry point
 
@@ -88,17 +88,17 @@ assert_eq!(from_tree.language(),    Language::Rust);
 // The tests additionally compare every node payload and typed edge.
 ```
 
-### 2. Empty `rholang` / `metta` features — logical toggles, zero dependencies
+### 2. Grammar-free `rholang` / `metta` features
 
 ```toml
-# From Cargo.toml — intentionally EMPTY feature lists.
+# From Cargo.toml.
 rholang = []
-metta   = []
+metta   = ["dep:libdictenstein"]
 ```
 
-These pull in **nothing**. They are pure `cfg` switches that gate *only* the
-`map_rholang` / `map_metta` arms (and their `map_kind` / `should_include`
-dispatch) in `src/builder/node_mapper.rs`:
+Both remain grammar-free `cfg` switches for the `map_rholang` / `map_metta`
+arms (and their `map_kind` / `should_include` dispatch) in
+`src/builder/node_mapper.rs`:
 
 ```rust
 // From map_kind in src/builder/node_mapper.rs — the arms are cfg-gated.
@@ -110,8 +110,11 @@ _ => self.map_generic(ts_kind, node, source),
 ```
 
 The mapper arms reference only `ts_kind` **strings** and `tree_sitter::Node`
-navigation — never a `tree_sitter_rholang` / `tree_sitter_metta` symbol — so
-there is nothing for the feature to link. The ρ-calculus / [S-expression](../GLOSSARY.md#s-expression)
+navigation—never a `tree_sitter_rholang` / `tree_sitter_metta` symbol. The
+`metta` feature additionally links `libdictenstein`, the canonical exact
+double-array dictionary index used to narrow rewrite-rule candidates. It does
+not link or replace a parser, and approximate matching does not participate.
+The ρ-calculus / [S-expression](../GLOSSARY.md#s-expression)
 CPG is built from the caller's already-parsed tree via `build_from_tree`. A
 caller that wants the Rholang-aware mapping enables `rholang` and hands over its
 tree:
@@ -170,7 +173,7 @@ duplicate-symbol hazard cannot arise from libcpg's side.
 - **Rholang and MeTTa are first-class Mode-B languages, today** — implemented
   mappers (`map_rholang`, `map_metta`), not "planned" and not stubs — without
   `libcpg` taking a single runtime grammar dependency for them.
-- **The duplicate-`tree_sitter_<lang>` link error is designed out.** Empty
+- **The duplicate-`tree_sitter_<lang>` link error is designed out.** Grammar-free
   runtime features plus test-only dev-deps plus pgmcp-matched pins mean the
   shared C symbols stay single-version.
 - **One pipeline, two doors.** `build` and `build_from_tree` share the AST →
@@ -178,6 +181,10 @@ duplicate-symbol hazard cannot arise from libcpg's side.
   cannot silently diverge — pinned by the equivalence test.
 
 ### Negative
+
+- **`metta` is no longer dependency-free.** It links the exact dictionary
+  implementation needed by rewrite analysis. This deliberately changes only
+  compile cost, not Mode-B parser ownership; see [ADR-0070](0070-stack-safe-metta-rewriting-analysis.md).
 
 - **The caller owns correctness of the tree.** `build_from_tree` trusts that
   `tree` matches `language` and `source`; a mismatch yields a degraded (generic)

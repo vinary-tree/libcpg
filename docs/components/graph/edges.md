@@ -47,7 +47,8 @@ is `DataFlow(DfgEdgeKind)`. The full set, by group:
 ![CpgEdgeKind grouped by overlay](../../diagrams/edge-kind-taxonomy.svg)
 
 *Figure — `CpgEdgeKind` grouped into AST, control-flow, data-flow, program-
-dependence, call, type, reference, scope, and import families. Source:
+dependence, heap, NameFlow, rewrite-dependency, call, type, reference, scope,
+and import families. Source:
 [`diagrams/edge-kind-taxonomy.puml`](../../diagrams/edge-kind-taxonomy.puml).*
 
 | Group | Variants | Meaning |
@@ -61,6 +62,7 @@ dependence, call, type, reference, scope, and import families. Source:
 | Reference | `Reference`, `Definition`, `Declaration` | use↔def and declaration links |
 | Scope | `EnclosingScope`, `ContainedIn` | lexical scoping |
 | Import | `Imports`, `Exports` | module dependency |
+| Rewrite dependency | `RewriteDep(RewriteDepEdgeKind)` | rule dependency pair or proven critical conflict (2 sub-kinds) |
 
 ## AST edges
 
@@ -201,7 +203,7 @@ for (target, kind) in cpg.dfg_successors(def_id) {
 `dfg_predecessors` mirrors `dfg_successors`. See [`components/builder/dfg.md`](../builder/dfg.md)
 for how these edges are produced.
 
-## PDG, Heap, NameFlow, call, type, reference, scope, and import edges
+## PDG, Heap, NameFlow, RewriteDep, call, type, reference, scope, and import edges
 
 The remaining overlays are single-level `CpgEdgeKind` variants:
 
@@ -221,6 +223,12 @@ The remaining overlays are single-level `CpgEdgeKind` variants:
   `name_flow_edges`, `name_flow_successors`, and `name_flow_predecessors`.
   The layer is populated only by explicit
   [`materialize_name_flow_overlay`](rholang-name-flow.md).
+- **Rewrite dependency.** `RewriteDep(RewriteDepEdgeKind)` carries
+  `DependencyPair` and `CriticalConflict` between existing MeTTa rule-function
+  nodes. It is populated only by transactional
+  [`materialize_rewrite_dep_overlay`](metta-rewriting-analysis.md); query it
+  with `rewrite_dep_edges`, `rewrite_dep_successors`, and
+  `rewrite_dep_predecessors`.
 - **Call graph.** `StaticCall`, `DynamicCall`, and `CallSite` connect a
   [call site to its callee](../../GLOSSARY.md#call-graph); query them with
   `call_sites`, `callees`, and `callers`.
@@ -262,9 +270,10 @@ the graph.
 
 ## Filtering edges by overlay
 
-`CpgEdgeKind` carries six classifier methods so you can select an overlay
+`CpgEdgeKind` carries nine classifier methods so you can select an overlay
 without spelling out every variant: `is_ast()`, `is_cfg()`, `is_dfg()`,
-`is_pdg()`, `is_call()`, and `is_type()`. Pair them with `edges_by_kind`, which
+`is_pdg()`, `is_heap()`, `is_name_flow()`, `is_rewrite_dep()`, `is_call()`,
+and `is_type()`. Pair them with `edges_by_kind`, which
 takes a predicate over `&CpgEdgeKind`:
 
 ```rust

@@ -8,7 +8,7 @@
 
 External machine-learning (ML) systems need a stable numerical view of a Code
 Property Graph (CPG), but libcpg's typed graph is richer than one adjacency
-matrix. It contains 45 node kinds, 60 edge relations, eleven coarse overlay
+matrix. It contains 45 node kinds, 62 edge relations, twelve coarse overlay
 layers, source identities, parallel relations, malformed-input possibilities,
 and optional dependence slices. A consumer must be able to map every numerical
 row and edge back to exact CPG evidence.
@@ -33,11 +33,11 @@ model runtime.
    `PygExport` for graph tensors and `PathContext` for exact AST paths.
 2. Canonicalize dense node ids by ascending `NodeId`. Align `node_features`,
    `node_ids`, and `source_ranges` one-for-one in that order.
-3. Freeze a 73-column node schema: 45 node-kind indicators; incoming and
+3. Freeze the original 73-column node schema: 45 node-kind indicators; incoming and
    outgoing degrees for eleven overlay layers; AST depth and a separate
    depth-known bit; loop-nesting depth; forward and reverse PageRank; and one
    optional backward-PDG-slice membership bit.
-4. Freeze a contiguous 60-class edge schema covering every current
+4. Freeze a contiguous 60-class edge schema covering every then-current
    `CpgEdgeKind`, `CfgEdgeKind`, and `DfgEdgeKind`. Export sorted
    `(source_dense, target_dense, relation_class)` tuples and preserve parallel
    edge multiplicity.
@@ -69,6 +69,9 @@ model runtime.
     depth or parse source spellings.
 12. Keep both exports immutable and out of graph. Optional serde derives encode
     the complete evidence records but do not change computation.
+13. When `RewriteDep` lands, append its incoming/outgoing degree columns at
+    73–74 and its two relation classes at 60–61. Preserve every original
+    column, class, and serialized edge-enum discriminant.
 
 ![Canonical CPG evidence exported for external ML consumers](../diagrams/ml-export-pipeline.svg)
 
@@ -147,7 +150,7 @@ visible.
 
 ## Verification
 
-Exact examples pin all 60 edge classes, the 73-column schema, dense alignment,
+Exact examples pin all 62 edge classes, the 75-column append-only schema, dense alignment,
 parallel-edge preservation, degree/depth/loop/slice columns, reconstructable
 AST paths, malformed-chain suppression, and every budget boundary. A 128-case
 property rebuilds complete graphs in forward and reverse insertion order and

@@ -1,0 +1,57 @@
+@startuml
+!include _libcpg-theme.iuml
+title MeTTa rewrite-analysis evidence and mutation boundary
+skinparam backgroundColor #FFFFFF
+skinparam componentStyle rectangle
+skinparam shadowing false
+
+package "Immutable normalized evidence" #F8F9FA {
+  component "Mode-B MeTTa CPG\nrule Functions + AST + DFG" as CPG #DBE4FF
+  component "Flat preorder terms\nheap Enter/Exit tasks" as FLAT #FFF3BF
+  component "Exact root discrimination\ndouble-array trie + wildcard" as INDEX #FFE8CC
+  component "Dependency pairs\nexact iterative unification" as DP #C3FAE8
+  component "Shared iterative SCCs\npolynomial reduction pair" as TERM #E5DBFF
+  component "Renamed critical overlaps\ntwo-sided BFS joinability" as CRIT #FCC2D7
+  component "Qualified immutable results\nproof, witness, conflict, issues" as RESULT #D3F9D8
+}
+
+package "Explicit caller mutation" #FFF9DB {
+  component "Validate every endpoint\nas an existing rule" as VALIDATE #FFE8CC
+  component "connect_unique" as CONNECT #FFF3BF
+  database "Same node set\n+ RewriteDep edges" as OVERLAY #FCC2D7
+}
+
+CPG --> FLAT : typed semantics only
+FLAT --> INDEX : exact LHS roots
+FLAT --> DP : RHS subterms
+INDEX --> DP : candidate rule ids
+DP --> TERM : RewriteDependency projection
+FLAT --> CRIT : rule pairs and positions
+TERM --> RESULT : Terminates / witness / Unknown
+CRIT --> RESULT : conflicts + status
+RESULT --> VALIDATE : optional materialization
+CPG --> VALIDATE : endpoint membership and type
+VALIDATE --> CONNECT : all endpoints valid
+CONNECT --> OVERLAY : append 2 kinds
+
+note bottom of FLAT #F1F3F5
+Term depth and continuation depth live on the heap.
+No analyzer reparses retained source text.
+end note
+
+note bottom of RESULT #FFE3E3
+Caps, malformed rules, and non-left-linear
+confluence input remain explicit qualifications.
+end note
+
+legend bottom
+|= Colour |= Meaning |
+|<#DBE4FF> | normalized shared-node CPG |
+|<#FFF3BF> | stack-safe flat representation/work |
+|<#FFE8CC> | exact index or validation boundary |
+|<#C3FAE8> | dependency-pair topology |
+|<#E5DBFF> | SCC/reduction-pair decision |
+|<#FCC2D7> | critical-pair or optional overlay |
+|<#D3F9D8> | immutable qualified result |
+endlegend
+@enduml

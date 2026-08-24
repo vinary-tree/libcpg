@@ -1,6 +1,6 @@
 @startmindmap
 !include _libcpg-theme.iuml
-caption CpgEdgeKind — typed edges overlaying AST + CFG + DFG + PDG + heap + call/type/ref/scope/import on one node set (src/graph/edge.rs)
+caption CpgEdgeKind — typed edges overlaying AST + CFG + DFG + PDG + heap + NameFlow + RewriteDep + call/type/ref/scope/import on one node set (src/graph/edge.rs)
 
 *[#F1F3F5] CpgEdgeKind
 
@@ -33,13 +33,25 @@ left side
 ***[#E5DBFF] DataDependence
 
 **[#FFD8A8] Heap(HeapEdgeKind)\n(6)
-**[#E5DBFF] NameFlow(NameFlowEdgeKind)\n(7)
 ***[#FFD8A8] Allocates
 ***[#FFD8A8] PointsTo
 ***[#FFD8A8] Dereferences
 ***[#FFD8A8] Releases
 ***[#FFD8A8] RequiresValid
 ***[#FFD8A8] EnsuresInvalid
+
+**[#E5DBFF] NameFlow(NameFlowEdgeKind)\n(7)
+***[#E5DBFF] Creates
+***[#E5DBFF] References
+***[#E5DBFF] Quotes
+***[#E5DBFF] Drops
+***[#E5DBFF] Carries
+***[#E5DBFF] Receives
+***[#E5DBFF] Communicates
+
+**[#FCC2D7] RewriteDep(RewriteDepEdgeKind)\n(2)
+***[#FCC2D7] DependencyPair
+***[#FCC2D7] CriticalConflict
 
 **[#FFE8CC] Scope\n(2)
 ***[#FFE8CC] EnclosingScope

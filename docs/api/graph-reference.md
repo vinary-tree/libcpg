@@ -324,7 +324,9 @@ tab-separated fact files; consuming Soufflé input directives must set
 `rfc4180=true` and `delimiter="\t"`. It performs no I/O.
 `DatalogFacts::cpg_edges` and
 `DatalogEdgeFact::to_cpg_edge` reconstruct the lossless ordered edge
-snapshot. See [Usage 33](../usage/33-datalog-export.md), the
+snapshot. Its generic family/detail columns include
+`rewrite_dep/dependency_pair` and `rewrite_dep/critical_conflict` when that
+typed overlay exists. See [Usage 33](../usage/33-datalog-export.md), the
 [component contract](../components/graph/datalog-export.md), and
 [ADR-0065](../design/0065-feature-free-datalog-edb-export.md).
 
@@ -534,6 +536,33 @@ contract](../components/graph/rholang-name-flow.md), [usage
 guide](../usage/37-rholang-name-flow-deadlock.md), and [security
 boundary](../security/27-rholang-name-flow-boundary.md).
 
+### MeTTa rewrite termination and confluence (`metta`)
+
+The analyzer consumes normalized MeTTa rule functions already present in the
+CPG. It does not parse source text. Every term is a flat arena and every
+traversal, unification, SCC pass, and joinability search uses explicit
+heap-owned work state.
+
+| Function | Signature | Result |
+|---|---|---|
+| `dependency_pairs` | `fn(&CodePropertyGraph) -> DpGraph` | Ordered dependency pairs, SCCs, issues, and completeness under default caps. |
+| `dependency_pairs_with_caps` | `fn(&CodePropertyGraph, RewriteAnalysisCaps) -> DpGraph` | Same analysis with explicit rule, term, pair, and unification bounds. |
+| `terminates` | `fn(&CodePropertyGraph) -> TerminationVerdict` | Polynomial reduction-pair proof, concrete self-loop nontermination witness, or qualified `Unknown`. |
+| `terminates_with_caps` | `fn(&CodePropertyGraph, RewriteAnalysisCaps) -> TerminationVerdict` | Same decision with caller-selected bounds. |
+| `critical_pairs` | `fn(&CodePropertyGraph) -> Vec<CriticalPair>` | Positive projection of proven non-joinable critical overlaps; absence alone is not a confluence claim. |
+| `analyze_critical_pairs` | `fn(&CodePropertyGraph) -> CriticalPairAnalysis` | Proven conflicts and completeness under default caps. |
+| `analyze_critical_pairs_with_caps` | `fn(&CodePropertyGraph, RewriteAnalysisCaps) -> CriticalPairAnalysis` | Same bounded symmetric rewrite search with caller-selected caps. |
+| `materialize_rewrite_dep_overlay` | `fn(&mut CodePropertyGraph, &DpGraph, &CriticalPairAnalysis) -> Result<usize, RewriteDepOverlayError>` | Transactional, idempotent append of typed dependency and proven-conflict edges. |
+
+Termination succeeds only when every source rule is weakly oriented and every
+dependency pair inside a cyclic SCC is strict under one fixed polynomial
+interpretation. A non-joinable critical pair requires exhaustion of both
+finite reachable spaces; a cap, unsupported shape, or non-left-linear rule
+makes the relevant negative claim incomplete. See the [component
+contract](../components/graph/metta-rewriting-analysis.md), [usage
+guide](../usage/38-metta-rewriting-analysis.md), and [security
+boundary](../security/28-metta-rewriting-boundary.md).
+
 ### Communication and lock-order deadlock candidates
 
 `LockKind::{AcquireRead, AcquireWrite, Release}` is optional typed metadata on a
@@ -641,7 +670,7 @@ pub fn ast_paths(
 | `PygExport::dense_index` | stable-id lookup into aligned rows |
 | `PygExport::feature_index` | exact schema-name lookup |
 | `PYG_NODE_FEATURE_NAMES` | canonical 73-name registry |
-| `edge_kind_class` / `EDGE_KIND_CLASS_COUNT` | exhaustive 60-relation map and bound |
+| `edge_kind_class` / `EDGE_KIND_CLASS_COUNT` | exhaustive 62-relation append-only map and bound |
 | `node_kind_class` | exhaustive 45-node-kind map |
 | `PathContext` | exact terminal ids/tokens, complete AST node path, aligned kind classes, ancestor id/index |
 | `AstPathOptions` | length/width filters plus terminal, pair, context, retained-node, and ancestor-step caps |
@@ -1877,14 +1906,15 @@ JSON string used by the former `Option<String>` field.
 
 ## `CpgEdgeKind`
 
-A 24-variant enum. Four variants wrap a finer kind:
+A 25-variant enum. Five variants wrap a finer kind:
 `ControlFlow(CfgEdgeKind)`, `DataFlow(DfgEdgeKind)`,
-`Heap(HeapEdgeKind)`, and `NameFlow(NameFlowEdgeKind)`.
+`Heap(HeapEdgeKind)`, `NameFlow(NameFlowEdgeKind)`, and
+`RewriteDep(RewriteDepEdgeKind)`.
 
-![Taxonomy of CpgEdgeKind and its CFG/DFG/Heap/NameFlow sub-kinds](../diagrams/edge-kind-taxonomy.svg)
+![Taxonomy of CpgEdgeKind and its CFG/DFG/Heap/NameFlow/RewriteDep sub-kinds](../diagrams/edge-kind-taxonomy.svg)
 
 *Figure — the edge-kind taxonomy across the AST, CFG, DFG, PDG, Heap,
-NameFlow, call, type, reference, scope, and import families. Source:
+NameFlow, RewriteDep, call, type, reference, scope, and import families. Source:
 [`diagrams/edge-kind-taxonomy.puml`](../diagrams/edge-kind-taxonomy.puml).*
 
 | Family | Variants |
@@ -1895,6 +1925,7 @@ NameFlow, call, type, reference, scope, and import families. Source:
 | PDG | `ControlDependence`, `DataDependence` |
 | Heap | `Heap(HeapEdgeKind)` |
 | NameFlow | `NameFlow(NameFlowEdgeKind)` |
+| Rewrite dependency | `RewriteDep(RewriteDepEdgeKind)` |
 | Call | `StaticCall`, `DynamicCall`, `CallSite` |
 | Type | `TypeOf`, `Inherits`, `Implements`, `GenericInstance` |
 | Reference | `Reference`, `Definition`, `Declaration` |
@@ -1913,6 +1944,7 @@ Predicates on the kind, useful with `edges_by_kind`:
 | `is_pdg(&self) -> bool` | `ControlDependence`, `DataDependence` |
 | `is_heap(&self) -> bool` | `Heap(_)` |
 | `is_name_flow(&self) -> bool` | `NameFlow(_)` |
+| `is_rewrite_dep(&self) -> bool` | `RewriteDep(_)` |
 | `is_call(&self) -> bool` | `StaticCall`, `DynamicCall`, `CallSite` |
 | `is_type(&self) -> bool` | `TypeOf`, `Inherits`, `Implements`, `GenericInstance` |
 

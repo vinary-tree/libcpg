@@ -20,7 +20,8 @@ overlay multiplicity, graph immutability, or stack safety.
 The focused unit suite contains six examples/properties:
 
 - all seventeen relation families are exercised and the exact `CpgEdge`
-  vector is reconstructed;
+  vector is reconstructed; the generic lossless relation additionally pins
+  both `rewrite_dep` details without inventing a relation-specific set view;
 - a rejected edge whose target is outside the graph never enters either the
   lossless master relation or a relation-specific fact vector;
 - RFC 4180 symbol rendering quotes every symbol, doubles internal quotes, and

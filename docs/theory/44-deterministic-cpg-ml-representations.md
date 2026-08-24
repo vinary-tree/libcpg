@@ -43,14 +43,17 @@ Every edge $`e=(u,v)`$ becomes:
 \bigl(d(u),d(v),c_E(\kappa_E(e))\bigr),
 ```
 
-where $`c_E:K_E\to\{0,\ldots,59\}`$ is the frozen relation-class map. Tuples
+where $`c_E:K_E\to\{0,\ldots,61\}`$ is the frozen relation-class map. Classes
+0–59 retain their original meanings; classes 60–61 append the two RewriteDep
+relations. Tuples
 are ordered lexicographically, but equal tuples are retained. Thus two typed
 parallel relations with equal endpoints and class contribute two rows rather
 than collapsing into one.
 
-## 2. The 73-column node schema
+## 2. The 75-column append-only node schema
 
-For node $`v_i`$, the exported row $`x_i\in\mathbb{R}^{73}`$ concatenates six
+For node $`v_i`$, the exported row $`x_i\in\mathbb{R}^{75}`$ concatenates
+the original schema followed by the RewriteDep degrees:
 families:
 
 ```math
@@ -64,7 +67,9 @@ k(v_i),
 \lambda(v_i),
 p(v_i),
 p^R(v_i),
-s(v_i)
+s(v_i),
+\deg^-_{\mathrm{rewrite}}(v_i),
+\deg^+_{\mathrm{rewrite}}(v_i)
 \right].
 ```
 
@@ -79,15 +84,19 @@ The symbols are defined before interpretation:
 - $`\lambda(v)`$ is represented AST loop-nesting depth;
 - $`p(v)`$ and $`p^R(v)`$ are PageRank on forward and reversed topology; and
 - $`s(v)\in\{0,1\}`$ marks membership in one optional complete backward PDG
-  slice.
+  slice; and
+- $`\deg^-_{\mathrm{rewrite}}`$ and $`\deg^+_{\mathrm{rewrite}}`$ count the
+  twelfth, typed RewriteDep layer.
 
-The equation has 45 kind columns, 22 layer-degree columns, and six scalar
-columns. `PYG_NODE_FEATURE_NAMES` is the ordered schema registry, so consumers
+The equation has 45 kind columns, 24 layer-degree columns, and six scalar
+columns. The RewriteDep columns occupy 73–74 rather than shifting the six
+existing scalars, preserving columns 0–72 exactly. `PYG_NODE_FEATURE_NAMES` is
+the ordered schema registry, so consumers
 should resolve indices by name rather than repeat numeric offsets.
 
 ### 2.1 Typed degrees
 
-The eleven degree layers deliberately coarsen relations without erasing the
+The twelve degree layers deliberately coarsen relations without erasing the
 typed edge table. For layer $`j`$ with relation subset $`K_E^j`$:
 
 ```math
@@ -228,7 +237,7 @@ CanonicalGraphExport(CPG, optional criterion):
     Traverse normalized AstChild roots with a breadth-first queue.
     Run canonical forward and reverse PageRank projections.
     If requested, compute the complete backward PDG slice and enforce its cap.
-    Fill one 73-column row for each dense node.
+    Fill one 75-column row for each dense node.
     Return aligned rows, edges, ids, ranges, slice evidence, and convergence.
 ```
 
