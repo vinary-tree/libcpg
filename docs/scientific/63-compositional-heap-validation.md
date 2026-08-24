@@ -36,9 +36,15 @@ bit-for-bit deterministic across two analyses.
 The insertion-permutation property rebuilds one fixed-ID AST/CFG/DFG in forward
 or reverse edge order and requires equal complete `HeapAnalysis` values. Its
 first run found that `call_arguments` removed a child before canonical source
-sorting. The minimized regression is committed at
-`proptest-regressions/analysis/heap/tests.txt`; the shared helper now orders by
-source range and stable node ID before separating callee syntax.
+sorting. The verifier then exposed the dual equal-range case: sorting by stable
+node ID before callee identification can misclassify an argument in a
+hand-built or deserialized resolved call. The root rule now separates the two
+operations. A unique direct identifier-definition matching the resolved target
+identifies callee syntax; parser source order is the fallback. Only after
+removing that exact node are the remaining arguments sorted. The minimized heap
+regression is committed at `proptest-regressions/analysis/heap/tests.txt`, and
+a generated builder property varies arity and AST-edge insertion direction
+while all child ranges are equal.
 
 ## Malformed, cap, and recursive oracles
 

@@ -729,16 +729,35 @@ fn enclosing_field_owner(cpg: &CodePropertyGraph, field: NodeId) -> Option<NodeI
 /// arguments directly. Supporting both shapes keeps the interprocedural DFG
 /// language-agnostic.
 pub(crate) fn call_arguments(cpg: &CodePropertyGraph, call: NodeId) -> Vec<NodeId> {
-    let mut children = cpg.ast_children(call).to_vec();
+    let mut children = source_ordered_call_children(cpg, call);
     if children.is_empty() {
         return Vec::new();
     }
-    children.sort_unstable_by_key(|&id| {
-        cpg.node(id)
-            .map(|node| (node.range.start, node.range.end, id))
-            .unwrap_or((u32::MAX, u32::MAX, id))
+
+    // Parsed calls identify the callee by its first source range. Hand-built
+    // or deserialized CPGs may legitimately use default/equal ranges, so a
+    // resolved call first uses its unique direct identifier-definition
+    // evidence. Removing the exact callee node before ordering arguments keeps
+    // positional flow independent of both NodeId and AST-edge insertion order.
+    let target = cpg.node(call).and_then(|node| match node.kind {
+        CpgNodeKind::Call { target, .. } => target,
+        _ => None,
     });
-    children.remove(0);
+    let resolved_callee = target.and_then(|target| {
+        let mut candidates = children.iter().copied().filter(|&child| {
+            matches!(
+                cpg.node(child).map(|node| &node.kind),
+                Some(CpgNodeKind::Identifier {
+                    definition: Some(definition),
+                    ..
+                }) if *definition == target
+            )
+        });
+        let candidate = candidates.next()?;
+        candidates.next().is_none().then_some(candidate)
+    });
+    let callee = resolved_callee.unwrap_or(children[0]);
+    children.retain(|&child| child != callee);
 
     let mut arguments = Vec::new();
     for child in children {
@@ -768,6 +787,16 @@ pub(crate) fn call_arguments(cpg: &CodePropertyGraph, call: NodeId) -> Vec<NodeI
             .unwrap_or((u32::MAX, u32::MAX, id))
     });
     arguments
+}
+
+fn source_ordered_call_children(cpg: &CodePropertyGraph, call: NodeId) -> Vec<NodeId> {
+    let mut children = cpg.ast_children(call).to_vec();
+    children.sort_unstable_by_key(|&id| {
+        cpg.node(id)
+            .map(|node| (node.range.start, node.range.end, id))
+            .unwrap_or((u32::MAX, u32::MAX, id))
+    });
+    children
 }
 
 impl Default for DfgExtractor {
@@ -3410,6 +3439,73 @@ mod proptests {
                     edge.kind,
                     CpgEdgeKind::DataFlow(DfgEdgeKind::Parameter)
                 )));
+        }
+
+        /// A resolved callee is semantic syntax, not merely the smallest
+        /// default-range NodeId or the first inserted AST edge. This is the
+        /// hand-built/deserialized counterpart to parser source ordering.
+        #[test]
+        fn prop_resolved_callee_selection_is_insertion_independent(
+            arity in 1usize..16,
+            reverse_edges in any::<bool>(),
+        ) {
+            let mut cpg = CodePropertyGraph::new(Language::Rust);
+            let callee = NodeId::new(10);
+            let call = NodeId::new(20);
+            let callee_syntax = NodeId::new(10_000);
+            cpg.add_node_with_id(CpgNode::new(
+                callee,
+                CpgNodeKind::Function {
+                    signature: Box::new(MethodSignature {
+                        name: "callee".into(),
+                        params: Default::default(),
+                        return_type: None,
+                        is_static: false,
+                        is_async: false,
+                        visibility: Visibility::Private,
+                    }),
+                },
+                SourceRange::default(),
+            ));
+            cpg.add_node_with_id(CpgNode::new(
+                call,
+                CpgNodeKind::Call {
+                    target: Some(callee),
+                    is_method: false,
+                },
+                SourceRange::default(),
+            ));
+            cpg.add_node_with_id(CpgNode::new(
+                callee_syntax,
+                CpgNodeKind::Identifier {
+                    name: "callee".into(),
+                    definition: Some(callee),
+                },
+                SourceRange::default(),
+            ));
+            let mut expected = Vec::with_capacity(arity);
+            for index in 0..arity {
+                let argument = NodeId::new(100 + index as u32);
+                cpg.add_node_with_id(CpgNode::new(
+                    argument,
+                    CpgNodeKind::Literal {
+                        kind: LiteralKind::Integer(index as i64),
+                    },
+                    SourceRange::default(),
+                ));
+                expected.push(argument);
+            }
+
+            let mut children = expected.clone();
+            children.push(callee_syntax);
+            if reverse_edges {
+                children.reverse();
+            }
+            for child in children {
+                cpg.connect(call, child, CpgEdgeKind::AstChild);
+            }
+
+            prop_assert_eq!(call_arguments(&cpg, call), expected);
         }
     }
 
