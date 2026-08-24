@@ -132,9 +132,10 @@ pub use dataflow::{
     BitSetDomain, Bound, Confluence, ConstLattice, ConstValue, DataflowAnalysis, DataflowSolution,
     DeadStore, DeadStoreReport, Direction, ExprFacts, ExprKey, ExprKeyError, ExprKeyLimit,
     ExprKeyLimits, ExprKeyMetrics, ExprKeyRef, ExprOperand, ExprOperandRef, ExprOperands,
-    ExprOperandsIter, ExprUniverse, FactUniverse, Interval, IntervalEnv, IntervalReport, Lattice,
-    LivenessResult, MustBits, SccpResult, SolverConfig, VarFacts, VariableDefinition,
-    VeryBusyExpressions,
+    ExprOperandsIter, ExprUniverse, FactUniverse, Interval, IntervalEnv, IntervalOctagonReduction,
+    IntervalReport, Lattice, LivenessResult, MustBits, NoReduction, Octagon, OctagonBound,
+    OctagonConstraint, OctagonError, OctagonSign, OctagonTerm, ReducedProduct, Reduction,
+    SccpResult, SolverConfig, VarFacts, VariableDefinition, VeryBusyExpressions,
 };
 
 pub use projection::{

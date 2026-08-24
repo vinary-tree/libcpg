@@ -10,6 +10,8 @@ mod expressions;
 mod facts;
 mod intervals;
 mod liveness;
+mod octagon;
+mod reduced_product;
 mod sccp;
 
 use std::{cmp::Reverse, collections::BinaryHeap, fmt::Debug};
@@ -46,6 +48,11 @@ pub(crate) use intervals::{
 };
 pub use intervals::{value_ranges, Bound, Interval, IntervalEnv, IntervalReport};
 pub use liveness::{dead_stores, liveness, DeadStore, DeadStoreReport, LivenessResult};
+pub use octagon::{
+    IntervalOctagonReduction, Octagon, OctagonBound, OctagonConstraint, OctagonError, OctagonSign,
+    OctagonTerm,
+};
+pub use reduced_product::{NoReduction, ReducedProduct, Reduction};
 pub(crate) use sccp::{fold_binary, fold_unary, literal_value};
 pub use sccp::{sccp, ConstLattice, ConstValue, SccpResult};
 
