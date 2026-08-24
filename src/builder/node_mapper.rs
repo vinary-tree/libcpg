@@ -7,8 +7,8 @@ use smallvec::SmallVec;
 use std::sync::Arc;
 
 use crate::{
-    CpgNodeKind, Language, LiteralKind, MethodSignature, MsgKind, NameOperationKind, ScopeId,
-    TypeInfo, Visibility,
+    CpgNodeKind, Language, LiteralKind, MethodSignature, MsgKind, NameOperationKind,
+    OwnershipOperationKind, ScopeId, TypeInfo, Visibility,
 };
 
 /// Maps tree-sitter node types to CpgNodeKind.
@@ -115,6 +115,38 @@ impl NodeMapper {
             },
             _ => None,
         }
+    }
+
+    /// Returns normalized ownership semantics for a syntax node.
+    ///
+    /// Rust grammar roles are interpreted only at this frontend boundary.
+    /// Analyses consume the closed marker and never reparse retained source.
+    pub(crate) fn ownership_operation(
+        &self,
+        ts_kind: &str,
+        node: &tree_sitter::Node,
+    ) -> Option<OwnershipOperationKind> {
+        if self.language != Language::Rust {
+            return None;
+        }
+        if ts_kind == "reference_expression" {
+            return Some(if self.has_child_kind(node, "mutable_specifier") {
+                OwnershipOperationKind::MutableBorrow
+            } else {
+                OwnershipOperationKind::SharedBorrow
+            });
+        }
+        let parent = node.parent()?;
+        let value = match parent.kind() {
+            "let_declaration" => parent.child_by_field_name("value"),
+            "assignment_expression" | "compound_assignment_expr" => {
+                parent.child_by_field_name("right")
+            }
+            _ => None,
+        };
+        value
+            .is_some_and(|value| value.id() == node.id())
+            .then_some(OwnershipOperationKind::Move)
     }
 
     /// Returns normalized allocation semantics for a constructor expression.
@@ -2128,8 +2160,16 @@ impl NodeMapper {
     }
 
     fn extract_type_from_node(&self, node: &tree_sitter::Node, source: &str) -> Option<TypeInfo> {
-        node.child_by_field_name("type")
-            .map(|t| TypeInfo::new(self.node_text(&t, source)))
+        let declared = node.child_by_field_name("type")?;
+        if self.language == Language::Rust && declared.kind() == "reference_type" {
+            let target = declared.child_by_field_name("type").unwrap_or(declared);
+            return Some(
+                TypeInfo::new(self.node_text(&target, source))
+                    .with_reference(true)
+                    .with_mutable(self.has_child_kind(&declared, "mutable_specifier")),
+            );
+        }
+        Some(TypeInfo::new(self.node_text(&declared, source)))
     }
 
     /// Extracts the declared type of a Java ordinary, variadic, or catch parameter.
@@ -2421,6 +2461,8 @@ impl NodeMapper {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[cfg(feature = "lang-rust")]
+    use crate::builder::CpgBuilder;
 
     #[test]
     fn test_mapper_creation() {
@@ -2481,6 +2523,55 @@ mod tests {
             .expect("named binary expression");
         assert_eq!(binary.kind(), "binary_expression");
         assert!(mapper.should_include_node(&binary, false));
+    }
+
+    #[test]
+    #[cfg(feature = "lang-rust")]
+    fn rust_frontend_normalizes_ownership_roles_and_reference_types() {
+        let source = r#"
+            fn ownership(source: String, target: &mut String) {
+                let moved: String = source;
+                let shared: &String = &*target;
+                let exclusive: &mut String = &mut *target;
+            }
+        "#;
+        let cpg = crate::TreeSitterCpgBuilder::new()
+            .build(source, Language::Rust)
+            .expect("build typed Rust ownership fixture");
+
+        let operations: Vec<_> = cpg
+            .nodes()
+            .filter_map(|node| node.ownership_operation)
+            .collect();
+        assert!(operations.contains(&OwnershipOperationKind::Move));
+        assert!(operations.contains(&OwnershipOperationKind::SharedBorrow));
+        assert!(operations.contains(&OwnershipOperationKind::MutableBorrow));
+
+        let target = cpg
+            .nodes()
+            .find_map(|node| match &node.kind {
+                CpgNodeKind::Parameter {
+                    name, param_type, ..
+                } if name.as_ref() == "target" => param_type.as_deref(),
+                _ => None,
+            })
+            .expect("target parameter type");
+        assert_eq!(target.name.as_ref(), "String");
+        assert!(target.is_reference);
+        assert!(target.is_mutable);
+
+        let shared = cpg
+            .nodes()
+            .find_map(|node| match &node.kind {
+                CpgNodeKind::Variable { name, var_type, .. } if name.as_ref() == "shared" => {
+                    var_type.as_deref()
+                }
+                _ => None,
+            })
+            .expect("shared binding type");
+        assert_eq!(shared.name.as_ref(), "String");
+        assert!(shared.is_reference);
+        assert!(!shared.is_mutable);
     }
 
     // ========================================================================

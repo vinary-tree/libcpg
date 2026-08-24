@@ -117,6 +117,23 @@ pub enum NameOperationKind {
     Drop,
 }
 
+/// Frontend-normalized ownership operation at one expression node.
+///
+/// Language frontends attach these markers from grammar roles while the
+/// concrete syntax tree is available. Ownership analyses can consequently
+/// consume typed evidence without inspecting retained source text or matching
+/// grammar-specific node names.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+pub enum OwnershipOperationKind {
+    /// A value-position expression that may transfer ownership.
+    Move,
+    /// Creation of a shared, read-only borrow.
+    SharedBorrow,
+    /// Creation of an exclusive, mutable borrow.
+    MutableBorrow,
+}
+
 impl MsgKind {
     /// Returns true for asynchronous and synchronous producers.
     pub const fn is_send(self) -> bool {
@@ -832,6 +849,16 @@ pub struct CpgNode {
         serde(default, skip_serializing_if = "Option::is_none")
     )]
     pub name_operation: Option<NameOperationKind>,
+    /// Normalized ownership semantics, when represented by this expression.
+    ///
+    /// This metadata records only a grammar-level operation. Whether a Rust
+    /// value-position expression copies or moves, and whether a borrow is a
+    /// reborrow, are determined from typed CPG evidence by the PCG analysis.
+    #[cfg_attr(
+        feature = "serde",
+        serde(default, skip_serializing_if = "Option::is_none")
+    )]
+    pub ownership_operation: Option<OwnershipOperationKind>,
     /// Normalized lock semantics, when this node is a synchronization call.
     ///
     /// This field is intentionally independent of [`CpgNodeKind::Call`]. A
@@ -872,6 +899,7 @@ impl CpgNode {
             text: None,
             message_kind: None,
             name_operation: None,
+            ownership_operation: None,
             lock_kind: None,
             allocation_type: None,
             properties: None,
@@ -895,6 +923,12 @@ impl CpgNode {
     /// Attaches normalized reflective-name semantics to this node.
     pub fn with_name_operation(mut self, kind: NameOperationKind) -> Self {
         self.name_operation = Some(kind);
+        self
+    }
+
+    /// Attaches normalized ownership semantics to this expression node.
+    pub fn with_ownership_operation(mut self, kind: OwnershipOperationKind) -> Self {
+        self.ownership_operation = Some(kind);
         self
     }
 

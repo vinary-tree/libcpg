@@ -159,10 +159,10 @@ pub use graph::{
     CfgEdgeKind, CfgNeighbors, CodePropertyGraph, CpgEdge, CpgEdgeKind, CpgEdges, CpgNode,
     CpgNodeKind, CpgNodeKindTag, CpgStats, DfgEdgeKind, DfgNeighbors, EdgeId, HeapEdgeKind,
     Language, LiteralKind, LockKind, LockMode, MethodSignature, MsgKind, NameFlowEdgeKind,
-    NameOperationKind, NodeId, Paradigm, PropertyKey, PropertyList, PropertyListIter,
-    PropertyValue, PropertyValueError, PropertyValueKind, PropertyValueLimit, PropertyValueLimits,
-    PropertyValueMetrics, PropertyValueRef, RewriteDepEdgeKind, ScopeId, SourceRange, TypeInfo,
-    Visibility,
+    NameOperationKind, NodeId, OwnershipOperationKind, Paradigm, PropertyKey, PropertyList,
+    PropertyListIter, PropertyValue, PropertyValueError, PropertyValueKind, PropertyValueLimit,
+    PropertyValueLimits, PropertyValueMetrics, PropertyValueRef, RewriteDepEdgeKind, ScopeId,
+    SourceRange, TypeInfo, Visibility,
 };
 
 pub use analysis::{

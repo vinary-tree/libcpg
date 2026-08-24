@@ -21,7 +21,8 @@ pub use edge::{
 pub use language::{Language, Paradigm};
 pub use node::{
     CpgNode, CpgNodeKind, CpgNodeKindTag, LiteralKind, LockKind, LockMode, MethodSignature,
-    MsgKind, NameOperationKind, NodeId, PropertyKey, ScopeId, SourceRange, TypeInfo, Visibility,
+    MsgKind, NameOperationKind, NodeId, OwnershipOperationKind, PropertyKey, ScopeId, SourceRange,
+    TypeInfo, Visibility,
 };
 pub use projection_cache::{CfgNeighbors, CpgEdges, DfgNeighbors};
 pub use property_value::{
