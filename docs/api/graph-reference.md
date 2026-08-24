@@ -328,6 +328,36 @@ snapshot. See [Usage 33](../usage/33-datalog-export.md), the
 [component contract](../components/graph/datalog-export.md), and
 [ADR-0065](../design/0065-feature-free-datalog-edb-export.md).
 
+### PDG information flow and constant-time evidence
+
+`noninterference(&CodePropertyGraph, &SecurityLabels) -> Vec<FlowViolation>`
+is a feature-free immutable reachability query over represented
+`DataDependence`, exact labeled SDG summary, and `ControlDependence` edges.
+`SecurityLabels` contains ordered `high_sources`, `low_sinks`, and
+`declassifiers`. A declassifier is a hard cut vertex; labels outside the graph
+are ignored.
+
+`FlowViolationKind` distinguishes `Explicit`, `Implicit`, and
+`ExplicitAndImplicit`. Each result retains separate canonical shortest
+`InformationFlowWitness` values for the explicit and implicit path classes.
+Every `InformationFlowStep` names its source, target, and
+`InformationFlowEdgeKind` (`DataDependence`, `Summary`, or
+`ControlDependence`).
+
+`constant_time(&CodePropertyGraph, &BTreeSet<NodeId>) -> Vec<LeakSite>`
+reports every represented secret-reachable branch edge and `IndexAccess` node.
+`LeakSiteKind::ConditionalTrue` and `ConditionalFalse` retain the exact CFG
+target; `IndexAccess` identifies the timing-sensitive index site.
+Declassification does not suppress timing evidence.
+
+Both APIs return every represented finding in stable order, mutate no graph
+state, and use heap-resident queues/parents with constant native call depth.
+They are advisory: zero findings do not prove source- or machine-level
+non-interference. See [Usage 34](../usage/34-pdg-information-flow.md), the
+[component contract](../components/graph/information-flow-control.md),
+[ADR-0066](../design/0066-deterministic-pdg-information-flow.md), and the
+[security boundary](../security/24-pdg-information-flow-boundary.md).
+
 ### IFDS/IDE procedure summaries
 
 The feature-free interprocedural framework evaluates a caller-defined

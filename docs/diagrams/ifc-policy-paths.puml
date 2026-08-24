@@ -1,0 +1,44 @@
+@startuml
+!include _libcpg-theme.iuml
+
+title Information-flow path classes and policy cuts
+left to right direction
+
+rectangle "High source\nH" as H #FCC2D7
+rectangle "Data use" as D #FFF3BF
+rectangle "Low explicit sink\nL_exp" as LE #FCC2D7
+rectangle "Branch controller" as B #D3F9D8
+rectangle "Low implicit sink\nL_imp" as LI #FCC2D7
+rectangle "Approved release\ncut vertex C" as C #FFE8CC
+rectangle "Low beyond release\nL_cut" as LC #F1F3F5
+rectangle "IndexAccess" as I #C3FAE8
+rectangle "true successor" as T #D3F9D8
+rectangle "false successor" as F #D3F9D8
+
+H -[#F08C00,bold]-> D : data dependence
+D -[#F08C00,bold]-> LE : explicit violation
+H -[#F08C00,bold]-> B : data dependence
+B -[#7048E8,bold]-> LI : control dependence\nimplicit violation
+H -[#F08C00,bold]-> C : reaches sanctioned release
+C -[#868E96,dashed]-> LC : traversal stops\nno confidentiality witness
+H -[#F08C00,bold]-> I : secret-dependent index
+B -[#2F9E44,bold]-> T : ConditionalTrue
+B -[#2F9E44,bold]-> F : ConditionalFalse
+
+note bottom of I
+  Index addressing remains timing evidence
+  even when confidentiality release is authorized
+end note
+
+legend bottom
+  | Color / line | Meaning |
+  |<#FCC2D7>| classified source or observation |
+  |<#FFF3BF>| explicit data influence |
+  |<#E5DBFF>| implicit control influence |
+  |<#FFE8CC>| declassification boundary |
+  |<#C3FAE8>| index timing site |
+  |<#D3F9D8>| branch / CFG site |
+  | dashed gray | cut relation is not traversed |
+endlegend
+
+@enduml

@@ -330,6 +330,10 @@ development, or jump to the layer you need:
     Typed EDB relations, least fixed points, composition in **Rel**, exact edge
     reconstruction, and the distinct equality-saturation boundary define the
     declarative query surface.
+49. **[49 — PDG information flow and constant-time evidence](49-pdg-information-flow-and-constant-time.md).**
+    High/Low labels, a two-state explicit/implicit reachability product,
+    declassification cuts, exact relational composition, and secret-dependent
+    branch/index sites define the advisory IFC surface.
 
 The later chapters define deterministic projection structure, architecture
 metrics, inspectable evidence, and their interpretation limits.

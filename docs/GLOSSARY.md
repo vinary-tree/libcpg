@@ -277,6 +277,15 @@ top and means values conflict or the operation is not safely foldable. Distinct
 constants join to `Overdefined`. See [Sparse conditional constant
 propagation](#sparse-conditional-constant-propagation-sccp).
 
+### Constant-time evidence
+
+Static evidence that a represented branch controller or index access is
+influence-reachable from a caller-supplied secret node. libcpg reports the
+exact conditional CFG edge or `IndexAccess` site and a canonical PDG witness;
+it does not prove relational, instruction-level, or microarchitectural
+constant time. See
+[Theory 49](theory/49-pdg-information-flow-and-constant-time.md).
+
 ### Complexity class / Big-O
 
 An asymptotic growth category for a function's running time. `libcpg`'s
@@ -392,6 +401,15 @@ given to a Datalog program. An **intensional database** (IDB) is the set of
 relations derived by rules at the program's least fixed point. libcpg exports
 canonical EDBs and leaves IDB evaluation to an external engine. See
 [Theory 48](theory/48-datalog-relational-semantics.md).
+
+### Declassification
+
+A policy-authorized release of confidential information. In libcpg's IFC
+query, a declassifier is a hard PDG cut vertex: traversal cannot start at or
+enter it, so a witness cannot silently resume beyond the release. This
+confidentiality policy never suppresses
+[constant-time evidence](#constant-time-evidence). See
+[ADR-0066](design/0066-deterministic-pdg-information-flow.md).
 
 ### Data dependence
 
@@ -596,6 +614,17 @@ transformer. libcpg's feature-free framework schedules analysis-defined
 procedure summaries in callee-first strongly-connected-component order and
 returns explicit cap or structural evidence [[41]](#references). See
 [`components/graph/ifds-ide-framework.md`](components/graph/ifds-ide-framework.md).
+
+### Information-flow control (IFC) / Non-interference / Explicit and implicit flow
+
+**Information-flow control** (IFC) enforces a policy over how classified
+information may influence observations. **Non-interference** means changing
+High inputs cannot change Low observations under the chosen semantic model.
+libcpg checks the represented PDG criterion: no High node reaches a Low node.
+An **explicit flow** uses data or exact summary dependence only; an **implicit
+flow** contains control dependence and therefore reveals information through
+whether an operation executes. The result is advisory outside the represented
+model. See [Theory 49](theory/49-pdg-information-flow-and-constant-time.md).
 
 ### Isomorphism / Subgraph isomorphism
 

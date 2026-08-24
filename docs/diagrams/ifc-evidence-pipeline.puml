@@ -1,0 +1,49 @@
+@startuml
+!include _libcpg-theme.iuml
+
+title Feature-free PDG information-flow evidence
+
+rectangle "Immutable typed CPG\nPDG + exact SDG summaries + CFG sites" as CPG #DBE4FF
+rectangle "Stable dense influence projection\ndata · summary · control rows" as Projection #E5DBFF
+rectangle "SecurityLabels\nHigh · Low · declassifier cuts" as Labels #FFF3BF
+rectangle "Product BFS\n<latex>(v,b),\;b\in\{0,1\}</latex>" as Product #D3F9D8
+rectangle "FlowViolation\nexplicit + implicit shortest witnesses" as Flow #FCC2D7
+rectangle "Secret node set" as Secrets #FFF3BF
+rectangle "Simple BFS + timing-site table\nconditional CFG edges · IndexAccess" as Timing #C3FAE8
+rectangle "LeakSite\nbranch target / index + shortest witness" as Leaks #FCC2D7
+rectangle "Caller review\nrepresented evidence · advisory verdict" as Review #FFE8CC
+
+CPG -[#7048E8,bold]-> Projection : borrow + canonicalize
+Labels -[#F08C00,bold]-> Product : starts · sinks · cuts
+Projection -[#2F9E44,bold]-> Product : product transitions
+Product -[#C2255C,bold]-> Flow : classify + reconstruct
+Secrets -[#F08C00,bold]-> Timing : starts
+Projection -[#0CA678,bold]-> Timing : influence reachability
+CPG -[#4C6EF5,bold]-> Timing : branch/index sites
+Timing -[#C2255C,bold]-> Leaks : enumerate every mechanism
+Flow -[#E8590C,bold]-> Review
+Leaks -[#E8590C,bold]-> Review
+
+note bottom of Projection
+  Sorted NodeId rows · deduplicated dependence edges
+  Explicit heap queues and parent arrays
+  Native call depth independent of graph depth
+end note
+
+note bottom of Review
+  Empty means no path in represented evidence
+  It is not a source- or machine-level security proof
+end note
+
+legend bottom
+  | Color | Meaning |
+  |<#DBE4FF>| represented CPG evidence |
+  |<#E5DBFF>| PDG/SDG influence projection |
+  |<#FFF3BF>| caller policy |
+  |<#D3F9D8>| confidentiality search |
+  |<#C3FAE8>| timing search |
+  |<#FCC2D7>| advisory finding |
+  |<#FFE8CC>| caller-owned interpretation |
+endlegend
+
+@enduml

@@ -442,6 +442,10 @@ So the safe pattern is: build (single-threaded, `&mut`), then analyse
 - [Datalog EDB export](datalog-export.md) — feature-free canonical AST, CFG,
   DFG, PDG, call, type, scope, and import relations plus a lossless typed edge
   snapshot for external rule engines.
+- [PDG information-flow and constant-time analysis](information-flow-control.md)
+  — feature-free explicit/implicit High-to-Low reachability with
+  declassification cuts, canonical witnesses, and secret-dependent branch and
+  index evidence.
 - [Advisory session-protocol analysis](session-analysis.md) — definition-
   resolved per-channel endpoint traces, shallow payload types, and conservative
   three-valued binary linear-duality evidence under the `rholang` feature.

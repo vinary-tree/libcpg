@@ -34,4 +34,4 @@ truncate it.
 
 1. Jordan, H., Scholz, B., Subotić, P. (2016). *Soufflé: On Synthesis of Program
    Analyzers.* CC. DOI:
-   [10.1007/978-3-319-49834-1_23](https://doi.org/10.1007/978-3-319-49834-1_23).
+   [10.1007/978-3-319-41540-6_23](https://doi.org/10.1007/978-3-319-41540-6_23).

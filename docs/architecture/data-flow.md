@@ -142,6 +142,28 @@ buffers. Caller-owned file I/O, Soufflé parsing, IDB fixed points, rule trust,
 and engine resource controls stay outside libcpg. See
 [ADR-0065](../design/0065-feature-free-datalog-edb-export.md).
 
+### Stage 5 — optional PDG information-flow checks
+
+After callers build the required per-function PDGs and exact caller-local SDG
+summaries, feature-free [`noninterference`](../components/graph/information-flow-control.md)
+projects represented data, summary, and control dependence into stable dense
+rows. A product-state breadth-first search retains explicit and implicit
+High-to-Low paths independently while caller-declared declassifiers remove
+sanctioned release vertices from the admitted relation.
+
+The separate `constant_time` lane reuses influence reachability, joins it with
+conditional CFG edges and `IndexAccess` nodes, and emits every distinct timing
+mechanism with a canonical witness. Both lanes borrow the CPG, allocate all
+depth-shaped state on the heap, and leave interpretation to the caller.
+
+![The immutable CPG is projected once, then separate product-state and timing-site searches emit canonical advisory evidence.](../diagrams/ifc-evidence-pipeline.svg)
+
+The stage is optional because High/Low/secret/declassification labels are
+caller security policy. It does not infer labels, construct missing PDGs, or
+turn represented absence into a whole-program proof. See
+[ADR-0066](../design/0066-deterministic-pdg-information-flow.md) and
+[Usage 34](../usage/34-pdg-information-flow.md).
+
 #### Optional post-C1 virtual-call type refinement
 
 After the graph carries nominal ownership, `Inherits`/`Implements`, receiver
