@@ -82,9 +82,25 @@ Every command ran with `CARGO_BUILD_JOBS=1` inside a user systemd scope with
 | `cargo clippy --all-targets --all-features -- -D warnings` | pass |
 | `cargo test --features rholang` | pass, including the existing integration matrix and doctests |
 
-The final repository-wide verifier, documentation-link counts, reproducible
-diagram counts, DOI metadata results, and pgmcp bug gate will be recorded only
-after those terminal gates run.
+## Final repository evidence
+
+The first repository-wide verifier stopped at its first gate because one
+receive-registration guard differed from canonical rustfmt layout. Commit
+`67daa43` applied only that formatter output; the clean rerun then completed
+the entire matrix under the same bounded systemd scope.
+
+| Gate | Result |
+|---|---|
+| `./scripts/verify.sh` | pass: formatting; default, maximal, and all-feature test matrices; examples; warnings-denied Clippy; rustdoc and doctests; documentation; and diff audit |
+| documentation links | 4,819 total; 962 unique; 4,054 checked successfully; zero errors; 765 explicitly excluded |
+| DOI syntax and resolution | 119 unique canonical DOI links passed syntax policy and all 119 resolved through `doi.org` |
+| reproducible diagrams | 148 sources rendered headlessly twice with byte-identical committed SVGs |
+| `pgmcp bug-gate` | no open bug anchored to the 851 files changed from epic base `71ab1a7cbe3fd9710b7c98626e994bd602e5c600` |
+
+The verification commands used `MemoryMax=4G`, `MemorySwapMax=0`,
+`TasksMax=256`, and `CARGO_BUILD_JOBS=1`. The three new SVGs were rasterized
+headlessly onto a white background for visual inspection; no GUI process was
+opened.
 
 ## Reproduction
 
