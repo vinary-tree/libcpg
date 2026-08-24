@@ -433,6 +433,46 @@ positive findings while omitting that qualification. See the [component
 guide](../components/graph/taint-analysis.md), [usage guide](../usage/10-taint-and-nullflow.md),
 and [security boundary](../security/02-taint-analysis.md).
 
+### Compositional heap summaries (feature-free)
+
+The heap domain consumes typed allocation, null, dereference, exact release,
+CFG, DFG, and resolved-call evidence. It returns finite separation-logic
+anti-frames and postconditions plus qualified null-dereference,
+use-after-free, and leak findings.
+
+```rust,ignore
+pub fn analyze_heap(
+    cpg: &CodePropertyGraph,
+    call_graph: &SccDecomposition,
+    caps: &IfdsCaps,
+) -> HeapAnalysis;
+
+pub fn materialize_heap_overlay(
+    cpg: &mut CodePropertyGraph,
+    summaries: &BTreeMap<NodeId, HeapSummary>,
+) -> Result<usize, HeapOverlayError>;
+```
+
+| API or type | Stable contract |
+|---|---|
+| `analyze_heap` / `analyze_heap_with_model` | Default or caller-owned exact release vocabulary with full solver evidence. |
+| `biabduction_summaries` | Ordered summary-map projection; insufficient by itself for a negative claim. |
+| `memory_safety` | Canonical findings; malformed caller-supplied references become capped `InvalidSummaryReference` evidence. |
+| `HeapAnalysis` | Summary map, solver order/work/SCC rounds, cap events, domain-capped functions, and structural issues. |
+| `HeapSummary` | Anti-frame, postconditions, allocations, composed callees, overlay relations, findings, and local completeness. |
+| `HeapLocation` / `HeapPredicate` | Parameter or allocation-site abstraction with `Valid`/`Invalid` spatial state. |
+| `HeapModel` | Ordered exact full or terminal names treated as release calls. |
+| `materialize_heap_overlay` | Transactional, idempotent append of typed Heap edges over existing nodes. |
+| `HeapOverlayError` | Exact missing source or target; no edge is added on failure. |
+
+All source/graph depth is stored in explicit heap queues, sets, and maps.
+Recursive must-invalidate evidence is marked partial. Require
+`HeapAnalysis::is_complete()` before interpreting an empty finding set as a
+clean modeled result. See the [component
+guide](../components/graph/compositional-heap-analysis.md), [usage
+guide](../usage/36-compositional-heap-analysis.md), and [security
+boundary](../security/26-compositional-heap-boundary.md).
+
 ### System dependence and interprocedural slices
 
 The feature-free SDG surface composes PDG, parameter, return, and effect
@@ -569,15 +609,15 @@ pub fn ast_paths(
 
 | Type or registry | Stable contract |
 |---|---|
-| `PygExport::node_features` | 69 finite `f32` columns per canonical node row |
+| `PygExport::node_features` | 71 finite `f32` columns per canonical node row |
 | `PygExport::edge_index` | sorted `(source_dense, target_dense, relation_class)` tuples with parallel multiplicity |
 | `PygExport::node_ids` / `source_ranges` | ascending stable ids and ranges aligned with every row |
 | `PygExport::slice_node_ids` | sorted complete backward-PDG slice, empty without a criterion |
 | `pagerank_converged` / `reverse_pagerank_converged` | convergence qualification for the two structural columns |
 | `PygExport::dense_index` | stable-id lookup into aligned rows |
 | `PygExport::feature_index` | exact schema-name lookup |
-| `PYG_NODE_FEATURE_NAMES` | canonical 69-name registry |
-| `edge_kind_class` / `EDGE_KIND_CLASS_COUNT` | exhaustive 47-relation map and bound |
+| `PYG_NODE_FEATURE_NAMES` | canonical 71-name registry |
+| `edge_kind_class` / `EDGE_KIND_CLASS_COUNT` | exhaustive 53-relation map and bound |
 | `node_kind_class` | exhaustive 45-node-kind map |
 | `PathContext` | exact terminal ids/tokens, complete AST node path, aligned kind classes, ancestor id/index |
 | `AstPathOptions` | length/width filters plus terminal, pair, context, retained-node, and ancestor-step caps |
@@ -1804,12 +1844,15 @@ JSON string used by the former `Option<String>` field.
 
 ## `CpgEdgeKind`
 
-A 22-variant enum. Two variants wrap a finer kind:
-`ControlFlow(CfgEdgeKind)` and `DataFlow(DfgEdgeKind)`.
+A 23-variant enum. Three variants wrap a finer kind:
+`ControlFlow(CfgEdgeKind)`, `DataFlow(DfgEdgeKind)`, and
+`Heap(HeapEdgeKind)`.
 
-![Taxonomy of CpgEdgeKind and its CFG/DFG sub-kinds](../diagrams/edge-kind-taxonomy.svg)
+![Taxonomy of CpgEdgeKind and its CFG/DFG/Heap sub-kinds](../diagrams/edge-kind-taxonomy.svg)
 
-*Figure — the edge-kind taxonomy across the AST, CFG, DFG, PDG, call, type, reference, scope, and import families. Source: [`diagrams/edge-kind-taxonomy.puml`](../diagrams/edge-kind-taxonomy.puml).*
+*Figure — the edge-kind taxonomy across the AST, CFG, DFG, PDG, Heap, call,
+type, reference, scope, and import families. Source:
+[`diagrams/edge-kind-taxonomy.puml`](../diagrams/edge-kind-taxonomy.puml).*
 
 | Family | Variants |
 |--------|----------|
@@ -1817,6 +1860,7 @@ A 22-variant enum. Two variants wrap a finer kind:
 | CFG | `ControlFlow(CfgEdgeKind)` |
 | DFG | `DataFlow(DfgEdgeKind)` |
 | PDG | `ControlDependence`, `DataDependence` |
+| Heap | `Heap(HeapEdgeKind)` |
 | Call | `StaticCall`, `DynamicCall`, `CallSite` |
 | Type | `TypeOf`, `Inherits`, `Implements`, `GenericInstance` |
 | Reference | `Reference`, `Definition`, `Declaration` |
@@ -1833,6 +1877,7 @@ Predicates on the kind, useful with `edges_by_kind`:
 | `is_cfg(&self) -> bool` | `ControlFlow(_)` |
 | `is_dfg(&self) -> bool` | `DataFlow(_)` |
 | `is_pdg(&self) -> bool` | `ControlDependence`, `DataDependence` |
+| `is_heap(&self) -> bool` | `Heap(_)` |
 | `is_call(&self) -> bool` | `StaticCall`, `DynamicCall`, `CallSite` |
 | `is_type(&self) -> bool` | `TypeOf`, `Inherits`, `Implements`, `GenericInstance` |
 

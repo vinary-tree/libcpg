@@ -1,0 +1,56 @@
+@startuml
+!include _libcpg-theme.iuml
+
+title Stack-safe symbolic heap lifetime machine
+
+start
+:Choose allocation-site or parameter location; <<#DBE4FF>>
+:Allocate finite state bits and heap queue; <<#E5DBFF>>
+:Seed entry with Absent (allocation)\nor Live (parameter); <<#D3F9D8>>
+
+while (queued CFG state exists?) is (yes)
+  :Pop canonical pending state; <<#E5DBFF>>
+  if (Freed may reach dereference?) then (yes)
+    :Record canonical use-after-free witness; <<#FFE3E3>>
+  else (no)
+  endif
+  if (allocation node?) then (yes)
+    :Set state to Live; <<#D3F9D8>>
+  else (no)
+  endif
+  if (release event?) then (yes)
+    :Map Live or Freed to Freed; <<#FFF3BF>>
+  else (no)
+  endif
+  :Union finite bits into sorted successors; <<#C3FAE8>>
+  :Enqueue only changed successors; <<#E5DBFF>>
+endwhile (no)
+
+:Inspect every represented exit; <<#DBE4FF>>
+if (local allocation may be Live?) then (yes)
+  :Emit leak and Valid postcondition; <<#FFE3E3>>
+else (no)
+  if (location is definitely Freed?) then (yes)
+    :Emit Invalid postcondition; <<#FFF3BF>>
+  else (no)
+  endif
+endif
+:Return canonical evidence + cap status; <<#C3FAE8>>
+stop
+
+note right
+  CFG length and loop depth consume Vec/VecDeque
+  storage. No transition calls itself and no
+  source level becomes native call depth.
+end note
+
+legend right
+  |<#DBE4FF>| selection / exit inspection |
+  |<#E5DBFF>| explicit worklist state |
+  |<#D3F9D8>| live state |
+  |<#FFF3BF>| freed state / postcondition |
+  |<#FFE3E3>| advisory violation |
+  |<#C3FAE8>| deterministic merge/result |
+endlegend
+
+@enduml

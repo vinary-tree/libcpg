@@ -201,7 +201,7 @@ for (target, kind) in cpg.dfg_successors(def_id) {
 `dfg_predecessors` mirrors `dfg_successors`. See [`components/builder/dfg.md`](../builder/dfg.md)
 for how these edges are produced.
 
-## PDG, call, type, reference, scope, and import edges
+## PDG, Heap, call, type, reference, scope, and import edges
 
 The remaining overlays are single-level `CpgEdgeKind` variants:
 
@@ -210,6 +210,11 @@ The remaining overlays are single-level `CpgEdgeKind` variants:
   [program slicing](../../GLOSSARY.md#program-slicing). `DataDependence` is a
   re-projection of DFG def-use edges; `ControlDependence` comes from the
   [reverse dominance frontier](../../GLOSSARY.md#dominance-frontier--reverse-dominance-frontier).
+- **Heap.** `Heap(HeapEdgeKind)` carries `Allocates`, `PointsTo`,
+  `Dereferences`, `Releases`, `RequiresValid`, and `EnsuresInvalid` relations
+  between existing nodes. The compositional heap analysis keeps summaries out
+  of graph until explicit transactional materialization; query the result with
+  `heap_edges`, `heap_successors`, and `heap_predecessors`.
 - **Call graph.** `StaticCall`, `DynamicCall`, and `CallSite` connect a
   [call site to its callee](../../GLOSSARY.md#call-graph); query them with
   `call_sites`, `callees`, and `callers`.

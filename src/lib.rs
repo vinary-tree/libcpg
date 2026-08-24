@@ -63,6 +63,8 @@
 //!   transitive purity, return dependencies, and checked scalar constants
 //! - **Advisory Taint and Maybe-Null Analysis**: Classify data-driven sources,
 //!   sinks, sanitizers, external calls, and dereferences with bounded witnesses
+//! - **Compositional Heap Analysis**: Infer separation-logic anti-frames and
+//!   postconditions over call SCCs and report qualified null/UAF/leak evidence
 //! - **System Dependence Slicing**: Materialize effect-derived labeled summary
 //!   edges and compute deterministic context-sensitive two-pass slices
 //! - **Channel Topology**: Extract typed message events through def-use channel

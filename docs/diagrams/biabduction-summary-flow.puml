@@ -1,0 +1,60 @@
+@startuml
+!include _libcpg-theme.iuml
+
+title Compositional heap-summary and bi-abduction flow
+
+rectangle "Typed CPG evidence" as CPG #DBE4FF {
+  rectangle "allocation_type\nnull literals" as Seeds #DBE4FF
+  rectangle "DFG dereference / origins" as DFG #D3F9D8
+  rectangle "CFG order / exits" as CFG #FFF3BF
+  rectangle "resolved calls" as Calls #C3FAE8
+}
+
+rectangle "Validated call-graph SCCs" as SCC #E5DBFF
+rectangle "Callees-first IFDS/IDE solver" as Solver #E5DBFF
+rectangle "Local heap machine" as Local #FFE8CC {
+  rectangle "origin closure" as Origins #FFE8CC
+  rectangle "anti-frame inference" as Anti #FFD8A8
+  rectangle "lifetime worklist" as Life #FFE3E3
+}
+rectangle "HeapSummary" as Summary #C3FAE8 {
+  rectangle "preconditions" as Pre #D3F9D8
+  rectangle "postconditions" as Post #FFF3BF
+  rectangle "qualified findings" as Findings #FFE3E3
+  rectangle "typed relations" as Relations #DBE4FF
+}
+rectangle "Optional transactional\nHeap overlay" as Overlay #D0EBFF
+
+Seeds -[#4C6EF5,bold]-> Origins
+DFG -[#2F9E44,bold]-> Origins
+CFG -[#F08C00,bold]-> Life
+Calls -[#0CA678,bold]-> Solver
+SCC -[#7048E8,bold]-> Solver
+Solver -[#7048E8,bold]-> Local : current callee summaries
+Origins -[#E8590C,bold]-> Anti
+Origins -[#E8590C,bold]-> Life
+Anti -[#2F9E44,bold]-> Pre
+Life -[#F08C00,bold]-> Post
+Life -[#C92A2A,bold]-> Findings
+Pre -[#4C6EF5,bold]-> Relations
+Post -[#4C6EF5,bold]-> Relations
+Summary -[#7048E8,bold]-> Solver : monotone SCC join
+Relations -[#1971C2,bold]-> Overlay : explicit caller request
+
+note bottom of Solver
+  A recursive must-invalidate effect is
+  retained but marked partial until a
+  sound greatest-fixed-point treatment exists.
+end note
+
+legend right
+  |<#DBE4FF>| typed graph evidence / overlay |
+  |<#E5DBFF>| SCC composition |
+  |<#FFE8CC>| heap-owned local machine |
+  |<#D3F9D8>| requirements |
+  |<#FFF3BF>| effects |
+  |<#FFE3E3>| advisory findings |
+  |<#C3FAE8>| canonical summary |
+endlegend
+
+@enduml

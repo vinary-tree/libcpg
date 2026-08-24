@@ -334,6 +334,13 @@ development, or jump to the layer you need:
     High/Low labels, a two-state explicit/implicit reachability product,
     declassification cuts, exact relational composition, and secret-dependent
     branch/index sites define the advisory IFC surface.
+50. **[50 — Relational abstract domains](50-relational-abstract-domains.md).**
+    Integer octagons, exact rational polyhedra, and static reduced products
+    expose deterministic relational invariants with explicit resource costs.
+51. **[51 — Compositional heap analysis](51-compositional-heap-analysis.md).**
+    Finite separation-logic footprints, bi-abductive anti-frames, callee-first
+    call-SCC composition, and heap-resident lifetime machines define qualified
+    null-dereference, use-after-free, and leak evidence.
 
 The later chapters define deterministic projection structure, architecture
 metrics, inspectable evidence, and their interpretation limits.

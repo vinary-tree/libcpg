@@ -55,6 +55,9 @@ sorted and deduplicated. `cpg_edge` deliberately retains the edge
 identifier and parallel multiplicity. Calling
 `DatalogFacts::cpg_edges` therefore reconstructs every represented
 overlay edge exactly, including its label.
+The generic relation and `souffle_files()` include all six `HeapEdgeKind`
+details when a caller has explicitly materialized that overlay; heap summaries
+remain absent until that opt-in mutation. No separate heap relation is emitted.
 
 ## Export algorithm
 

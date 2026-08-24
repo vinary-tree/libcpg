@@ -21,7 +21,7 @@ Let $`G=(V,E,kappa_V,kappa_E,ho)`$ be a CPG, where:
 - $`V`$ is the finite node set;
 - $`E`$ is the edge multiset, so parallel typed edges remain distinct;
 - $`\kappa_V:V\to K_V`$ assigns one of 45 node kinds;
-- $`\kappa_E:E\to K_E`$ assigns one of 47 edge relations; and
+- $`\kappa_E:E\to K_E`$ assigns one of 53 edge relations; and
 - $`\rho:V\to R`$ assigns a source range.
 
 Let $`\operatorname{id}(v)`$ be the stable `NodeId` of node $`v`. Canonical
@@ -43,22 +43,22 @@ Every edge $`e=(u,v)`$ becomes:
 \bigl(d(u),d(v),c_E(\kappa_E(e))\bigr),
 ```
 
-where $`c_E:K_E\to\{0,\ldots,46\}`$ is the frozen relation-class map. Tuples
+where $`c_E:K_E\to\{0,\ldots,52\}`$ is the frozen relation-class map. Tuples
 are ordered lexicographically, but equal tuples are retained. Thus two typed
 parallel relations with equal endpoints and class contribute two rows rather
 than collapsing into one.
 
-## 2. The 69-column node schema
+## 2. The 71-column node schema
 
-For node $`v_i`$, the exported row $`x_i\in\mathbb{R}^{69}`$ concatenates six
+For node $`v_i`$, the exported row $`x_i\in\mathbb{R}^{71}`$ concatenates six
 families:
 
 ```math
 x_i=
 \left[
 \operatorname{onehot}_{45}(\kappa_V(v_i)),
-\deg^-_9(v_i),
-\deg^+_9(v_i),
+\deg^-_{10}(v_i),
+\deg^+_{10}(v_i),
 h(v_i),
 k(v_i),
 \lambda(v_i),
@@ -71,8 +71,8 @@ s(v_i)
 The symbols are defined before interpretation:
 
 - $`\operatorname{onehot}_{45}`$ is the exact 45-kind indicator vector;
-- $`\deg^-_9`$ and $`\deg^+_9`$ are incoming and outgoing degree vectors for
-  AST, CFG, DFG, PDG, call, type, reference, scope, and import layers;
+- $`\deg^-_{10}`$ and $`\deg^+_{10}`$ are incoming and outgoing degree vectors
+  for AST, CFG, DFG, PDG, call, type, reference, scope, import, and Heap layers;
 - $`h(v)`$ is the represented AST depth, or zero when unknown;
 - $`k(v)\in\{0,1\}`$ is the depth-known bit;
 - $`\lambda(v)`$ is represented AST loop-nesting depth;
@@ -80,13 +80,13 @@ The symbols are defined before interpretation:
 - $`s(v)\in\{0,1\}`$ marks membership in one optional complete backward PDG
   slice.
 
-The equation has 45 kind columns, 18 layer-degree columns, and six scalar
+The equation has 45 kind columns, 20 layer-degree columns, and six scalar
 columns. `PYG_NODE_FEATURE_NAMES` is the ordered schema registry, so consumers
 should resolve indices by name rather than repeat numeric offsets.
 
 ### 2.1 Typed degrees
 
-The nine degree layers deliberately coarsen relations without erasing the
+The ten degree layers deliberately coarsen relations without erasing the
 typed edge table. For layer $`j`$ with relation subset $`K_E^j`$:
 
 ```math
@@ -227,7 +227,7 @@ CanonicalGraphExport(CPG, optional criterion):
     Traverse normalized AstChild roots with a breadth-first queue.
     Run canonical forward and reverse PageRank projections.
     If requested, compute the complete backward PDG slice and enforce its cap.
-    Fill one 69-column row for each dense node.
+    Fill one 71-column row for each dense node.
     Return aligned rows, edges, ids, ranges, slice evidence, and convergence.
 ```
 

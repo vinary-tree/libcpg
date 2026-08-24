@@ -411,6 +411,21 @@ visible in the report and its affected witnesses. See the [taint component
 guide](../components/graph/taint-analysis.md) and [Theory
 27](../theory/27-interprocedural-taint-and-nullflow.md).
 
+### Compositional heap summaries (feature-free)
+
+`analyze_heap` is another domain over the validated callee-first call-SCC
+schedule. Typed allocation, null, DFG dereference, exact release-call, and CFG
+evidence feeds heap-resident origin and lifetime worklists. The result retains
+anti-frame preconditions, exit postconditions, canonical null/UAF/leak
+findings, and every solver cap or structural issue out of graph.
+
+`materialize_heap_overlay` is an optional terminal projection. It validates
+every relation endpoint before the first mutation, then appends idempotent
+`HeapEdgeKind` relations over the existing node set. See the [component
+guide](../components/graph/compositional-heap-analysis.md), [Theory
+51](../theory/51-compositional-heap-analysis.md), and [security
+boundary](../security/26-compositional-heap-boundary.md).
+
 `condensation_metrics(&sccs, &options)` continues that pipeline without
 revisiting the CPG. A minimum-id Kahn order drives source-oriented longest-path
 levels and an SCC-member-weighted critical path; optional
@@ -666,10 +681,10 @@ See the [component guide](../components/graph/concurrency-bug-detection.md),
 
 `export_pyg` reads the immutable whole CPG and first replaces internal graph
 order with ascending stable `NodeId` coordinates. One typed edge pass produces
-nine-layer in/out degrees and a complete relation-class edge list. Independent
+ten-layer in/out degrees and a complete relation-class edge list. Independent
 heap-backed passes compute AST depth/knownness/loop depth and canonical
 forward/reverse PageRank. Optional localization traverses the complete backward
-PDG slice before its caller cap is checked. The row assembler then aligns 69
+PDG slice before its caller cap is checked. The row assembler then aligns 71
 named values with stable ids and source ranges.
 
 `ast_paths` takes a separate function-local route. It collects AST descendants

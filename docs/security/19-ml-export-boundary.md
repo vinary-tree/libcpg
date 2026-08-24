@@ -73,7 +73,7 @@ feature extraction when isolation is required.
 
 ## Integrity and schema evolution
 
-The 69 feature names and 47 relation classes are an interchange contract, but
+The 71 feature names and 53 relation classes are an interchange contract, but
 the current payload does not include a separate schema-version field. Persist
 the libcpg version or a hash of `PYG_NODE_FEATURE_NAMES` with long-lived data
 sets. A future node/edge enum addition must update the exhaustive mapping,

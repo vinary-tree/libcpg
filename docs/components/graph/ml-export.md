@@ -20,9 +20,9 @@ tensor, or modify the CPG.
 | `PygExportOptions` | optional criterion and maximum accepted complete slice size |
 | `PygExport::dense_index` | stable `NodeId` to dense-row lookup by binary search |
 | `PygExport::feature_index` | schema-name to feature-column lookup |
-| `PYG_NODE_FEATURE_NAMES` | ordered 69-column schema registry |
+| `PYG_NODE_FEATURE_NAMES` | ordered 71-column schema registry |
 | `node_kind_class` | exhaustive 45-kind stable class map |
-| `edge_kind_class` | exhaustive 47-relation stable class map |
+| `edge_kind_class` | exhaustive 53-relation stable class map |
 | `ast_paths(&CodePropertyGraph, NodeId, AstPathOptions)` | complete retained source-ordered terminal-pair contexts for one function |
 | `AstPathOptions` | semantic length/width filters and explicit resource caps |
 | `PathContext` | terminals, exact path, aligned kinds/tokens, lowest common ancestor, and ancestor index |
@@ -36,7 +36,7 @@ No `gnn`, `ndarray`, `rand`, Python, PyTorch, or PyG dependency is required.
 1. A binary min-order heap canonicalizes stable node ids without source-depth
    recursion.
 2. An ordered map establishes `NodeId -> dense u32` identity.
-3. One edge scan builds nine-layer in/out degrees and typed dense tuples.
+3. One edge scan builds ten-layer in/out degrees and typed dense tuples.
 4. A second heap orders tuples while retaining duplicates.
 5. A normalized root-first AST queue computes depth, knownness, and loop depth.
 6. Canonical `GraphProjection` values compute unweighted forward/reverse
@@ -54,14 +54,14 @@ semantics rather than inconsistent normalization.
 | Columns | Family | Semantics |
 |---|---|---|
 | 0–44 | `kind.*` | one exact node-kind indicator |
-| 45–53 | `degree.in.*` | incoming degree for AST, CFG, DFG, PDG, call, type, reference, scope, import |
-| 54–62 | `degree.out.*` | outgoing degree for the same nine layers |
-| 63 | `ast.depth` | represented depth, interpreted only with column 64 |
-| 64 | `ast.depth_known` | one iff a unique root-reachable parent chain exists |
-| 65 | `ast.loop_depth` | `While`/`For`/`Loop` nesting on that known chain |
-| 66 | `centrality.pagerank` | whole-CPG unweighted directed PageRank |
-| 67 | `centrality.reverse_pagerank` | PageRank on reversed topology |
-| 68 | `localization.backward_pdg_slice` | complete-slice membership or zero when no criterion was requested |
+| 45–54 | `degree.in.*` | incoming degree for AST, CFG, DFG, PDG, call, type, reference, scope, import, heap |
+| 55–64 | `degree.out.*` | outgoing degree for the same ten layers |
+| 65 | `ast.depth` | represented depth, interpreted only with column 66 |
+| 66 | `ast.depth_known` | one iff a unique root-reachable parent chain exists |
+| 67 | `ast.loop_depth` | `While`/`For`/`Loop` nesting on that known chain |
+| 68 | `centrality.pagerank` | whole-CPG unweighted directed PageRank |
+| 69 | `centrality.reverse_pagerank` | PageRank on reversed topology |
+| 70 | `localization.backward_pdg_slice` | complete-slice membership or zero when no criterion was requested |
 
 Use `PygExport::feature_index` or `PYG_NODE_FEATURE_NAMES`; numeric positions
 are shown for schema review, not as an invitation to duplicate offsets.
@@ -84,8 +84,8 @@ downward branches.
 ## Invariants
 
 1. `node_features.len() == node_ids.len() == source_ranges.len()`.
-2. Every node row has exactly `PYG_NODE_FEATURE_COUNT == 69` finite values.
-3. Every dense edge endpoint indexes `node_ids`; every class is below 47.
+2. Every node row has exactly `PYG_NODE_FEATURE_COUNT == 71` finite values.
+3. Every dense edge endpoint indexes `node_ids`; every class is below 53.
 4. Parallel typed edge multiplicity is preserved.
 5. `slice_node_ids` is sorted, exact, complete, and empty without a criterion.
 6. Unknown depth is distinguishable from root depth through

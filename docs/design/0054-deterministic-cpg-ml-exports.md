@@ -8,7 +8,7 @@
 
 External machine-learning (ML) systems need a stable numerical view of a Code
 Property Graph (CPG), but libcpg's typed graph is richer than one adjacency
-matrix. It contains 45 node kinds, 47 edge relations, nine coarse overlay
+matrix. It contains 45 node kinds, 53 edge relations, ten coarse overlay
 layers, source identities, parallel relations, malformed-input possibilities,
 and optional dependence slices. A consumer must be able to map every numerical
 row and edge back to exact CPG evidence.
@@ -33,11 +33,11 @@ model runtime.
    `PygExport` for graph tensors and `PathContext` for exact AST paths.
 2. Canonicalize dense node ids by ascending `NodeId`. Align `node_features`,
    `node_ids`, and `source_ranges` one-for-one in that order.
-3. Freeze a 69-column node schema: 45 node-kind indicators; incoming and
-   outgoing degrees for nine overlay layers; AST depth and a separate
+3. Freeze a 71-column node schema: 45 node-kind indicators; incoming and
+   outgoing degrees for ten overlay layers; AST depth and a separate
    depth-known bit; loop-nesting depth; forward and reverse PageRank; and one
    optional backward-PDG-slice membership bit.
-4. Freeze a contiguous 47-class edge schema covering every current
+4. Freeze a contiguous 53-class edge schema covering every current
    `CpgEdgeKind`, `CfgEdgeKind`, and `DfgEdgeKind`. Export sorted
    `(source_dense, target_dense, relation_class)` tuples and preserve parallel
    edge multiplicity.
@@ -147,7 +147,7 @@ visible.
 
 ## Verification
 
-Exact examples pin all 47 edge classes, the 69-column schema, dense alignment,
+Exact examples pin all 53 edge classes, the 71-column schema, dense alignment,
 parallel-edge preservation, degree/depth/loop/slice columns, reconstructable
 AST paths, malformed-chain suppression, and every budget boundary. A 128-case
 property rebuilds complete graphs in forward and reverse insertion order and

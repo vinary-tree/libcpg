@@ -1,0 +1,33 @@
+@startuml
+!include _libcpg-theme.iuml
+
+title Heap summary ownership and transactional overlay boundary
+
+actor "Analysis caller" as Caller #DBE4FF
+participant "HeapAnalysis\n(out of graph)" as Report #C3FAE8
+participant "materialize_heap_overlay" as Materialize #E5DBFF
+participant "CodePropertyGraph" as CPG #FFF3BF
+database "Projection cache" as Cache #FFE8CC
+
+Caller -[#4C6EF5,bold]> Report : analyze immutable CPG
+Report -[#0CA678,bold]--> Caller : summaries + caps + issues
+Caller -[#7048E8,bold]> Materialize : explicit summaries
+Materialize -[#7048E8,bold]> Materialize : sort + deduplicate relations
+Materialize -[#F08C00,bold]> CPG : validate every source and target
+alt any endpoint missing
+  CPG -[#C92A2A,bold]--> Materialize : invalid endpoint
+  Materialize -[#C92A2A,bold]--> Caller : HeapOverlayError\nzero mutation
+else all endpoints valid
+  Materialize -[#2F9E44,bold]> CPG : connect_unique Heap edges
+  CPG -[#E8590C,bold]> Cache : invalidate on first new edge
+  CPG -[#2F9E44,bold]--> Materialize : stable added count
+  Materialize -[#2F9E44,bold]--> Caller : Ok(count)
+end
+
+note over Report,CPG
+  Summaries do not create a parallel graph.
+  Materialization adds no nodes and never
+  removes or rewrites existing overlays.
+end note
+
+@enduml

@@ -148,7 +148,7 @@ Typed constructors keep call sites readable: `CpgEdge::ast_child`, `control_flow
 
 The [edge kind](../GLOSSARY.md#node-kind--edge-kind) both *labels* the overlay and, for CFG/DFG, *wraps* the sub-kind:
 
-![Mind-map of CpgEdgeKind grouped into AST, CFG, DFG, PDG, call, type, reference, scope, and import edges](../diagrams/edge-kind-taxonomy.svg)
+![Mind-map of CpgEdgeKind grouped into AST, CFG, DFG, PDG, Heap, call, type, reference, scope, and import edges](../diagrams/edge-kind-taxonomy.svg)
 
 *Figure — `CpgEdgeKind` grouped by overlay; control flow is `ControlFlow(CfgEdgeKind)` and data flow is `DataFlow(DfgEdgeKind)`. Source: [`diagrams/edge-kind-taxonomy.puml`](../diagrams/edge-kind-taxonomy.puml).*
 
@@ -158,6 +158,7 @@ The [edge kind](../GLOSSARY.md#node-kind--edge-kind) both *labels* the overlay a
 | CFG | `ControlFlow(CfgEdgeKind)` (14 sub-kinds) | `is_cfg()` |
 | DFG | `DataFlow(DfgEdgeKind)` (13 sub-kinds) | `is_dfg()` |
 | PDG | `ControlDependence`, `DataDependence` | `is_pdg()` |
+| Heap | `Heap(HeapEdgeKind)` (6 sub-kinds) | `is_heap()` |
 | Call | `StaticCall`, `DynamicCall`, `CallSite` | `is_call()` |
 | Type | `TypeOf`, `Inherits`, `Implements`, `GenericInstance` | `is_type()` |
 | Reference | `Reference`, `Definition`, `Declaration` | — |
@@ -166,9 +167,12 @@ The [edge kind](../GLOSSARY.md#node-kind--edge-kind) both *labels* the overlay a
 
 There is **no** `CfgEdge`/`DfgEdge` wrapper type and **no** `BranchTrue`/`UseUse`/`Phi` variant. The 14 [`CfgEdgeKind`](../GLOSSARY.md#control-flow-graph-cfg) and 13 [`DfgEdgeKind`](../GLOSSARY.md#data-flow-graph-dfg) sub-kinds are tabulated in [`data-flow.md`](data-flow.md#stage-2--cfg-extraction) and [`../components/graph/edges.md`](../components/graph/edges.md). The classifiers let an analysis filter to one overlay in a single pass — for example, `cpg.edges_by_kind(|k| k.is_cfg())` yields exactly the control-flow edges.
 
-## Four overlays over one node set
+## Typed overlays over one node set
 
-The payoff of the shared $`V`$ is that the overlays *co-locate*: the same `Call` node participates in AST child edges, CFG sequencing, DFG argument edges, and — after `PdgBuilder::build` — dependence edges.
+The payoff of the shared $`V`$ is that the overlays *co-locate*: the same
+`Call` node can participate in AST child edges, CFG sequencing, DFG argument
+edges, on-demand PDG dependence edges, and an explicitly materialized
+separation-logic Heap relation.
 
 ![The AST, CFG, and DFG overlays drawn on one shared set of code nodes](../diagrams/cpg-overlay.svg)
 

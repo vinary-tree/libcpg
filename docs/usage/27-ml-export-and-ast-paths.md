@@ -36,8 +36,8 @@ use libcpg::PygExport;
 
 let depth = PygExport::feature_index("ast.depth").expect("stable column");
 let known = PygExport::feature_index("ast.depth_known").expect("stable column");
-assert_eq!(depth, 63);
-assert_eq!(known, 64);
+assert_eq!(depth, 65);
+assert_eq!(known, 66);
 ```
 
 Do not interpret `ast.depth` without `ast.depth_known`. A root has depth zero

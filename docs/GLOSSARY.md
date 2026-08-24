@@ -158,8 +158,8 @@ A single directed graph that merges several program views onto **one shared node
 ### CPG ML export / PyG edge index / AST path context
 
 A **CPG machine-learning (ML) export** is libcpg's deterministic feature-free
-numerical view: 69 named node columns aligned with ascending stable ids/source
-ranges, plus typed dense edge tuples covering all 47 relation classes. **PyG**
+numerical view: 71 named node columns aligned with ascending stable ids/source
+ranges, plus typed dense edge tuples covering all 53 relation classes. **PyG**
 abbreviates PyTorch Geometric; libcpg's `edge_index` is an ordinary sorted
 `(source_dense, target_dense, relation_class)` vector that a caller may
 transpose for PyG, not a PyG runtime object. An **AST path context** retains two
@@ -599,6 +599,35 @@ cloning node payloads. It is the common feature-free substrate for dominance,
 SCC, DSM, WL, and other exact analyses. `is_well_formed` checks the complete
 forward/reverse CSR contract before public-field consumers traverse it. See
 [`components/graph/projections.md`](components/graph/projections.md).
+
+### Heap footprint / Separation logic / Spatial conjunction
+
+A **heap footprint** is the represented fragment of memory that a procedure
+needs or changes. **Separation logic** describes disjoint heap regions;
+**spatial conjunction** $`P * Q`$ states that $`P`$ and $`Q`$ hold over
+disjoint regions. libcpg models a finite footprint whose locations are formal
+parameters or allocation sites and whose predicates are `Valid` or `Invalid`.
+It is an allocation-site abstraction over typed CPG evidence, not a concrete
+alias model or proof of whole-program memory safety [[72]](#references). See
+[Theory 51](theory/51-compositional-heap-analysis.md).
+
+### Bi-abduction / Anti-frame / Frame
+
+**Bi-abduction** infers both an **anti-frame** (the missing heap fragment a
+caller must supply) and a **frame** (the disjoint fragment preserved by a
+callee). libcpg synthesizes finite parameter-validity anti-frames and exit
+postconditions, then substitutes them through source-ordered actual arguments
+over the call-SCC schedule [[72]](#references), [[73]](#references). A partial
+or capped summary cannot justify an absence-of-violation claim.
+
+### Heap overlay / Allocation-site abstraction
+
+The optional **Heap overlay** consists of `CpgEdgeKind::Heap` relations among
+existing CPG nodes: allocation, points-to, dereference, release, required-valid,
+and ensured-invalid evidence. An **allocation-site abstraction** represents all
+concrete objects created at one allocation node with one symbolic location.
+`materialize_heap_overlay` validates the complete relation set before mutation
+and appends edges idempotently; summaries remain out of graph by default.
 
 ### Idempotent
 
@@ -1486,3 +1515,5 @@ strict tree interpretation. See
 69. Li, Y., Wang, S., Nguyen, T. N. (2021). *Vulnerability Detection with Fine-grained Interpretations.* DOI: [10.1145/3468264.3468597](https://doi.org/10.1145/3468264.3468597).
 70. Cousot, P., Halbwachs, N. (1978). *Automatic Discovery of Linear Restraints Among Variables of a Program.* DOI: [10.1145/512760.512770](https://doi.org/10.1145/512760.512770).
 71. Cousot, P., Cousot, R. (1979). *Systematic Design of Program Analysis Frameworks.* DOI: [10.1145/567752.567778](https://doi.org/10.1145/567752.567778).
+72. Calcagno, C., Distefano, D., O'Hearn, P. W., Yang, H. (2011). *Compositional Shape Analysis by Means of Bi-Abduction.* DOI: [10.1145/2049697.2049700](https://doi.org/10.1145/2049697.2049700).
+73. Calcagno, C., Distefano, D., O'Hearn, P. W., Yang, H. (2009). *Compositional Shape Analysis by Means of Bi-Abduction.* DOI: [10.1145/1480881.1480917](https://doi.org/10.1145/1480881.1480917).

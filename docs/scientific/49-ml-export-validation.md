@@ -28,12 +28,13 @@ and reference relations, including two identical parallel typed DFG edges.
 | AST depth | `[0, 1, 2, 3, 3]`, all known |
 | loop depth | `[0, 1, 1, 1, 1]` |
 | layer degrees | exact AST, DFG, and reference counts at selected nodes |
-| numerical validity | every one of 69 values in every row is finite |
+| numerical validity | every one of 71 values in every row is finite |
 | immutability | node and edge counts are unchanged |
 
 The class-registry oracle enumerates all four AST relations, all fourteen CFG
-subtypes, all thirteen DFG subtypes, and the sixteen remaining relations. Their
-classes must be exactly the contiguous vector `0..47`. Exhaustive `match`
+subtypes, all thirteen DFG subtypes, and the twenty-two remaining relations,
+including all six Heap subtypes. Their
+classes must be exactly the contiguous vector `0..53`. Exhaustive `match`
 expressions make a future enum addition a compile failure until the schema is
 updated deliberately.
 

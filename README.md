@@ -73,6 +73,9 @@ PDG). A query can therefore mix syntax, control flow, and data flow freely.
 - **Advisory taint and maybe-null analysis** — feature-free, data-driven source,
   sink, sanitizer, external-model, and dereference findings with deterministic
   interprocedural witnesses and explicit completeness evidence.
+- **Compositional heap analysis** — feature-free separation-logic anti-frames
+  and postconditions over call SCCs, with qualified null-dereference,
+  use-after-free, and leak evidence plus an optional typed Heap overlay.
 - **System dependence and interprocedural slicing** — feature-free labeled
   summary edges plus deterministic node/depth-capped two-pass backward and
   forward slices that preserve represented call context.
