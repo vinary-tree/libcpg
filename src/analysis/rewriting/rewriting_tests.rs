@@ -139,6 +139,23 @@ fn critical_branches_preserve_shared_variable_identity() {
 }
 
 #[test]
+fn repeated_lhs_variables_share_identity_and_qualify_confluence() {
+    let cpg = build_metta("(= (same $x $x) (same $x $x))\n");
+
+    assert!(matches!(
+        terminates(&cpg),
+        TerminationVerdict::DoesNotTerminate(_)
+    ));
+    let critical = analyze_critical_pairs(&cpg);
+    assert!(!critical.complete);
+    assert!(critical.issues.iter().any(|issue| matches!(
+        issue,
+        RewriteAnalysisIssue::NonLeftLinearRule { variables, .. }
+            if variables.len() == 1
+    )));
+}
+
+#[test]
 fn bounded_rewrite_search_disposes_of_joinable_overlap() {
     let cpg =
         build_metta("(= (join $x) (norm $x))\n(= (join $x) (step $x))\n(= (step $x) (norm $x))\n");

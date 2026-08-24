@@ -87,6 +87,17 @@ pub enum RewriteAnalysisIssue {
         /// Sorted candidate binders.
         definitions: Vec<NodeId>,
     },
+    /// A rule repeats a variable in its left-hand side.
+    ///
+    /// Dependency-pair termination remains available, but variable-position
+    /// overlaps prevent this critical-pair implementation from certifying
+    /// local confluence.
+    NonLeftLinearRule {
+        /// Rule whose left-hand side is non-left-linear.
+        rule: NodeId,
+        /// Sorted canonical binders repeated in that left-hand side.
+        variables: Vec<NodeId>,
+    },
     /// The rule bound was reached.
     RuleLimitExceeded {
         /// Configured maximum.
@@ -464,10 +475,12 @@ fn analyze_system(cpg: &CodePropertyGraph, caps: RewriteAnalysisCaps) -> Rewrite
             issues.insert(RewriteAnalysisIssue::MalformedRule { rule: rule_node });
             continue;
         };
+        let mut rule_variables = BTreeMap::new();
         let Some(lhs) = extract_term(
             cpg,
             lhs_root,
             true,
+            &mut rule_variables,
             &mut term_nodes,
             caps.max_term_nodes,
             &mut issues,
@@ -478,6 +491,7 @@ fn analyze_system(cpg: &CodePropertyGraph, caps: RewriteAnalysisCaps) -> Rewrite
             cpg,
             rhs_root,
             false,
+            &mut rule_variables,
             &mut term_nodes,
             caps.max_term_nodes,
             &mut issues,
@@ -719,6 +733,7 @@ fn extract_term(
     cpg: &CodePropertyGraph,
     root: NodeId,
     lhs: bool,
+    rule_variables: &mut BTreeMap<Arc<str>, u64>,
     total_nodes: &mut usize,
     max_nodes: usize,
     issues: &mut BTreeSet<RewriteAnalysisIssue>,
@@ -735,7 +750,7 @@ fn extract_term(
                     issues.insert(RewriteAnalysisIssue::TermNodeLimitExceeded { limit: max_nodes });
                     return None;
                 }
-                let (symbol, children) = semantic_shape(cpg, source, lhs, issues)?;
+                let (symbol, children) = semantic_shape(cpg, source, lhs, rule_variables, issues)?;
                 let arity = u32::try_from(children.len()).ok()?;
                 let index = nodes.len();
                 nodes.push(FlatNode {
@@ -759,20 +774,30 @@ fn semantic_shape(
     cpg: &CodePropertyGraph,
     source: NodeId,
     lhs: bool,
+    rule_variables: &mut BTreeMap<Arc<str>, u64>,
     issues: &mut BTreeSet<RewriteAnalysisIssue>,
 ) -> Option<(FlatSymbol, Vec<NodeId>)> {
     let node = cpg.node(source)?;
     let children = cpg.ast_children(source);
     match &node.kind {
-        CpgNodeKind::Parameter { .. } => {
-            Some((FlatSymbol::Variable(u64::from(source.as_u32())), Vec::new()))
+        CpgNodeKind::Parameter { name, .. } => {
+            let variable = *rule_variables
+                .entry(name.clone())
+                .or_insert_with(|| u64::from(source.as_u32()));
+            Some((FlatSymbol::Variable(variable), Vec::new()))
         }
         CpgNodeKind::Identifier { name, definition } if name.as_ref() == "_" => {
             Some((FlatSymbol::Variable(u64::from(source.as_u32())), Vec::new()))
         }
         CpgNodeKind::Identifier { name, definition } if name.starts_with('$') => {
             if lhs {
-                return Some((FlatSymbol::Variable(u64::from(source.as_u32())), Vec::new()));
+                let variable = *rule_variables
+                    .entry(name.clone())
+                    .or_insert_with(|| u64::from(source.as_u32()));
+                return Some((FlatSymbol::Variable(variable), Vec::new()));
+            }
+            if let Some(variable) = rule_variables.get(name) {
+                return Some((FlatSymbol::Variable(*variable), Vec::new()));
             }
             let mut definitions = BTreeSet::new();
             if let Some(definition) = definition {
@@ -1157,6 +1182,15 @@ fn critical_pairs_from_system(
     caps: RewriteAnalysisCaps,
 ) -> CriticalPairAnalysis {
     let mut issues = system.extraction_issues.clone();
+    for rule in &system.rules {
+        let variables = repeated_lhs_variables(rule);
+        if !variables.is_empty() {
+            issues.insert(RewriteAnalysisIssue::NonLeftLinearRule {
+                rule: rule.node,
+                variables,
+            });
+        }
+    }
     let mut pairs = BTreeSet::new();
     let mut steps = 0usize;
     let mut joinability_states = 0usize;
@@ -1286,6 +1320,21 @@ fn critical_pairs_from_system(
         complete: issues.is_empty(),
         issues: issues.into_iter().collect(),
     }
+}
+
+fn repeated_lhs_variables(rule: &Rule) -> Vec<NodeId> {
+    let mut seen = BTreeSet::new();
+    let mut repeated = BTreeSet::new();
+    for node in &rule.lhs.nodes {
+        if let FlatSymbol::Variable(variable) = node.symbol {
+            if !seen.insert(variable) {
+                repeated.insert(NodeId::new(
+                    u32::try_from(variable).expect("CPG variable identity fits NodeId"),
+                ));
+            }
+        }
+    }
+    repeated.into_iter().collect()
 }
 
 enum InstantiateTask<'a> {
