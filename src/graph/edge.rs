@@ -147,6 +147,30 @@ pub enum HeapEdgeKind {
     EnsuresInvalid,
 }
 
+/// Reflective-name provenance carried by the `NameFlow` overlay.
+///
+/// Every relation starts at the stable [`NodeId`] of a fresh binder and ends
+/// at an existing syntax or semantic event node. The overlay therefore adds
+/// provenance without adding or removing CPG nodes.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+pub enum NameFlowEdgeKind {
+    /// The fresh binder belongs to the target restriction scope.
+    Creates,
+    /// The target directly references the fresh name.
+    References,
+    /// The target quote reifies a process containing the fresh name.
+    Quotes,
+    /// The target drop/eval reflects the fresh name back into a process.
+    Drops,
+    /// The fresh name is carried as a message payload at the target send.
+    Carries,
+    /// Communication transfers the fresh name to the target receive binder.
+    Receives,
+    /// The fresh name is the channel matched at the target communication event.
+    Communicates,
+}
+
 impl DfgEdgeKind {
     /// Returns true if this is a read operation.
     pub fn is_read(&self) -> bool {
@@ -193,6 +217,10 @@ pub enum CpgEdgeKind {
     // === Abstract heap / separation-logic edges ===
     /// Compositional heap relation.
     Heap(HeapEdgeKind),
+
+    // === Reflective process-calculus name-flow edges ===
+    /// Fresh-name provenance through restriction, reflection, and communication.
+    NameFlow(NameFlowEdgeKind),
 
     // === Call graph edges ===
     /// Static call (target known at compile time).
@@ -260,6 +288,11 @@ impl CpgEdgeKind {
     /// Returns true if this is an abstract heap edge.
     pub fn is_heap(&self) -> bool {
         matches!(self, Self::Heap(_))
+    }
+
+    /// Returns true if this is a reflective-name provenance edge.
+    pub fn is_name_flow(&self) -> bool {
+        matches!(self, Self::NameFlow(_))
     }
 
     /// Returns true if this is a call graph edge.

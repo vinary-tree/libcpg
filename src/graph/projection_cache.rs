@@ -274,6 +274,7 @@ pub(crate) enum EdgeLayer {
     Dfg,
     Pdg,
     Heap,
+    NameFlow,
     Call,
     Other,
 }
@@ -646,6 +647,7 @@ fn edge_layer(kind: &CpgEdgeKind) -> EdgeLayer {
         CpgEdgeKind::DataFlow(_) => EdgeLayer::Dfg,
         CpgEdgeKind::ControlDependence | CpgEdgeKind::DataDependence => EdgeLayer::Pdg,
         CpgEdgeKind::Heap(_) => EdgeLayer::Heap,
+        CpgEdgeKind::NameFlow(_) => EdgeLayer::NameFlow,
         CpgEdgeKind::StaticCall | CpgEdgeKind::DynamicCall | CpgEdgeKind::CallSite => {
             EdgeLayer::Call
         }

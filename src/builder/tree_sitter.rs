@@ -358,6 +358,7 @@ impl TreeSitterCpgBuilder {
 
                 let mut cpg_node = CpgNode::new(NodeId::new(0), cpg_kind, range);
                 cpg_node.message_kind = mapper.message_kind(ts_kind);
+                cpg_node.name_operation = mapper.name_operation(ts_kind, &ts_node);
                 cpg_node.allocation_type = mapper
                     .allocation_type(ts_kind, &ts_node, source)
                     .map(Box::new);

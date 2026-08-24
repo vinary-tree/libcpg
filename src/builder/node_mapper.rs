@@ -7,7 +7,8 @@ use smallvec::SmallVec;
 use std::sync::Arc;
 
 use crate::{
-    CpgNodeKind, Language, LiteralKind, MethodSignature, MsgKind, ScopeId, TypeInfo, Visibility,
+    CpgNodeKind, Language, LiteralKind, MethodSignature, MsgKind, NameOperationKind, ScopeId,
+    TypeInfo, Visibility,
 };
 
 /// Maps tree-sitter node types to CpgNodeKind.
@@ -81,6 +82,35 @@ impl NodeMapper {
                 "peek_bind" => Some(MsgKind::Peek),
                 "choice" => Some(MsgKind::Select),
                 "par" => Some(MsgKind::Spawn),
+                _ => None,
+            },
+            _ => None,
+        }
+    }
+
+    /// Returns normalized reflective-name semantics for a syntax node.
+    ///
+    /// Binder classification uses the concrete parent only here, at the
+    /// frontend boundary. Downstream analyses consume [`NameOperationKind`]
+    /// and remain independent of the Rholang grammar.
+    pub(crate) fn name_operation(
+        &self,
+        _ts_kind: &str,
+        _node: &tree_sitter::Node,
+    ) -> Option<NameOperationKind> {
+        match self.language {
+            #[cfg(feature = "rholang")]
+            Language::Rholang => match _ts_kind {
+                "new" => Some(NameOperationKind::Restriction),
+                "var"
+                    if _node
+                        .parent()
+                        .is_some_and(|parent| parent.kind() == "name_decl") =>
+                {
+                    Some(NameOperationKind::FreshBinder)
+                }
+                "quote" => Some(NameOperationKind::Quote),
+                "eval" => Some(NameOperationKind::Drop),
                 _ => None,
             },
             _ => None,

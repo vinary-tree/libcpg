@@ -158,10 +158,10 @@ pub(crate) mod testutil;
 pub use graph::{
     CfgEdgeKind, CfgNeighbors, CodePropertyGraph, CpgEdge, CpgEdgeKind, CpgEdges, CpgNode,
     CpgNodeKind, CpgNodeKindTag, CpgStats, DfgEdgeKind, DfgNeighbors, EdgeId, HeapEdgeKind,
-    Language, LiteralKind, LockKind, LockMode, MethodSignature, MsgKind, NodeId, Paradigm,
-    PropertyKey, PropertyList, PropertyListIter, PropertyValue, PropertyValueError,
-    PropertyValueKind, PropertyValueLimit, PropertyValueLimits, PropertyValueMetrics,
-    PropertyValueRef, ScopeId, SourceRange, TypeInfo, Visibility,
+    Language, LiteralKind, LockKind, LockMode, MethodSignature, MsgKind, NameFlowEdgeKind,
+    NameOperationKind, NodeId, Paradigm, PropertyKey, PropertyList, PropertyListIter,
+    PropertyValue, PropertyValueError, PropertyValueKind, PropertyValueLimit, PropertyValueLimits,
+    PropertyValueMetrics, PropertyValueRef, ScopeId, SourceRange, TypeInfo, Visibility,
 };
 
 pub use analysis::{
@@ -282,8 +282,14 @@ pub use analysis::{LinearConstraint, Polyhedron, PolyhedronError, Rational};
 
 #[cfg(feature = "rholang")]
 pub use analysis::{
-    session_sketches, SessionAction, SessionConformance, SessionDirection, SessionEndpoint,
-    SessionIssue, SessionIssueKind, SessionPayloadType, SessionSketch,
+    analyze_deadlock_freedom, analyze_deadlock_freedom_with_caps, analyze_name_flow,
+    analyze_name_flow_with_caps, deadlock_freedom, materialize_name_flow_overlay, session_sketches,
+    ChannelUsageLevel, DeadlockFreedomAnalysis, DeadlockFreedomIssue, NameFlowAnalysis,
+    NameFlowCaps, NameFlowIssue, NameFlowOverlayError, NameFlowRelation, SessionAction,
+    SessionConformance, SessionDirection, SessionEndpoint, SessionIssue, SessionIssueKind,
+    SessionPayloadType, SessionSketch, MAX_NAME_FLOW_COMMUNICATION_MATCHES,
+    MAX_NAME_FLOW_DEPENDENCIES, MAX_NAME_FLOW_ORIGIN_ASSIGNMENTS, MAX_NAME_FLOW_RELATIONS,
+    MAX_NAME_FLOW_WORK_ITEMS,
 };
 
 pub use builder::{

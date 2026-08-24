@@ -6,7 +6,7 @@
 
 use crate::{
     CfgEdgeKind, CodePropertyGraph, CpgEdge, CpgEdgeKind, CpgNodeKind, CpgNodeKindTag, DfgEdgeKind,
-    EdgeId, HeapEdgeKind, NodeId, TypeInfo,
+    EdgeId, HeapEdgeKind, NameFlowEdgeKind, NodeId, TypeInfo,
 };
 
 #[cfg(feature = "serde")]
@@ -303,6 +303,7 @@ pub fn export_datalog(cpg: &CodePropertyGraph) -> DatalogFacts {
             CpgEdgeKind::ControlDependence => facts.control_dependence.push(pair),
             CpgEdgeKind::DataDependence => facts.data_dependence.push(pair),
             CpgEdgeKind::Heap(_) => {}
+            CpgEdgeKind::NameFlow(_) => {}
             CpgEdgeKind::StaticCall => facts.call.push(CallFact {
                 site: edge.source,
                 callee: edge.target,
@@ -570,6 +571,7 @@ fn edge_names(kind: &CpgEdgeKind) -> (&'static str, &'static str) {
         CpgEdgeKind::ControlDependence => ("cdep", ""),
         CpgEdgeKind::DataDependence => ("ddep", ""),
         CpgEdgeKind::Heap(kind) => ("heap", heap_name(*kind)),
+        CpgEdgeKind::NameFlow(kind) => ("name_flow", name_flow_name(*kind)),
         CpgEdgeKind::StaticCall => ("call", "static"),
         CpgEdgeKind::DynamicCall => ("call", "dynamic"),
         CpgEdgeKind::CallSite => ("call", "call_site"),
@@ -595,6 +597,18 @@ fn heap_name(kind: HeapEdgeKind) -> &'static str {
         HeapEdgeKind::Releases => "releases",
         HeapEdgeKind::RequiresValid => "requires_valid",
         HeapEdgeKind::EnsuresInvalid => "ensures_invalid",
+    }
+}
+
+fn name_flow_name(kind: NameFlowEdgeKind) -> &'static str {
+    match kind {
+        NameFlowEdgeKind::Creates => "creates",
+        NameFlowEdgeKind::References => "references",
+        NameFlowEdgeKind::Quotes => "quotes",
+        NameFlowEdgeKind::Drops => "drops",
+        NameFlowEdgeKind::Carries => "carries",
+        NameFlowEdgeKind::Receives => "receives",
+        NameFlowEdgeKind::Communicates => "communicates",
     }
 }
 

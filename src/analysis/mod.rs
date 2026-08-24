@@ -104,8 +104,14 @@ pub use concurrency::{
 
 #[cfg(feature = "rholang")]
 pub use concurrency::{
-    session_sketches, SessionAction, SessionConformance, SessionDirection, SessionEndpoint,
-    SessionIssue, SessionIssueKind, SessionPayloadType, SessionSketch,
+    analyze_deadlock_freedom, analyze_deadlock_freedom_with_caps, analyze_name_flow,
+    analyze_name_flow_with_caps, deadlock_freedom, materialize_name_flow_overlay, session_sketches,
+    ChannelUsageLevel, DeadlockFreedomAnalysis, DeadlockFreedomIssue, NameFlowAnalysis,
+    NameFlowCaps, NameFlowIssue, NameFlowOverlayError, NameFlowRelation, SessionAction,
+    SessionConformance, SessionDirection, SessionEndpoint, SessionIssue, SessionIssueKind,
+    SessionPayloadType, SessionSketch, MAX_NAME_FLOW_COMMUNICATION_MATCHES,
+    MAX_NAME_FLOW_DEPENDENCIES, MAX_NAME_FLOW_ORIGIN_ASSIGNMENTS, MAX_NAME_FLOW_RELATIONS,
+    MAX_NAME_FLOW_WORK_ITEMS,
 };
 
 pub use condensation::{

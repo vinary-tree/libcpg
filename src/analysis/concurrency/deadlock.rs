@@ -57,6 +57,25 @@ pub enum DeadlockWitness {
         /// Source range of `producer_site`.
         producer_range: SourceRange,
     },
+    /// One strict capability-to-obligation constraint inside a cyclic
+    /// Rholang usage-type SCC.
+    #[cfg(feature = "rholang")]
+    ObligationCapability {
+        /// Process whose sequential actions establish the dependency.
+        process: NodeId,
+        /// Channel whose capability is exercised first.
+        capability_channel: NodeId,
+        /// Channel whose obligation is delayed by that capability.
+        obligation_channel: NodeId,
+        /// Blocking receive site.
+        capability_site: NodeId,
+        /// Source range of `capability_site`.
+        capability_range: SourceRange,
+        /// Delayed send site.
+        obligation_site: NodeId,
+        /// Source range of `obligation_site`.
+        obligation_range: SourceRange,
+    },
     /// `acquired_lock` can be acquired while `held_lock` is held.
     LockOrder {
         /// Process that holds `held_lock` at the ordering point.
@@ -962,6 +981,8 @@ mod tests {
                         producer_site,
                         ..
                     } => cpg.contains_node(*wait_site) && cpg.contains_node(*producer_site),
+                    #[cfg(feature = "rholang")]
+                    DeadlockWitness::ObligationCapability { .. } => false,
                     DeadlockWitness::LockOrder {
                         held_site,
                         acquired_site,

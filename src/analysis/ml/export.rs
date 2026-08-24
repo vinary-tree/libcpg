@@ -7,7 +7,7 @@ use std::{
 
 use crate::{
     backward_slice, CfgEdgeKind, CodePropertyGraph, CpgEdgeKind, CpgNode, CpgNodeKind, DfgEdgeKind,
-    HeapEdgeKind, LiteralKind, NodeId, SourceRange,
+    HeapEdgeKind, LiteralKind, NameFlowEdgeKind, NodeId, SourceRange,
 };
 
 use super::super::{
@@ -21,7 +21,7 @@ use serde::{Deserialize, Serialize};
 /// Number of stable node-kind classes in the feature schema.
 const NODE_KIND_CLASS_COUNT: usize = 45;
 /// Number of coarse CPG overlay layers with separate in/out degree features.
-const EDGE_LAYER_COUNT: usize = 10;
+const EDGE_LAYER_COUNT: usize = 11;
 const IN_DEGREE_OFFSET: usize = NODE_KIND_CLASS_COUNT;
 const OUT_DEGREE_OFFSET: usize = IN_DEGREE_OFFSET + EDGE_LAYER_COUNT;
 const AST_DEPTH_INDEX: usize = OUT_DEGREE_OFFSET + EDGE_LAYER_COUNT;
@@ -91,6 +91,7 @@ pub const PYG_NODE_FEATURE_NAMES: [&str; PYG_NODE_FEATURE_COUNT] = [
     "degree.in.scope",
     "degree.in.import",
     "degree.in.heap",
+    "degree.in.name_flow",
     "degree.out.ast",
     "degree.out.cfg",
     "degree.out.dfg",
@@ -101,6 +102,7 @@ pub const PYG_NODE_FEATURE_NAMES: [&str; PYG_NODE_FEATURE_COUNT] = [
     "degree.out.scope",
     "degree.out.import",
     "degree.out.heap",
+    "degree.out.name_flow",
     "ast.depth",
     "ast.depth_known",
     "ast.loop_depth",
@@ -110,7 +112,7 @@ pub const PYG_NODE_FEATURE_NAMES: [&str; PYG_NODE_FEATURE_COUNT] = [
 ];
 
 /// Number of stable classes produced by [`edge_kind_class`].
-pub const EDGE_KIND_CLASS_COUNT: u16 = 53;
+pub const EDGE_KIND_CLASS_COUNT: u16 = 60;
 
 /// Maximum accepted AST path length in edges.
 pub const MAX_AST_PATH_LENGTH: usize = 1_000_000;
@@ -773,10 +775,11 @@ fn edge_layer(kind: &CpgEdgeKind) -> usize {
         CpgEdgeKind::EnclosingScope | CpgEdgeKind::ContainedIn => 7,
         CpgEdgeKind::Imports | CpgEdgeKind::Exports => 8,
         CpgEdgeKind::Heap(_) => 9,
+        CpgEdgeKind::NameFlow(_) => 10,
     }
 }
 
-/// Maps every CPG edge kind to a stable relation class in `0..53`.
+/// Maps every CPG edge kind to a stable relation class in `0..60`.
 pub const fn edge_kind_class(kind: &CpgEdgeKind) -> u16 {
     match kind {
         CpgEdgeKind::AstChild => 0,
@@ -802,6 +805,19 @@ pub const fn edge_kind_class(kind: &CpgEdgeKind) -> u16 {
         CpgEdgeKind::Imports => 45,
         CpgEdgeKind::Exports => 46,
         CpgEdgeKind::Heap(kind) => 47 + heap_kind_class(*kind),
+        CpgEdgeKind::NameFlow(kind) => 53 + name_flow_kind_class(*kind),
+    }
+}
+
+const fn name_flow_kind_class(kind: NameFlowEdgeKind) -> u16 {
+    match kind {
+        NameFlowEdgeKind::Creates => 0,
+        NameFlowEdgeKind::References => 1,
+        NameFlowEdgeKind::Quotes => 2,
+        NameFlowEdgeKind::Drops => 3,
+        NameFlowEdgeKind::Carries => 4,
+        NameFlowEdgeKind::Receives => 5,
+        NameFlowEdgeKind::Communicates => 6,
     }
 }
 

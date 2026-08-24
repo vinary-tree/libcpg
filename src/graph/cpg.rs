@@ -737,6 +737,16 @@ impl CodePropertyGraph {
         self.incoming_layer(id, EdgeLayer::Heap)
     }
 
+    /// Iterates outgoing reflective-name provenance in deterministic order.
+    pub fn name_flow_successors(&self, id: NodeId) -> CpgEdges<'_> {
+        self.outgoing_layer(id, EdgeLayer::NameFlow)
+    }
+
+    /// Iterates incoming reflective-name provenance in deterministic order.
+    pub fn name_flow_predecessors(&self, id: NodeId) -> CpgEdges<'_> {
+        self.incoming_layer(id, EdgeLayer::NameFlow)
+    }
+
     // ========== Call Graph ==========
 
     /// Returns call sites in this function.
@@ -904,6 +914,11 @@ impl CodePropertyGraph {
     /// Iterates the complete heap overlay in canonical source/target/id order.
     pub fn heap_edges(&self) -> impl Iterator<Item = &CpgEdge> {
         self.overlay_edges(EdgeLayer::Heap)
+    }
+
+    /// Iterates the complete NameFlow overlay in canonical order.
+    pub fn name_flow_edges(&self) -> impl Iterator<Item = &CpgEdge> {
+        self.overlay_edges(EdgeLayer::NameFlow)
     }
 
     /// Iterates the explicit call overlay in canonical source/target/id order.
@@ -1107,6 +1122,7 @@ impl CodePropertyGraph {
         let cfg_edges = self.cfg_overlay_edges().count();
         let dfg_edges = self.dfg_overlay_edges().count();
         let heap_edges = self.heap_edges().count();
+        let name_flow_edges = self.name_flow_edges().count();
         let call_edges = self.call_overlay_edges().count();
 
         CpgStats {
@@ -1116,6 +1132,7 @@ impl CodePropertyGraph {
             cfg_edges,
             dfg_edges,
             heap_edges,
+            name_flow_edges,
             call_edges,
             function_count: self.functions().count(),
             class_count: self.classes().count(),
@@ -1505,6 +1522,9 @@ pub struct CpgStats {
     pub dfg_edges: usize,
     /// Number of abstract-heap edges.
     pub heap_edges: usize,
+    /// Number of reflective-name provenance edges.
+    #[cfg_attr(feature = "serde", serde(default))]
+    pub name_flow_edges: usize,
     /// Number of call graph edges.
     pub call_edges: usize,
     /// Number of functions.
@@ -2883,6 +2903,7 @@ mod serde_tests {
             cfg_edges: 1,
             dfg_edges: 1,
             heap_edges: 1,
+            name_flow_edges: 1,
             call_edges: 1,
             function_count: 1,
             class_count: 1,
@@ -2895,6 +2916,7 @@ mod serde_tests {
         assert_eq!(stats.ast_edges, back.ast_edges);
         assert_eq!(stats.cfg_edges, back.cfg_edges);
         assert_eq!(stats.heap_edges, back.heap_edges);
+        assert_eq!(stats.name_flow_edges, back.name_flow_edges);
         assert_eq!(stats.dfg_edges, back.dfg_edges);
         assert_eq!(stats.call_edges, back.call_edges);
         assert_eq!(stats.function_count, back.function_count);

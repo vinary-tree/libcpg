@@ -86,7 +86,7 @@ fn public_pipeline_exports_exact_paths_typed_edges_and_localization() {
     assert_eq!(export.edge_index.len(), cpg.edge_count());
     assert_eq!(export.node_features.len(), cpg.node_count());
     assert_eq!(export.source_ranges.len(), cpg.node_count());
-    assert_eq!(PygExport::feature_index("ast.depth"), Some(65));
+    assert_eq!(PygExport::feature_index("ast.depth"), Some(67));
 
     let paths = ast_paths(&cpg, NodeId::new(100), AstPathOptions::default())
         .expect("public exact AST paths");

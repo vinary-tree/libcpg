@@ -111,6 +111,8 @@ fn public_api_reports_mutual_channel_wait_with_valid_ranges() {
                 && *wait_range == cpg.node(*wait_site).expect("wait").range
                 && *producer_range == cpg.node(*producer_site).expect("send").range
         }
+        #[cfg(feature = "rholang")]
+        DeadlockWitness::ObligationCapability { .. } => false,
         DeadlockWitness::LockOrder { .. } => false,
     }));
 }

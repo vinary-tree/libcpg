@@ -98,6 +98,25 @@ pub enum MsgKind {
     Spawn,
 }
 
+/// Frontend-normalized reflective-name operation.
+///
+/// Rholang supplies these markers at the grammar boundary so downstream
+/// name-flow analysis never has to inspect source text or reconstruct concrete
+/// syntax. The vocabulary is language-neutral enough for another reflective
+/// process-calculus frontend to reuse.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+pub enum NameOperationKind {
+    /// A restriction creates a fresh lexical name scope (Rholang `new`).
+    Restriction,
+    /// A definition introduces the fresh name bound by a restriction.
+    FreshBinder,
+    /// A process is reified into a name (Rholang quote, `@P`).
+    Quote,
+    /// A name is reflected back into a process (Rholang drop/eval, `*x`).
+    Drop,
+}
+
 impl MsgKind {
     /// Returns true for asynchronous and synchronous producers.
     pub const fn is_send(self) -> bool {
@@ -107,6 +126,11 @@ impl MsgKind {
     /// Returns true only for a linear, consuming receive.
     pub const fn is_linear_receive(self) -> bool {
         matches!(self, Self::Recv)
+    }
+
+    /// Returns true for consuming, persistent, and peeking receivers.
+    pub const fn is_receive(self) -> bool {
+        matches!(self, Self::Recv | Self::RecvPersistent | Self::Peek)
     }
 
     /// Returns true for operations that identify a channel.
@@ -156,7 +180,7 @@ pub enum LockMode {
 }
 
 /// Source code location range.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Default)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct SourceRange {
     /// Start byte offset.
@@ -799,6 +823,15 @@ pub struct CpgNode {
         serde(default, skip_serializing_if = "Option::is_none")
     )]
     pub message_kind: Option<MsgKind>,
+    /// Normalized reflective-name semantics, when represented by this node.
+    ///
+    /// Like [`Self::message_kind`], this is assigned only by a language
+    /// frontend. Analyses consume the closed enum and never parse source text.
+    #[cfg_attr(
+        feature = "serde",
+        serde(default, skip_serializing_if = "Option::is_none")
+    )]
+    pub name_operation: Option<NameOperationKind>,
     /// Normalized lock semantics, when this node is a synchronization call.
     ///
     /// This field is intentionally independent of [`CpgNodeKind::Call`]. A
@@ -838,6 +871,7 @@ impl CpgNode {
             range,
             text: None,
             message_kind: None,
+            name_operation: None,
             lock_kind: None,
             allocation_type: None,
             properties: None,
@@ -855,6 +889,12 @@ impl CpgNode {
     /// Attaches normalized message-passing semantics to this node.
     pub fn with_message_kind(mut self, kind: MsgKind) -> Self {
         self.message_kind = Some(kind);
+        self
+    }
+
+    /// Attaches normalized reflective-name semantics to this node.
+    pub fn with_name_operation(mut self, kind: NameOperationKind) -> Self {
+        self.name_operation = Some(kind);
         self
     }
 
