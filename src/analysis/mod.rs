@@ -19,6 +19,7 @@ mod diff;
 mod dominators;
 mod dsm;
 mod effects;
+mod heap;
 pub mod ifds;
 mod induction;
 mod layering;
@@ -160,6 +161,12 @@ pub use dsm::{
 
 pub use effects::{
     analyze_effects, effect_summaries, EffectAnalysis, EffectSummary, Place, Purity,
+};
+
+pub use heap::{
+    analyze_heap, analyze_heap_with_model, biabduction_summaries, materialize_heap_overlay,
+    memory_safety, HeapAnalysis, HeapAssertion, HeapLocation, HeapModel, HeapOverlayError,
+    HeapPredicate, HeapRelation, HeapSummary, HeapViolation, HeapViolationKind,
 };
 
 pub use ifds::{

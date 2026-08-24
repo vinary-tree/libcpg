@@ -125,6 +125,28 @@ pub enum DfgEdgeKind {
     AddressOf,
 }
 
+/// Separation-logic relation carried by the heap overlay.
+///
+/// Heap objects are represented by existing allocation, parameter, or value
+/// nodes. Consequently the overlay preserves the CPG node set and only adds
+/// typed, idempotent relations between semantic program points.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+pub enum HeapEdgeKind {
+    /// A function owns an allocation site in its local footprint.
+    Allocates,
+    /// A value may designate the abstract object at the target node.
+    PointsTo,
+    /// The source heap value is dereferenced at the target operation.
+    Dereferences,
+    /// The source heap value is released at the target operation.
+    Releases,
+    /// The target operation contributes a valid-cell anti-frame requirement.
+    RequiresValid,
+    /// The target operation establishes that the source cell is invalid.
+    EnsuresInvalid,
+}
+
 impl DfgEdgeKind {
     /// Returns true if this is a read operation.
     pub fn is_read(&self) -> bool {
@@ -167,6 +189,10 @@ pub enum CpgEdgeKind {
     ControlDependence,
     /// Data dependence (DFG-derived).
     DataDependence,
+
+    // === Abstract heap / separation-logic edges ===
+    /// Compositional heap relation.
+    Heap(HeapEdgeKind),
 
     // === Call graph edges ===
     /// Static call (target known at compile time).
@@ -229,6 +255,11 @@ impl CpgEdgeKind {
     /// Returns true if this is a PDG edge.
     pub fn is_pdg(&self) -> bool {
         matches!(self, Self::ControlDependence | Self::DataDependence)
+    }
+
+    /// Returns true if this is an abstract heap edge.
+    pub fn is_heap(&self) -> bool {
+        matches!(self, Self::Heap(_))
     }
 
     /// Returns true if this is a call graph edge.

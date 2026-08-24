@@ -7,7 +7,7 @@ use std::{
 
 use crate::{
     backward_slice, CfgEdgeKind, CodePropertyGraph, CpgEdgeKind, CpgNode, CpgNodeKind, DfgEdgeKind,
-    LiteralKind, NodeId, SourceRange,
+    HeapEdgeKind, LiteralKind, NodeId, SourceRange,
 };
 
 use super::super::{
@@ -21,7 +21,7 @@ use serde::{Deserialize, Serialize};
 /// Number of stable node-kind classes in the feature schema.
 const NODE_KIND_CLASS_COUNT: usize = 45;
 /// Number of coarse CPG overlay layers with separate in/out degree features.
-const EDGE_LAYER_COUNT: usize = 9;
+const EDGE_LAYER_COUNT: usize = 10;
 const IN_DEGREE_OFFSET: usize = NODE_KIND_CLASS_COUNT;
 const OUT_DEGREE_OFFSET: usize = IN_DEGREE_OFFSET + EDGE_LAYER_COUNT;
 const AST_DEPTH_INDEX: usize = OUT_DEGREE_OFFSET + EDGE_LAYER_COUNT;
@@ -90,6 +90,7 @@ pub const PYG_NODE_FEATURE_NAMES: [&str; PYG_NODE_FEATURE_COUNT] = [
     "degree.in.reference",
     "degree.in.scope",
     "degree.in.import",
+    "degree.in.heap",
     "degree.out.ast",
     "degree.out.cfg",
     "degree.out.dfg",
@@ -99,6 +100,7 @@ pub const PYG_NODE_FEATURE_NAMES: [&str; PYG_NODE_FEATURE_COUNT] = [
     "degree.out.reference",
     "degree.out.scope",
     "degree.out.import",
+    "degree.out.heap",
     "ast.depth",
     "ast.depth_known",
     "ast.loop_depth",
@@ -108,7 +110,7 @@ pub const PYG_NODE_FEATURE_NAMES: [&str; PYG_NODE_FEATURE_COUNT] = [
 ];
 
 /// Number of stable classes produced by [`edge_kind_class`].
-pub const EDGE_KIND_CLASS_COUNT: u16 = 47;
+pub const EDGE_KIND_CLASS_COUNT: u16 = 53;
 
 /// Maximum accepted AST path length in edges.
 pub const MAX_AST_PATH_LENGTH: usize = 1_000_000;
@@ -770,10 +772,11 @@ fn edge_layer(kind: &CpgEdgeKind) -> usize {
         CpgEdgeKind::Reference | CpgEdgeKind::Definition | CpgEdgeKind::Declaration => 6,
         CpgEdgeKind::EnclosingScope | CpgEdgeKind::ContainedIn => 7,
         CpgEdgeKind::Imports | CpgEdgeKind::Exports => 8,
+        CpgEdgeKind::Heap(_) => 9,
     }
 }
 
-/// Maps every CPG edge kind to a stable relation class in `0..47`.
+/// Maps every CPG edge kind to a stable relation class in `0..53`.
 pub const fn edge_kind_class(kind: &CpgEdgeKind) -> u16 {
     match kind {
         CpgEdgeKind::AstChild => 0,
@@ -798,6 +801,18 @@ pub const fn edge_kind_class(kind: &CpgEdgeKind) -> u16 {
         CpgEdgeKind::ContainedIn => 44,
         CpgEdgeKind::Imports => 45,
         CpgEdgeKind::Exports => 46,
+        CpgEdgeKind::Heap(kind) => 47 + heap_kind_class(*kind),
+    }
+}
+
+const fn heap_kind_class(kind: HeapEdgeKind) -> u16 {
+    match kind {
+        HeapEdgeKind::Allocates => 0,
+        HeapEdgeKind::PointsTo => 1,
+        HeapEdgeKind::Dereferences => 2,
+        HeapEdgeKind::Releases => 3,
+        HeapEdgeKind::RequiresValid => 4,
+        HeapEdgeKind::EnsuresInvalid => 5,
     }
 }
 

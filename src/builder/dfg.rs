@@ -733,6 +733,11 @@ pub(crate) fn call_arguments(cpg: &CodePropertyGraph, call: NodeId) -> Vec<NodeI
     if children.is_empty() {
         return Vec::new();
     }
+    children.sort_unstable_by_key(|&id| {
+        cpg.node(id)
+            .map(|node| (node.range.start, node.range.end, id))
+            .unwrap_or((u32::MAX, u32::MAX, id))
+    });
     children.remove(0);
 
     let mut arguments = Vec::new();

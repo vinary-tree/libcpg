@@ -6,7 +6,7 @@
 
 use crate::{
     CfgEdgeKind, CodePropertyGraph, CpgEdge, CpgEdgeKind, CpgNodeKind, CpgNodeKindTag, DfgEdgeKind,
-    EdgeId, NodeId, TypeInfo,
+    EdgeId, HeapEdgeKind, NodeId, TypeInfo,
 };
 
 #[cfg(feature = "serde")]
@@ -302,6 +302,7 @@ pub fn export_datalog(cpg: &CodePropertyGraph) -> DatalogFacts {
             }),
             CpgEdgeKind::ControlDependence => facts.control_dependence.push(pair),
             CpgEdgeKind::DataDependence => facts.data_dependence.push(pair),
+            CpgEdgeKind::Heap(_) => {}
             CpgEdgeKind::StaticCall => facts.call.push(CallFact {
                 site: edge.source,
                 callee: edge.target,
@@ -568,6 +569,7 @@ fn edge_names(kind: &CpgEdgeKind) -> (&'static str, &'static str) {
         CpgEdgeKind::DataFlow(kind) => ("dfg", dfg_name(*kind)),
         CpgEdgeKind::ControlDependence => ("cdep", ""),
         CpgEdgeKind::DataDependence => ("ddep", ""),
+        CpgEdgeKind::Heap(kind) => ("heap", heap_name(*kind)),
         CpgEdgeKind::StaticCall => ("call", "static"),
         CpgEdgeKind::DynamicCall => ("call", "dynamic"),
         CpgEdgeKind::CallSite => ("call", "call_site"),
@@ -582,6 +584,17 @@ fn edge_names(kind: &CpgEdgeKind) -> (&'static str, &'static str) {
         CpgEdgeKind::ContainedIn => ("contained_in", ""),
         CpgEdgeKind::Imports => ("imports", ""),
         CpgEdgeKind::Exports => ("exports", ""),
+    }
+}
+
+fn heap_name(kind: HeapEdgeKind) -> &'static str {
+    match kind {
+        HeapEdgeKind::Allocates => "allocates",
+        HeapEdgeKind::PointsTo => "points_to",
+        HeapEdgeKind::Dereferences => "dereferences",
+        HeapEdgeKind::Releases => "releases",
+        HeapEdgeKind::RequiresValid => "requires_valid",
+        HeapEdgeKind::EnsuresInvalid => "ensures_invalid",
     }
 }
 

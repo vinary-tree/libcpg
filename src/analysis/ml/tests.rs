@@ -3,7 +3,8 @@ use proptest::prelude::*;
 use super::*;
 use crate::{
     AnalysisError, CfgEdgeKind, CodePropertyGraph, CpgEdge, CpgEdgeKind, CpgNode, CpgNodeKind,
-    DfgEdgeKind, EdgeId, Language, LiteralKind, MethodSignature, NodeId, SourceRange, Visibility,
+    DfgEdgeKind, EdgeId, HeapEdgeKind, Language, LiteralKind, MethodSignature, NodeId, SourceRange,
+    Visibility,
 };
 
 fn function(name: &str) -> CpgNodeKind {
@@ -157,6 +158,12 @@ fn relation_registry_is_complete_contiguous_and_stable() {
         CpgEdgeKind::ContainedIn,
         CpgEdgeKind::Imports,
         CpgEdgeKind::Exports,
+        CpgEdgeKind::Heap(HeapEdgeKind::Allocates),
+        CpgEdgeKind::Heap(HeapEdgeKind::PointsTo),
+        CpgEdgeKind::Heap(HeapEdgeKind::Dereferences),
+        CpgEdgeKind::Heap(HeapEdgeKind::Releases),
+        CpgEdgeKind::Heap(HeapEdgeKind::RequiresValid),
+        CpgEdgeKind::Heap(HeapEdgeKind::EnsuresInvalid),
     ]);
 
     assert_eq!(kinds.len(), usize::from(EDGE_KIND_CLASS_COUNT));
