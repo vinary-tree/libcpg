@@ -52,7 +52,7 @@ abstract-domains = ["dep:num-bigint", "dep:num-rational", "dep:num-traits"]
 # grammars ARE linked, but only as TEST-ONLY path `[dev-dependencies]` (which
 # Cargo never propagates downstream), to drive the Mode-B unit tests.
 rholang = []
-metta = []
+metta = ["dep:libdictenstein"]
 
 # Serialization support
 serde = [
@@ -113,6 +113,12 @@ rayon = "1.10"
 
 # Efficient hash maps
 rustc-hash = "2.0"
+
+# Exact symbol discrimination for MeTTa rewrite rules. This is the canonical
+# dictionary crate extracted from liblevenshtein; depending on it directly
+# avoids liblevenshtein's deprecated compatibility re-exports and does not pull
+# fuzzy transducers into non-MeTTa builds.
+libdictenstein = { version = "=4.0.0-rc.1", default-features = false, optional = true }
 
 # Arbitrary-precision rational arithmetic for optional exact polyhedra.
 # num-rational 0.4 uses the compatible num-bigint 0.4 line.

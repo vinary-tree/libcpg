@@ -4,7 +4,7 @@ use super::*;
 use crate::{
     AnalysisError, CfgEdgeKind, CodePropertyGraph, CpgEdge, CpgEdgeKind, CpgNode, CpgNodeKind,
     DfgEdgeKind, EdgeId, HeapEdgeKind, Language, LiteralKind, MethodSignature, NameFlowEdgeKind,
-    NodeId, SourceRange, Visibility,
+    NodeId, RewriteDepEdgeKind, SourceRange, Visibility,
 };
 
 fn function(name: &str) -> CpgNodeKind {
@@ -171,6 +171,8 @@ fn relation_registry_is_complete_contiguous_and_stable() {
         CpgEdgeKind::NameFlow(NameFlowEdgeKind::Carries),
         CpgEdgeKind::NameFlow(NameFlowEdgeKind::Receives),
         CpgEdgeKind::NameFlow(NameFlowEdgeKind::Communicates),
+        CpgEdgeKind::RewriteDep(RewriteDepEdgeKind::DependencyPair),
+        CpgEdgeKind::RewriteDep(RewriteDepEdgeKind::CriticalConflict),
     ]);
 
     assert_eq!(kinds.len(), usize::from(EDGE_KIND_CLASS_COUNT));
@@ -183,6 +185,53 @@ fn relation_registry_is_complete_contiguous_and_stable() {
             kind: "future".into()
         }),
         44
+    );
+}
+
+#[test]
+fn rewrite_dep_has_append_only_degree_columns_and_relation_classes() {
+    let mut cpg = CodePropertyGraph::new(Language::MeTTa);
+    cpg.add_node_with_id(CpgNode::new(
+        NodeId::new(10),
+        function("left"),
+        SourceRange::default(),
+    ));
+    cpg.add_node_with_id(CpgNode::new(
+        NodeId::new(20),
+        function("right"),
+        SourceRange::default(),
+    ));
+    cpg.connect(
+        NodeId::new(10),
+        NodeId::new(20),
+        CpgEdgeKind::RewriteDep(RewriteDepEdgeKind::DependencyPair),
+    );
+
+    let export = export_pyg(&cpg);
+    let incoming = PYG_NODE_FEATURE_NAMES
+        .iter()
+        .position(|name| *name == "degree.in.rewrite_dep")
+        .expect("incoming RewriteDep column");
+    let outgoing = PYG_NODE_FEATURE_NAMES
+        .iter()
+        .position(|name| *name == "degree.out.rewrite_dep")
+        .expect("outgoing RewriteDep column");
+
+    assert_eq!(incoming, 73);
+    assert_eq!(outgoing, 74);
+    assert_eq!(PygExport::feature_index("ast.depth"), Some(67));
+    assert_eq!(export.node_ids, vec![NodeId::new(10), NodeId::new(20)]);
+    assert_eq!(export.node_features[0][outgoing], 1.0);
+    assert_eq!(export.node_features[0][incoming], 0.0);
+    assert_eq!(export.node_features[1][incoming], 1.0);
+    assert_eq!(export.node_features[1][outgoing], 0.0);
+    assert_eq!(
+        export.edge_index,
+        vec![(
+            0,
+            1,
+            edge_kind_class(&CpgEdgeKind::RewriteDep(RewriteDepEdgeKind::DependencyPair))
+        )]
     );
 }
 

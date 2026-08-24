@@ -34,6 +34,8 @@ mod reachability;
 mod reflexion;
 mod resolve;
 mod resolve_types;
+#[cfg(feature = "metta")]
+mod rewriting;
 mod scc;
 mod sdg;
 pub mod security;
@@ -151,6 +153,17 @@ pub use dataflow::{LinearConstraint, Polyhedron, PolyhedronError, Rational};
 pub use projection::{
     call_graph_projection, cfg_projection, dfg_projection, module_graph_projection, pdg_projection,
     projection_of, GraphProjection, ProjectionError, ProjectionKind, UndirectedProjection,
+};
+
+#[cfg(feature = "metta")]
+pub use rewriting::{
+    analyze_critical_pairs, analyze_critical_pairs_with_caps, critical_pairs, dependency_pairs,
+    dependency_pairs_with_caps, materialize_rewrite_dep_overlay, terminates, terminates_with_caps,
+    CriticalPair, CriticalPairAnalysis, DependencyPair, DpGraph, NonTerminationWitness,
+    ReductionPairProof, RewriteAnalysisCaps, RewriteAnalysisIssue, RewriteDepOverlayError,
+    TerminationProof, TerminationUnknown, TerminationVerdict, MAX_CRITICAL_PAIRS,
+    MAX_JOINABILITY_STATES, MAX_REWRITE_DEPENDENCY_PAIRS, MAX_REWRITE_RULES,
+    MAX_REWRITE_TERM_NODES, MAX_REWRITE_UNIFICATION_STEPS,
 };
 
 pub use program::{

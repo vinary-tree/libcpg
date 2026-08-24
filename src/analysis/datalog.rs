@@ -6,7 +6,7 @@
 
 use crate::{
     CfgEdgeKind, CodePropertyGraph, CpgEdge, CpgEdgeKind, CpgNodeKind, CpgNodeKindTag, DfgEdgeKind,
-    EdgeId, HeapEdgeKind, NameFlowEdgeKind, NodeId, TypeInfo,
+    EdgeId, HeapEdgeKind, NameFlowEdgeKind, NodeId, RewriteDepEdgeKind, TypeInfo,
 };
 
 #[cfg(feature = "serde")]
@@ -304,6 +304,7 @@ pub fn export_datalog(cpg: &CodePropertyGraph) -> DatalogFacts {
             CpgEdgeKind::DataDependence => facts.data_dependence.push(pair),
             CpgEdgeKind::Heap(_) => {}
             CpgEdgeKind::NameFlow(_) => {}
+            CpgEdgeKind::RewriteDep(_) => {}
             CpgEdgeKind::StaticCall => facts.call.push(CallFact {
                 site: edge.source,
                 callee: edge.target,
@@ -572,6 +573,7 @@ fn edge_names(kind: &CpgEdgeKind) -> (&'static str, &'static str) {
         CpgEdgeKind::DataDependence => ("ddep", ""),
         CpgEdgeKind::Heap(kind) => ("heap", heap_name(*kind)),
         CpgEdgeKind::NameFlow(kind) => ("name_flow", name_flow_name(*kind)),
+        CpgEdgeKind::RewriteDep(kind) => ("rewrite_dep", rewrite_dep_name(*kind)),
         CpgEdgeKind::StaticCall => ("call", "static"),
         CpgEdgeKind::DynamicCall => ("call", "dynamic"),
         CpgEdgeKind::CallSite => ("call", "call_site"),
@@ -609,6 +611,13 @@ fn name_flow_name(kind: NameFlowEdgeKind) -> &'static str {
         NameFlowEdgeKind::Carries => "carries",
         NameFlowEdgeKind::Receives => "receives",
         NameFlowEdgeKind::Communicates => "communicates",
+    }
+}
+
+fn rewrite_dep_name(kind: RewriteDepEdgeKind) -> &'static str {
+    match kind {
+        RewriteDepEdgeKind::DependencyPair => "dependency_pair",
+        RewriteDepEdgeKind::CriticalConflict => "critical_conflict",
     }
 }
 
@@ -748,6 +757,10 @@ mod tests {
             CpgEdgeKind::DataFlow(DfgEdgeKind::DefUse),
             CpgEdgeKind::ControlDependence,
             CpgEdgeKind::DataDependence,
+            CpgEdgeKind::Heap(HeapEdgeKind::PointsTo),
+            CpgEdgeKind::NameFlow(NameFlowEdgeKind::References),
+            CpgEdgeKind::RewriteDep(RewriteDepEdgeKind::DependencyPair),
+            CpgEdgeKind::RewriteDep(RewriteDepEdgeKind::CriticalConflict),
             CpgEdgeKind::CallSite,
             CpgEdgeKind::TypeOf,
             CpgEdgeKind::Inherits,
@@ -794,6 +807,14 @@ mod tests {
         ] {
             assert_eq!(count, 1);
         }
+        let edge_file = facts
+            .souffle_files()
+            .into_iter()
+            .find(|file| file.relation == "cpg_edge")
+            .expect("generic edge facts");
+        assert!(edge_file.contents.contains("rewrite_dep"));
+        assert!(edge_file.contents.contains("dependency_pair"));
+        assert!(edge_file.contents.contains("critical_conflict"));
     }
 
     #[test]

@@ -42,6 +42,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "arc-swap"
+version = "1.9.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c049c0be4daef0b145cb3555416b3b8ef5b7888a38aea1a3a155801fe7b0810b"
+dependencies = [
+ "rustversion",
+]
+
+[[package]]
 name = "arrayvec"
 version = "0.7.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -603,6 +612,7 @@ name = "libcpg"
 version = "0.1.1"
 dependencies = [
  "criterion",
+ "libdictenstein",
  "linfa",
  "linfa-trees",
  "ndarray 0.16.1",
@@ -643,6 +653,20 @@ dependencies = [
  "tree-sitter-typescript",
  "tree-sitter-yaml",
  "wgpu",
+]
+
+[[package]]
+name = "libdictenstein"
+version = "4.0.0-rc.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "8c2cf6ce32979447f123bcf9341d84dc410d6621a705f3d4cd1c84310a58bd43"
+dependencies = [
+ "arc-swap",
+ "llattice",
+ "log",
+ "rustc-hash 2.1.1",
+ "smallvec",
+ "thiserror 2.0.17",
 ]
 
 [[package]]
@@ -697,6 +721,12 @@ name = "litrs"
 version = "1.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "11d3d7f243d5c5a8b9bb5d6dd2b1602c0cb0b9db1621bafc7ed66e35ff9fe092"
+
+[[package]]
+name = "llattice"
+version = "0.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "11b2da71811803fafc6a1f2aff2fb8d8f25be26ee38678a89cf4008e7374f567"
 
 [[package]]
 name = "lock_api"

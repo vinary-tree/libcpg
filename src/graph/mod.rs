@@ -16,6 +16,7 @@ pub(crate) mod serde_util;
 pub use cpg::{CodePropertyGraph, CpgStats};
 pub use edge::{
     CfgEdgeKind, CpgEdge, CpgEdgeKind, DfgEdgeKind, EdgeId, HeapEdgeKind, NameFlowEdgeKind,
+    RewriteDepEdgeKind,
 };
 pub use language::{Language, Paradigm};
 pub use node::{

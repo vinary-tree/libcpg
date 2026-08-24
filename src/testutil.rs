@@ -24,7 +24,8 @@
 
 use crate::{
     CfgEdgeKind, CodePropertyGraph, CpgEdgeKind, CpgNode, CpgNodeKind, DfgEdgeKind, Language,
-    LiteralKind, MethodSignature, NodeId, ScopeId, SourceRange, TypeInfo, Visibility,
+    LiteralKind, MethodSignature, NodeId, RewriteDepEdgeKind, ScopeId, SourceRange, TypeInfo,
+    Visibility,
 };
 use proptest::prelude::*;
 
@@ -224,6 +225,10 @@ pub(crate) fn arb_edge_kind() -> impl Strategy<Value = CpgEdgeKind> {
         Just(CpgEdgeKind::Reference),
         Just(CpgEdgeKind::EnclosingScope),
         Just(CpgEdgeKind::Imports),
+        Just(CpgEdgeKind::RewriteDep(RewriteDepEdgeKind::DependencyPair)),
+        Just(CpgEdgeKind::RewriteDep(
+            RewriteDepEdgeKind::CriticalConflict
+        )),
     ]
 }
 

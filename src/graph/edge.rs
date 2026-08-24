@@ -171,6 +171,22 @@ pub enum NameFlowEdgeKind {
     Communicates,
 }
 
+/// Semantic relations produced by term-rewriting analyses.
+///
+/// Both endpoints are existing syntax nodes. A dependency-pair edge connects
+/// the source and target rule functions, while a critical-conflict edge
+/// connects two rules whose overlap has no joinability witness within a
+/// complete bounded analysis.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+pub enum RewriteDepEdgeKind {
+    /// A defined-symbol call in the source rule's right-hand side can invoke
+    /// the target rule.
+    DependencyPair,
+    /// Two overlapping rewrite rules yield a non-joinable critical pair.
+    CriticalConflict,
+}
+
 impl DfgEdgeKind {
     /// Returns true if this is a read operation.
     pub fn is_read(&self) -> bool {
@@ -259,6 +275,13 @@ pub enum CpgEdgeKind {
     Imports,
     /// Export.
     Exports,
+
+    // === Term-rewriting dependency and conflict edges ===
+    /// Dependency-pair or critical-conflict relation between rewrite rules.
+    ///
+    /// This variant is appended to preserve the serialized discriminants of
+    /// every pre-existing edge kind.
+    RewriteDep(RewriteDepEdgeKind),
 }
 
 impl CpgEdgeKind {
@@ -293,6 +316,11 @@ impl CpgEdgeKind {
     /// Returns true if this is a reflective-name provenance edge.
     pub fn is_name_flow(&self) -> bool {
         matches!(self, Self::NameFlow(_))
+    }
+
+    /// Returns true if this is a term-rewriting dependency or conflict edge.
+    pub fn is_rewrite_dep(&self) -> bool {
+        matches!(self, Self::RewriteDep(_))
     }
 
     /// Returns true if this is a call graph edge.
@@ -471,6 +499,9 @@ mod tests {
         assert!(CpgEdgeKind::Inherits.is_type());
         assert!(CpgEdgeKind::Implements.is_type());
         assert!(CpgEdgeKind::GenericInstance.is_type());
+        assert!(CpgEdgeKind::Heap(HeapEdgeKind::PointsTo).is_heap());
+        assert!(CpgEdgeKind::NameFlow(NameFlowEdgeKind::Creates).is_name_flow());
+        assert!(CpgEdgeKind::RewriteDep(RewriteDepEdgeKind::DependencyPair).is_rewrite_dep());
 
         // Cross-class negatives.
         assert!(!CpgEdgeKind::AstChild.is_cfg());
@@ -591,12 +622,15 @@ mod proptests {
 
         #[test]
         fn prop_edge_kind_partition(k in arb_edge_kind()) {
-            // At most one of the six top-level classes holds.
+            // At most one of the nine top-level classes holds.
             let classes = [
                 k.is_ast(),
                 k.is_cfg(),
                 k.is_dfg(),
                 k.is_pdg(),
+                k.is_heap(),
+                k.is_name_flow(),
+                k.is_rewrite_dep(),
                 k.is_call(),
                 k.is_type(),
             ];
@@ -605,6 +639,9 @@ mod proptests {
 
             prop_assert_eq!(k.is_cfg(), matches!(k, CpgEdgeKind::ControlFlow(_)));
             prop_assert_eq!(k.is_dfg(), matches!(k, CpgEdgeKind::DataFlow(_)));
+            prop_assert_eq!(k.is_heap(), matches!(k, CpgEdgeKind::Heap(_)));
+            prop_assert_eq!(k.is_name_flow(), matches!(k, CpgEdgeKind::NameFlow(_)));
+            prop_assert_eq!(k.is_rewrite_dep(), matches!(k, CpgEdgeKind::RewriteDep(_)));
             prop_assert_eq!(
                 k.is_ast(),
                 matches!(

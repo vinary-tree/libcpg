@@ -1791,9 +1791,9 @@ impl NodeMapper {
                 kind: LiteralKind::String(Arc::from(self.node_text(node, source))),
             },
 
-            // Operator glyphs as *standalone* leaves (a list head is consumed by
-            // `map_metta_list` and never reaches here). Kept out of the DFG
-            // use-set as `Unknown`.
+            // Operator glyphs as standalone leaves. Retain the normalized
+            // lexeme in `Unknown::kind`: rewrite analyses must distinguish `+`
+            // from `*` without reparsing retained source text.
             "operator"
             | "arrow_operator"
             | "comparison_operator"
@@ -1806,7 +1806,7 @@ impl NodeMapper {
             | "exclaim_prefix"
             | "question_prefix"
             | "quote_prefix" => CpgNodeKind::Unknown {
-                kind: Arc::from(ts_kind),
+                kind: Arc::from(self.node_text(node, source)),
             },
 
             "line_comment" => CpgNodeKind::Comment { is_doc: false },
@@ -1941,25 +1941,28 @@ impl NodeMapper {
     #[cfg(feature = "metta")]
     fn classify_metta_var(&self, node: &tree_sitter::Node, source: &str) -> CpgNodeKind {
         let name: Arc<str> = Arc::from(self.node_text(node, source));
-        let is_lhs_binder = (|| {
-            let lhs = node.parent()?.parent()?.parent()?; // atom_expression → expression → lhs_list
-            if lhs.kind() != "list" {
-                return Some(false);
+        let mut is_lhs_binder = false;
+        let mut ancestor = node.parent();
+        while let Some(candidate) = ancestor {
+            if candidate.kind() == "list" {
+                let is_rule = candidate
+                    .named_child(0)
+                    .map(|head| self.metta_unwrap(head))
+                    .is_some_and(|head| {
+                        matches!(
+                            head.kind(),
+                            "assignment_operator" | "rule_definition_operator"
+                        )
+                    });
+                if is_rule {
+                    is_lhs_binder = candidate.named_child(1).is_some_and(|lhs| {
+                        lhs.start_byte() <= node.start_byte() && node.end_byte() <= lhs.end_byte()
+                    });
+                    break;
+                }
             }
-            let outer = lhs.parent()?.parent()?; // expression → outer_list
-            if outer.kind() != "list" {
-                return Some(false);
-            }
-            let head = self.metta_unwrap(outer.named_child(0)?);
-            let head_is_rule = matches!(
-                head.kind(),
-                "assignment_operator" | "rule_definition_operator"
-            );
-            let lhs_is_second =
-                outer.named_child(1).map(|c| self.metta_unwrap(c).id()) == Some(lhs.id());
-            Some(head_is_rule && lhs_is_second)
-        })()
-        .unwrap_or(false);
+            ancestor = candidate.parent();
+        }
 
         if is_lhs_binder {
             CpgNodeKind::Parameter {
@@ -2736,6 +2739,24 @@ mod tests {
         assert!(
             defuse_by_name(&cpg, "$x"),
             "the LHS `$x` def must reach the RHS `$x` use in the DFG"
+        );
+    }
+
+    #[test]
+    #[cfg(feature = "metta")]
+    fn metta_nested_lhs_pattern_variables_are_binders_with_defuse() {
+        let cpg = build_metta("(= (f (S $x)) (g $x))\n");
+
+        assert!(
+            cpg.nodes().any(|node| matches!(
+                &node.kind,
+                CpgNodeKind::Parameter { name, .. } if name.as_ref() == "$x"
+            )),
+            "a variable at any depth in a rule LHS is a normalized binder"
+        );
+        assert!(
+            defuse_by_name(&cpg, "$x"),
+            "the nested pattern binder must reach the RHS variable use"
         );
     }
 

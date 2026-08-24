@@ -161,7 +161,8 @@ pub use graph::{
     Language, LiteralKind, LockKind, LockMode, MethodSignature, MsgKind, NameFlowEdgeKind,
     NameOperationKind, NodeId, Paradigm, PropertyKey, PropertyList, PropertyListIter,
     PropertyValue, PropertyValueError, PropertyValueKind, PropertyValueLimit, PropertyValueLimits,
-    PropertyValueMetrics, PropertyValueRef, ScopeId, SourceRange, TypeInfo, Visibility,
+    PropertyValueMetrics, PropertyValueRef, RewriteDepEdgeKind, ScopeId, SourceRange, TypeInfo,
+    Visibility,
 };
 
 pub use analysis::{
@@ -275,6 +276,17 @@ pub use analysis::{
     MAX_SPECTRAL_ITERATIONS, MAX_SPECTRAL_STARTS, MAX_TEMPORAL_PROPERTIES, MAX_TRIAD_NODES,
     MAX_WL_ITERATIONS, PYG_NODE_FEATURE_COUNT, PYG_NODE_FEATURE_NAMES, SUMMARY_EDGE_LABEL,
     TRIAD_NAMES,
+};
+
+#[cfg(feature = "metta")]
+pub use analysis::{
+    analyze_critical_pairs, analyze_critical_pairs_with_caps, critical_pairs, dependency_pairs,
+    dependency_pairs_with_caps, materialize_rewrite_dep_overlay, terminates, terminates_with_caps,
+    CriticalPair, CriticalPairAnalysis, DependencyPair, DpGraph, NonTerminationWitness,
+    ReductionPairProof, RewriteAnalysisCaps, RewriteAnalysisIssue, RewriteDepOverlayError,
+    TerminationProof, TerminationUnknown, TerminationVerdict, MAX_CRITICAL_PAIRS,
+    MAX_JOINABILITY_STATES, MAX_REWRITE_DEPENDENCY_PAIRS, MAX_REWRITE_RULES,
+    MAX_REWRITE_TERM_NODES, MAX_REWRITE_UNIFICATION_STEPS,
 };
 
 #[cfg(feature = "abstract-domains")]

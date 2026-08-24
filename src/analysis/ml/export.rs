@@ -7,7 +7,7 @@ use std::{
 
 use crate::{
     backward_slice, CfgEdgeKind, CodePropertyGraph, CpgEdgeKind, CpgNode, CpgNodeKind, DfgEdgeKind,
-    HeapEdgeKind, LiteralKind, NameFlowEdgeKind, NodeId, SourceRange,
+    HeapEdgeKind, LiteralKind, NameFlowEdgeKind, NodeId, RewriteDepEdgeKind, SourceRange,
 };
 
 use super::super::{
@@ -21,18 +21,23 @@ use serde::{Deserialize, Serialize};
 /// Number of stable node-kind classes in the feature schema.
 const NODE_KIND_CLASS_COUNT: usize = 45;
 /// Number of coarse CPG overlay layers with separate in/out degree features.
-const EDGE_LAYER_COUNT: usize = 11;
+const EDGE_LAYER_COUNT: usize = 12;
+/// Number of degree layers present before RewriteDep was appended.
+const LEGACY_EDGE_LAYER_COUNT: usize = 11;
+const REWRITE_DEP_EDGE_LAYER_INDEX: usize = 11;
 const IN_DEGREE_OFFSET: usize = NODE_KIND_CLASS_COUNT;
-const OUT_DEGREE_OFFSET: usize = IN_DEGREE_OFFSET + EDGE_LAYER_COUNT;
-const AST_DEPTH_INDEX: usize = OUT_DEGREE_OFFSET + EDGE_LAYER_COUNT;
+const OUT_DEGREE_OFFSET: usize = IN_DEGREE_OFFSET + LEGACY_EDGE_LAYER_COUNT;
+const AST_DEPTH_INDEX: usize = OUT_DEGREE_OFFSET + LEGACY_EDGE_LAYER_COUNT;
 const AST_DEPTH_KNOWN_INDEX: usize = AST_DEPTH_INDEX + 1;
 const LOOP_DEPTH_INDEX: usize = AST_DEPTH_KNOWN_INDEX + 1;
 const PAGERANK_INDEX: usize = LOOP_DEPTH_INDEX + 1;
 const REVERSE_PAGERANK_INDEX: usize = PAGERANK_INDEX + 1;
 const PDG_SLICE_INDEX: usize = REVERSE_PAGERANK_INDEX + 1;
+const REWRITE_DEP_IN_DEGREE_INDEX: usize = PDG_SLICE_INDEX + 1;
+const REWRITE_DEP_OUT_DEGREE_INDEX: usize = REWRITE_DEP_IN_DEGREE_INDEX + 1;
 
 /// Number of columns in every [`PygExport::node_features`] row.
-pub const PYG_NODE_FEATURE_COUNT: usize = PDG_SLICE_INDEX + 1;
+pub const PYG_NODE_FEATURE_COUNT: usize = REWRITE_DEP_OUT_DEGREE_INDEX + 1;
 
 /// Stable, ordered names for the columns in [`PygExport::node_features`].
 pub const PYG_NODE_FEATURE_NAMES: [&str; PYG_NODE_FEATURE_COUNT] = [
@@ -109,10 +114,12 @@ pub const PYG_NODE_FEATURE_NAMES: [&str; PYG_NODE_FEATURE_COUNT] = [
     "centrality.pagerank",
     "centrality.reverse_pagerank",
     "localization.backward_pdg_slice",
+    "degree.in.rewrite_dep",
+    "degree.out.rewrite_dep",
 ];
 
 /// Number of stable classes produced by [`edge_kind_class`].
-pub const EDGE_KIND_CLASS_COUNT: u16 = 60;
+pub const EDGE_KIND_CLASS_COUNT: u16 = 62;
 
 /// Maximum accepted AST path length in edges.
 pub const MAX_AST_PATH_LENGTH: usize = 1_000_000;
@@ -336,7 +343,7 @@ fn build_pyg_export(
         source_ranges.push(node.range);
         let mut row = vec![0.0; PYG_NODE_FEATURE_COUNT];
         row[node_kind_class(&node.kind) as usize] = 1.0;
-        for layer in 0..EDGE_LAYER_COUNT {
+        for layer in 0..LEGACY_EDGE_LAYER_COUNT {
             row[IN_DEGREE_OFFSET + layer] = in_degree[index][layer] as f32;
             row[OUT_DEGREE_OFFSET + layer] = out_degree[index][layer] as f32;
         }
@@ -346,6 +353,8 @@ fn build_pyg_export(
         row[PAGERANK_INDEX] = forward.scores[index] as f32;
         row[REVERSE_PAGERANK_INDEX] = reverse.scores[index] as f32;
         row[PDG_SLICE_INDEX] = f32::from(slice_members.contains_key(&node_id));
+        row[REWRITE_DEP_IN_DEGREE_INDEX] = in_degree[index][REWRITE_DEP_EDGE_LAYER_INDEX] as f32;
+        row[REWRITE_DEP_OUT_DEGREE_INDEX] = out_degree[index][REWRITE_DEP_EDGE_LAYER_INDEX] as f32;
         node_features.push(row);
     }
 
@@ -776,10 +785,11 @@ fn edge_layer(kind: &CpgEdgeKind) -> usize {
         CpgEdgeKind::Imports | CpgEdgeKind::Exports => 8,
         CpgEdgeKind::Heap(_) => 9,
         CpgEdgeKind::NameFlow(_) => 10,
+        CpgEdgeKind::RewriteDep(_) => REWRITE_DEP_EDGE_LAYER_INDEX,
     }
 }
 
-/// Maps every CPG edge kind to a stable relation class in `0..60`.
+/// Maps every CPG edge kind to a stable relation class in `0..62`.
 pub const fn edge_kind_class(kind: &CpgEdgeKind) -> u16 {
     match kind {
         CpgEdgeKind::AstChild => 0,
@@ -806,6 +816,14 @@ pub const fn edge_kind_class(kind: &CpgEdgeKind) -> u16 {
         CpgEdgeKind::Exports => 46,
         CpgEdgeKind::Heap(kind) => 47 + heap_kind_class(*kind),
         CpgEdgeKind::NameFlow(kind) => 53 + name_flow_kind_class(*kind),
+        CpgEdgeKind::RewriteDep(kind) => 60 + rewrite_dep_kind_class(*kind),
+    }
+}
+
+const fn rewrite_dep_kind_class(kind: RewriteDepEdgeKind) -> u16 {
+    match kind {
+        RewriteDepEdgeKind::DependencyPair => 0,
+        RewriteDepEdgeKind::CriticalConflict => 1,
     }
 }
 

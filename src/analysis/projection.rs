@@ -44,6 +44,10 @@ pub enum ProjectionKind {
     Condensation,
     /// A caller-supplied graph that does not originate from a CPG overlay.
     External,
+    /// Rule-to-rule dependency pairs in a term-rewriting system.
+    ///
+    /// Appended to preserve the serialized discriminants of existing kinds.
+    RewriteDependency,
 }
 
 /// A deterministic directed graph in forward and reverse CSR form.
