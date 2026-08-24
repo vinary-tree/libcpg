@@ -440,10 +440,7 @@ pub fn analyze_name_flow_with_caps(
                     );
                 }
             } else if event.kind.is_receive()
-                && registered_receives
-                    .entry(origin)
-                    .or_default()
-                    .insert(index)
+                && registered_receives.entry(origin).or_default().insert(index)
             {
                 pending_matches.extend(
                     registered_sends
