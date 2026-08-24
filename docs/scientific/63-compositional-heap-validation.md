@@ -91,9 +91,26 @@ Every command ran with `CARGO_BUILD_JOBS=1` inside a user systemd scope with
 | `cargo clippy --all-targets --all-features -- -D warnings` | pass |
 | `cargo fmt --all -- --check` | pass |
 
-Repository-wide verifier, documentation-link, reproducible-diagram, live-DOI,
-and bug-gate evidence is recorded in the final FT.4 evidence checkpoint after
-the documentation tranche is rendered and audited.
+## Final repository evidence
+
+The first two repository-wide verifier runs exposed integration defects rather
+than analysis defects: resolved-call construction could confuse a callee with
+an equal-range argument, and one ML integration assertion retained the old
+feature-column offset. Both root causes were corrected and covered by focused
+regressions before the third, clean run.
+
+| Gate | Result |
+|---|---|
+| `./scripts/verify.sh` | pass: formatting; default, maximal, and all-feature test matrices; examples; strict Clippy; rustdoc and doctests; documentation; and diff audit |
+| default library tests | 932 passed |
+| documentation links | 4,765 links, 949 unique, 4,012 checked successfully, zero errors, and 753 explicitly excluded |
+| DOI syntax and metadata | 118 DOI links passed syntax validation; both cited records matched their exact Crossref titles and publication years |
+| reproducible diagrams | 145 diagrams rendered headlessly twice with byte-identical output |
+| `pgmcp bug-gate` | no open bug anchored to the 836 changed files in the epic branch |
+
+The verifier, link checker, diagram renderer, and bug gate ran under the same
+bounded systemd scope stated above. Visual inspection rasterized the five
+changed SVGs onto a white background without opening a GUI.
 
 ## Reproduction
 
