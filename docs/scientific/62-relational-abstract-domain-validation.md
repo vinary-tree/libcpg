@@ -69,9 +69,20 @@ passed, as did both public integration tests. Strict all-target Clippy with
 `abstract-domains,serde` and warnings denied passed under the same resource
 scope.
 
-The repository-wide FT.3 verifier and base-aware bug gate are recorded after
-the documentation tranche; this section must be updated with their exact
-counts before the work item is claimed done.
+The repository's canonical `scripts/verify.sh` subsequently passed formatting;
+default, `full rholang metta`, and all-feature test suites; all-feature example
+targets; strict all-target/all-feature Clippy with warnings denied; default and
+all-feature rustdoc and doctests with warnings denied; documentation; and
+working-tree diff integrity. The documentation stage checked 4,715 links with
+zero errors, rendered all 142 diagram sources headlessly twice with
+byte-identical committed SVGs, and validated 116 unique canonical DOI links.
+A separate live resolver gate resolved all 116 unique DOI identifiers through
+`doi.org`.
+
+The base-aware pgmcp bug gate checked all 818 files changed by the epic since
+merge base `71ab1a7cbe3fd9710b7c98626e994bd602e5c600` and found no open bug
+anchored to that change set. A working-tree-only invocation on a clean tree is
+not counted as this evidence.
 
 ## 5. Reproduction
 
@@ -92,11 +103,25 @@ systemd-run --user --scope \
   env CARGO_BUILD_JOBS=1 \
   cargo clippy --all-targets --features abstract-domains,serde \
     -- -D warnings
+
+systemd-run --user --scope \
+  -p MemoryMax=4G -p MemorySwapMax=0 -p TasksMax=256 \
+  env CARGO_BUILD_JOBS=1 \
+  ./scripts/verify.sh
+
+systemd-run --user --scope \
+  -p MemoryMax=1G -p MemorySwapMax=0 -p TasksMax=256 \
+  ./scripts/verify-dois.sh --resolve
+
+systemd-run --user --scope \
+  -p MemoryMax=4G -p MemorySwapMax=0 -p TasksMax=256 \
+  pgmcp bug-gate --cwd . \
+    --base 71ab1a7cbe3fd9710b7c98626e994bd602e5c600
 ```
 
 ## 6. Interpretation boundary
 
-The focused results support H1--H8 for the generated and exact cases above.
+H1--H8 are supported for the generated and exact cases above.
 They validate domain algebra and implementation behavior, not completeness of a
 language transfer, machine-integer overflow semantics, scalability to
 unbounded constraints, or precision after an arbitrary widening schedule.
