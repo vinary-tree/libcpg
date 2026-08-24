@@ -1,0 +1,33 @@
+@startuml
+!include _libcpg-theme.iuml
+
+title Static reduced-product invariant lifecycle
+
+rectangle "Component A\n<latex>a \in A</latex>" as A #D3F9D8
+rectangle "Component B\n<latex>b \in B</latex>" as B #FFF3BF
+rectangle "Raw product operation" as Op #DBE4FF {
+  rectangle "new" as New #DBE4FF
+  rectangle "transform" as Transfer #DBE4FF
+  rectangle "join at CFG merge" as Join #DBE4FF
+  rectangle "widen / narrow" as Widen #DBE4FF
+}
+rectangle "Static reduction R\n<latex>R(R(a,b))=R(a,b)</latex>\nreductive · concretization preserving" as Reduce #FFE8CC
+rectangle "ReducedProduct invariant\nsolver-visible value" as Stable #C3FAE8
+
+A -[#4C6EF5,bold]-> Op : first component
+B -[#4C6EF5,bold]-> Op : second component
+New -[#7048E8,bold]-> Reduce
+Transfer -[#7048E8,bold]-> Reduce
+Join -[#7048E8,bold]-> Reduce
+Widen -[#7048E8,bold]-> Reduce
+Reduce -[#0CA678,bold]-> Stable : restore invariant
+Stable -[#E8590C,bold]-> Transfer : next block/edge
+Stable -[#E8590C,bold]-> Join : next confluence
+Stable -[#E8590C,bold]-> Widen : loop policy
+
+note bottom of Reduce
+  One compile-time policy type;
+  no dynamic callback and no second solver.
+end note
+
+@enduml

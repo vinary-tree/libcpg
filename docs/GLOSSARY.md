@@ -15,7 +15,8 @@ whose elements summarize sets of concrete states. Sound transfer functions
 over-approximate every concrete behavior; joins combine paths, while widening
 and narrowing control convergence on infinite-height domains. libcpg's interval
 value-range analysis follows Cousot and Cousot [[20]](#references). See
-[`components/graph/interval-analysis.md`](components/graph/interval-analysis.md).
+[`components/graph/interval-analysis.md`](components/graph/interval-analysis.md)
+and [relational abstract domains](theory/50-relational-abstract-domains.md).
 
 ### Abstract Syntax Tree (AST)
 
@@ -415,6 +416,14 @@ confidentiality policy never suppresses
 
 A [PDG](#program-dependence-graph-pdg) edge kind (`DataDependence`): node $`u`$ (a use) is data-dependent on node $`d`$ (a definition) when $`d`$ defines a value that $`u`$ reads and the definition can reach the use. `libcpg` derives these by re-projecting DFG `DefUse`/`ReachingDef` edges within a function. See [`theory/04-program-dependence-and-slicing.md`](theory/04-program-dependence-and-slicing.md).
 
+### Difference-bound matrix (DBM)
+
+A **difference-bound matrix** (DBM) represents constraints
+$`v_i-v_j\leq c`$ as matrix entries. Shortest-path closure derives every
+represented consequence. libcpg's integer octagon uses two signed forms per
+variable, iterative Floyd--Warshall closure, coherence, and integer tightening
+[[23]](#references). See [relational abstract domains](theory/50-relational-abstract-domains.md).
+
 ### Data-flow analysis
 
 A monotone fixed-point computation that propagates abstract facts along a CFG.
@@ -716,6 +725,15 @@ stable local order; cached plans store ordinals rather than build-specific
 `NodeId` values. Cross-boundary evidence that cannot be represented exactly
 causes an observable bypass and fresh planning.
 
+### Fourier--Motzkin elimination
+
+An exact linear projection method that eliminates one variable by combining
+every constraint with a positive coefficient with every constraint having a
+negative coefficient. libcpg uses deterministic iterative Fourier--Motzkin
+elimination for rational-polyhedron feasibility, implication, redundancy, and
+closed convex hull. Its worst-case constraint growth is exponential. See
+[Theory 50](theory/50-relational-abstract-domains.md).
+
 ### Leiden algorithm / Leiden-style refinement
 
 The Leiden algorithm improves [Louvain](#louvain-algorithm) by interleaving
@@ -946,6 +964,14 @@ strict set containment and records each node's innermost loop. `libcpg` exposes
 `LoopForest`, `NaturalLoop`, and `LoopExitEdge` through feature-free
 `loop_forest`. See [`components/graph/loop-analysis.md`](components/graph/loop-analysis.md).
 
+### Octagon abstract domain
+
+An integer relational abstract domain whose constraints have the form
+$`\pm x_i\pm x_j\leq c`$. It is more expressive than independent intervals
+and less general than arbitrary convex polyhedra. libcpg stores a coherent,
+integer-tight DBM and closes it without recursion [[23]](#references). See
+[Theory 50](theory/50-relational-abstract-domains.md).
+
 ### Node kind / Edge kind
 
 The type tag on a CPG node (`CpgNodeKind`, 45 variants — a mix of unit variants such as `Root`, `If`, `Return` and data-carrying variants such as `Function { signature }`, `Call { target, is_method }`) or edge (`CpgEdgeKind`). Kinds drive every query and every pattern/complexity heuristic. See [`components/graph/nodes.md`](components/graph/nodes.md) and [`components/graph/edges.md`](components/graph/edges.md).
@@ -970,6 +996,14 @@ The Rust graph library `libcpg` builds on. `CodePropertyGraph` wraps a `petgraph
 ### Program Dependence Graph (PDG)
 
 The overlay of [control-dependence](#control-dependence) and [data-dependence](#data-dependence) edges, introduced by Ferrante–Ottenstein–Warren [[2]](#references). It is the substrate for [program slicing](#program-slicing). Added on demand by `PdgBuilder::build(&mut cpg, function)` (it is *not* built during initial construction). See [`theory/04-program-dependence-and-slicing.md`](theory/04-program-dependence-and-slicing.md).
+
+### Polyhedron abstract domain
+
+A conjunction of rational linear half-spaces
+$`P=\{x\in\mathbb{Q}^n\mid Ax\leq b\}`$. libcpg's optional exact domain uses
+arbitrary-precision rationals, exact iterative projection, closed convex hull
+join, facet widening, and intersection narrowing [[70]](#references). See
+[Theory 50](theory/50-relational-abstract-domains.md).
 
 ### System Dependence Graph (SDG) / Summary edge
 
@@ -1018,6 +1052,15 @@ A definition of a variable that reaches a program point with no intervening rede
 relations. Identity is the diagonal relation and composition is existential
 join. It supplies a precise compositional interpretation for binary CPG
 relations without turning libcpg into a general category-theory framework.
+
+### Reduced product
+
+The product of two abstract domains followed by a sound reduction that
+exchanges consequences while preserving the intersection of their
+concretizations. libcpg's `ReducedProduct<A,B,R>` applies a static,
+deterministic, idempotent, reductive policy after every construction and
+lattice transformation [[71]](#references). See
+[Theory 50](theory/50-relational-abstract-domains.md).
 See [Theory 48](theory/48-datalog-relational-semantics.md).
 
 ### ReLU
@@ -1441,3 +1484,5 @@ strict tree interpretation. See
 67. Alon, U., Zilberstein, M., Levy, O., Yahav, E. (2019). *code2vec: Learning Distributed Representations of Code.* DOI: [10.1145/3290353](https://doi.org/10.1145/3290353).
 68. Hin, D., Kan, A., Chen, H., Babar, M. A. (2022). *LineVD: Statement-level Vulnerability Detection using Graph Neural Networks.* DOI: [10.1145/3524842.3527949](https://doi.org/10.1145/3524842.3527949).
 69. Li, Y., Wang, S., Nguyen, T. N. (2021). *Vulnerability Detection with Fine-grained Interpretations.* DOI: [10.1145/3468264.3468597](https://doi.org/10.1145/3468264.3468597).
+70. Cousot, P., Halbwachs, N. (1978). *Automatic Discovery of Linear Restraints Among Variables of a Program.* DOI: [10.1145/512760.512770](https://doi.org/10.1145/512760.512770).
+71. Cousot, P., Cousot, R. (1979). *Systematic Design of Program Analysis Frameworks.* DOI: [10.1145/567752.567778](https://doi.org/10.1145/567752.567778).

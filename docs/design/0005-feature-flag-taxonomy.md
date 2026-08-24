@@ -50,7 +50,9 @@ gnn                 = ["ndarray", "rand"]      # Graph Neural Network
 gpu                 = ["wgpu", "pollster"]     # RESERVED — no code wired yet
 design-patterns     = ["serde_yaml", "toml_edit"]  # GoF + DPML
 algorithm-detection = []                       # complexity/algorithm heuristics
-serde               = ["dep:serde", "petgraph/serde-1"]
+abstract-domains    = ["dep:num-bigint", "dep:num-rational", "dep:num-traits"]
+serde               = ["dep:serde", "petgraph/serde-1",
+                       "num-bigint?/serde", "num-rational?/serde"]
 ml-linfa            = ["linfa", "linfa-trees"] # ML classification (heavy)
 ml-rules            = []                        # rule-based classification (no ML deps)
 
@@ -71,7 +73,7 @@ lang-all       = ["lang-systems", "lang-scripting", "lang-web",
                   "lang-bash", "lang-markdown", "lang-java"]
 
 # ── Umbrella ─────────────────────────────────────────────────────────
-full = ["gnn", "design-patterns", "algorithm-detection", "serde",
+full = ["gnn", "design-patterns", "algorithm-detection", "abstract-domains", "serde",
         "ml-rules", "lang-all"]
 ```
 
@@ -84,7 +86,8 @@ usual analysis set plus every language.
 ### What `full` deliberately excludes
 
 `full` is *not* "everything." It pulls `gnn`, `design-patterns`,
-`algorithm-detection`, `serde`, `ml-rules`, and `lang-all` — and pointedly leaves
+`algorithm-detection`, `abstract-domains`, `serde`, `ml-rules`, and `lang-all`
+— and pointedly leaves
 out four features:
 
 | Excluded from `full` | Why |
@@ -121,7 +124,8 @@ documents the intent and is future-proof.)
   enumerating grammars while keeping fine-grained control available.
 - **Heavy and reserved paths stay opt-in.** `ml-linfa` (ML stack) and `gpu`
   (reserved) never burden a build unless explicitly requested — and `full`
-  refuses to drag them in.
+  refuses to drag them in. Exact rational polyhedra are included in `full` but
+  remain absent from the empty default.
 
 ### Negative
 
@@ -174,7 +178,7 @@ documents the intent and is future-proof.)
 
 ![The feature-flag map: default empty, per-grammar lang-* features, language groups, capability features, and the full umbrella](../diagrams/feature-flag-map.svg)
 
-*Figure — the feature taxonomy: `default = []` at the root, sixteen `lang-*` grammars bundled into groups, the capability features with their dependencies, the empty Mode-B toggles, and the `full` umbrella (excluding `gpu`, `ml-linfa`, `rholang`, `metta`). Source: [`diagrams/feature-flag-map.puml`](../diagrams/feature-flag-map.puml).*
+*Figure — the feature taxonomy: `default = []` at the root, sixteen `lang-*` grammars bundled into groups, the capability features (including optional exact polyhedra) with their dependencies, the empty Mode-B toggles, and the `full` umbrella (excluding `gpu`, `ml-linfa`, `rholang`, `metta`). Source: [`diagrams/feature-flag-map.puml`](../diagrams/feature-flag-map.puml).*
 
 ## Related decisions and further reading
 

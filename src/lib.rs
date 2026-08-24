@@ -29,6 +29,8 @@
 //!   caller-owned Soufflé buffers without evaluating rules
 //! - **Sparse Constant Propagation**: Prove scalar constants and executable CFG edges
 //! - **Interval Value Ranges**: Bound integers with widening and narrowing
+//! - **Relational Abstract Domains**: Compose feature-free integer octagons and
+//!   static reduced products with optional exact rational polyhedra
 //! - **Loop Induction**: Find invariant computations, induction variables, and counted guards
 //! - **Vulnerability Extrapolation**: Rank function PDGs against one labeled
 //!   seed with shared-vocabulary WL cosine and bounded relaxed VF2 evidence

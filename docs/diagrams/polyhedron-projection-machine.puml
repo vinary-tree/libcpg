@@ -1,0 +1,46 @@
+@startuml
+!include _libcpg-theme.iuml
+
+title Exact stack-safe Fourier-Motzkin projection
+
+start
+:Receive rational half-spaces\n<latex>Ax \leq b</latex>;
+:Normalize directions\nmerge equal normals\nreject <latex>0 \leq c,\;c<0</latex>; <<#D3F9D8>>
+:Store pending variables and rows\nin heap-owned vectors;
+
+while (pending variable exists?) is (yes)
+  :Choose minimum-product variable\n<latex>\arg\min_k |P_k||N_k|</latex>; <<#FFF3BF>>
+  :Partition rows by coefficient sign\npositive <latex>P_k</latex> · negative <latex>N_k</latex> · zero; <<#DBE4FF>>
+  :Retain zero rows; <<#FFE8CC>>
+  while (opposite-sign pair exists?) is (yes)
+    :Scale by positive exact rationals; <<#E5DBFF>>
+    :Add rows and cancel selected coefficient; <<#E5DBFF>>
+    :Append consequence to next heap vector;
+  endwhile (no)
+  :Normalize and deduplicate consequences; <<#D3F9D8>>
+endwhile (no)
+
+if (negative constant row?) then (yes)
+  :Return bottom / infeasible; <<#FFE3E3>>
+else (no)
+  :Return exact projected constraints\nin canonical order; <<#C3FAE8>>
+endif
+stop
+
+legend right
+  |<#D3F9D8>| canonicalization |
+  |<#FFF3BF>| deterministic selection |
+  |<#DBE4FF>| partition |
+  |<#FFE8CC>| retained evidence |
+  |<#E5DBFF>| exact pair product |
+  |<#FFE3E3>| contradiction |
+  |<#C3FAE8>| canonical result |
+endlegend
+
+note right
+  No recursive call represents a variable,
+  row, pair, or projection round.
+  Logical depth consumes heap state only.
+end note
+
+@enduml

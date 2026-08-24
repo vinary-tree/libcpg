@@ -154,6 +154,9 @@ PDG). A query can therefore mix syntax, control flow, and data flow freely.
   refinement, loop-header widening, bounded narrowing, and canonical immutable
   block-entry reports; typed heap continuations keep expression depth off the
   native call stack.
+- **Relational abstract domains** — feature-free integer octagons and static
+  reduced products plus `abstract-domains`-gated exact arbitrary-precision
+  rational polyhedra; closure and projection use iterative heap machines.
 - **Loop invariants and induction variables** — DFG-backed invariant fixed
   points, unique latch-dominating additive/affine IVs, conservative hoist
   candidates, and counted-trip evidence; typed postorder and expression
@@ -245,11 +248,12 @@ versus incomplete report handling.
 | `lang-systems` / `lang-scripting` / `lang-web` / `lang-config` / `lang-all` | grammar groups |
 | `design-patterns` | Gang-of-Four detection (`patterns::`) |
 | `algorithm-detection` | algorithm-family recognition + complexity (`algorithms::`) |
+| `abstract-domains` | exact arbitrary-precision rational convex polyhedra |
 | `serde` | `Serialize` / `Deserialize` derives |
 | `gnn` | graph-neural-network embeddings (`gnn::CpgGnn`) |
 | `ml-linfa` / `ml-rules` | ML- / rule-based pattern classification |
 | `rholang` / `metta` | the Rholang / MeTTa Mode-B node mappers |
-| `full` | `gnn + design-patterns + algorithm-detection + serde + ml-rules + lang-all` |
+| `full` | `gnn + design-patterns + algorithm-detection + abstract-domains + serde + ml-rules + lang-all` |
 
 *(`gpu` is reserved for future work and wires no code yet.)*
 

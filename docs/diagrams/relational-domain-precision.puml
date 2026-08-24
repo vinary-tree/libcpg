@@ -1,0 +1,39 @@
+@startuml
+!include _libcpg-theme.iuml
+
+title Relational abstract-domain precision and composition
+
+rectangle "Concrete states\n<latex>\mathcal{P}(C)</latex>" as Concrete #DBE4FF
+rectangle "IntervalEnv\n<latex>l_i \leq x_i \leq u_i</latex>\nfeature-free · axis-aligned" as Interval #D3F9D8
+rectangle "Octagon\n<latex>\pm x_i \pm x_j \leq c</latex>\nfeature-free · integer DBM" as Octagon #FFF3BF
+rectangle "Polyhedron\n<latex>Ax \leq b</latex>\nabstract-domains · exact rationals" as Poly #FCC2D7
+
+rectangle "ReducedProduct<A,B,R>" as Product #E5DBFF {
+  rectangle "component A" as A #D3F9D8
+  rectangle "static Reduction R\nidempotent · reductive · sound" as R #FFE8CC
+  rectangle "component B" as B #FFF3BF
+}
+
+Concrete -[#4C6EF5,bold]-> Interval : abstract cheaply
+Interval -[#2F9E44,bold]-> Octagon : retain signed pairs
+Octagon -[#E8590C,bold]-> Poly : admit arbitrary facets
+Interval ..[#7048E8,bold]> A : selectable
+Octagon ..[#7048E8,bold]> B : selectable
+Poly ..[#7048E8,bold]> A : selectable
+A -[#E8590C,bold]-> R : consequence
+B -[#E8590C,bold]-> R : consequence
+R -[#0CA678,bold]-> A : refine
+R -[#0CA678,bold]-> B : refine
+
+note bottom of Poly
+  More expressive does not mean cheaper.
+  Fourier-Motzkin projection is exact
+  and exponential in the worst case.
+end note
+
+note bottom of Product
+  The concretization is the intersection
+  of both component concretizations.
+end note
+
+@enduml
