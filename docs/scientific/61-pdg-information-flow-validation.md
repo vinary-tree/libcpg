@@ -59,10 +59,26 @@ nodes before calling both analyses.
 
 ## 4. Focused results
 
-The all-feature unit/property/deep-stack run passed all seven tests, including
-256 generated oracle cases. The public/parser integration run passed both
-tests. Strict all-target/all-feature Clippy, formatting, staged-diff integrity,
-and the unfinished-marker scan passed.
+The final feature-free unit/property/deep-stack run passed all seven focused
+tests: four exact examples, two independent 128-case properties, and the
+100,001-node small-stack lifecycle. The `lang-rust` public/parser integration
+run passed both focused tests. Together, the generated properties evaluated
+256 cases and each compared complete outputs across forward and reverse edge
+insertion.
+
+The repository's canonical `scripts/verify.sh` subsequently passed formatting;
+default, `full rholang metta`, and all-feature test suites; all-feature example
+targets; strict all-target/all-feature Clippy with warnings denied; default and
+all-feature rustdoc and doctests with warnings denied; documentation; and
+working-tree diff integrity. The documentation gate checked 4,658 links with
+zero errors and rendered all 139 PlantUML sources headlessly twice with
+byte-identical committed SVGs. A separate live resolver gate resolved all 114
+unique DOI identifiers through `doi.org`.
+
+The base-aware pgmcp bug gate checked all 800 files changed by the epic since
+merge base `71ab1a7cbe3fd9710b7c98626e994bd602e5c600` and found no open bug
+anchored to that change set. A working-tree-only invocation on a clean tree is
+not counted as this evidence.
 
 The enlarged all-feature unit-test binary was first linked with four Cargo
 jobs inside a 4 GiB cgroup. The scope reached exactly `MemoryMax=4G` and the
@@ -77,17 +93,26 @@ the semantic tests themselves completed in less than one second after linking.
 systemd-run --user --scope \
   -p MemoryMax=4G -p MemorySwapMax=0 -p TasksMax=256 \
   env CARGO_BUILD_JOBS=1 \
-  cargo test -j 1 --all-features analysis::security::ifc::tests
+  cargo test --lib ifc::tests:: -- --nocapture
 
 systemd-run --user --scope \
   -p MemoryMax=4G -p MemorySwapMax=0 -p TasksMax=256 \
   env CARGO_BUILD_JOBS=1 \
-  cargo test -j 1 --all-features --test ifc_integration
+  cargo test --features lang-rust --test ifc_integration -- --nocapture
 
 systemd-run --user --scope \
   -p MemoryMax=4G -p MemorySwapMax=0 -p TasksMax=256 \
   env CARGO_BUILD_JOBS=1 \
-  cargo clippy -j 1 --all-targets --all-features -- -D warnings
+  ./scripts/verify.sh
+
+systemd-run --user --scope \
+  -p MemoryMax=1G -p MemorySwapMax=0 -p TasksMax=256 \
+  ./scripts/verify-dois.sh --resolve
+
+systemd-run --user --scope \
+  -p MemoryMax=4G -p MemorySwapMax=0 -p TasksMax=256 \
+  pgmcp bug-gate --cwd . \
+    --base 71ab1a7cbe3fd9710b7c98626e994bd602e5c600
 ```
 
 Validation output is captured under disk-backed `target/verification`,
