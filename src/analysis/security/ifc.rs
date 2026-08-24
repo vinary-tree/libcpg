@@ -589,7 +589,12 @@ mod tests {
         );
         assert_eq!(violations.len(), 1);
         assert_eq!(
-            violations[0].explicit_witness.as_ref().unwrap().steps[0].kind,
+            violations[0]
+                .explicit_witness
+                .as_ref()
+                .expect("summary edge produces an explicit witness")
+                .steps[0]
+                .kind,
             InformationFlowEdgeKind::Summary
         );
     }
@@ -672,6 +677,40 @@ mod tests {
         ));
     }
 
+    fn add_generated_cfg_edges(
+        cpg: &mut CodePropertyGraph,
+        first_id: usize,
+        edges: &[(u32, u32, bool)],
+        reverse: bool,
+    ) {
+        if reverse {
+            for (id, &edge) in edges.iter().enumerate().rev() {
+                add_generated_cfg_edge(cpg, first_id + id, edge);
+            }
+        } else {
+            for (id, &edge) in edges.iter().enumerate() {
+                add_generated_cfg_edge(cpg, first_id + id, edge);
+            }
+        }
+    }
+
+    fn add_generated_cfg_edge(
+        cpg: &mut CodePropertyGraph,
+        id: usize,
+        (source, target, is_true): (u32, u32, bool),
+    ) {
+        cpg.add_edge_with_id(CpgEdge::new(
+            EdgeId::new(id as u32),
+            NodeId::new(source),
+            NodeId::new(target),
+            CpgEdgeKind::ControlFlow(if is_true {
+                CfgEdgeKind::ConditionalTrue
+            } else {
+                CfgEdgeKind::ConditionalFalse
+            }),
+        ));
+    }
+
     fn oracle_pairs(
         count: usize,
         edges: &[(u32, u32, bool)],
@@ -732,6 +771,94 @@ mod tests {
             .collect()
     }
 
+    fn oracle_constant_time(
+        count: usize,
+        dependencies: &[(u32, u32, bool)],
+        cfg_edges: &[(u32, u32, bool)],
+        index_mask: u8,
+        secret_mask: u8,
+    ) -> Vec<(NodeId, NodeId, LeakSiteKind)> {
+        let mut sites: BTreeMap<NodeId, BTreeSet<LeakSiteKind>> = BTreeMap::new();
+        for index in 0..count {
+            if index_mask & (1 << index) != 0 {
+                sites
+                    .entry(NodeId::new(index as u32))
+                    .or_default()
+                    .insert(LeakSiteKind::IndexAccess);
+            }
+        }
+        for &(source, target, is_true) in cfg_edges {
+            sites
+                .entry(NodeId::new(source))
+                .or_default()
+                .insert(if is_true {
+                    LeakSiteKind::ConditionalTrue {
+                        target: NodeId::new(target),
+                    }
+                } else {
+                    LeakSiteKind::ConditionalFalse {
+                        target: NodeId::new(target),
+                    }
+                });
+        }
+
+        let mut expected = Vec::new();
+        for source in 0..count {
+            if secret_mask & (1 << source) == 0 {
+                continue;
+            }
+            let mut reached = vec![false; count];
+            reached[source] = true;
+            loop {
+                let mut changed = false;
+                for &(from, to, _) in dependencies {
+                    if reached[from as usize] && !reached[to as usize] {
+                        reached[to as usize] = true;
+                        changed = true;
+                    }
+                }
+                if !changed {
+                    break;
+                }
+            }
+            for (&site, kinds) in &sites {
+                if reached[site.as_u32() as usize] {
+                    expected.extend(
+                        kinds
+                            .iter()
+                            .copied()
+                            .map(|kind| (NodeId::new(source as u32), site, kind)),
+                    );
+                }
+            }
+        }
+        expected
+    }
+
+    fn finding_tuples(findings: &[LeakSite]) -> Vec<(NodeId, NodeId, LeakSiteKind)> {
+        findings
+            .iter()
+            .map(|finding| (finding.secret, finding.site, finding.kind))
+            .collect()
+    }
+
+    fn witness_step_exists(cpg: &CodePropertyGraph, step: InformationFlowStep) -> bool {
+        cpg.edges_between(step.source, step.target)
+            .iter()
+            .any(|edge| {
+                matches!(
+                    (step.kind, &edge.kind),
+                    (
+                        InformationFlowEdgeKind::DataDependence,
+                        CpgEdgeKind::DataDependence
+                    ) | (
+                        InformationFlowEdgeKind::ControlDependence,
+                        CpgEdgeKind::ControlDependence
+                    )
+                )
+            })
+    }
+
     proptest! {
         #![proptest_config(ProptestConfig::with_cases(128))]
 
@@ -789,6 +916,83 @@ mod tests {
                     }
                     prop_assert_eq!(current, finding.sink);
                 }
+            }
+        }
+
+        #[test]
+        fn generated_constant_time_matches_reachability_and_permutations(
+            count in 1usize..8,
+            raw_dependencies in prop::collection::vec((0u8..8, 0u8..8, any::<bool>()), 0..40),
+            raw_cfg_edges in prop::collection::vec((0u8..8, 0u8..8, any::<bool>()), 0..24),
+            index_mask in any::<u8>(),
+            secret_mask in any::<u8>(),
+        ) {
+            let dependencies: Vec<_> = raw_dependencies
+                .into_iter()
+                .map(|(source, target, control)| {
+                    (
+                        u32::from(source) % count as u32,
+                        u32::from(target) % count as u32,
+                        control,
+                    )
+                })
+                .collect();
+            let cfg_edges: Vec<_> = raw_cfg_edges
+                .into_iter()
+                .map(|(source, target, is_true)| {
+                    (
+                        u32::from(source) % count as u32,
+                        u32::from(target) % count as u32,
+                        is_true,
+                    )
+                })
+                .collect();
+            let kinds = (0..count).map(|index| {
+                if index_mask & (1 << index) != 0 {
+                    CpgNodeKind::IndexAccess
+                } else {
+                    opaque(&format!("n{index}"))
+                }
+            });
+            let mut forward = graph(kinds.clone());
+            let mut reverse = graph(kinds);
+            add_generated_edges(&mut forward, &dependencies, false);
+            add_generated_edges(&mut reverse, &dependencies, true);
+            add_generated_cfg_edges(
+                &mut forward,
+                dependencies.len(),
+                &cfg_edges,
+                false,
+            );
+            add_generated_cfg_edges(
+                &mut reverse,
+                dependencies.len(),
+                &cfg_edges,
+                true,
+            );
+            let secrets: BTreeSet<_> = (0..count)
+                .filter(|index| secret_mask & (1 << index) != 0)
+                .map(|index| NodeId::new(index as u32))
+                .collect();
+            let expected = oracle_constant_time(
+                count,
+                &dependencies,
+                &cfg_edges,
+                index_mask,
+                secret_mask,
+            );
+            let left = constant_time(&forward, &secrets);
+            let right = constant_time(&reverse, &secrets);
+            prop_assert_eq!(finding_tuples(&left), expected);
+            prop_assert_eq!(&left, &right);
+            for finding in left {
+                let mut current = finding.secret;
+                for step in finding.witness.steps {
+                    prop_assert_eq!(step.source, current);
+                    prop_assert!(witness_step_exists(&forward, step));
+                    current = step.target;
+                }
+                prop_assert_eq!(current, finding.site);
             }
         }
     }
