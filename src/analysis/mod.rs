@@ -16,6 +16,7 @@ mod cycles;
 pub mod dataflow;
 mod datalog;
 mod diff;
+mod distance;
 mod dominators;
 mod dsm;
 mod effects;
@@ -136,6 +137,8 @@ pub use diff::{
     MAX_CPG_DIFF_EDITS, MAX_CPG_DIFF_NODES,
 };
 
+pub use distance::distance_to_targets;
+
 pub use dataflow::{
     available_expressions, dead_stores, expression_facts, expression_facts_with_limits, liveness,
     sccp, solve, value_ranges, variable_facts, very_busy_expressions, AvailableExpressions,
@@ -218,11 +221,12 @@ pub use metrics::{
 };
 
 pub use ml::{
-    ast_paths, edge_kind_class, export_pyg, export_pyg_with_options, node_kind_class,
-    AstPathOptions, PathContext, PygExport, PygExportOptions, EDGE_KIND_CLASS_COUNT,
-    MAX_AST_PATH_ANCESTOR_STEPS, MAX_AST_PATH_CONTEXTS, MAX_AST_PATH_LENGTH,
-    MAX_AST_PATH_PAIR_CHECKS, MAX_AST_PATH_TERMINALS, MAX_AST_PATH_TOTAL_NODES,
-    PYG_NODE_FEATURE_COUNT, PYG_NODE_FEATURE_NAMES,
+    ast_paths, edge_kind_class, export_heterogeneous_gnn, export_pyg, export_pyg_with_options,
+    node_kind_class, AstPathOptions, HeteroGnnExport, HeteroRelationEdges, PathContext, PygExport,
+    PygExportOptions, EDGE_KIND_CLASS_COUNT, EDGE_KIND_CLASS_NAMES, HETERO_NODE_FEATURE_COUNT,
+    HETERO_TOKEN_EMBEDDING_DIM, MAX_AST_PATH_ANCESTOR_STEPS, MAX_AST_PATH_CONTEXTS,
+    MAX_AST_PATH_LENGTH, MAX_AST_PATH_PAIR_CHECKS, MAX_AST_PATH_TERMINALS,
+    MAX_AST_PATH_TOTAL_NODES, PYG_NODE_FEATURE_COUNT, PYG_NODE_FEATURE_NAMES,
 };
 
 pub use motifs::{

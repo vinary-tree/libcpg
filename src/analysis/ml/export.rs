@@ -20,7 +20,7 @@ use super::super::{
 use serde::{Deserialize, Serialize};
 
 /// Number of stable node-kind classes in the feature schema.
-const NODE_KIND_CLASS_COUNT: usize = 45;
+pub(super) const NODE_KIND_CLASS_COUNT: usize = 45;
 /// Number of coarse CPG overlay layers with separate in/out degree features.
 const EDGE_LAYER_COUNT: usize = 13;
 /// Number of degree layers present before RewriteDep was appended.
@@ -126,6 +126,77 @@ pub const PYG_NODE_FEATURE_NAMES: [&str; PYG_NODE_FEATURE_COUNT] = [
 
 /// Number of stable classes produced by [`edge_kind_class`].
 pub const EDGE_KIND_CLASS_COUNT: u16 = 67;
+
+/// Stable, ordered names for the classes produced by [`edge_kind_class`].
+pub const EDGE_KIND_CLASS_NAMES: [&str; EDGE_KIND_CLASS_COUNT as usize] = [
+    "ast.child",
+    "ast.parent",
+    "ast.next_sibling",
+    "ast.previous_sibling",
+    "cfg.sequential",
+    "cfg.conditional_true",
+    "cfg.conditional_false",
+    "cfg.loop_back",
+    "cfg.loop_exit",
+    "cfg.break",
+    "cfg.continue",
+    "cfg.return",
+    "cfg.throw",
+    "cfg.catch",
+    "cfg.call",
+    "cfg.call_return",
+    "cfg.case",
+    "cfg.default_case",
+    "dfg.def_use",
+    "dfg.use_def",
+    "dfg.reaching_def",
+    "dfg.data_dependency",
+    "dfg.parameter",
+    "dfg.return_value",
+    "dfg.field_read",
+    "dfg.field_write",
+    "dfg.index_read",
+    "dfg.index_write",
+    "dfg.alias",
+    "dfg.dereference",
+    "dfg.address_of",
+    "pdg.control_dependence",
+    "pdg.data_dependence",
+    "call.static",
+    "call.dynamic",
+    "call.site",
+    "type.of",
+    "type.inherits",
+    "type.implements",
+    "type.generic_instance",
+    "reference.reference",
+    "reference.definition",
+    "reference.declaration",
+    "scope.enclosing",
+    "scope.contained_in",
+    "import.imports",
+    "import.exports",
+    "heap.allocates",
+    "heap.points_to",
+    "heap.dereferences",
+    "heap.releases",
+    "heap.requires_valid",
+    "heap.ensures_invalid",
+    "name_flow.creates",
+    "name_flow.references",
+    "name_flow.quotes",
+    "name_flow.drops",
+    "name_flow.carries",
+    "name_flow.receives",
+    "name_flow.communicates",
+    "rewrite_dep.dependency_pair",
+    "rewrite_dep.critical_conflict",
+    "place_capability.move",
+    "place_capability.shared_borrow",
+    "place_capability.mutable_borrow",
+    "place_capability.shared_reborrow",
+    "place_capability.mutable_reborrow",
+];
 
 /// Maximum accepted AST path length in edges.
 pub const MAX_AST_PATH_LENGTH: usize = 1_000_000;
@@ -605,11 +676,11 @@ pub fn ast_paths(
                 ancestor_index: left_ancestor,
                 path,
                 node_kinds,
-                start_token: terminal_token(
+                start_token: semantic_token(
                     cpg.node(start)
                         .expect("terminal belongs to the validated function scope"),
                 ),
-                end_token: terminal_token(
+                end_token: semantic_token(
                     cpg.node(end)
                         .expect("terminal belongs to the validated function scope"),
                 ),
@@ -960,7 +1031,7 @@ pub const fn node_kind_class(kind: &CpgNodeKind) -> u16 {
     }
 }
 
-fn terminal_token(node: &CpgNode) -> String {
+pub(super) fn semantic_token(node: &CpgNode) -> String {
     if let Some(text) = node.text.as_deref().filter(|text| !text.is_empty()) {
         return text.to_owned();
     }

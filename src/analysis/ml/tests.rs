@@ -100,6 +100,87 @@ fn feature(row: &[f32], name: &str) -> f32 {
     row[PygExport::feature_index(name).expect("stable feature name")]
 }
 
+fn every_edge_kind() -> Vec<CpgEdgeKind> {
+    let cfg = [
+        CfgEdgeKind::Sequential,
+        CfgEdgeKind::ConditionalTrue,
+        CfgEdgeKind::ConditionalFalse,
+        CfgEdgeKind::LoopBack,
+        CfgEdgeKind::LoopExit,
+        CfgEdgeKind::Break,
+        CfgEdgeKind::Continue,
+        CfgEdgeKind::Return,
+        CfgEdgeKind::Throw,
+        CfgEdgeKind::Catch,
+        CfgEdgeKind::Call,
+        CfgEdgeKind::CallReturn,
+        CfgEdgeKind::Case,
+        CfgEdgeKind::DefaultCase,
+    ];
+    let dfg = [
+        DfgEdgeKind::DefUse,
+        DfgEdgeKind::UseDef,
+        DfgEdgeKind::ReachingDef,
+        DfgEdgeKind::DataDependency,
+        DfgEdgeKind::Parameter,
+        DfgEdgeKind::ReturnValue,
+        DfgEdgeKind::FieldRead,
+        DfgEdgeKind::FieldWrite,
+        DfgEdgeKind::IndexRead,
+        DfgEdgeKind::IndexWrite,
+        DfgEdgeKind::Alias,
+        DfgEdgeKind::Dereference,
+        DfgEdgeKind::AddressOf,
+    ];
+    let mut kinds = vec![
+        CpgEdgeKind::AstChild,
+        CpgEdgeKind::AstParent,
+        CpgEdgeKind::AstNextSibling,
+        CpgEdgeKind::AstPrevSibling,
+    ];
+    kinds.extend(cfg.into_iter().map(CpgEdgeKind::ControlFlow));
+    kinds.extend(dfg.into_iter().map(CpgEdgeKind::DataFlow));
+    kinds.extend([
+        CpgEdgeKind::ControlDependence,
+        CpgEdgeKind::DataDependence,
+        CpgEdgeKind::StaticCall,
+        CpgEdgeKind::DynamicCall,
+        CpgEdgeKind::CallSite,
+        CpgEdgeKind::TypeOf,
+        CpgEdgeKind::Inherits,
+        CpgEdgeKind::Implements,
+        CpgEdgeKind::GenericInstance,
+        CpgEdgeKind::Reference,
+        CpgEdgeKind::Definition,
+        CpgEdgeKind::Declaration,
+        CpgEdgeKind::EnclosingScope,
+        CpgEdgeKind::ContainedIn,
+        CpgEdgeKind::Imports,
+        CpgEdgeKind::Exports,
+        CpgEdgeKind::Heap(HeapEdgeKind::Allocates),
+        CpgEdgeKind::Heap(HeapEdgeKind::PointsTo),
+        CpgEdgeKind::Heap(HeapEdgeKind::Dereferences),
+        CpgEdgeKind::Heap(HeapEdgeKind::Releases),
+        CpgEdgeKind::Heap(HeapEdgeKind::RequiresValid),
+        CpgEdgeKind::Heap(HeapEdgeKind::EnsuresInvalid),
+        CpgEdgeKind::NameFlow(NameFlowEdgeKind::Creates),
+        CpgEdgeKind::NameFlow(NameFlowEdgeKind::References),
+        CpgEdgeKind::NameFlow(NameFlowEdgeKind::Quotes),
+        CpgEdgeKind::NameFlow(NameFlowEdgeKind::Drops),
+        CpgEdgeKind::NameFlow(NameFlowEdgeKind::Carries),
+        CpgEdgeKind::NameFlow(NameFlowEdgeKind::Receives),
+        CpgEdgeKind::NameFlow(NameFlowEdgeKind::Communicates),
+        CpgEdgeKind::RewriteDep(RewriteDepEdgeKind::DependencyPair),
+        CpgEdgeKind::RewriteDep(RewriteDepEdgeKind::CriticalConflict),
+        CpgEdgeKind::PlaceCapability(PlaceCapabilityEdgeKind::Move),
+        CpgEdgeKind::PlaceCapability(PlaceCapabilityEdgeKind::SharedBorrow),
+        CpgEdgeKind::PlaceCapability(PlaceCapabilityEdgeKind::MutableBorrow),
+        CpgEdgeKind::PlaceCapability(PlaceCapabilityEdgeKind::SharedReborrow),
+        CpgEdgeKind::PlaceCapability(PlaceCapabilityEdgeKind::MutableReborrow),
+    ]);
+    kinds
+}
+
 #[test]
 fn relation_registry_is_complete_contiguous_and_stable() {
     let cfg = [
@@ -191,6 +272,72 @@ fn relation_registry_is_complete_contiguous_and_stable() {
         }),
         44
     );
+}
+
+#[test]
+fn heterogeneous_export_is_exact_for_every_typed_relation() {
+    let kinds = every_edge_kind();
+    let mut cpg = CodePropertyGraph::new(Language::Rust);
+    cpg.add_node_with_id(node(20, CpgNodeKind::Return));
+    cpg.add_node_with_id(
+        node(
+            10,
+            CpgNodeKind::Identifier {
+                name: "value".into(),
+                definition: None,
+            },
+        )
+        .with_text("value"),
+    );
+    for (index, kind) in kinds.iter().cloned().enumerate() {
+        add_edge(&mut cpg, index as u32, 10, 20, kind);
+    }
+
+    let export = export_heterogeneous_gnn(&cpg);
+    assert_eq!(export.node_ids, [10, 20].map(NodeId::new));
+    assert_eq!(export.node_types, [32, 12]);
+    assert_eq!(export.tokens, ["value", "return"]);
+    assert_eq!(
+        export.source_ranges,
+        [
+            node(10, CpgNodeKind::Return).range,
+            node(20, CpgNodeKind::Return).range
+        ]
+    );
+    assert_eq!(export.relations.len(), usize::from(EDGE_KIND_CLASS_COUNT));
+    assert_eq!(EDGE_KIND_CLASS_NAMES.len(), export.relations.len());
+    for (class, kind) in kinds.iter().enumerate() {
+        let relation = export.relation(kind);
+        assert_eq!(relation.relation_class, class as u16);
+        assert_eq!(relation.relation_name, EDGE_KIND_CLASS_NAMES[class]);
+        assert_eq!(relation.edge_index, [(0, 1)]);
+    }
+
+    for (row, &node_type) in export.node_features.iter().zip(&export.node_types) {
+        assert_eq!(row.len(), HETERO_NODE_FEATURE_COUNT);
+        assert_eq!(row[..45].iter().sum::<f32>(), 1.0);
+        assert_eq!(row[usize::from(node_type)], 1.0);
+        assert!(row[45..].iter().any(|value| *value != 0.0));
+    }
+}
+
+#[test]
+fn heterogeneous_export_keeps_empty_buckets_and_parallel_multiplicity() {
+    let export = export_heterogeneous_gnn(&exact_fixture());
+    assert_eq!(export.tokens, ["score", "while", "+", "lhs", "7"]);
+    assert_eq!(export.node_types, [7, 15, 26, 32, 33]);
+    assert_eq!(
+        export
+            .relation(&CpgEdgeKind::DataFlow(DfgEdgeKind::DefUse))
+            .edge_index,
+        [(3, 4), (3, 4)]
+    );
+    assert!(export
+        .relation(&CpgEdgeKind::Heap(HeapEdgeKind::Allocates))
+        .edge_index
+        .is_empty());
+    assert_eq!(export.dense_index(NodeId::new(30)), Some(2));
+    assert_eq!(export.dense_index(NodeId::new(999)), None);
 }
 
 #[test]
@@ -596,6 +743,14 @@ proptest! {
         let forward = permutation_fixture(leaf_count, &extra_edges, false);
         let reverse = permutation_fixture(leaf_count, &extra_edges, true);
         prop_assert_eq!(export_pyg(&forward), export_pyg(&reverse));
+        let forward_heterogeneous = export_heterogeneous_gnn(&forward);
+        let reverse_heterogeneous = export_heterogeneous_gnn(&reverse);
+        prop_assert_eq!(&forward_heterogeneous, &reverse_heterogeneous);
+        #[cfg(feature = "serde")]
+        prop_assert_eq!(
+            serde_json::to_vec(&forward_heterogeneous).unwrap(),
+            serde_json::to_vec(&reverse_heterogeneous).unwrap(),
+        );
 
         let options = AstPathOptions {
             max_path_width: leaf_count,
@@ -618,9 +773,12 @@ proptest! {
 fn public_export_layers_round_trip_and_encode_deterministically() {
     let cpg = exact_fixture();
     let export = export_pyg(&cpg);
+    let heterogeneous = export_heterogeneous_gnn(&cpg);
     let contexts = ast_paths(&cpg, NodeId::new(10), AstPathOptions::default()).unwrap();
     let export_bytes = serde_json::to_vec(&export).expect("serialize PyG export");
     let path_bytes = serde_json::to_vec(&contexts).expect("serialize path contexts");
+    let heterogeneous_bytes =
+        serde_json::to_vec(&heterogeneous).expect("serialize heterogeneous export");
     assert_eq!(
         serde_json::from_slice::<PygExport>(&export_bytes).unwrap(),
         export
@@ -631,4 +789,12 @@ fn public_export_layers_round_trip_and_encode_deterministically() {
     );
     assert_eq!(serde_json::to_vec(&export).unwrap(), export_bytes);
     assert_eq!(serde_json::to_vec(&contexts).unwrap(), path_bytes);
+    assert_eq!(
+        serde_json::from_slice::<HeteroGnnExport>(&heterogeneous_bytes).unwrap(),
+        heterogeneous
+    );
+    assert_eq!(
+        serde_json::to_vec(&heterogeneous).unwrap(),
+        heterogeneous_bytes
+    );
 }
