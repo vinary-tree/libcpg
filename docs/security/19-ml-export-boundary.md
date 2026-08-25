@@ -73,13 +73,13 @@ feature extraction when isolation is required.
 
 ## Integrity and schema evolution
 
-The 75 feature names and 62 relation classes are an interchange contract, but
+The 77 feature names and 67 relation classes are an interchange contract, but
 the current payload does not include a separate schema-version field. Persist
 the libcpg version or a hash of `PYG_NODE_FEATURE_NAMES` with long-lived data
 sets. A future node/edge enum addition must update the exhaustive mapping,
 oracles, and documentation before release. FT6 preserves columns 0–72 and
-classes 0–59, then appends two RewriteDep degree columns and two relation
-classes.
+classes 0–59, appends two RewriteDep degree columns and relation classes 60–61,
+then appends two PlaceCapability degree columns and relation classes 62–66.
 
 Serde accepts constructible public records. Treat deserialized `PygExport` as
 untrusted data unless the consumer revalidates row cardinalities, endpoint

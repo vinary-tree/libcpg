@@ -731,10 +731,10 @@ See the [component guide](../components/graph/concurrency-bug-detection.md),
 
 `export_pyg` reads the immutable whole CPG and first replaces internal graph
 order with ascending stable `NodeId` coordinates. One typed edge pass produces
-twelve-layer in/out degrees and a complete relation-class edge list. Independent
+thirteen-layer in/out degrees and a complete relation-class edge list. Independent
 heap-backed passes compute AST depth/knownness/loop depth and canonical
 forward/reverse PageRank. Optional localization traverses the complete backward
-PDG slice before its caller cap is checked. The row assembler then aligns 75
+PDG slice before its caller cap is checked. The row assembler then aligns 77
 named values with stable ids and source ranges.
 
 `ast_paths` takes a separate function-local route. It collects AST descendants
@@ -752,9 +752,24 @@ Both outputs remain out of graph and contain no learned weights or tensor-
 runtime objects. The optional `gnn` module is a distinct randomly initialized,
 untrained structural embedder; it is not the canonical interchange path.
 
+`export_heterogeneous_gnn` reuses the stable node/class/token boundary, then
+places every one of 67 exact relation classes in its own named bucket and
+initializes nodes with 45 kind columns plus 64 deterministic token-hash
+columns. `distance_to_targets` follows a separate reverse-BFS path over only
+CFG and call edges and combines reachable target lengths harmonically. Both
+flows use explicit heap worklists and leave the CPG unchanged.
+
+![Typed heterogeneous export pipeline](../diagrams/heterogeneous-export-pipeline.svg)
+
+![Directed target-distance pipeline](../diagrams/directed-fuzzing-distance.svg)
+
 See the [component guide](../components/graph/ml-export.md), [Theory
 44](../theory/44-deterministic-cpg-ml-representations.md), and [Usage
 27](../usage/27-ml-export-and-ast-paths.md).
+
+See the [heterogeneous component](../components/graph/heterogeneous-export-and-distance.md),
+[Theory 55](../theory/55-heterogeneous-graphs-and-directed-fuzzing-distance.md),
+and [Usage 40](../usage/40-heterogeneous-export-and-fuzzing-distance.md).
 
 ### Deterministic CPG version diff (feature-free)
 

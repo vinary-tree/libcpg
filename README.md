@@ -280,7 +280,7 @@ Comprehensive documentation lives under [`docs/`](docs/README.md):
 - **[Architecture](docs/architecture/overview.md)** — module map, the graph data model, construction & analysis pipelines, and language frontends.
 - **[Design decisions](docs/design/00-overview.md)** — ADR-style records for load-bearing graph, construction, analysis, and feature choices.
 - **[API reference](docs/api/graph-reference.md)** — graph/program/projection/block-CFG/SCC/condensation/layering/architectural-smell/DSM/Martin/code-metric/reflexion/centrality/community/cohesion/reachability, builder, and pattern/algorithm/GNN reference.
-- **[Components](docs/README.md#components)** — graph projections, basic blocks, dominators, SCC/condensation/layering/architectural-smell/DSM/Martin/code-metric/reflexion/centrality/community/cohesion analytics, reachability, builders, patterns, algorithms, and GNN internals.
+- **[Components](docs/README.md#components)** — graph projections, basic blocks, dominators, SCC/condensation/layering/architectural-smell/DSM/Martin/code-metric/reflexion/centrality/community/cohesion analytics, reachability, heterogeneous export, fuzzing distance, builders, patterns, algorithms, and GNN internals.
 - **[Usage guides](docs/usage/00-getting-started.md)** — task-oriented how-tos.
 - **[Engineering](docs/engineering/00-overview.md)** · **[Analysis-expansion matrix](docs/engineering/analysis-expansion-matrix.md)** · **[Scientific validation](docs/scientific/00-overview.md)** · **[Security](docs/security/00-threat-model.md)** · **[Taint-analysis usage](docs/usage/10-taint-and-nullflow.md)** · **[Bug-detector usage](docs/usage/17-advisory-bug-detectors.md)**.
 - **[Glossary](docs/GLOSSARY.md)** and the **[diagram catalog](docs/diagrams/README.md)**.

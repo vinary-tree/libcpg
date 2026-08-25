@@ -675,6 +675,15 @@ pub fn export_pyg_with_options(
     options: PygExportOptions,
 ) -> Result<PygExport, AnalysisError>;
 
+pub fn export_heterogeneous_gnn(
+    cpg: &CodePropertyGraph,
+) -> HeteroGnnExport;
+
+pub fn distance_to_targets(
+    cpg: &CodePropertyGraph,
+    targets: &[NodeId],
+) -> BTreeMap<NodeId, f64>;
+
 pub fn ast_paths(
     cpg: &CodePropertyGraph,
     function: NodeId,
@@ -684,16 +693,21 @@ pub fn ast_paths(
 
 | Type or registry | Stable contract |
 |---|---|
-| `PygExport::node_features` | 73 finite `f32` columns per canonical node row |
+| `PygExport::node_features` | 77 finite `f32` columns per canonical node row |
 | `PygExport::edge_index` | sorted `(source_dense, target_dense, relation_class)` tuples with parallel multiplicity |
 | `PygExport::node_ids` / `source_ranges` | ascending stable ids and ranges aligned with every row |
 | `PygExport::slice_node_ids` | sorted complete backward-PDG slice, empty without a criterion |
 | `pagerank_converged` / `reverse_pagerank_converged` | convergence qualification for the two structural columns |
 | `PygExport::dense_index` | stable-id lookup into aligned rows |
 | `PygExport::feature_index` | exact schema-name lookup |
-| `PYG_NODE_FEATURE_NAMES` | canonical 73-name registry |
-| `edge_kind_class` / `EDGE_KIND_CLASS_COUNT` | exhaustive 62-relation append-only map and bound |
+| `PYG_NODE_FEATURE_NAMES` | canonical 77-name registry |
+| `edge_kind_class` / `EDGE_KIND_CLASS_COUNT` / `EDGE_KIND_CLASS_NAMES` | exhaustive 67-relation append-only map, names, and bound |
 | `node_kind_class` | exhaustive 45-node-kind map |
+| `HeteroGnnExport` | aligned ids/ranges/types/tokens, 109-column rows, and 67 complete relation buckets |
+| `HeteroRelationEdges` | stable class/name plus sorted dense endpoints with parallel multiplicity |
+| `HETERO_NODE_FEATURE_COUNT` | 109: 45 exact kind columns plus 64 token-hash columns |
+| `HETERO_TOKEN_EMBEDDING_DIM` | fixed deterministic token-hash width 64 |
+| `distance_to_targets` | zero targets, harmonic reachable CFG/call shortest paths, positive infinity otherwise |
 | `PathContext` | exact terminal ids/tokens, complete AST node path, aligned kind classes, ancestor id/index |
 | `AstPathOptions` | length/width filters plus terminal, pair, context, retained-node, and ancestor-step caps |
 
@@ -707,6 +721,10 @@ See the [component guide](../components/graph/ml-export.md), [usage
 guide](../usage/27-ml-export-and-ast-paths.md), [Theory
 44](../theory/44-deterministic-cpg-ml-representations.md), and [security
 boundary](../security/19-ml-export-boundary.md).
+
+See [Theory 55](../theory/55-heterogeneous-graphs-and-directed-fuzzing-distance.md)
+and [Usage 40](../usage/40-heterogeneous-export-and-fuzzing-distance.md) for the
+heterogeneous and directed-fuzzing surfaces.
 
 ### Deterministic CPG diff (feature-free)
 

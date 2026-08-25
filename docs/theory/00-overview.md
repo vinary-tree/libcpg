@@ -354,6 +354,10 @@ development, or jump to the layer you need:
     Existing-node places, typed move/borrow/reborrow relations, represented
     copy qualification, CFG reachability, and DFG-backed loan liveness define
     deterministic advisory Rust ownership evidence.
+55. **[55 — Heterogeneous graphs and directed-fuzzing distance](55-heterogeneous-graphs-and-directed-fuzzing-distance.md).**
+    Exact relation families, deterministic token feature hashing, and harmonic
+    CFG/call shortest paths define feature-free interfaces for caller-owned
+    relational GNNs and target-directed fuzzers.
 
 The later chapters define deterministic projection structure, architecture
 metrics, inspectable evidence, and their interpretation limits.

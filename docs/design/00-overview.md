@@ -115,8 +115,9 @@ alternatives is folklore, and a decision without its costs is marketing.
 | [0069 — Stack-safe Rholang NameFlow](0069-stack-safe-rholang-name-flow.md) | Normalize reflective-name operations at the frontend, propagate scope extrusion with a bounded heap fixed point, and reuse iterative SCCs for qualified obligation/capability cycles. | Accepted |
 | [0070 — Stack-safe MeTTa rewriting analysis](0070-stack-safe-metta-rewriting-analysis.md) | Flatten normalized rules, index exact roots, reuse iterative SCCs for dependency-pair proofs, and qualify critical-pair joinability through explicit heap worklists. | Accepted |
 | [0071 — Stack-safe place-capability analysis](0071-stack-safe-place-capability-analysis.md) | Compose frontend-normalized Rust ownership operations with typed DFG, Reference, AST-scope, and CFG evidence into an advisory immutable PCG and optional transactional typed overlay. | Accepted |
+| [0072 — Deterministic heterogeneous export and fuzzing distance](0072-deterministic-heterogeneous-export-and-fuzzing-distance.md) | Export aligned deterministic node initialization and all 67 typed relation buckets, then compute harmonic CFG/call target distance with heap-backed reverse BFS. | Accepted |
 
-These seventy-one are not independent. ADR-0001 fixes the substrate that all analyses
+These seventy-two are not independent. ADR-0001 fixes the substrate that all analyses
 write onto; ADR-0002 and ADR-0005 together explain how a language reaches that
 substrate and what you must switch on to get there; ADR-0003 and ADR-0004 are
 two analyses *over* the substrate (one always-on, one feature-gated) that each
@@ -333,6 +334,10 @@ ADR-0071 reuses ADR-0003's definition identity and ADR-0001's shared-node
 model. It composes normalized Rust ownership metadata with DFG, Reference,
 scope, and CFG evidence, keeps every traversal in explicit heap work, and adds
 PlaceCapability relations only through a transactional append-only boundary.
+ADR-0072 extends ADR-0054's canonical ML boundary and consumes ADR-0071's
+append-only 67-class registry. It separates every typed relation for external
+heterogeneous consumers and reuses exact CFG/call direction for harmonic target
+distance, with all ordering and traversal state on the heap.
 
 ![Module architecture of libcpg, showing the graph core and the analysis modules layered over it](../diagrams/module-architecture.svg)
 

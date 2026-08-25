@@ -1,0 +1,53 @@
+@startuml
+!include _libcpg-theme.iuml
+
+title Harmonic directed distance to target nodes
+
+database "Immutable typed CPG" as CPG #FFF3BF {
+  component "ControlFlow edges" as CFG #FFE066
+  component "StaticCall / DynamicCall / CallSite" as Calls #FFA94D
+  component "other overlays\nexcluded from distance" as Other #FF8787
+}
+
+rectangle "Canonical topology" as Topology #DBE4FF {
+  component "ascending NodeId dense map" as Dense #A5D8FF
+  component "endpoint-deduplicated\nreverse predecessor rows" as Reverse #74C0FC
+  component "sorted unique valid targets" as Targets #4DABF7
+}
+
+rectangle "Explicit per-target work" as Work #E5DBFF {
+  queue "VecDeque reverse BFS" as Queue #D0BFFF
+  component "u32 shortest-path vector" as Paths #B197FC
+  component "reachable count +\nreciprocal sum" as Aggregate #9775FA
+}
+
+rectangle "BTreeMap<NodeId, f64>" as Result #C3FAE8 {
+  component "target = 0" as Zero #63E6BE
+  component "reachable = harmonic mean" as Harmonic #38D9A9
+  component "unreachable = positive infinity" as Infinity #20C997
+}
+
+CFG -[#E67700,bold]-> Reverse
+Calls -[#E67700,bold]-> Reverse
+Other -[#C92A2A,dashed]-> Reverse : rejected
+CPG -[#1971C2,bold]-> Dense
+Dense -[#1971C2,bold]-> Targets
+Targets -[#7048E8,bold]-> Queue : one seed at a time
+Reverse -[#7048E8,bold]-> Queue
+Queue -[#7048E8,bold]-> Paths
+Paths -[#7048E8,bold]-> Aggregate
+Targets -[#087F5B,bold]-> Zero
+Aggregate -[#087F5B,bold]-> Harmonic : <latex>|R(v)| / \sum_{t\in R(v)} 1/d_t(v)</latex>
+Aggregate -[#087F5B,bold]-> Infinity : no reachable target
+
+note bottom of Work
+  FIFO traversal uses heap storage.
+  Graph depth never becomes native call depth.
+end note
+
+note bottom of Result
+  Structural evidence only: not path feasibility,
+  a fuzzing schedule, or a vulnerability verdict.
+end note
+
+@enduml

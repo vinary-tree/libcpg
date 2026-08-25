@@ -36,9 +36,10 @@ canonical SCC behavior. This targets source/construction ordering rather than
 sorting one result twice.
 
 The edge-kind property includes both RewriteDep subtypes and requires every
-edge to inhabit at most one of the nine top-level classifier families. The ML
-registry oracle enumerates every edge subtype and requires the contiguous
-class vector `0..62`, with old classes `0..60` unchanged.
+edge to inhabit at most one of the nine then-existing top-level classifier
+families. At FT.6, the ML registry oracle required contiguous classes `0..62`
+with old classes `0..60` unchanged; later append-only PlaceCapability classes
+do not change either RewriteDep position.
 
 ## Cap and malformed-input oracles
 

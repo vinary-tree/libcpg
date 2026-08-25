@@ -8,7 +8,7 @@
 
 External machine-learning (ML) systems need a stable numerical view of a Code
 Property Graph (CPG), but libcpg's typed graph is richer than one adjacency
-matrix. It contains 45 node kinds, 62 edge relations, twelve coarse overlay
+matrix. It contains 45 node kinds, 67 edge relations, thirteen coarse overlay
 layers, source identities, parallel relations, malformed-input possibilities,
 and optional dependence slices. A consumer must be able to map every numerical
 row and edge back to exact CPG evidence.
@@ -72,6 +72,9 @@ model runtime.
 13. When `RewriteDep` lands, append its incoming/outgoing degree columns at
     73–74 and its two relation classes at 60–61. Preserve every original
     column, class, and serialized edge-enum discriminant.
+14. When `PlaceCapability` lands, append its incoming/outgoing degree columns
+    at 75–76 and its five relation classes at 62–66. Preserve every older
+    position and add a thirteenth coarse degree layer.
 
 ![Canonical CPG evidence exported for external ML consumers](../diagrams/ml-export-pipeline.svg)
 
@@ -150,7 +153,7 @@ visible.
 
 ## Verification
 
-Exact examples pin all 62 edge classes, the 75-column append-only schema, dense alignment,
+Exact examples pin all 67 edge classes, the 77-column append-only schema, dense alignment,
 parallel-edge preservation, degree/depth/loop/slice columns, reconstructable
 AST paths, malformed-chain suppression, and every budget boundary. A 128-case
 property rebuilds complete graphs in forward and reverse insertion order and

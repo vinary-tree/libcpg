@@ -82,10 +82,11 @@ alpha-equivalent root self-loops; infinite joinability spaces reach a cap; and
 non-left-linear systems do not receive a confluence certificate. Each case is
 `Unknown` or `complete == false`, never a guessed proof.
 
-The current ML schema grows from 73 to 75 node columns, 60 to 62 relation
-classes, and eleven to twelve coarse layers. The two new columns and classes
-are appended, so existing numeric consumers remain stable while schema-aware
-consumers must admit the new suffix.
+At FT.6, the ML schema grew from 73 to 75 node columns, 60 to 62 relation
+classes, and eleven to twelve coarse layers. Those two columns and classes
+remain at their appended positions in the current 77-column, 67-relation,
+thirteen-layer schema, so older numeric identities stay stable while
+schema-aware consumers must admit later suffixes.
 
 ## Alternatives considered
 

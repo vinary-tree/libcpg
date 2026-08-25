@@ -158,10 +158,10 @@ A single directed graph that merges several program views onto **one shared node
 ### CPG ML export / PyG edge index / AST path context
 
 A **CPG machine-learning (ML) export** is libcpg's deterministic feature-free
-numerical view: 75 named node columns aligned with ascending stable ids/source
-ranges, plus typed dense edge tuples covering all 62 relation classes. Columns
-73–74 and classes 60–61 append `RewriteDep` evidence without changing the
-pre-existing positions. **PyG**
+numerical view: 77 named node columns aligned with ascending stable ids/source
+ranges, plus typed dense edge tuples covering all 67 relation classes. Columns
+73–74/classes 60–61 append `RewriteDep`; columns 75–76/classes 62–66 append
+`PlaceCapability`, without changing pre-existing positions. **PyG**
 abbreviates PyTorch Geometric; libcpg's `edge_index` is an ordinary sorted
 `(source_dense, target_dense, relation_class)` vector that a caller may
 transpose for PyG, not a PyG runtime object. An **AST path context** retains two
@@ -170,6 +170,19 @@ terminal path, aligned node-kind classes/tokens, and the ancestor position,
 following the path-representation lineage of code2vec [[67]](#references).
 See [Theory 44](theory/44-deterministic-cpg-ml-representations.md) and the
 [component contract](components/graph/ml-export.md).
+
+### Heterogeneous GNN export / feature hashing / directed-fuzzing distance
+
+A **heterogeneous GNN export** separates every typed CPG relation into one of
+67 stable named buckets, including empty buckets, while aligning exact node
+types/tokens/ranges with 109-column initial features. **Feature hashing** maps
+width-1/2/3 UTF-8 token byte n-grams into a fixed 64-column signed vector; it
+is deterministic but collisions are possible, so exact tokens remain beside
+the rows. **Directed-fuzzing distance** is zero at valid target nodes, the
+harmonic mean of positive stored-direction CFG/call shortest paths at reachable
+non-targets, and positive infinity otherwise. See [Theory
+55](theory/55-heterogeneous-graphs-and-directed-fuzzing-distance.md) and the
+[component contract](components/graph/heterogeneous-export-and-distance.md).
 
 ### CPG diff / node alignment / dependence-aware classification
 

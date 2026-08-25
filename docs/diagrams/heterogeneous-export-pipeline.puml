@@ -1,0 +1,54 @@
+@startuml
+!include _libcpg-theme.iuml
+
+title Deterministic heterogeneous CPG export
+
+database "Immutable CodePropertyGraph\nstable NodeId identity" as CPG #FFF3BF {
+  component "45 CpgNodeKind values" as NodeKind #FFE066
+  component "exact text / name /\noperator / literal" as Token #FFD43B
+  component "67 typed edge classes" as EdgeKind #FFA94D
+}
+
+rectangle "Explicit canonical heap work" as Work #E5DBFF {
+  component "NodeId min heap" as NodeHeap #D0BFFF
+  component "typed edge tuple min heap" as EdgeHeap #B197FC
+  component "iterative byte n-grams\nwidths 1 / 2 / 3" as Ngrams #9775FA
+}
+
+rectangle "Aligned node table" as Nodes #DBE4FF {
+  component "node_ids + source_ranges" as Identity #A5D8FF
+  component "node_types + exact tokens" as Categories #74C0FC
+  component "109 f32 columns\n45 one-hot + 64 feature hash" as Features #4DABF7
+}
+
+rectangle "Complete relation family" as Relations #C3FAE8 {
+  component "67 named buckets\nempty buckets retained" as Buckets #63E6BE
+  component "sorted dense endpoints\nparallel multiplicity retained" as Endpoints #38D9A9
+}
+
+cloud "Caller-owned R-GCN / HGT /\nother heterogeneous consumer" as Consumer #FFD8A8
+
+NodeKind -[#E67700,bold]-> NodeHeap
+Token -[#E67700,bold]-> Ngrams
+EdgeKind -[#E67700,bold]-> EdgeHeap
+NodeHeap -[#7048E8,bold]-> Identity
+NodeHeap -[#7048E8,bold]-> Categories
+Ngrams -[#7048E8,bold]-> Features
+Categories -[#1971C2,bold]-> Features : exact kind prefix
+EdgeHeap -[#7048E8,bold]-> Buckets
+Buckets -[#087F5B,bold]-> Endpoints
+Identity -[#C92A2A,bold]-> Endpoints : dense map
+Features -[#E67700,bold]-> Consumer
+Endpoints -[#E67700,bold]-> Consumer
+
+note bottom of Work
+  Binary heaps and iterative loops keep
+  native call depth constant in graph depth.
+end note
+
+note bottom of Relations
+  The exporter is feature-free, deterministic,
+  read-only, and contains no learned weights.
+end note
+
+@enduml

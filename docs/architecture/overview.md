@@ -157,7 +157,9 @@ and interval providers without moving policy into the graph.
 Canonical machine-learning interchange is provided by `analysis::ml`; it
 exports stable graph tensors and exact terminal-to-terminal AST paths without
 requiring the optional `gnn` feature, mutating the CPG, or selecting a training
-runtime.
+runtime. The same feature-free boundary also exports complete relation-separated
+heterogeneous tensors, while `analysis::distance_to_targets` computes
+heap-backed harmonic CFG/call distance for caller-owned directed fuzzing.
 Deterministic version comparison is provided by `analysis::diff`; it reuses the
 bounded GED correspondence, compares exact node and typed-edge evidence in
 aligned coordinates, and confines behavior-change classification to represented

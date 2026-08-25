@@ -1,0 +1,35 @@
+@startuml
+!include _libcpg-theme.iuml
+
+title Deterministic 64-column token feature hash
+
+start
+:Select exact retained text; <<#DBE4FF>>
+if (non-empty?) then (yes)
+else (no)
+  :Select semantic name; <<#A5D8FF>>
+  if (present?) then (yes)
+  else (no)
+    :Select represented operator or literal; <<#74C0FC>>
+    if (present?) then (yes)
+    else (no)
+      :Select stable node-kind name; <<#4DABF7>>
+    endif
+  endif
+endif
+:Retain exact normalized token; <<#FFF3BF>>
+:Enumerate UTF-8 byte n-grams\nfor widths 1, 2, and 3; <<#E5DBFF>>
+:Hash width and bytes with fixed\n64-bit FNV-1a-style recurrence; <<#D0BFFF>>
+:Choose <latex>h \bmod 64</latex> bucket and\n<latex>\pm 1</latex> from the high bit; <<#B197FC>>
+:Accumulate signed counts in columns 45--108; <<#C3FAE8>>
+:Return exact token plus numerical initialization; <<#63E6BE>>
+stop
+
+note right
+  No vocabulary, parser, learned weight,
+  random seed, or native recursion.
+  Collisions are visible because the exact
+  token remains beside the feature row.
+end note
+
+@enduml
