@@ -63,9 +63,16 @@ systemd scope with `MemoryMax=4G`, `MemorySwapMax=0`, and `TasksMax=256`.
 | default library suite | 939 tests pass |
 | default and all-feature compilation | both configurations pass |
 | strict Clippy | all targets/all features pass with warnings denied |
+| complete all-feature/all-target matrix | 1,536 tests across 76 test targets and 260 Criterion test-mode cases pass; zero failures |
+| rustdoc and doctests | default/all-feature rustdoc pass with warnings denied; both three-example doctest sets pass |
+| documentation structure | 154 diagram sources render headlessly twice byte-identically; 126 canonical DOI links, 994 unique links, anchors, and MathJax delimiters pass policy |
 
-Repository documentation, DOI, reproducible-diagram, all-feature test, and
-rustdoc evidence is recorded after the FT.7 terminal validation pass.
+The complete matrix includes the parser-built ownership oracle and the public
+100,000-depth/64 KiB PCG analysis, materialization, and destruction oracle. It
+also replays every pre-existing all-feature unit, property, integration,
+stack-safety, example, and Criterion test-mode target so the append-only graph,
+serialization, Datalog, and machine-learning changes cannot silently regress
+another analysis family.
 
 ## Reproduction
 
