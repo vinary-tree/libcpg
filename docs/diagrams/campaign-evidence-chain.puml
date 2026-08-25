@@ -1,0 +1,68 @@
+@startuml
+!include _libcpg-theme.iuml
+
+title Analysis-expansion evidence and trust chain
+
+rectangle "Authoritative pgmcp contract" as Contract #FFF3BF {
+  component "91 leaf requirements" as Leaves #FFE066
+  component "acceptance bullets + caps" as Acceptance #FFD43B
+}
+
+rectangle "Stable feature branches" as Branches #DBE4FF {
+  component "L: libcpg commits\ntyped kernels + public APIs" as Libcpg #74C0FC
+  component "P: pgmcp commits\nadapters + orchestration" as Pgmcp #4DABF7
+}
+
+rectangle "Executable evidence" as Tests #C3FAE8 {
+  component "hand-computed examples" as Examples #8CE99A
+  component "property + differential oracles" as Properties #69DB7C
+  component "public integration + parser cases" as Integration #38D9A9
+  component "64 / 256 KiB small-stack gates" as Stack #20C997
+}
+
+rectangle "Durable explanation" as Docs #E5DBFF {
+  component "theory + design + architecture" as Semantics #D0BFFF
+  component "scientific + security + usage" as Interpretation #B197FC
+  component "colored reproducible diagrams + DOI links" as Reproducibility #9775FA
+}
+
+rectangle "Terminal audit" as Audit #FFE8CC {
+  component "branch indexing + commit resolution" as Index #FFC078
+  component "requirement / commit / test / document matrix" as Matrix #FFA94D
+  component "capped one-time integration gate" as Gate #FF922B
+}
+
+cloud "Trusted gatekeeper / user" as Trust #FCC2D7
+
+Leaves -[#E67700,bold]-> Acceptance
+Acceptance -[#1971C2,bold]-> Libcpg
+Acceptance -[#1971C2,bold]-> Pgmcp
+Libcpg -[#087F5B,bold]-> Examples
+Libcpg -[#087F5B,bold]-> Properties
+Libcpg -[#087F5B,bold]-> Integration
+Libcpg -[#087F5B,bold]-> Stack
+Pgmcp -[#087F5B,bold]-> Integration
+Libcpg -[#7048E8,bold]-> Semantics
+Pgmcp -[#7048E8,bold]-> Interpretation
+Semantics -[#7048E8,bold]-> Reproducibility
+Interpretation -[#7048E8,bold]-> Reproducibility
+Examples -[#E67700,bold]-> Index
+Properties -[#E67700,bold]-> Index
+Integration -[#E67700,bold]-> Index
+Stack -[#E67700,bold]-> Index
+Reproducibility -[#E67700,bold]-> Matrix
+Index -[#E67700,bold]-> Matrix
+Matrix -[#E67700,bold]-> Gate
+Gate -[#C2255C,bold]-> Trust : agent claim\nawaits trusted verification
+
+note bottom of Audit
+  Logs live only under disk-backed target/verification,
+  are inspected completely, and are then deleted exactly.
+end note
+
+note bottom of Trust
+  Agent evidence may reach claimed_done.
+  It cannot self-assign verified or user-only bug triage.
+end note
+
+@enduml

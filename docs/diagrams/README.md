@@ -55,6 +55,7 @@ Grouped by subject. Each row: the source (its `.svg` sibling is embedded by the 
 | `build-local-string-pool.puml` | activity/ownership flow | Mode-A/Mode-B tree → explicit AST work stack → per-node mapped-string canonicalization → pool drop → unchanged public CPG | architecture/language-frontends, design/0060, scientific/55 |
 | `analysis-pipeline.puml` | activity | CPG → blocks/data-flow/liveness/induction/reachability/dominance/loops/SCC/condensation/layering/DSM/Martin/smells/WL/centrality/community/cohesion/spectral/cycles/motifs, PDG/slice, VF2/GoF, algorithm, GNN | architecture/data-flow |
 | `feature-flag-map.puml` | mindmap | Cargo feature taxonomy (`default = []`) | design/0005, engineering/01, usage/00 |
+| `campaign-evidence-chain.puml` | component/evidence and trust flow | authoritative leaf contracts → stable libcpg/pgmcp commits → executable and documentary evidence → terminal audit → trusted gatekeeper | engineering/analysis-expansion-matrix, engineering/analysis-expansion-evidence-ledger |
 
 ### Graph data model
 | Source | Type | Depicts | Embedded by |
