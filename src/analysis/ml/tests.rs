@@ -4,7 +4,7 @@ use super::*;
 use crate::{
     AnalysisError, CfgEdgeKind, CodePropertyGraph, CpgEdge, CpgEdgeKind, CpgNode, CpgNodeKind,
     DfgEdgeKind, EdgeId, HeapEdgeKind, Language, LiteralKind, MethodSignature, NameFlowEdgeKind,
-    NodeId, RewriteDepEdgeKind, SourceRange, Visibility,
+    NodeId, PlaceCapabilityEdgeKind, RewriteDepEdgeKind, SourceRange, Visibility,
 };
 
 fn function(name: &str) -> CpgNodeKind {
@@ -173,6 +173,11 @@ fn relation_registry_is_complete_contiguous_and_stable() {
         CpgEdgeKind::NameFlow(NameFlowEdgeKind::Communicates),
         CpgEdgeKind::RewriteDep(RewriteDepEdgeKind::DependencyPair),
         CpgEdgeKind::RewriteDep(RewriteDepEdgeKind::CriticalConflict),
+        CpgEdgeKind::PlaceCapability(PlaceCapabilityEdgeKind::Move),
+        CpgEdgeKind::PlaceCapability(PlaceCapabilityEdgeKind::SharedBorrow),
+        CpgEdgeKind::PlaceCapability(PlaceCapabilityEdgeKind::MutableBorrow),
+        CpgEdgeKind::PlaceCapability(PlaceCapabilityEdgeKind::SharedReborrow),
+        CpgEdgeKind::PlaceCapability(PlaceCapabilityEdgeKind::MutableReborrow),
     ]);
 
     assert_eq!(kinds.len(), usize::from(EDGE_KIND_CLASS_COUNT));
@@ -231,6 +236,46 @@ fn rewrite_dep_has_append_only_degree_columns_and_relation_classes() {
             0,
             1,
             edge_kind_class(&CpgEdgeKind::RewriteDep(RewriteDepEdgeKind::DependencyPair))
+        )]
+    );
+}
+
+#[test]
+fn place_capability_has_append_only_degree_columns_and_relation_classes() {
+    let mut cpg = CodePropertyGraph::new(Language::Rust);
+    cpg.add_node_with_id(CpgNode::new(
+        NodeId::new(10),
+        function("source"),
+        SourceRange::default(),
+    ));
+    cpg.add_node_with_id(CpgNode::new(
+        NodeId::new(20),
+        function("target"),
+        SourceRange::default(),
+    ));
+    cpg.connect(
+        NodeId::new(10),
+        NodeId::new(20),
+        CpgEdgeKind::PlaceCapability(PlaceCapabilityEdgeKind::MutableReborrow),
+    );
+
+    let export = export_pyg(&cpg);
+    let incoming = PygExport::feature_index("degree.in.place_capability")
+        .expect("incoming PlaceCapability column");
+    let outgoing = PygExport::feature_index("degree.out.place_capability")
+        .expect("outgoing PlaceCapability column");
+    assert_eq!(incoming, 75);
+    assert_eq!(outgoing, 76);
+    assert_eq!(export.node_features[0][outgoing], 1.0);
+    assert_eq!(export.node_features[1][incoming], 1.0);
+    assert_eq!(
+        export.edge_index,
+        vec![(
+            0,
+            1,
+            edge_kind_class(&CpgEdgeKind::PlaceCapability(
+                PlaceCapabilityEdgeKind::MutableReborrow
+            ))
         )]
     );
 }

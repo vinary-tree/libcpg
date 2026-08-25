@@ -278,6 +278,7 @@ pub(crate) enum EdgeLayer {
     RewriteDep,
     Call,
     Other,
+    PlaceCapability,
 }
 
 #[derive(Debug)]
@@ -650,6 +651,7 @@ fn edge_layer(kind: &CpgEdgeKind) -> EdgeLayer {
         CpgEdgeKind::Heap(_) => EdgeLayer::Heap,
         CpgEdgeKind::NameFlow(_) => EdgeLayer::NameFlow,
         CpgEdgeKind::RewriteDep(_) => EdgeLayer::RewriteDep,
+        CpgEdgeKind::PlaceCapability(_) => EdgeLayer::PlaceCapability,
         CpgEdgeKind::StaticCall | CpgEdgeKind::DynamicCall | CpgEdgeKind::CallSite => {
             EdgeLayer::Call
         }

@@ -757,6 +757,16 @@ impl CodePropertyGraph {
         self.incoming_layer(id, EdgeLayer::RewriteDep)
     }
 
+    /// Iterates outgoing ownership and borrowing relations deterministically.
+    pub fn place_capability_successors(&self, id: NodeId) -> CpgEdges<'_> {
+        self.outgoing_layer(id, EdgeLayer::PlaceCapability)
+    }
+
+    /// Iterates incoming ownership and borrowing relations deterministically.
+    pub fn place_capability_predecessors(&self, id: NodeId) -> CpgEdges<'_> {
+        self.incoming_layer(id, EdgeLayer::PlaceCapability)
+    }
+
     // ========== Call Graph ==========
 
     /// Returns call sites in this function.
@@ -934,6 +944,11 @@ impl CodePropertyGraph {
     /// Iterates the complete RewriteDep overlay in canonical order.
     pub fn rewrite_dep_edges(&self) -> impl Iterator<Item = &CpgEdge> {
         self.overlay_edges(EdgeLayer::RewriteDep)
+    }
+
+    /// Iterates the complete PlaceCapability overlay in canonical order.
+    pub fn place_capability_edges(&self) -> impl Iterator<Item = &CpgEdge> {
+        self.overlay_edges(EdgeLayer::PlaceCapability)
     }
 
     /// Iterates the explicit call overlay in canonical source/target/id order.
@@ -1139,6 +1154,7 @@ impl CodePropertyGraph {
         let heap_edges = self.heap_edges().count();
         let name_flow_edges = self.name_flow_edges().count();
         let rewrite_dep_edges = self.rewrite_dep_edges().count();
+        let place_capability_edges = self.place_capability_edges().count();
         let call_edges = self.call_overlay_edges().count();
 
         CpgStats {
@@ -1150,6 +1166,7 @@ impl CodePropertyGraph {
             heap_edges,
             name_flow_edges,
             rewrite_dep_edges,
+            place_capability_edges,
             call_edges,
             function_count: self.functions().count(),
             class_count: self.classes().count(),
@@ -1555,6 +1572,11 @@ pub struct CpgStats {
     /// Appended to preserve the serialized order of existing statistics.
     #[cfg_attr(feature = "serde", serde(default))]
     pub rewrite_dep_edges: usize,
+    /// Number of ownership and place-capability edges.
+    ///
+    /// Appended to preserve the serialized order of existing statistics.
+    #[cfg_attr(feature = "serde", serde(default))]
+    pub place_capability_edges: usize,
 }
 
 #[cfg(test)]
@@ -2927,6 +2949,7 @@ mod serde_tests {
             heap_edges: 1,
             name_flow_edges: 1,
             rewrite_dep_edges: 1,
+            place_capability_edges: 1,
             call_edges: 1,
             function_count: 1,
             class_count: 1,
@@ -2941,6 +2964,7 @@ mod serde_tests {
         assert_eq!(stats.heap_edges, back.heap_edges);
         assert_eq!(stats.name_flow_edges, back.name_flow_edges);
         assert_eq!(stats.rewrite_dep_edges, back.rewrite_dep_edges);
+        assert_eq!(stats.place_capability_edges, back.place_capability_edges);
         assert_eq!(stats.dfg_edges, back.dfg_edges);
         assert_eq!(stats.call_edges, back.call_edges);
         assert_eq!(stats.function_count, back.function_count);

@@ -28,6 +28,7 @@ mod martin;
 mod metrics;
 pub mod ml;
 mod motifs;
+mod place_capability;
 mod program;
 mod projection;
 mod reachability;
@@ -153,6 +154,12 @@ pub use dataflow::{LinearConstraint, Polyhedron, PolyhedronError, Rational};
 pub use projection::{
     call_graph_projection, cfg_projection, dfg_projection, module_graph_projection, pdg_projection,
     projection_of, GraphProjection, ProjectionError, ProjectionKind, UndirectedProjection,
+};
+
+pub use place_capability::{
+    borrow_check, materialize_place_capability_overlay, place_capability_graph, BorrowViolation,
+    BorrowViolationKind, CapabilityPlace, CapabilityPlaceKind, CopySemantics, Pcg, PcgIssue,
+    PlaceCapabilityEdge, PlaceCapabilityEvidence, PlaceCapabilityOverlayError,
 };
 
 #[cfg(feature = "metta")]

@@ -187,6 +187,26 @@ pub enum RewriteDepEdgeKind {
     CriticalConflict,
 }
 
+/// Ownership and borrowing relation carried by the PlaceCapability overlay.
+///
+/// Both endpoints are existing CPG nodes representing source and destination
+/// places. The operation that justifies a relation remains available in the
+/// out-of-graph [`crate::PlaceCapabilityEdge`] evidence record.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+pub enum PlaceCapabilityEdgeKind {
+    /// Ownership of a non-`Copy` value transfers to the target place.
+    Move,
+    /// The target place receives a shared borrow from an owned place.
+    SharedBorrow,
+    /// The target place receives a mutable borrow from an owned place.
+    MutableBorrow,
+    /// The target place receives a shared borrow through another reference.
+    SharedReborrow,
+    /// The target place receives a mutable borrow through another reference.
+    MutableReborrow,
+}
+
 impl DfgEdgeKind {
     /// Returns true if this is a read operation.
     pub fn is_read(&self) -> bool {
@@ -282,6 +302,13 @@ pub enum CpgEdgeKind {
     /// This variant is appended to preserve the serialized discriminants of
     /// every pre-existing edge kind.
     RewriteDep(RewriteDepEdgeKind),
+
+    // === Rust ownership and place-capability edges ===
+    /// Move, borrow, or reborrow relation between represented places.
+    ///
+    /// This variant is appended to preserve the serialized discriminants of
+    /// every pre-existing edge kind.
+    PlaceCapability(PlaceCapabilityEdgeKind),
 }
 
 impl CpgEdgeKind {
@@ -321,6 +348,11 @@ impl CpgEdgeKind {
     /// Returns true if this is a term-rewriting dependency or conflict edge.
     pub fn is_rewrite_dep(&self) -> bool {
         matches!(self, Self::RewriteDep(_))
+    }
+
+    /// Returns true if this is an ownership or borrowing relation.
+    pub fn is_place_capability(&self) -> bool {
+        matches!(self, Self::PlaceCapability(_))
     }
 
     /// Returns true if this is a call graph edge.
@@ -502,6 +534,7 @@ mod tests {
         assert!(CpgEdgeKind::Heap(HeapEdgeKind::PointsTo).is_heap());
         assert!(CpgEdgeKind::NameFlow(NameFlowEdgeKind::Creates).is_name_flow());
         assert!(CpgEdgeKind::RewriteDep(RewriteDepEdgeKind::DependencyPair).is_rewrite_dep());
+        assert!(CpgEdgeKind::PlaceCapability(PlaceCapabilityEdgeKind::Move).is_place_capability());
 
         // Cross-class negatives.
         assert!(!CpgEdgeKind::AstChild.is_cfg());
@@ -622,7 +655,7 @@ mod proptests {
 
         #[test]
         fn prop_edge_kind_partition(k in arb_edge_kind()) {
-            // At most one of the nine top-level classes holds.
+            // At most one of the ten top-level classes holds.
             let classes = [
                 k.is_ast(),
                 k.is_cfg(),
@@ -631,6 +664,7 @@ mod proptests {
                 k.is_heap(),
                 k.is_name_flow(),
                 k.is_rewrite_dep(),
+                k.is_place_capability(),
                 k.is_call(),
                 k.is_type(),
             ];
@@ -642,6 +676,7 @@ mod proptests {
             prop_assert_eq!(k.is_heap(), matches!(k, CpgEdgeKind::Heap(_)));
             prop_assert_eq!(k.is_name_flow(), matches!(k, CpgEdgeKind::NameFlow(_)));
             prop_assert_eq!(k.is_rewrite_dep(), matches!(k, CpgEdgeKind::RewriteDep(_)));
+            prop_assert_eq!(k.is_place_capability(), matches!(k, CpgEdgeKind::PlaceCapability(_)));
             prop_assert_eq!(
                 k.is_ast(),
                 matches!(

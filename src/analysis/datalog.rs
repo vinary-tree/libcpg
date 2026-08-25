@@ -6,7 +6,8 @@
 
 use crate::{
     CfgEdgeKind, CodePropertyGraph, CpgEdge, CpgEdgeKind, CpgNodeKind, CpgNodeKindTag, DfgEdgeKind,
-    EdgeId, HeapEdgeKind, NameFlowEdgeKind, NodeId, RewriteDepEdgeKind, TypeInfo,
+    EdgeId, HeapEdgeKind, NameFlowEdgeKind, NodeId, PlaceCapabilityEdgeKind, RewriteDepEdgeKind,
+    TypeInfo,
 };
 
 #[cfg(feature = "serde")]
@@ -305,6 +306,7 @@ pub fn export_datalog(cpg: &CodePropertyGraph) -> DatalogFacts {
             CpgEdgeKind::Heap(_) => {}
             CpgEdgeKind::NameFlow(_) => {}
             CpgEdgeKind::RewriteDep(_) => {}
+            CpgEdgeKind::PlaceCapability(_) => {}
             CpgEdgeKind::StaticCall => facts.call.push(CallFact {
                 site: edge.source,
                 callee: edge.target,
@@ -574,6 +576,7 @@ fn edge_names(kind: &CpgEdgeKind) -> (&'static str, &'static str) {
         CpgEdgeKind::Heap(kind) => ("heap", heap_name(*kind)),
         CpgEdgeKind::NameFlow(kind) => ("name_flow", name_flow_name(*kind)),
         CpgEdgeKind::RewriteDep(kind) => ("rewrite_dep", rewrite_dep_name(*kind)),
+        CpgEdgeKind::PlaceCapability(kind) => ("place_capability", place_capability_name(*kind)),
         CpgEdgeKind::StaticCall => ("call", "static"),
         CpgEdgeKind::DynamicCall => ("call", "dynamic"),
         CpgEdgeKind::CallSite => ("call", "call_site"),
@@ -618,6 +621,16 @@ fn rewrite_dep_name(kind: RewriteDepEdgeKind) -> &'static str {
     match kind {
         RewriteDepEdgeKind::DependencyPair => "dependency_pair",
         RewriteDepEdgeKind::CriticalConflict => "critical_conflict",
+    }
+}
+
+fn place_capability_name(kind: PlaceCapabilityEdgeKind) -> &'static str {
+    match kind {
+        PlaceCapabilityEdgeKind::Move => "move",
+        PlaceCapabilityEdgeKind::SharedBorrow => "shared_borrow",
+        PlaceCapabilityEdgeKind::MutableBorrow => "mutable_borrow",
+        PlaceCapabilityEdgeKind::SharedReborrow => "shared_reborrow",
+        PlaceCapabilityEdgeKind::MutableReborrow => "mutable_reborrow",
     }
 }
 
@@ -761,6 +774,11 @@ mod tests {
             CpgEdgeKind::NameFlow(NameFlowEdgeKind::References),
             CpgEdgeKind::RewriteDep(RewriteDepEdgeKind::DependencyPair),
             CpgEdgeKind::RewriteDep(RewriteDepEdgeKind::CriticalConflict),
+            CpgEdgeKind::PlaceCapability(PlaceCapabilityEdgeKind::Move),
+            CpgEdgeKind::PlaceCapability(PlaceCapabilityEdgeKind::SharedBorrow),
+            CpgEdgeKind::PlaceCapability(PlaceCapabilityEdgeKind::MutableBorrow),
+            CpgEdgeKind::PlaceCapability(PlaceCapabilityEdgeKind::SharedReborrow),
+            CpgEdgeKind::PlaceCapability(PlaceCapabilityEdgeKind::MutableReborrow),
             CpgEdgeKind::CallSite,
             CpgEdgeKind::TypeOf,
             CpgEdgeKind::Inherits,
