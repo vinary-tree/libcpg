@@ -1,0 +1,36 @@
+@startuml
+!include _libcpg-theme.iuml
+
+title Advisory loan liveness and conflict evidence
+
+start
+:Select two borrow or reborrow relations; <<#DBE4FF>>
+if (same source place?) then (yes)
+  if (at least one mutable?) then (yes)
+    :Run heap-queued CFG reachability\nfrom earlier operation to later operation; <<#E5DBFF>>
+    if (<latex>\operatorname{reach}(o_{b_1},o_{b_2})</latex>?) then (yes)
+      :Enumerate DFG uses of the earlier\ndestination reference; <<#FFF3BF>>
+      :For each use, run heap-queued CFG\nreachability from later operation; <<#E5DBFF>>
+      if (<latex>\exists u\in U(t_{b_1}).\operatorname{reach}(o_{b_2},u)</latex>?) then (yes)
+        :Emit canonical ConflictingBorrow\nwith operations and live-use witness; <<#C3FAE8>>
+      else (no)
+        :Earlier loan is not represented live; <<#FFE8CC>>
+      endif
+    else (no)
+      :No represented operation order; <<#FFE8CC>>
+    endif
+  else (no)
+    :Shared/shared loans are compatible; <<#B2F2BB>>
+  endif
+else (no)
+  :Distinct represented sources do not conflict; <<#B2F2BB>>
+endif
+stop
+
+note right
+  Every CFG search uses VecDeque plus
+  an ordered visited set. Source and graph
+  depth never become native call depth.
+end note
+
+@enduml

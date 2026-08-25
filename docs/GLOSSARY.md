@@ -1059,6 +1059,36 @@ integer-tight DBM and closes it without recursion [[23]](#references). See
 
 The type tag on a CPG node (`CpgNodeKind`, 45 variants — a mix of unit variants such as `Root`, `If`, `Return` and data-carrying variants such as `Function { signature }`, `Call { target, is_method }`) or edge (`CpgEdgeKind`). Kinds drive every query and every pattern/complexity heuristic. See [`components/graph/nodes.md`](components/graph/nodes.md) and [`components/graph/edges.md`](components/graph/edges.md).
 
+### Place / Place-capability graph (PCG) / Capability
+
+A **place** is represented program storage such as a parameter, local, field,
+assignment result, or temporary. A **capability** is permission to own or
+access a place. A **place-capability graph** (PCG) relates existing place nodes
+by move, shared-borrow, mutable-borrow, shared-reborrow, or mutable-reborrow
+operations. libcpg's PCG is reconstructed from typed Code Property Graph (CPG)
+evidence and is advisory; it is not rustc's compiler-derived PCG [[80]](#references).
+See [Theory 54](theory/54-place-capability-ownership-and-borrowing.md).
+
+### Ownership move / Borrow / Reborrow / Loan extent
+
+An **ownership move** transfers a non-`Copy` value's ownership to another
+place. A **borrow** transfers temporary access: shared access permits reads,
+while mutable access requires exclusivity. A **reborrow** borrows through an
+existing reference. A **loan extent** is the CFG region in which the borrowed
+capability remains needed; libcpg approximates it by reachability through a
+later DFG use of the destination reference. RustHorn and Flowistry illustrate
+related ownership and information-flow abstractions [[81]](#references)
+[[82]](#references). See [Theory
+54](theory/54-place-capability-ownership-and-borrowing.md).
+
+### Non-lexical lifetime (NLL)
+
+A **non-lexical lifetime** (NLL) lets a Rust borrow end according to use and
+control-flow liveness rather than the enclosing lexical block alone. libcpg's
+later-destination-use predicate is an advisory CPG analogue; it does not carry
+rustc's complete region, origin, MIR-place, or Polonius facts. See the
+[place-capability security boundary](security/29-place-capability-boundary.md).
+
 ### Partial-redundancy elimination (PRE)
 
 An optimization that makes an expression fully redundant by placing a
@@ -1608,3 +1638,6 @@ strict tree interpretation. See
 77. Robinson, J. A. (1965). *A Machine-Oriented Logic Based on the Resolution Principle.* DOI: [10.1145/321250.321253](https://doi.org/10.1145/321250.321253).
 78. Aoe, J.-I. (1989). *An Efficient Digital Search Algorithm by Using a Double-Array Structure.* DOI: [10.1109/32.31365](https://doi.org/10.1109/32.31365).
 79. Giesl, J. et al. (2017). *Automated Termination Proofs with AProVE.* DOI: [10.1007/s10817-016-9388-y](https://doi.org/10.1007/s10817-016-9388-y).
+80. Grannan, D. et al. (2026). *Place Capability Graphs: A General-Purpose Abstraction for the Rust Borrow Checker.* DOI: [10.1145/3763122](https://doi.org/10.1145/3763122); preprint: [arXiv:2503.21691](https://arxiv.org/abs/2503.21691).
+81. Matsushita, Y. et al. (2020). *RustHorn: CHC-Based Verification for Rust Programs.* DOI: [10.1007/978-3-030-44914-8_18](https://doi.org/10.1007/978-3-030-44914-8_18).
+82. Crichton, W. et al. (2022). *Flowistry: An IDE Plugin for Rust to Focus on Relevant Code.* DOI: [10.1145/3519939.3523445](https://doi.org/10.1145/3519939.3523445).

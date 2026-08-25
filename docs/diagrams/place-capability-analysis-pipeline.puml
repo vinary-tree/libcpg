@@ -1,0 +1,59 @@
+@startuml
+!include _libcpg-theme.iuml
+
+title Stack-safe place-capability evidence pipeline
+
+rectangle "Rust frontend" as Frontend #DBE4FF {
+  component "Tree-sitter typed fields" as Typed #A5D8FF
+  component "OwnershipOperationKind\nMove / shared / mutable" as Operation #74C0FC
+  component "structured TypeInfo\nreference + mutability" as Type #B2F2BB
+}
+
+database "CodePropertyGraph\nexisting NodeId identity" as CPG #FFF3BF {
+  component "AST function scope" as AST #FFE066
+  component "DFG DefUse / ReachingDef" as DFG #FFA94D
+  component "field Reference" as Reference #FF8787
+  component "CFG reachability" as CFG #D0BFFF
+}
+
+rectangle "Explicit heap work" as Work #E5DBFF {
+  component "Vec operand/ancestor work" as VecWork #B197FC
+  component "VecDeque CFG work" as Queue #9775FA
+  component "ordered maps and sets" as Ordered #845EF7
+}
+
+rectangle "Qualified immutable results" as Results #C3FAE8 {
+  component "Pcg\nplaces + capability edges + issues" as PCG #63E6BE
+  component "BorrowViolation\nadvisory witnesses" as Findings #38D9A9
+}
+
+component "transactional endpoint validation" as Validate #FFD8A8
+database "optional typed\nPlaceCapability overlay" as Overlay #FFC078
+
+Typed -[#1971C2,bold]-> Operation : normalize syntax role
+Typed -[#2B8A3E,bold]-> Type : normalize reference type
+Operation -[#1971C2,bold]-> CPG
+Type -[#2B8A3E,bold]-> CPG
+AST -[#E67700,bold]-> VecWork : bound + destination
+DFG -[#E67700,bold]-> VecWork : local identity + uses
+Reference -[#C92A2A,bold]-> VecWork : field identity
+CFG -[#7048E8,bold]-> Queue : order + liveness
+VecWork -[#7048E8,bold]-> Ordered
+Queue -[#7048E8,bold]-> Ordered
+Ordered -[#087F5B,bold]-> PCG
+Ordered -[#087F5B,bold]-> Findings
+PCG -[#E67700,bold]-> Validate : explicit materialization
+Validate -[#E67700,bold]-> Overlay : all endpoints exist
+
+note right of Work
+  No source-shaped native recursion.
+  Logical traversal state remains
+  on explicit heap worklists.
+end note
+
+note bottom of Results
+  Completeness covers represented transfers only.
+  The report is not rustc's MIR borrow checker.
+end note
+
+@enduml

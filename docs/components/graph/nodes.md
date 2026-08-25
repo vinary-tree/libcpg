@@ -35,6 +35,8 @@ pub struct CpgNode {
     pub lock_kind: Option<LockKind>,
     /// Nominal constructor result, when normalized.
     pub allocation_type: Option<Box<TypeInfo>>,
+    /// Frontend-normalized move or borrow operation, if any.
+    pub ownership_operation: Option<OwnershipOperationKind>,
     /// Extra key/value metadata, allocated only when nonempty.
     pub properties: Option<Box<FxHashMap<PropertyKey, PropertyValue>>>,
     /// AST children, in source order.
@@ -46,7 +48,7 @@ pub struct CpgNode {
 
 Construct nodes with `CpgNode::new(id, kind, range)` and refine them with the
 chainable builders `with_text`, `with_message_kind`, `with_name_operation`, `with_lock_kind`,
-`with_allocation_type`, `with_property`,
+`with_allocation_type`, `with_ownership_operation`, `with_property`,
 `with_child`, and `with_parent`:
 
 ```rust
@@ -77,6 +79,12 @@ syntax remains `Call`. JavaScript/TypeScript `new` and Java object creation are
 normalized from typed grammar fields; downstream CHA/RTA/VTA analysis never
 reparses node text. Legacy or unsupported input leaves the field `None`. See
 [virtual-call type refinement](type-refinement.md).
+
+`ownership_operation` preserves Rust move, shared-borrow, or mutable-borrow
+syntax while the node retains its structural kind. The Rust frontend derives
+it from typed grammar fields; feature-free place-capability analysis consumes
+it without reparsing source. See [Rust place-capability
+analysis](place-capability-analysis.md).
 
 When you add a node to a graph with `add_node`, the graph assigns the real
 [`NodeId`](#nodeid) and overwrites the placeholder you passed — so `NodeId::new(0)`

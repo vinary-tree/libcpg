@@ -203,7 +203,7 @@ for (target, kind) in cpg.dfg_successors(def_id) {
 `dfg_predecessors` mirrors `dfg_successors`. See [`components/builder/dfg.md`](../builder/dfg.md)
 for how these edges are produced.
 
-## PDG, Heap, NameFlow, RewriteDep, call, type, reference, scope, and import edges
+## PDG, Heap, NameFlow, RewriteDep, PlaceCapability, call, type, reference, scope, and import edges
 
 The remaining overlays are single-level `CpgEdgeKind` variants:
 
@@ -229,6 +229,13 @@ The remaining overlays are single-level `CpgEdgeKind` variants:
   [`materialize_rewrite_dep_overlay`](metta-rewriting-analysis.md); query it
   with `rewrite_dep_edges`, `rewrite_dep_successors`, and
   `rewrite_dep_predecessors`.
+- **Place capability.** `PlaceCapability(PlaceCapabilityEdgeKind)` carries
+  `Move`, `SharedBorrow`, `MutableBorrow`, `SharedReborrow`, and
+  `MutableReborrow` between existing Rust place nodes. It is populated only by
+  transactional
+  [`materialize_place_capability_overlay`](place-capability-analysis.md); query
+  it with `place_capability_edges`, `place_capability_successors`, and
+  `place_capability_predecessors`.
 - **Call graph.** `StaticCall`, `DynamicCall`, and `CallSite` connect a
   [call site to its callee](../../GLOSSARY.md#call-graph); query them with
   `call_sites`, `callees`, and `callers`.

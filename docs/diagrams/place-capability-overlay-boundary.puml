@@ -1,0 +1,32 @@
+@startuml
+!include _libcpg-theme.iuml
+
+title Place-capability report and transactional overlay boundary
+
+actor "Analysis caller" as Caller #DBE4FF
+participant "Pcg\n(out of graph)" as Report #C3FAE8
+participant "materialize_place_capability_overlay" as Materialize #E5DBFF
+participant "CodePropertyGraph" as CPG #FFF3BF
+database "Projection cache" as Cache #FFE8CC
+
+Caller -[#4C6EF5,bold]> Report : analyze immutable function scope
+Report -[#0CA678,bold]--> Caller : places + relations + issues
+Caller -[#7048E8,bold]> Materialize : explicit report
+Materialize -[#F08C00,bold]> CPG : validate every source and target
+alt any endpoint missing
+  CPG -[#C92A2A,bold]--> Materialize : invalid endpoint
+  Materialize -[#C92A2A,bold]--> Caller : typed error\nzero mutation
+else all endpoints valid
+  Materialize -[#2F9E44,bold]> CPG : connect_unique typed edges
+  CPG -[#E8590C,bold]> Cache : invalidate on first new edge
+  CPG -[#2F9E44,bold]--> Materialize : stable added count
+  Materialize -[#2F9E44,bold]--> Caller : Ok(count)
+end
+
+note over Report,CPG
+  The report introduces no second node identity.
+  Materialization adds no nodes and never
+  removes or rewrites an existing overlay.
+end note
+
+@enduml

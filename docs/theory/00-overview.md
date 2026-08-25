@@ -350,6 +350,10 @@ development, or jump to the layer you need:
     reduction-pair obligations, renamed critical overlaps, and finite
     joinability exhaustion define qualified MeTTa termination/confluence
     evidence.
+54. **[54 — Place capabilities, ownership, and borrowing](54-place-capability-ownership-and-borrowing.md).**
+    Existing-node places, typed move/borrow/reborrow relations, represented
+    copy qualification, CFG reachability, and DFG-backed loan liveness define
+    deterministic advisory Rust ownership evidence.
 
 The later chapters define deterministic projection structure, architecture
 metrics, inspectable evidence, and their interpretation limits.

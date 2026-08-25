@@ -114,8 +114,9 @@ alternatives is folklore, and a decision without its costs is marketing.
 | [0068 — Compositional heap summaries](0068-compositional-heap-summaries.md) | Reuse the call-SCC solver for finite separation-logic footprints, qualified null/UAF/leak evidence, heap-resident lifetime machines, and a transactional typed Heap overlay. | Accepted |
 | [0069 — Stack-safe Rholang NameFlow](0069-stack-safe-rholang-name-flow.md) | Normalize reflective-name operations at the frontend, propagate scope extrusion with a bounded heap fixed point, and reuse iterative SCCs for qualified obligation/capability cycles. | Accepted |
 | [0070 — Stack-safe MeTTa rewriting analysis](0070-stack-safe-metta-rewriting-analysis.md) | Flatten normalized rules, index exact roots, reuse iterative SCCs for dependency-pair proofs, and qualify critical-pair joinability through explicit heap worklists. | Accepted |
+| [0071 — Stack-safe place-capability analysis](0071-stack-safe-place-capability-analysis.md) | Compose frontend-normalized Rust ownership operations with typed DFG, Reference, AST-scope, and CFG evidence into an advisory immutable PCG and optional transactional typed overlay. | Accepted |
 
-These seventy are not independent. ADR-0001 fixes the substrate that all analyses
+These seventy-one are not independent. ADR-0001 fixes the substrate that all analyses
 write onto; ADR-0002 and ADR-0005 together explain how a language reaches that
 substrate and what you must switch on to get there; ADR-0003 and ADR-0004 are
 two analyses *over* the substrate (one always-on, one feature-gated) that each
@@ -328,6 +329,10 @@ ADR-0070 reuses ADR-0002's grammar-free Mode-B construction and ADR-0014's
 iterative SCC substrate. It keeps terms and continuations in flat heap state,
 uses exact dictionary indexing only as an acceleration, and extends ADR-0001's
 shared-node model through a transactional append-only RewriteDep layer.
+ADR-0071 reuses ADR-0003's definition identity and ADR-0001's shared-node
+model. It composes normalized Rust ownership metadata with DFG, Reference,
+scope, and CFG evidence, keeps every traversal in explicit heap work, and adds
+PlaceCapability relations only through a transactional append-only boundary.
 
 ![Module architecture of libcpg, showing the graph core and the analysis modules layered over it](../diagrams/module-architecture.svg)
 

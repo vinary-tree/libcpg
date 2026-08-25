@@ -437,6 +437,9 @@ So the safe pattern is: build (single-threaded, `&mut`), then analyse
   terms, exact dependency pairs, iterative SCC reduction-pair evidence,
   renamed critical overlaps, bounded finite joinability, and optional
   RewriteDep materialization under `metta`.
+- [Rust place-capability analysis](place-capability-analysis.md) — normalized
+  move/borrow/reborrow operations, DFG/Reference place identity, CFG-backed
+  loan liveness, advisory findings, and optional PlaceCapability materialization.
 - [May-happen-in-parallel analysis](mhp-analysis.md) — typed parallel operand
   subtrees, canonical symmetric execution-site pairs, nested-region
   composition, and explicit quadratic-output truncation.

@@ -458,6 +458,24 @@ See the [component contract](../components/graph/metta-rewriting-analysis.md),
 [Theory 53](../theory/53-dependency-pairs-and-critical-pair-confluence.md), and
 [security boundary](../security/28-metta-rewriting-boundary.md).
 
+### Rust place capabilities
+
+The Rust frontend normalizes moves, shared borrows, mutable borrows, and
+structured reference mutability onto existing syntax nodes. The feature-free
+`place_capability_graph` analysis composes that metadata with DFG definition
+identity, field `Reference` identity, iterative AST function scope, and CFG
+reachability. Operand and ancestor traversal uses explicit heap vectors; CFG
+queries use `VecDeque`.
+
+`borrow_check` reports represented move-after-use and incompatible live-loan
+evidence. Its loan extent runs through a later DFG use of the destination
+reference, so it is an advisory graph analogue of non-lexical lifetime
+liveness rather than rustc's MIR borrow checker. Reports stay out of graph;
+`materialize_place_capability_overlay` is a separate transactional idempotent
+append. See the [component contract](../components/graph/place-capability-analysis.md),
+[Theory 54](../theory/54-place-capability-ownership-and-borrowing.md), and
+[security boundary](../security/29-place-capability-boundary.md).
+
 `condensation_metrics(&sccs, &options)` continues that pipeline without
 revisiting the CPG. A minimum-id Kahn order drives source-oriented longest-path
 levels and an SCC-member-weighted critical path; optional

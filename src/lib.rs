@@ -65,6 +65,8 @@
 //!   sinks, sanitizers, external calls, and dereferences with bounded witnesses
 //! - **Compositional Heap Analysis**: Infer separation-logic anti-frames and
 //!   postconditions over call SCCs and report qualified null/UAF/leak evidence
+//! - **Rust Place Capabilities**: Reconstruct typed move, borrow, and reborrow
+//!   relations and advisory violations with stack-safe heap worklists
 //! - **System Dependence Slicing**: Materialize effect-derived labeled summary
 //!   edges and compute deterministic context-sensitive two-pass slices
 //! - **Channel Topology**: Extract typed message events through def-use channel

@@ -563,6 +563,28 @@ contract](../components/graph/metta-rewriting-analysis.md), [usage
 guide](../usage/38-metta-rewriting-analysis.md), and [security
 boundary](../security/28-metta-rewriting-boundary.md).
 
+### Rust place capabilities
+
+The Rust frontend attaches `OwnershipOperationKind` and structured reference
+flags to existing nodes. The feature-free analyzer reconstructs source places
+from DFG/`Reference` identity and orders advisory evidence with the function's
+CFG; it never parses source text.
+
+| Function | Signature | Result |
+|---|---|---|
+| `place_capability_graph` | `fn(&CodePropertyGraph, NodeId) -> Result<Pcg, AnalysisError>` | Canonical existing-node places, capability relations, and typed issues for one function. |
+| `borrow_check` | `fn(&CodePropertyGraph, NodeId) -> Result<Vec<BorrowViolation>, AnalysisError>` | Ordered advisory use-after-move and conflicting-live-borrow witnesses. |
+| `materialize_place_capability_overlay` | `fn(&mut CodePropertyGraph, &Pcg) -> Result<usize, PlaceCapabilityOverlayError>` | Transactional, idempotent append of five typed relations. |
+
+`PlaceCapabilityEdgeKind::{Move, SharedBorrow, MutableBorrow, SharedReborrow,
+MutableReborrow}` is append-only. `Pcg::is_complete()` covers represented
+source/copy evidence only; it is not compiler borrow-check completeness. Query
+materialized edges with `place_capability_edges`,
+`place_capability_successors`, and `place_capability_predecessors`. See the
+[component contract](../components/graph/place-capability-analysis.md), [usage
+guide](../usage/39-place-capability-analysis.md), and [security
+boundary](../security/29-place-capability-boundary.md).
+
 ### Communication and lock-order deadlock candidates
 
 `LockKind::{AcquireRead, AcquireWrite, Release}` is optional typed metadata on a
