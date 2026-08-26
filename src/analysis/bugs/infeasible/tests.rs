@@ -229,13 +229,14 @@ fn guard_local_interval_state_includes_prior_same_block_assignments() {
     cfg(&mut cpg, guard, false_target, CfgEdgeKind::ConditionalFalse);
     def_use(&mut cpg, declaration, usage);
 
-    let analysis = analyze_infeasible_paths(&cpg, &InfeasiblePathConfig::default()).unwrap();
+    let analysis = analyze_infeasible_paths(&cpg, &InfeasiblePathConfig::default())
+        .expect("the interval-refinement fixture is valid");
     assert!(analysis.is_complete(), "{analysis:#?}");
     let redundant = analysis
         .findings
         .iter()
         .find(|finding| finding.kind == InfeasiblePathKind::RedundantCondition { value: true })
-        .unwrap();
+        .expect("the redundant condition finding must be present");
     assert_eq!(
         redundant.entry_intervals,
         vec![("x".into(), Interval::singleton(7))]
@@ -264,7 +265,8 @@ fn correlated_x_greater_five_and_x_less_three_is_contradictory() {
         false,
     );
     let before = (cpg.node_count(), cpg.edge_count());
-    let analysis = analyze_infeasible_paths(&cpg, &InfeasiblePathConfig::default()).unwrap();
+    let analysis = analyze_infeasible_paths(&cpg, &InfeasiblePathConfig::default())
+        .expect("the contradictory compound fixture is valid");
     assert!(analysis.is_complete(), "{analysis:#?}");
     assert_eq!(analysis.analyzed_functions, vec![NodeId::new(0)]);
     assert_eq!(analysis.analyzed_conditions.len(), 1);
@@ -282,7 +284,7 @@ fn correlated_x_greater_five_and_x_less_three_is_contradictory() {
         .findings
         .iter()
         .find(|finding| finding.kind == InfeasiblePathKind::ContradictoryCondition)
-        .unwrap();
+        .expect("the contradiction finding must be present");
     assert_eq!(contradiction.interval_contradictions.len(), 1);
     assert_eq!(contradiction.interval_contradictions[0].predicates.len(), 2);
     assert_eq!(
@@ -297,7 +299,8 @@ fn correlated_x_greater_five_and_x_less_three_is_contradictory() {
         finding.kind == InfeasiblePathKind::RedundantCondition { value: false }
     }));
     assert_eq!(
-        infeasible_paths(&cpg, &InfeasiblePathConfig::default()).unwrap(),
+        infeasible_paths(&cpg, &InfeasiblePathConfig::default())
+            .expect("the public finding wrapper accepts the compound fixture"),
         analysis.findings
     );
     assert_eq!((cpg.node_count(), cpg.edge_count()), before);
@@ -306,7 +309,8 @@ fn correlated_x_greater_five_and_x_less_three_is_contradictory() {
 #[test]
 fn literal_true_is_a_redundant_guard_and_sccp_prunes_false_edge() {
     let (cpg, guard, _, false_target) = constant_fixture(true);
-    let analysis = analyze_infeasible_paths(&cpg, &InfeasiblePathConfig::default()).unwrap();
+    let analysis = analyze_infeasible_paths(&cpg, &InfeasiblePathConfig::default())
+        .expect("the literal-true fixture is valid");
     assert!(analysis.is_complete(), "{analysis:#?}");
     assert_eq!(analysis.findings.len(), 2, "{analysis:#?}");
     assert!(analysis.findings.iter().any(|finding| {
@@ -342,7 +346,8 @@ fn complementary_disjunction_is_always_true_but_not_a_contradiction() {
         },
         false,
     );
-    let analysis = analyze_infeasible_paths(&cpg, &InfeasiblePathConfig::default()).unwrap();
+    let analysis = analyze_infeasible_paths(&cpg, &InfeasiblePathConfig::default())
+        .expect("the complementary-disjunction fixture is valid");
     assert!(analysis.is_complete(), "{analysis:#?}");
     assert_eq!(analysis.findings.len(), 2, "{analysis:#?}");
     assert!(analysis.findings.iter().any(|finding| {
@@ -365,11 +370,15 @@ fn complementary_disjunction_is_always_true_but_not_a_contradiction() {
 #[test]
 fn unknown_predicates_and_all_resource_boundaries_are_explicit() {
     let (mut unsupported, guard, _, _) = constant_fixture(true);
-    unsupported.node_mut(guard).unwrap().kind = CpgNodeKind::Call {
+    unsupported
+        .node_mut(guard)
+        .expect("the fixture guard exists")
+        .kind = CpgNodeKind::Call {
         target: None,
         is_method: false,
     };
-    let report = analyze_infeasible_paths(&unsupported, &InfeasiblePathConfig::default()).unwrap();
+    let report = analyze_infeasible_paths(&unsupported, &InfeasiblePathConfig::default())
+        .expect("unsupported syntax is represented by a typed incomplete result");
     assert!(!report.is_complete());
     assert!(report
         .issues
@@ -414,7 +423,8 @@ fn unknown_predicates_and_all_resource_boundaries_are_explicit() {
             "steps",
         ),
     ] {
-        let report = analyze_infeasible_paths(&compound, &config).unwrap();
+        let report = analyze_infeasible_paths(&compound, &config)
+            .expect("resource exhaustion is represented by a typed incomplete result");
         assert!(!report.is_complete());
         assert!(report.issues.iter().any(|issue| match (expected, issue) {
             ("nodes", InfeasiblePathIssue::ConditionNodeCap { condition, .. })
@@ -458,7 +468,8 @@ fn cyclic_condition_is_bounded_and_reported() {
     cfg(&mut cpg, parameter_id, guard, CfgEdgeKind::Sequential);
     cfg(&mut cpg, guard, true_target, CfgEdgeKind::ConditionalTrue);
     cfg(&mut cpg, guard, false_target, CfgEdgeKind::ConditionalFalse);
-    let report = analyze_infeasible_paths(&cpg, &InfeasiblePathConfig::default()).unwrap();
+    let report = analyze_infeasible_paths(&cpg, &InfeasiblePathConfig::default())
+        .expect("a cyclic condition is represented by a typed incomplete result");
     assert!(report
         .issues
         .contains(&InfeasiblePathIssue::CyclicCondition {
@@ -558,7 +569,8 @@ proptest! {
             right_operator,
             right_constant,
         );
-        let arena = build_condition_arena(&cpg, root, MAX_CONDITION_NODES).unwrap();
+        let arena = build_condition_arena(&cpg, root, MAX_CONDITION_NODES)
+            .expect("the generated formula fits the condition arena");
         let outcome = evaluate_condition(
             &arena,
             root,
@@ -566,7 +578,7 @@ proptest! {
             &[("x".into(), Interval::top())],
             &BTreeMap::new(),
             &InfeasiblePathConfig::default(),
-        ).unwrap();
+        ).expect("the generated formula fits the evaluation budget");
         let expected = (-16i64..=16).any(|value| {
             let left = comparison_truth(left_operator, value, left_constant);
             let right = comparison_truth(right_operator, value, right_constant);
@@ -585,9 +597,12 @@ proptest! {
         );
         let (first, ..) = compound_fixture("&&", spec.0, spec.1, reverse);
         let (second, ..) = compound_fixture("&&", spec.0, spec.1, !reverse);
-        let first_report = analyze_infeasible_paths(&first, &InfeasiblePathConfig::default()).unwrap();
-        let second_report = analyze_infeasible_paths(&second, &InfeasiblePathConfig::default()).unwrap();
-        let repeated = analyze_infeasible_paths(&first, &InfeasiblePathConfig::default()).unwrap();
+        let first_report = analyze_infeasible_paths(&first, &InfeasiblePathConfig::default())
+            .expect("the first generated fixture is valid");
+        let second_report = analyze_infeasible_paths(&second, &InfeasiblePathConfig::default())
+            .expect("the insertion-permuted fixture is valid");
+        let repeated = analyze_infeasible_paths(&first, &InfeasiblePathConfig::default())
+            .expect("the repeated generated fixture is valid");
         prop_assert_eq!(&first_report, &second_report);
         prop_assert_eq!(first_report, repeated);
     }
@@ -619,7 +634,8 @@ fn one_hundred_thousand_nested_negations_use_a_small_native_stack() {
                 ast(&mut cpg, pair[0], pair[1]);
             }
             let root = nodes[0];
-            let arena = build_condition_arena(&cpg, root, MAX_CONDITION_NODES).unwrap();
+            let arena = build_condition_arena(&cpg, root, MAX_CONDITION_NODES)
+                .expect("the deep fixture exactly meets the documented arena bound");
             let outcome = evaluate_condition(
                 &arena,
                 root,
@@ -628,22 +644,23 @@ fn one_hundred_thousand_nested_negations_use_a_small_native_stack() {
                 &BTreeMap::new(),
                 &InfeasiblePathConfig::default(),
             )
-            .unwrap();
+            .expect("the deep condition fits the documented evaluation budget");
             assert!(outcome.possible);
             assert!(outcome.unknown_nodes.is_empty());
         })
-        .unwrap()
+        .expect("the operating system can create the small-stack infeasible-path test thread")
         .join()
-        .unwrap();
+        .expect("the deep infeasible-path traversal completes without a panic");
 }
 
 #[cfg(feature = "serde")]
 #[test]
 fn public_config_and_report_round_trip_through_json() {
     let config = InfeasiblePathConfig::default();
-    let encoded = serde_json::to_string(&config).unwrap();
+    let encoded = serde_json::to_string(&config).expect("serialize infeasible-path configuration");
     assert_eq!(
-        serde_json::from_str::<InfeasiblePathConfig>(&encoded).unwrap(),
+        serde_json::from_str::<InfeasiblePathConfig>(&encoded)
+            .expect("deserialize infeasible-path configuration"),
         config
     );
     let (cpg, ..) = compound_fixture(
@@ -658,10 +675,12 @@ fn public_config_and_report_round_trip_through_json() {
         },
         false,
     );
-    let report = analyze_infeasible_paths(&cpg, &config).unwrap();
-    let encoded = serde_json::to_string(&report).unwrap();
+    let report =
+        analyze_infeasible_paths(&cpg, &config).expect("the serialization fixture is valid");
+    let encoded = serde_json::to_string(&report).expect("serialize infeasible-path report");
     assert_eq!(
-        serde_json::from_str::<InfeasiblePathAnalysis>(&encoded).unwrap(),
+        serde_json::from_str::<InfeasiblePathAnalysis>(&encoded)
+            .expect("deserialize infeasible-path report"),
         report
     );
 }

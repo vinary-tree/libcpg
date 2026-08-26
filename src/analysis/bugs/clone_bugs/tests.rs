@@ -161,7 +161,8 @@ fn guard_fixture(left_operator: &str, right_operator: &str) -> CodePropertyGraph
 #[test]
 fn one_of_ten_identifier_renames_is_reported_with_exact_support() {
     let cpg = rename_fixture(1, false);
-    let analysis = analyze_inconsistent_clones(&cpg, &CloneBugConfig::default()).unwrap();
+    let analysis = analyze_inconsistent_clones(&cpg, &CloneBugConfig::default())
+        .expect("the rename fixture is valid");
     assert!(analysis.is_complete());
     assert_eq!(analysis.analyzed_pairs.len(), 1);
     assert_eq!(analysis.analyzed_pairs[0].clone_type, CloneType::Type2);
@@ -181,7 +182,8 @@ fn one_of_ten_identifier_renames_is_reported_with_exact_support() {
     assert_eq!(analysis.findings[0].left_node, NodeId::new(1));
     assert_eq!(analysis.findings[0].right_node, NodeId::new(101));
     assert_eq!(
-        inconsistent_clone_bugs(&cpg, &CloneBugConfig::default()).unwrap(),
+        inconsistent_clone_bugs(&cpg, &CloneBugConfig::default())
+            .expect("the public finding wrapper accepts the rename fixture"),
         analysis.findings
     );
 }
@@ -189,7 +191,8 @@ fn one_of_ten_identifier_renames_is_reported_with_exact_support() {
 #[test]
 fn rename_support_boundary_is_exact_and_never_uses_floating_point() {
     let accepted =
-        analyze_inconsistent_clones(&rename_fixture(2, false), &CloneBugConfig::default()).unwrap();
+        analyze_inconsistent_clones(&rename_fixture(2, false), &CloneBugConfig::default())
+            .expect("the exact support-boundary fixture is valid");
     assert_eq!(accepted.findings.len(), 2);
     assert!(accepted.findings.iter().all(|finding| {
         matches!(
@@ -205,7 +208,8 @@ fn rename_support_boundary_is_exact_and_never_uses_floating_point() {
     }));
 
     let rejected =
-        analyze_inconsistent_clones(&rename_fixture(3, false), &CloneBugConfig::default()).unwrap();
+        analyze_inconsistent_clones(&rename_fixture(3, false), &CloneBugConfig::default())
+            .expect("the below-support fixture is valid");
     assert!(rejected.findings.is_empty());
     assert!(rejected.analyzed_pairs[0].is_low_edit);
 }
@@ -213,7 +217,8 @@ fn rename_support_boundary_is_exact_and_never_uses_floating_point() {
 #[test]
 fn aligned_guard_operator_flip_is_reported_as_typed_evidence() {
     let cpg = guard_fixture(">", "<");
-    let analysis = analyze_inconsistent_clones(&cpg, &CloneBugConfig::default()).unwrap();
+    let analysis = analyze_inconsistent_clones(&cpg, &CloneBugConfig::default())
+        .expect("the guard fixture is valid");
     assert!(analysis.is_complete());
     assert_eq!(analysis.findings.len(), 1);
     assert_eq!(analysis.findings[0].clone_type, CloneType::Type2);
@@ -230,13 +235,13 @@ fn aligned_guard_operator_flip_is_reported_as_typed_evidence() {
 fn equal_guards_and_consistent_renames_are_not_reported() {
     assert!(
         analyze_inconsistent_clones(&guard_fixture("<", "<"), &CloneBugConfig::default())
-            .unwrap()
+            .expect("the equal-guard fixture is valid")
             .findings
             .is_empty()
     );
     assert!(
         analyze_inconsistent_clones(&rename_fixture(0, false), &CloneBugConfig::default())
-            .unwrap()
+            .expect("the consistent-rename fixture is valid")
             .findings
             .is_empty()
     );
@@ -256,7 +261,8 @@ fn type3_insertion_is_evaluated_once_with_exact_edit_fraction() {
     let inserted = add(&mut cpg, CpgNodeKind::Return);
     ast(&mut cpg, right, inserted);
 
-    let analysis = analyze_inconsistent_clones(&cpg, &CloneBugConfig::default()).unwrap();
+    let analysis = analyze_inconsistent_clones(&cpg, &CloneBugConfig::default())
+        .expect("the Type-3 insertion fixture is valid");
     assert!(analysis.is_complete());
     assert_eq!(
         analysis.analyzed_pairs.len(),
@@ -275,7 +281,8 @@ fn malformed_and_bounded_evidence_is_explicit() {
     let mut cyclic = rename_fixture(1, false);
     cyclic.connect(NodeId::new(1), NodeId::new(0), CpgEdgeKind::AstChild);
     cyclic.connect(NodeId::new(101), NodeId::new(100), CpgEdgeKind::AstChild);
-    let cycle = analyze_inconsistent_clones(&cyclic, &CloneBugConfig::default()).unwrap();
+    let cycle = analyze_inconsistent_clones(&cyclic, &CloneBugConfig::default())
+        .expect("cyclic evidence is a typed incomplete result");
     assert!(!cycle.is_complete());
     assert!(cycle.issues.contains(&CloneBugIssue::CyclicAst {
         function: NodeId::new(0),
@@ -292,7 +299,7 @@ fn malformed_and_bounded_evidence_is_explicit() {
             ..CloneBugConfig::default()
         },
     )
-    .unwrap();
+    .expect("the graph-edit-distance cap is a typed incomplete result");
     assert_eq!(
         capped.issues,
         BTreeSet::from([CloneBugIssue::GedCapped {
@@ -316,7 +323,7 @@ fn malformed_and_bounded_evidence_is_explicit() {
             ..CloneBugConfig::default()
         },
     )
-    .unwrap();
+    .expect("the alignment cap is a typed incomplete result");
     assert!(matches!(
         alignment_cap.issues.iter().next(),
         Some(CloneBugIssue::AlignmentCellCap { cap: 1, .. })
@@ -407,7 +414,8 @@ proptest! {
     ) {
         let left = tape(&left, 1);
         let right = tape(&right, 10_000);
-        let actual = align_tapes(&left, &right, MAX_CLONE_ALIGNMENT_CELLS).unwrap();
+        let actual = align_tapes(&left, &right, MAX_CLONE_ALIGNMENT_CELLS)
+            .expect("generated tapes remain within the alignment cell cap");
         prop_assert_eq!(actual.edits, reference_distance(&left.tokens, &right.tokens));
         prop_assert_eq!(actual.size, left.tokens.len().max(right.tokens.len()));
         prop_assert!(actual.pairs.len() <= left.tokens.len().min(right.tokens.len()));
@@ -418,15 +426,15 @@ proptest! {
         let forward = analyze_inconsistent_clones(
             &rename_fixture(anomalies, false),
             &CloneBugConfig::default(),
-        ).unwrap();
+        ).expect("the generated forward fixture is valid");
         let reversed = analyze_inconsistent_clones(
             &rename_fixture(anomalies, true),
             &CloneBugConfig::default(),
-        ).unwrap();
+        ).expect("the generated reversed fixture is valid");
         let repeated = analyze_inconsistent_clones(
             &rename_fixture(anomalies, false),
             &CloneBugConfig::default(),
-        ).unwrap();
+        ).expect("the repeated generated fixture is valid");
         prop_assert_eq!(&forward, &reversed);
         prop_assert_eq!(forward, repeated);
     }
@@ -450,29 +458,32 @@ fn one_hundred_thousand_deep_ast_uses_no_native_recursion() {
                 ast(&mut cpg, parent, child);
                 parent = child;
             }
-            let tape = ast_tape(&cpg, root, MAX_CLONE_BUG_AST_NODES).unwrap();
+            let tape = ast_tape(&cpg, root, MAX_CLONE_BUG_AST_NODES)
+                .expect("the deep fixture exactly meets the documented arena bound");
             assert_eq!(tape.tokens.len(), 100_001);
         })
-        .unwrap()
+        .expect("the operating system can create the small-stack clone test thread")
         .join()
-        .unwrap();
+        .expect("the deep clone traversal completes without a panic");
 }
 
 #[cfg(feature = "serde")]
 #[test]
 fn public_configuration_and_report_round_trip_through_json() {
     let config = CloneBugConfig::default();
-    let encoded = serde_json::to_string(&config).unwrap();
+    let encoded = serde_json::to_string(&config).expect("serialize clone-bug configuration");
     assert_eq!(
-        serde_json::from_str::<CloneBugConfig>(&encoded).unwrap(),
+        serde_json::from_str::<CloneBugConfig>(&encoded)
+            .expect("deserialize clone-bug configuration"),
         config
     );
 
     let analysis =
-        analyze_inconsistent_clones(&rename_fixture(1, false), &CloneBugConfig::default()).unwrap();
-    let encoded = serde_json::to_string(&analysis).unwrap();
+        analyze_inconsistent_clones(&rename_fixture(1, false), &CloneBugConfig::default())
+            .expect("the serialization fixture is valid");
+    let encoded = serde_json::to_string(&analysis).expect("serialize clone-bug analysis");
     assert_eq!(
-        serde_json::from_str::<CloneBugAnalysis>(&encoded).unwrap(),
+        serde_json::from_str::<CloneBugAnalysis>(&encoded).expect("deserialize clone-bug analysis"),
         analysis
     );
 }
