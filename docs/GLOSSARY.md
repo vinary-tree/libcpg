@@ -35,6 +35,15 @@ package metrics](#martin-package-metrics).
 
 The step in a [Graph Neural Network](#graph-neural-network-gnn) that combines a node's neighbour vectors into one vector. `libcpg`'s `AggregationMethod` enumerates `Mean` (the default and the only one used in message passing), `Sum`, `Max`, `Attention`, and `Hierarchical`; the latter two are **reserved placeholders**, not yet wired. See [Message passing](#message-passing-gnn).
 
+### Approximate evidence
+
+A deterministically ranked candidate produced by a named edit method over an
+immutable text or typed-token tape. It records exact rational cost, limits,
+completion, provenance, and an independent exact-confirmation predicate.
+Approximate evidence is advisory: it cannot establish identity, graph
+topology, e-graph equality, or a security verdict. See
+[bounded approximate matching](components/graph/approximate-matching.md).
+
 ### Algebraic connectivity / Fiedler vector
 
 For the combinatorial graph Laplacian $`L=D-A`$, **algebraic connectivity** is
@@ -1269,10 +1278,12 @@ resource controls. See
 A **fuzzy candidate** is a name admitted by an explicitly selected edit metric
 and bound, such as Levenshtein distance two. It is not an exact identifier and
 does not authorize a `Call::target` or call edge. libcpg exposes no fuzzy
-resolver API; an exact miss remains unresolved. A separate advisory interface
-would need to expose its metric, work/candidate caps, ordering, and
-completeness. See
-[`usage/32-exact-call-resolution.md`](usage/32-exact-call-resolution.md).
+resolver API; an exact miss remains unresolved. The separately feature-gated
+approximate-evidence API can rank immutable symbol spellings with explicit
+method, caps, ordering, completeness, and exact-confirmation identity, but it
+does not write resolver topology. See
+[`usage/32-exact-call-resolution.md`](usage/32-exact-call-resolution.md) and
+[`usage/41-bounded-approximate-matching.md`](usage/41-bounded-approximate-matching.md).
 
 ### Structural clone class
 

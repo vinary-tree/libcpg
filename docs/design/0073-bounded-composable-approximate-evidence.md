@@ -58,13 +58,18 @@ layer. T4.5 is authorized to implement the production adapter.
    consumer key, then stable identifier. It is independent of hash order,
    insertion order, cache residency, automaton state numbering, thread count,
    and traversal scheduling.
-7. Use direct bounded `liblevenshtein` kernels for flat candidate scans. Use
-   `duallity` composition where a consumer actually needs typed rewrite stages.
-   Do not duplicate either engine inside libcpg.
+7. Use the bounded `liblevenshtein` pair adapter for one-shot token and text
+   scans. Reusable structural corpora use an explicit two-level
+   `ApproximateTokenIndex`: `libdictenstein` maps vocabulary terms reversibly
+   to `u64` identifiers, a second `libdictenstein` dictionary indexes
+   sequences of those identifiers, and `liblevenshtein` performs the bounded
+   sequence query. Use `duallity` through `lling-llang` only where a consumer
+   needs typed weighted rewrite composition. Do not duplicate any distance or
+   automata engine inside libcpg.
 8. Only dependency surfaces with constant native call depth and enforced heap
-   and work bounds are reachable from the adapter. Generalized edit operations
-   use the iterative distance automaton; the currently recursive generalized
-   dictionary-path enumerator is not on a production call path.
+   and work bounds are reachable from the adapter. The complete construction,
+   query, evidence, formatting, cloning, serialization, and destruction
+   lifecycle is qualified at 100,000 token units on a 256 KiB native stack.
 9. Rust 1.85 is not a project requirement or an admission gate. The evaluated
    release graph declares Rust 1.95. libcpg may require that toolchain, and may
    use nightly when a selected PathMap, portable-SIMD, or other retained fast
@@ -103,6 +108,49 @@ transitive default.
 libcpg already uses optional `libdictenstein` for exact MeTTa symbol
 discrimination. The production change aligns that direct dependency with the
 selected release line so combined features resolve one coherent crate family.
+
+## Two-level structural dictionary
+
+A **vocabulary** is a reversible bijection between corpus terms and positive
+integer identifiers. Let $`V`$ be the set of distinct token values and let
+$`I=\{1,\ldots,|V|\}`$. The first dictionary is a bijection
+
+```math
+\nu:V\leftrightarrow I.
+```
+
+It is exact: a finite hash may accelerate lookup, but the stored term and
+identifier establish identity. The second dictionary maps an encoded sequence
+to every stable candidate slot having that sequence:
+
+```math
+D:I^*\to\mathcal{P}_{\mathrm{fin}}(C).
+```
+
+Here $`C`$ is the ordered candidate-slot domain and
+$`\mathcal{P}_{\mathrm{fin}}`$ denotes a finite set. Retaining a slot vector is
+necessary because two different stable candidates may have identical token
+sequences. An implementation that stores only one value per sequence would
+silently lose valid candidates.
+
+The literate construction algorithm is:
+
+```text
+BUILD-SEQUENCE-INDEX(records, limits)
+    order records by stable identifier and reject duplicate identifiers
+    admit only complete token tapes within candidate, input, work, and memory caps
+    terms <- exact sorted set of every admitted token
+    reject-or-return-incomplete if |terms| exceeds the vocabulary cap
+    vocabulary <- reversible ids 1..|terms| in canonical term order
+    grouped <- ordered map from encoded id sequence to ordered record slots
+    dictionary <- DynamicDawgU64(grouped)
+    return index(dictionary, vocabulary, records, completion, counters)
+```
+
+An unknown query term receives a query-local identifier beyond the corpus
+vocabulary. Repeated occurrences of that same unknown term reuse its local
+identifier, while different unknown terms remain different. This preserves
+token equality without mutating the immutable corpus vocabulary.
 
 ## Evidence serialization and trust boundary
 
@@ -177,8 +225,8 @@ The following remain exact:
 
 ## Measured engine selection
 
-The baseline experiment compared every result with an independent bounded
-distance scan before timing. Result sets and checksums were equal.
+The initial adoption experiment compared every result with an independent
+bounded distance scan before timing. Result sets and checksums were equal.
 
 | Corpus | Terms | Ordered build | DAWG build | Direct scan | WFST query | Selection consequence |
 |---|---:|---:|---:|---:|---:|---|
@@ -198,6 +246,27 @@ The 4,096-symbol locality probe recorded 11,926,591 versus 219,267,029 cache
 references and 370,567 versus 45,561,229 cache misses for direct and WFST paths.
 That evidence reinforces the per-consumer choice and establishes a regression
 baseline for later index optimization.
+
+T4.5 then measured the final structural-sequence APIs directly. Each sequence
+has five typed units and the noisy case changes one unit. Times are Criterion
+point-estimate intervals on the retained release implementation; allocation
+counts use the benchmark's process allocator census.
+
+| Candidates | Case | Independent two-row scan | Reused `u64` DAWG | One-shot pair adapter | Rejected build-and-query |
+|---:|---|---:|---:|---:|---:|
+| 256 | exact | 22.84 us | 130.94 us | 267.92 us | about 726 us |
+| 256 | noisy | 21.24 us | 122.34 us | 280.44 us | about 724 us |
+| 4,096 | exact | 367.09 us | 2.045 ms | 4.558 ms | about 12.45 ms |
+| 4,096 | noisy | 326.52 us | 2.014 ms | 4.471 ms | about 12.51 ms |
+
+The independent scan is a benchmark oracle, not a production engine: copying
+it into libcpg would fork edit semantics. The production decision is therefore
+to expose the reusable index explicitly and keep one-shot calls free of index
+construction. At 4,096 candidates index construction used 113,882 allocations
+and 10,696,683 allocated bytes; a reused noisy query used 19,832 allocations
+and 1,943,826 allocated bytes. The algorithm-accounted index/search peak was
+28,664,336 bytes. All benchmark processes ran headlessly with a 4 GiB resident
+memory cap, swap disabled, and one Cargo build job.
 
 ## Stack, heap, and cancellation contract
 
@@ -224,6 +293,12 @@ The adapter addresses the root boundary structurally:
 - cancellation is observed before every candidate and at bounded work
   intervals; and
 - a cap or cancellation produces typed incomplete evidence.
+
+The reusable index additionally charges canonical ordering, vocabulary text,
+encoded sequence storage, directed acyclic word graph (DAWG) nodes and edge
+bounds, query-local unknown terms, transducer traversal work, yielded duplicate
+slots, and retained evidence. Build incompleteness is carried into every later
+query; a partial index can never report a complete no-match.
 
 Here *canonicalization* means arranging records by their stable identifier
 before a consumer observes them. Let `n` be the number of supplied candidates,
@@ -281,6 +356,14 @@ Complete finite relations obey extensional left identity, right identity, and
 associativity. Resource-bounded observations do not automatically obey those
 laws. A truncated observation is therefore an execution report, not another
 arrow; reassociation is prohibited after any stage becomes incomplete.
+
+Replete is deliberately outside this category boundary. Replete owns e-graph
+equivalence saturation, congruence closure, equational rewrite provenance, and
+cost-based extraction. `duallity` owns finite-state weighted tape rewrites;
+`lling-llang` owns their typed composition; `libdictenstein` owns exact
+vocabulary and sequence dictionaries; `liblevenshtein` owns edit semantics.
+No approximate path asserts an equality in Replete, and Replete does not
+replace the approximate candidate index.
 
 ## Alternatives considered
 

@@ -22,8 +22,11 @@ rectangle "Semantic admission" as semantic #FFF3BF {
 rectangle "Selected engine boundary" as evidence #FFE8CC {
   component "exact registry pins + checksums" as supply #FFE8CC
   component "oracle and category laws" as laws #E5DBFF
-  component "direct bounded kernels for\none-shot candidate scans" as direct #C3FAE8
-  component "typed WFST composition for\nreused rewrite pipelines" as composed #E5DBFF
+  component "one-shot bounded pair adapter\n(text or typed tokens)" as direct #C3FAE8
+  component "duallity tape rewrites +\nlling typed composition" as composed #E5DBFF
+  component "libdictenstein bijection\nterm <-> u64 id" as vocabulary #FCC2D7
+  component "libdictenstein DAWG\nsequence<u64> -> candidate slots" as dictionary #FCC2D7
+  component "liblevenshtein bounded\nsequence intersection" as distance #C3FAE8
   component "Rust 1.95 or nightly as needed\n256 KiB stack + bounded heap" as resource #FFE8CC
 }
 
@@ -47,7 +50,11 @@ laws --> composed : complete relations only
 resource --> direct : select stack-safe paths
 resource --> composed : explicit lifecycle limits
 direct --> result
-composed --> result
+composed --> vocabulary : normalized terms
+vocabulary --> dictionary : encode sequences
+dictionary --> distance : reusable index
+resource --> distance : work / state / memory caps
+distance --> result
 result --> completion
 completion --> exact : partial evidence remains incomplete
 confirm --> exact
@@ -60,6 +67,7 @@ legend right
   |<#FFF3BF>| semantic / advisory gate |
   |<#E5DBFF>| algebraic evidence |
   |<#C3FAE8>| measured evidence |
+  |<#FCC2D7>| exact vocabulary / sequence index |
   |<#FFE8CC>| supply-chain evidence |
   |<#D3F9D8>| admitted result and consumer |
   |<#FFE3E3>| forbidden semantic use |

@@ -224,6 +224,8 @@ let slice = backward_slice(&cpg, func, 256);         // bounded backward slice
 
 [Heterogeneous graphs and directed-fuzzing distance](theory/55-heterogeneous-graphs-and-directed-fuzzing-distance.md)
 
+[Weighted relations and approximate matching](theory/56-weighted-relations-and-approximate-matching.md)
+
 ### Architecture — the "what / where"
 [Overview](architecture/overview.md) · [Graph data model](architecture/graph-data-model.md) · [Construction & analysis data flow](architecture/data-flow.md) · [Language frontends](architecture/language-frontends.md)
 
@@ -312,8 +314,10 @@ let slice = backward_slice(&cpg, func, 256);         // bounded backward slice
 
 [0072 Deterministic heterogeneous export and fuzzing distance](design/0072-deterministic-heterogeneous-export-and-fuzzing-distance.md)
 
+[0073 Bounded composable approximate evidence](design/0073-bounded-composable-approximate-evidence.md)
+
 ### API reference
-[Graph / analysis reference](api/graph-reference.md) · [Builder reference](api/builder-reference.md) · [Pattern / algorithm / GNN reference](api/pattern-reference.md)
+[Graph / analysis reference](api/graph-reference.md) · [Builder reference](api/builder-reference.md) · [Pattern / algorithm / GNN reference](api/pattern-reference.md) · [Approximate-matching reference](api/approximate-matching-reference.md)
 
 ### Components
 
@@ -347,6 +351,8 @@ let slice = backward_slice(&cpg, func, 256);         // bounded backward slice
 [Deterministic ML export](components/graph/ml-export.md)
 
 [Heterogeneous export and directed-fuzzing distance](components/graph/heterogeneous-export-and-distance.md)
+
+[Bounded approximate matching](components/graph/approximate-matching.md)
 
 [Deterministic CPG diff](components/graph/cpg-diff.md)
 
@@ -453,6 +459,8 @@ let slice = backward_slice(&cpg, func, 256);         // bounded backward slice
 
 [Export heterogeneous tensors and fuzzing distance](usage/40-heterogeneous-export-and-fuzzing-distance.md)
 
+[Generate bounded approximate candidates](usage/41-bounded-approximate-matching.md)
+
 ### Engineering
 [Overview](engineering/00-overview.md) · [Build & features](engineering/01-build-and-features.md) · [Testing](engineering/02-testing.md) · [Performance](engineering/03-performance.md) · [Optimization ledger](engineering/optimization-ledger.md) · [Analysis-expansion matrix](engineering/analysis-expansion-matrix.md) · [Terminal evidence ledger](engineering/analysis-expansion-evidence-ledger.md) · [Contributing](engineering/04-contributing.md)
 
@@ -541,8 +549,10 @@ let slice = backward_slice(&cpg, func, 256);         // bounded backward slice
 
 [Heterogeneous-export and fuzzing-distance validation](scientific/67-heterogeneous-export-distance-validation.md)
 
+[Approximate-automata and structural-index validation](scientific/68-approximate-automata-validation.md)
+
 ### Security
-[Threat model](security/00-threat-model.md) · [Input & resource hardening](security/01-input-and-resource-hardening.md) · [Taint-analysis security boundary](security/02-taint-analysis.md) · [Interprocedural-slicing security boundary](security/03-system-dependence-slicing.md) · [Channel-topology security boundary](security/04-channel-topology.md) · [Deadlock-analysis security boundary](security/05-deadlock-analysis.md) · [MHP-analysis security boundary](security/06-mhp-analysis.md) · [Session-analysis security boundary](security/07-session-analysis.md) · [Typestate-analysis security boundary](security/08-typestate-analysis.md) · [Bug-detector security boundary](security/09-bug-detectors.md) · [Population-anomaly security boundary](security/10-population-anomaly-detectors.md) · [Clone/feasibility security boundary](security/11-clone-feasibility-detectors.md) · [API-usage protocol-mining security boundary](security/12-api-usage-protocol-mining.md) · [CWE-template security boundary](security/13-cwe-template-analysis.md) · [Cryptographic API-misuse security boundary](security/14-cryptographic-api-misuse.md) · [Secret-flow/access-policy security boundary](security/15-secret-and-access-policy-analysis.md) · [Vulnerability-extrapolation security boundary](security/16-vulnerability-extrapolation.md) · [Virtual-call type-refinement security boundary](security/17-type-refinement-boundary.md) · [Concurrency-bug detection security boundary](security/18-concurrency-bug-detection.md) · [ML-export security boundary](security/19-ml-export-boundary.md) · [CPG-diff security boundary](security/20-cpg-diff-boundary.md) · [Incremental-cache security boundary](security/21-incremental-cache-boundary.md) · [Resolver symbol-index security boundary](security/22-resolver-symbol-index-boundary.md) · [Datalog-export security boundary](security/23-datalog-export-boundary.md) · [PDG information-flow security boundary](security/24-pdg-information-flow-boundary.md) · [Relational-domain security boundary](security/25-relational-abstract-domain-boundary.md) · [Compositional-heap security boundary](security/26-compositional-heap-boundary.md) · [Rholang NameFlow security boundary](security/27-rholang-name-flow-boundary.md) · [MeTTa rewriting security boundary](security/28-metta-rewriting-boundary.md) · [Rust place-capability security boundary](security/29-place-capability-boundary.md) · [Heterogeneous-export and fuzzing-distance security boundary](security/30-heterogeneous-export-and-distance-boundary.md)
+[Threat model](security/00-threat-model.md) · [Input & resource hardening](security/01-input-and-resource-hardening.md) · [Taint-analysis security boundary](security/02-taint-analysis.md) · [Interprocedural-slicing security boundary](security/03-system-dependence-slicing.md) · [Channel-topology security boundary](security/04-channel-topology.md) · [Deadlock-analysis security boundary](security/05-deadlock-analysis.md) · [MHP-analysis security boundary](security/06-mhp-analysis.md) · [Session-analysis security boundary](security/07-session-analysis.md) · [Typestate-analysis security boundary](security/08-typestate-analysis.md) · [Bug-detector security boundary](security/09-bug-detectors.md) · [Population-anomaly security boundary](security/10-population-anomaly-detectors.md) · [Clone/feasibility security boundary](security/11-clone-feasibility-detectors.md) · [API-usage protocol-mining security boundary](security/12-api-usage-protocol-mining.md) · [CWE-template security boundary](security/13-cwe-template-analysis.md) · [Cryptographic API-misuse security boundary](security/14-cryptographic-api-misuse.md) · [Secret-flow/access-policy security boundary](security/15-secret-and-access-policy-analysis.md) · [Vulnerability-extrapolation security boundary](security/16-vulnerability-extrapolation.md) · [Virtual-call type-refinement security boundary](security/17-type-refinement-boundary.md) · [Concurrency-bug detection security boundary](security/18-concurrency-bug-detection.md) · [ML-export security boundary](security/19-ml-export-boundary.md) · [CPG-diff security boundary](security/20-cpg-diff-boundary.md) · [Incremental-cache security boundary](security/21-incremental-cache-boundary.md) · [Resolver symbol-index security boundary](security/22-resolver-symbol-index-boundary.md) · [Datalog-export security boundary](security/23-datalog-export-boundary.md) · [PDG information-flow security boundary](security/24-pdg-information-flow-boundary.md) · [Relational-domain security boundary](security/25-relational-abstract-domain-boundary.md) · [Compositional-heap security boundary](security/26-compositional-heap-boundary.md) · [Rholang NameFlow security boundary](security/27-rholang-name-flow-boundary.md) · [MeTTa rewriting security boundary](security/28-metta-rewriting-boundary.md) · [Rust place-capability security boundary](security/29-place-capability-boundary.md) · [Heterogeneous-export and fuzzing-distance security boundary](security/30-heterogeneous-export-and-distance-boundary.md) · [Approximate-evidence security boundary](security/31-approximate-evidence-boundary.md)
 
 ### Reference
 [Glossary](GLOSSARY.md) · [Diagram catalog](diagrams/README.md)
@@ -562,7 +572,8 @@ let slice = backward_slice(&cpg, func, 256);         // bounded backward slice
 | `ml-linfa` / `ml-rules` | ML- / rule-based pattern classification |
 | `rholang` | the dependency-free Rholang Mode-B mapper and NameFlow analyses |
 | `metta` | the grammar-free MeTTa Mode-B mapper plus exact `libdictenstein`-indexed rewrite analyses |
-| `full` | `gnn + design-patterns + algorithm-detection + serde + ml-rules + lang-all` |
+| `approximate-matching` | bounded text/token candidate evidence, reusable structural index, and typed finite rewrite composition |
+| `full` | `gnn + design-patterns + algorithm-detection + abstract-domains + approximate-matching + serde + ml-rules + lang-all` |
 
 *(`gpu` is reserved and wires no code yet.)* Full detail:
 [engineering/build-and-features](engineering/01-build-and-features.md).

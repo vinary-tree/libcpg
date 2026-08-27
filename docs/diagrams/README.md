@@ -184,7 +184,7 @@ Grouped by subject. Each row: the source (its `.svg` sibling is embedded by the 
 | `similarity-metrics.puml` | mindmap | Jaccard / Cosine / WL / GraphEdit | theory/06, components/patterns/vf2-matching |
 | `ged-pipeline.puml` | activity | Budgeted star costs → Hungarian assignment → concrete typed edit scripts → symmetric normalized bound | theory/06, components/patterns/ged-analysis |
 | `clone-detection-pipeline.puml` | activity/decision flow | Ordered Type-1/2 AST fingerprints → bounded Type-3 multiset comparison → PDG WL prefilter and relaxed VF2 Type-4 verification → canonical classes | theory/23, design/0030, components/patterns/clone-detection |
-| `approximate-automata-adoption.puml` | component/evidence flow | immutable typed projections → bounded direct or composed approximate matching → typed completion and provenance → consumer-specific exact confirmation | design/0073, theory/56 |
+| `approximate-automata-adoption.puml` | component/evidence flow | immutable typed projections → duallity/lling rewrites → reversible term IDs → reusable ID-sequence dictionary or one-shot adapter → bounded liblevenshtein evidence → exact confirmation | design/0073, theory/56, components/graph/approximate-matching, scientific/68 |
 | `wl-kernel.dot` | graph | Weisfeiler-Lehman label refinement | theory/06, components/patterns/vf2-matching |
 | `pattern-detection-pipeline.puml` | activity | GoF detect: template → relaxed VF2 → confidence | theory/07, design/0004, components/patterns/overview, usage/03 |
 | `gof-taxonomy.puml` | mindmap | 23 GoF patterns by category | theory/07, api/pattern-reference, components/patterns/gang-of-four |

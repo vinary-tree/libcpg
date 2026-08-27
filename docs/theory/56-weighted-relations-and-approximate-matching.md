@@ -272,6 +272,77 @@ relation, but its fixed point does not make approximate facts exact. Category
 theory helps state these interfaces and laws; it does not erase their semantic
 boundaries.
 
+## 9. Exact vocabularies and sequence languages
+
+Approximate matching over program structure must compare token equality, not
+the textual accident of concatenating tokens. A token may contain any Unicode
+text, delimiter, or sentinel-like value. The reusable structural index uses two
+exact dictionaries.
+
+First, a bijection $`\nu`$ assigns each vocabulary term a reversible integer
+identifier:
+
+```math
+\nu:V\leftrightarrow\{1,\ldots,|V|\}.
+```
+
+Second, a finite dictionary recognizes a language of identifier sequences and
+maps each accepted sequence to all stable candidate slots represented by it:
+
+```math
+D:\nu(V)^*\to\mathcal{P}_{\mathrm{fin}}(C).
+```
+
+This factorization has four useful properties.
+
+1. **Type independence.** A vocabulary term can represent an identifier,
+   operator, node kind, API event, n-gram, or another caller-defined structure.
+2. **Reversibility.** Evidence can decode an integer back to the exact term;
+   hashes are accelerators rather than semantic identities.
+3. **Sequence preservation.** Boundaries are structural. Tokens `ab,c` and
+   `a,bc` cannot collide through concatenation.
+4. **Multiplicity preservation.** Identical sequences belonging to different
+   stable candidates remain different candidates.
+
+Unknown query terms are assigned fresh query-local identifiers greater than
+the corpus range. The encoding function is equality-reflecting within the
+query:
+
+```math
+q_i=q_j\Longleftrightarrow\widehat{\nu}(q_i)=\widehat{\nu}(q_j).
+```
+
+Consequently a bijective renaming of every token leaves every edit distance
+and public ranking unchanged. The property suite checks this metamorphic law
+against an independent two-row dynamic-programming oracle.
+
+The directed acyclic word graph (DAWG) is a compact recognizer for the finite
+sequence language. Intersecting a bounded edit transducer with that recognizer
+searches many sequences without flattening their terms into characters. The
+representation is an indexed capability, not an unconditional performance
+claim: for one ad hoc query, index construction can dominate the search. The
+measured API therefore separates a one-shot pair adapter from an explicitly
+owned reusable index.
+
+## 10. Division of algebraic responsibilities
+
+Four libraries participate in approximate tape processing, while Replete has a
+separate equational role.
+
+| Component | Mathematical object | libcpg responsibility |
+|---|---|---|
+| `duallity` | weighted finite-state tape rewrite | optional lexical/domain rewrites |
+| `lling-llang` | typed weighted-relation composition | valid intermediate tape and semiring connection |
+| `libdictenstein` | exact finite vocabulary and sequence language | reversible IDs and reusable corpus index |
+| `liblevenshtein` | edit relation and bounded traversal | cost semantics and accepted neighborhood |
+| Replete | congruence-closed equivalence classes | later pure-expression equality saturation and extraction |
+
+A tape rewrite does not prove an equation between program expressions. An
+e-graph equation does not define an edit metric. Their outputs may meet only at
+an explicit adapter: approximate search proposes stable candidates, and an
+exact semantic analysis may confirm them or reject them. This keeps category
+composition useful without erasing the proposition each category represents.
+
 ## References
 
 1. Schulz, K. U., Mihov, S. (2002). *Fast String Correction with Levenshtein
