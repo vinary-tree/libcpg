@@ -20,6 +20,9 @@ use lling_llang::composition::{compose, LazyComposition};
 use lling_llang::semiring::{Semiring, TropicalWeight};
 use lling_llang::wfst::{MutableWfst, VectorWfst};
 
+#[cfg(feature = "serde")]
+use serde::{Deserialize, Serialize};
+
 use super::{ApproximateCancellation, ApproximateCompletion, ApproximateLimit, ApproximateLimits};
 
 /// Largest integer exactly represented by the tropical `f64` carrier.
@@ -43,6 +46,7 @@ pub enum NormalizedTapeDomain {}
 
 /// One explicit weighted relation path.
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct FiniteRewriteRule {
     /// Complete input tape.
     pub input: Arc<str>,
@@ -340,6 +344,7 @@ impl<Domain> TypedFiniteRelation<Domain, Domain> {
 
 /// Resource counters for one finite composition observation.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct FiniteCompositionCounters {
     /// Conservative reachable product-state upper bound.
     pub state_upper_bound: u64,
@@ -355,6 +360,7 @@ pub struct FiniteCompositionCounters {
 
 /// One extensional input/output pair with its minimum tropical cost.
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct FiniteRelationPath {
     /// Complete input tape.
     pub input: Arc<str>,
@@ -366,6 +372,7 @@ pub struct FiniteRelationPath {
 
 /// Bounded extensional observation of a composed relation.
 #[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct FiniteRelationObservation<From, To> {
     /// Canonically ordered, minimum-cost extensional paths.
     pub paths: Vec<FiniteRelationPath>,
@@ -373,6 +380,7 @@ pub struct FiniteRelationObservation<From, To> {
     pub completion: ApproximateCompletion,
     /// Composition resource counters.
     pub counters: FiniteCompositionCounters,
+    #[cfg_attr(feature = "serde", serde(skip))]
     marker: PhantomData<fn(From) -> To>,
 }
 
@@ -389,6 +397,7 @@ impl<From, To> FiniteRelationObservation<From, To> {
 
 /// Complete extensional observation eligible for category-law comparison.
 #[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct CompleteFiniteObservation<From, To>(FiniteRelationObservation<From, To>);
 
 impl<From, To> CompleteFiniteObservation<From, To> {
@@ -673,6 +682,27 @@ mod tests {
             TypedFiniteRelation::<A, B>::from_duallity_rules(&rules, &ApproximateLimits::default())
                 .unwrap();
         assert_eq!(relation.rule_count(), 1);
+    }
+
+    #[cfg(feature = "serde")]
+    #[test]
+    fn complete_extensional_observation_round_trips_without_marker_state() {
+        let limits = ApproximateLimits::default();
+        let left = TypedFiniteRelation::<A, B>::from_rules(&[rule("a", "b", 2)], &limits).unwrap();
+        let right = TypedFiniteRelation::<B, C>::from_rules(&[rule("b", "c", 3)], &limits).unwrap();
+        let observed = left
+            .compose(&right, &limits)
+            .unwrap()
+            .observe(&ApproximateCancellation::default())
+            .unwrap();
+
+        let encoded = serde_json::to_vec(&observed).unwrap();
+        let decoded: FiniteRelationObservation<A, C> = serde_json::from_slice(&encoded).unwrap();
+
+        assert_eq!(decoded.paths, observed.paths);
+        assert_eq!(decoded.completion, observed.completion);
+        assert_eq!(decoded.counters, observed.counters);
+        assert!(!String::from_utf8(encoded).unwrap().contains("marker"));
     }
 
     proptest! {

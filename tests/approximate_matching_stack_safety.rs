@@ -127,6 +127,14 @@ fn candidate_order_rank_clone_debug_and_drop_are_stack_safe_at_100k() {
 
             let cloned = report.clone();
             assert!(format!("{cloned:?}").contains("RevisionAlignment"));
+            #[cfg(feature = "serde")]
+            {
+                let encoded = serde_json::to_vec(&cloned)
+                    .expect("serialize evidence from the 100k-candidate lifecycle");
+                let decoded: libcpg::ApproximateReport = serde_json::from_slice(&encoded)
+                    .expect("deserialize evidence from the 100k-candidate lifecycle");
+                assert_eq!(decoded, cloned);
+            }
             drop(cloned);
             drop(report);
             drop(candidates);

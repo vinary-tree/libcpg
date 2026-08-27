@@ -102,6 +102,47 @@ libcpg already uses optional `libdictenstein` for exact MeTTa symbol
 discrimination. The production change aligns that direct dependency with the
 selected release line so combined features resolve one coherent crate family.
 
+## Evidence serialization and trust boundary
+
+When libcpg's `serde` feature is enabled, approximate configurations,
+projections, reports, individual evidence records, finite rewrite rules, and
+finite extensional observations have an owned serialization form. The method
+identity is owned text rather than a process-local static reference. No live
+cancellation token, automaton, worklist, cache, or mutable graph is serialized.
+
+The wire contract has three safeguards:
+
+1. `schema_version` is emitted in every report provenance record and currently
+   equals `1`. A reader must reject or explicitly migrate an unsupported
+   version; it must not guess field semantics.
+2. Evidence and relation paths are already canonically ordered, completion
+   reasons are ordered enum values, and the serialized structures contain no
+   hash maps. Repeated JSON serialization of the same report is therefore
+   byte-deterministic.
+3. Deserialization restores evidence, not authority. A consumer still checks
+   the recorded method/configuration identity, graph or corpus namespace,
+   completion state, limits, and the consumer-specific exact confirmation
+   predicate before acting on a candidate.
+
+For example, persistence and replay are deliberately explicit:
+
+```rust,no_run
+use libcpg::ApproximateReport;
+
+# fn persist(report: &ApproximateReport) -> Result<(), serde_json::Error> {
+let bytes = serde_json::to_vec(report)?;
+let replayed: ApproximateReport = serde_json::from_slice(&bytes)?;
+assert_eq!(&replayed, report);
+# Ok(())
+# }
+```
+
+The 100,000-candidate lifecycle gate performs this round trip on a 256 KiB
+thread stack. The marker-typed weighted finite-state transducer (WFST)
+observation gate separately proves that only extensional paths, completion,
+and counters cross the wire; zero-sized tape-domain markers do not become
+runtime state.
+
 ## Consumer contracts
 
 | Consumer | Approximate proposition | Independent confirmation | Result use |

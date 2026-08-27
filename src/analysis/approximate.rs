@@ -25,6 +25,9 @@ use liblevenshtein::transducer::generalized::{
 };
 use liblevenshtein::transducer::OperationSet;
 
+#[cfg(feature = "serde")]
+use serde::{Deserialize, Serialize};
+
 use crate::{CodePropertyGraph, CpgNodeKindTag, NodeId};
 
 use super::{ApiUsageGraph, ApiUsageNodeKind};
@@ -37,6 +40,7 @@ pub const APPROXIMATE_EVIDENCE_SCHEMA_VERSION: u32 = 1;
 /// Graph and corpus namespaces prevent equal local identifiers from different
 /// revisions or input collections from being mistaken for the same item.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub enum ApproximateId {
     /// A node in a namespaced CPG revision.
     CpgNode {
@@ -63,6 +67,7 @@ pub enum ApproximateId {
 
 /// Immutable tape compared by an approximate method.
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub enum ApproximateTape {
     /// Unicode scalar sequence, suitable for names and source-independent text.
     Text(Arc<str>),
@@ -95,6 +100,7 @@ impl ApproximateTape {
 
 /// One immutable item admitted to approximate candidate generation.
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct ApproximateRecord {
     /// Stable identity retained by every emitted evidence record.
     pub id: ApproximateId,
@@ -114,6 +120,7 @@ impl ApproximateRecord {
 
 /// Supported edit-distance semantics.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub enum ApproximateMethod {
     /// Standard Levenshtein insertion, deletion, and substitution distance.
     StandardLevenshtein,
@@ -149,6 +156,7 @@ impl ApproximateMethod {
 
 /// Meaning of a raw approximate score.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub enum ApproximateScoreSemantics {
     /// A non-negative distance satisfying the metric laws.
     MetricDistance,
@@ -160,6 +168,7 @@ pub enum ApproximateScoreSemantics {
 
 /// Semiring used by distance and composition evidence.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub enum ApproximateSemiring {
     /// Tropical min-plus: alternative paths take minimum and sequential costs add.
     TropicalMinPlus,
@@ -167,6 +176,7 @@ pub enum ApproximateSemiring {
 
 /// Consumer requesting approximate candidate generation.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub enum ApproximateConsumer {
     /// Typo-tolerant symbol navigation.
     SymbolNavigation,
@@ -198,6 +208,7 @@ impl ApproximateConsumer {
 
 /// Exact confirmation required before acting on approximate evidence.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub enum ExactConfirmation {
     /// A user selection or an exact symbol-table lookup.
     UserSelectionOrExactLookup,
@@ -215,6 +226,7 @@ pub enum ExactConfirmation {
 
 /// Explicit resource limits for one search.
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct ApproximateLimits {
     /// Maximum number of candidate records examined.
     pub max_candidates: usize,
@@ -248,6 +260,7 @@ impl Default for ApproximateLimits {
 
 /// Complete configuration of one reproducible search.
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct ApproximateConfig {
     /// Distance method and its mathematical semantics.
     pub method: ApproximateMethod,
@@ -291,6 +304,7 @@ impl ApproximateCancellation {
 
 /// Reason why a search could not examine all admitted evidence.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub enum ApproximateLimit {
     /// Candidate count exceeded the configured cap.
     CandidateCount,
@@ -312,6 +326,7 @@ pub enum ApproximateLimit {
 
 /// Whether all eligible candidates were examined.
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub enum ApproximateCompletion {
     /// Every candidate was examined and the returned top-k is complete.
     Complete,
@@ -321,6 +336,7 @@ pub enum ApproximateCompletion {
 
 /// Exact non-negative rational used for raw and normalized costs.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct ApproximateRational {
     /// Non-negative numerator.
     pub numerator: u64,
@@ -345,11 +361,12 @@ impl ApproximateRational {
 
 /// Replayable identity of a search and its admitted inputs.
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct ApproximateProvenance {
     /// Evidence schema version.
     pub schema_version: u32,
     /// Stable method/configuration identity.
-    pub method_identity: &'static str,
+    pub method_identity: Arc<str>,
     /// Deterministic digest of the complete configuration.
     pub config_digest: u64,
     /// Deterministic digest of the query identity and tape.
@@ -360,6 +377,7 @@ pub struct ApproximateProvenance {
 
 /// Resource accounting for one search.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct ApproximateCounters {
     /// Candidate records presented by the caller.
     pub candidate_count: usize,
@@ -383,6 +401,7 @@ pub struct ApproximateCounters {
 
 /// Resource accounting for an immutable CPG or API projection.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct ApproximateProjectionCounters {
     /// Source nodes or API-usage graphs visited.
     pub visited_items: usize,
@@ -396,6 +415,7 @@ pub struct ApproximateProjectionCounters {
 
 /// Bounded immutable records projected from typed graph evidence.
 #[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct ApproximateProjection {
     /// Deterministically ordered records admitted by the projection.
     pub records: Vec<ApproximateRecord>,
@@ -407,6 +427,7 @@ pub struct ApproximateProjection {
 
 /// One ranked approximate candidate requiring exact confirmation.
 #[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct ApproximateEvidence {
     /// Stable candidate identity.
     pub candidate: ApproximateId,
@@ -442,6 +463,7 @@ pub struct ApproximateEvidence {
 
 /// Immutable result of bounded approximate candidate generation.
 #[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct ApproximateReport {
     /// Ranked candidates. An empty incomplete report is not evidence of no match.
     pub evidence: Vec<ApproximateEvidence>,
@@ -1691,7 +1713,7 @@ fn provenance<'a>(
     }
     ApproximateProvenance {
         schema_version: APPROXIMATE_EVIDENCE_SCHEMA_VERSION,
-        method_identity: config.method.identity(),
+        method_identity: Arc::from(config.method.identity()),
         config_digest: config_hash.finish(),
         query_digest: query_hash.finish(),
         corpus_digest: corpus_hash.finish(),
