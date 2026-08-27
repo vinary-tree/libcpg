@@ -12,7 +12,7 @@
 //! state, or memory limit, and incomplete work is reported as incomplete.
 
 use std::cmp::Ordering;
-use std::collections::BTreeSet;
+use std::collections::{BTreeSet, BinaryHeap};
 use std::mem::size_of;
 use std::sync::atomic::{AtomicBool, Ordering as AtomicOrdering};
 use std::sync::Arc;
@@ -501,29 +501,50 @@ pub fn approximate_candidates(
 ) -> Result<ApproximateReport, ApproximateError> {
     validate_config(config)?;
 
-    let pointer_bytes = candidates
+    let ordering_bytes = candidates
         .len()
-        .checked_mul(size_of::<&ApproximateRecord>())
+        .checked_mul(size_of::<(ApproximateId, &ApproximateRecord)>())
         .and_then(|bytes| u64::try_from(bytes).ok())
-        .ok_or(ApproximateError::IntegerDomain("candidate pointer storage"))?;
+        .ok_or(ApproximateError::IntegerDomain(
+            "candidate ordering storage",
+        ))?;
 
-    let mut ordered: Vec<_> = candidates.iter().collect();
-    ordered.sort_unstable_by_key(|record| record.id);
+    let candidate_count = candidates.len();
+    let mut limitations = BTreeSet::new();
+    if candidate_count > config.limits.max_candidates {
+        limitations.insert(ApproximateLimit::CandidateCount);
+    }
+    if ordering_bytes > config.limits.max_memory_bytes {
+        limitations.insert(ApproximateLimit::Memory);
+        return Ok(finish_report(
+            Vec::new(),
+            limitations,
+            provenance(query, std::iter::empty(), config),
+            ApproximateCounters {
+                candidate_count,
+                peak_memory_bytes: ordering_bytes,
+                ..ApproximateCounters::default()
+            },
+            consumer,
+            config,
+        ));
+    }
+
+    let mut ordered = BinaryHeap::from(
+        candidates
+            .iter()
+            .map(|record| (record.id, record))
+            .collect::<Vec<_>>(),
+    )
+    .into_sorted_vec();
     for duplicate in ordered.windows(2) {
-        if duplicate[0].id == duplicate[1].id {
-            return Err(ApproximateError::DuplicateCandidate(duplicate[0].id));
+        if duplicate[0].0 == duplicate[1].0 {
+            return Err(ApproximateError::DuplicateCandidate(duplicate[0].0));
         }
     }
 
-    let candidate_count = ordered.len();
-    let mut limitations = BTreeSet::new();
     if ordered.len() > config.limits.max_candidates {
         ordered.truncate(config.limits.max_candidates);
-        limitations.insert(ApproximateLimit::CandidateCount);
-    }
-    if pointer_bytes > config.limits.max_memory_bytes {
-        ordered.clear();
-        limitations.insert(ApproximateLimit::Memory);
     }
 
     let retained_bytes = config
@@ -532,27 +553,38 @@ pub fn approximate_candidates(
         .checked_mul(size_of::<PendingEvidence>())
         .and_then(|bytes| u64::try_from(bytes).ok())
         .ok_or(ApproximateError::IntegerDomain("retained evidence storage"))?;
-    let base_memory_bytes = pointer_bytes
+    let base_memory_bytes = ordering_bytes
         .checked_add(retained_bytes)
         .ok_or(ApproximateError::IntegerDomain("base search storage"))?;
     if base_memory_bytes > config.limits.max_memory_bytes {
-        ordered.clear();
         limitations.insert(ApproximateLimit::Memory);
+        return Ok(finish_report(
+            Vec::new(),
+            limitations,
+            provenance(query, ordered.iter().map(|(_, record)| *record), config),
+            ApproximateCounters {
+                candidate_count,
+                peak_memory_bytes: base_memory_bytes,
+                ..ApproximateCounters::default()
+            },
+            consumer,
+            config,
+        ));
     }
 
-    let provenance = provenance(query, &ordered, config);
+    let provenance = provenance(query, ordered.iter().map(|(_, record)| *record), config);
     let mut counters = ApproximateCounters {
         candidate_count,
         admitted_candidates: ordered.len(),
         peak_memory_bytes: base_memory_bytes,
         ..ApproximateCounters::default()
     };
-    let mut evidence = Vec::with_capacity(config.top_k.min(ordered.len()));
+    let mut evidence = BinaryHeap::with_capacity(config.top_k.min(ordered.len()));
 
     if query.tape.units() > config.limits.max_input_units {
         limitations.insert(ApproximateLimit::InputUnits);
         return Ok(finish_report(
-            evidence,
+            evidence.into_sorted_vec(),
             limitations,
             provenance,
             counters,
@@ -561,7 +593,7 @@ pub fn approximate_candidates(
         ));
     }
 
-    for candidate in ordered {
+    for (_, candidate) in ordered {
         if cancellation.is_cancelled() {
             limitations.insert(ApproximateLimit::Cancelled);
             break;
@@ -640,14 +672,13 @@ pub fn approximate_candidates(
             raw_cost,
             normalized_cost: ApproximateRational::new(raw_cost.numerator, normalized_denominator),
         });
-        evidence.sort_unstable_by(compare_pending);
         if evidence.len() > config.top_k {
             evidence.pop();
         }
     }
 
     Ok(finish_report(
-        evidence,
+        evidence.into_sorted_vec(),
         limitations,
         provenance,
         counters,
@@ -679,9 +710,7 @@ pub fn project_cpg_names(
     if base_bytes > limits.max_memory_bytes {
         return Ok(limited_projection(ApproximateLimit::Memory, base_bytes));
     }
-    let mut node_ids = Vec::with_capacity(cpg.node_count());
-    node_ids.extend(cpg.node_ids());
-    node_ids.sort_unstable();
+    let node_ids = BinaryHeap::from(cpg.node_ids().collect::<Vec<_>>()).into_sorted_vec();
 
     let mut records = Vec::with_capacity(record_capacity);
     let mut limitations = BTreeSet::new();
@@ -753,12 +782,13 @@ pub fn project_cpg_functions(
     if id_upper_bytes > limits.max_memory_bytes {
         return Ok(limited_projection(ApproximateLimit::Memory, id_upper_bytes));
     }
-    let mut functions: Vec<_> = cpg
-        .nodes()
-        .filter(|node| node.kind.tag() == CpgNodeKindTag::Function)
-        .map(|node| node.id)
-        .collect();
-    functions.sort_unstable();
+    let functions = BinaryHeap::from(
+        cpg.nodes()
+            .filter(|node| node.kind.tag() == CpgNodeKindTag::Function)
+            .map(|node| node.id)
+            .collect::<Vec<_>>(),
+    )
+    .into_sorted_vec();
     let id_bytes = checked_allocation(
         functions.capacity(),
         size_of::<NodeId>(),
@@ -838,10 +868,10 @@ pub fn project_api_usages(
     limits: &ApproximateLimits,
 ) -> Result<ApproximateProjection, ApproximateError> {
     validate_limits(limits)?;
-    let pointer_bytes = checked_allocation(
+    let ordering_bytes = checked_allocation(
         usages.len(),
-        size_of::<&ApiUsageGraph>(),
-        "API-usage pointers",
+        size_of::<(NodeId, &ApiUsageGraph)>(),
+        "API-usage ordering",
     )?;
     let record_capacity = usages.len().min(limits.max_candidates);
     let reserved_record_bytes = checked_allocation(
@@ -849,15 +879,19 @@ pub fn project_api_usages(
         size_of::<ApproximateRecord>(),
         "API-usage records",
     )?;
-    let base_bytes = pointer_bytes
+    let base_bytes = ordering_bytes
         .checked_add(reserved_record_bytes)
         .ok_or(ApproximateError::IntegerDomain("API-usage projection"))?;
     if base_bytes > limits.max_memory_bytes {
         return Ok(limited_projection(ApproximateLimit::Memory, base_bytes));
     }
-    let mut ordered = Vec::with_capacity(usages.len());
-    ordered.extend(usages.iter());
-    ordered.sort_unstable_by_key(|usage| usage.anchor);
+    let ordered = BinaryHeap::from(
+        usages
+            .iter()
+            .map(|usage| (usage.anchor, usage))
+            .collect::<Vec<_>>(),
+    )
+    .into_sorted_vec();
 
     let mut records = Vec::with_capacity(record_capacity);
     let mut limitations = BTreeSet::new();
@@ -866,7 +900,7 @@ pub fn project_api_usages(
         ..ApproximateProjectionCounters::default()
     };
     let mut retained_bytes = base_bytes;
-    for usage in ordered {
+    for (_, usage) in ordered {
         if !charge_projection_visit(&mut counters, limits) {
             limitations.insert(ApproximateLimit::TotalWork);
             break;
@@ -1336,6 +1370,26 @@ struct PendingEvidence {
     normalized_cost: ApproximateRational,
 }
 
+impl PartialEq for PendingEvidence {
+    fn eq(&self, other: &Self) -> bool {
+        compare_pending(self, other) == Ordering::Equal
+    }
+}
+
+impl Eq for PendingEvidence {}
+
+impl PartialOrd for PendingEvidence {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
+impl Ord for PendingEvidence {
+    fn cmp(&self, other: &Self) -> Ordering {
+        compare_pending(self, other)
+    }
+}
+
 fn compare_pending(left: &PendingEvidence, right: &PendingEvidence) -> Ordering {
     left.normalized_cost
         .compare(right.normalized_cost)
@@ -1465,8 +1519,14 @@ fn encode_token_pair(
     candidate: &[Arc<str>],
     max_unique_tokens: usize,
 ) -> Result<(String, String), PairPreparation> {
-    let mut vocabulary: Vec<&str> = query.iter().chain(candidate).map(AsRef::as_ref).collect();
-    vocabulary.sort_unstable();
+    let mut vocabulary = BinaryHeap::from(
+        query
+            .iter()
+            .chain(candidate)
+            .map(AsRef::as_ref)
+            .collect::<Vec<_>>(),
+    )
+    .into_sorted_vec();
     vocabulary.dedup();
     if vocabulary.len() > max_unique_tokens || vocabulary.len() > VALID_TOKEN_SCALARS {
         return Err(PairPreparation::Limit(ApproximateLimit::UniqueTokens));
@@ -1616,9 +1676,9 @@ fn integer_distance(
         .transpose()
 }
 
-fn provenance(
+fn provenance<'a>(
     query: &ApproximateRecord,
-    candidates: &[&ApproximateRecord],
+    candidates: impl IntoIterator<Item = &'a ApproximateRecord>,
     config: &ApproximateConfig,
 ) -> ApproximateProvenance {
     let mut config_hash = StableHasher::new();
@@ -1966,6 +2026,64 @@ mod tests {
                 &ApproximateCancellation::default(),
             ).unwrap();
             prop_assert_eq!(forward, reverse);
+        }
+
+        #[test]
+        fn bounded_top_k_is_the_prefix_of_the_complete_order(
+            query in "[a-z]{0,12}",
+            values in prop::collection::vec("[a-z]{0,12}", 1..32),
+            requested_top_k in 1usize..32,
+        ) {
+            let candidates = values
+                .iter()
+                .enumerate()
+                .map(|(index, value)| {
+                    external(u64::try_from(index).unwrap() + 1, value)
+                })
+                .collect::<Vec<_>>();
+            let all = approximate_candidates(
+                &external(0, &query),
+                &candidates,
+                ApproximateConsumer::RevisionAlignment,
+                &ApproximateConfig {
+                    max_distance: 12,
+                    top_k: candidates.len(),
+                    ..ApproximateConfig::default()
+                },
+                &ApproximateCancellation::default(),
+            ).unwrap();
+            let retained = requested_top_k.min(candidates.len());
+            let bounded = approximate_candidates(
+                &external(0, &query),
+                &candidates,
+                ApproximateConsumer::RevisionAlignment,
+                &ApproximateConfig {
+                    max_distance: 12,
+                    top_k: retained,
+                    ..ApproximateConfig::default()
+                },
+                &ApproximateCancellation::default(),
+            ).unwrap();
+            let expected = all.evidence
+                .iter()
+                .take(retained)
+                .map(|evidence| {
+                    (evidence.candidate, evidence.raw_cost, evidence.normalized_cost)
+                })
+                .collect::<Vec<_>>();
+            let actual = bounded.evidence
+                .iter()
+                .map(|evidence| {
+                    (evidence.candidate, evidence.raw_cost, evidence.normalized_cost)
+                })
+                .collect::<Vec<_>>();
+
+            prop_assert_eq!(bounded.completion, ApproximateCompletion::Complete);
+            prop_assert_eq!(actual, expected);
+            let ranks_are_consecutive = bounded.evidence.iter().enumerate().all(|(index, evidence)| {
+                evidence.rank == index + 1
+            });
+            prop_assert!(ranks_are_consecutive);
         }
 
         #[test]

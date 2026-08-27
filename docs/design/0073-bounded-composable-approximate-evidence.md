@@ -169,13 +169,54 @@ The adapter addresses the root boundary structurally:
 - standard and optimal-string-alignment scans call iterative bounded kernels;
 - generalized costs call the iterative `GeneralizedAutomaton` alignment
   machine, not recursive dictionary-path enumeration;
-- candidate iteration, projection, ranking, serialization, cloning, and drop
-  use flat vectors, arenas, and worklists;
+- candidate and projection canonicalization use in-place binary heaps rather
+  than recursive comparison sorting;
+- top-k retention uses a bounded max-heap whose root is the current worst
+  retained result, so a scan never retains more than the configured result
+  count;
+- iteration, ranking, serialization, cloning, and drop use flat vectors,
+  arenas, heaps, and worklists;
 - checked limits cover input units, candidate count, dynamic-programming cells,
   accepted results, retained bytes, and total work;
 - cancellation is observed before every candidate and at bounded work
   intervals; and
 - a cap or cancellation produces typed incomplete evidence.
+
+Here *canonicalization* means arranging records by their stable identifier
+before a consumer observes them. Let `n` be the number of supplied candidates,
+`r` the number admitted by the candidate-count limit, and `k` the configured
+result count. The implementation first charges the `n`-entry ordering vector
+and the `min(k, r)`-entry retained heap against the memory budget. It then
+performs the following iterative procedure:
+
+```text
+CANONICAL-TOP-K(query, candidates, k, limits)
+    reject-or-report-incomplete unless storage for n ordering entries
+        and min(k, r) retained entries fits limits
+    ordered <- BUILD-MAX-HEAP((stable-id(candidate), candidate)
+                              for candidate in candidates)
+    HEAP-SORT-IN-PLACE(ordered)
+    retained <- empty max-heap with capacity k
+    for candidate in ordered do
+        observe cancellation and work limits
+        evidence <- bounded-distance(query, candidate)
+        if evidence is accepted then
+            PUSH(retained, evidence)
+            if SIZE(retained) > k then POP-MAX(retained)
+    return HEAP-SORT-IN-PLACE(retained)
+```
+
+The evidence ordering compares normalized cost, raw cost, and stable
+identifier; both costs are exact rational values rather than floating-point
+approximations. Therefore the max-heap root is exactly the worst retained
+result, while the final in-place heap sort exposes best-first public order.
+Construction and destruction are iterative, native call depth is constant,
+ordering storage is `$\mathcal{O}(n)$`, and retained-result storage is
+`$\mathcal{O}(\min(k,n))$`. The
+integration gate exercises ordering, ranking, cloning, debug formatting, and
+destruction for 100,000 reverse-ordered candidates on a 256 KiB thread stack;
+the projection gate separately exercises 20,000 and 100,000 functions on the
+same stack size.
 
 The positional transition cache now selects a dense row only while one row is
 at most 2,048 bytes and stores only observed transitions for longer queries.
