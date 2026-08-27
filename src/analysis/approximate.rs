@@ -20,6 +20,10 @@ use std::sync::Arc;
 use liblevenshtein::distance::{
     damerau_levenshtein_distance_bounded, standard_distance_bounded, transposition_distance_bounded,
 };
+use liblevenshtein::transducer::generalized::{
+    GeneralizedAutomaton, GeneralizedAutomatonError, MAX_GENERALIZED_ALIGNMENT_STATES,
+};
+use liblevenshtein::transducer::OperationSet;
 
 use crate::{CodePropertyGraph, CpgNodeKindTag, NodeId};
 
@@ -117,6 +121,8 @@ pub enum ApproximateMethod {
     OptimalStringAlignment,
     /// Unrestricted Damerau-Levenshtein distance.
     DamerauLevenshtein,
+    /// Runtime-configurable generalized alignment with merge/split operations.
+    GeneralizedMergeSplit,
 }
 
 impl ApproximateMethod {
@@ -127,6 +133,7 @@ impl ApproximateMethod {
                 ApproximateScoreSemantics::MetricDistance
             }
             Self::OptimalStringAlignment => ApproximateScoreSemantics::SymmetricNonMetricDistance,
+            Self::GeneralizedMergeSplit => ApproximateScoreSemantics::GeneralizedEditCost,
         }
     }
 
@@ -135,6 +142,7 @@ impl ApproximateMethod {
             Self::StandardLevenshtein => "liblevenshtein.standard.v1",
             Self::OptimalStringAlignment => "liblevenshtein.osa.v1",
             Self::DamerauLevenshtein => "liblevenshtein.damerau.v1",
+            Self::GeneralizedMergeSplit => "liblevenshtein.generalized.merge-split.v1",
         }
     }
 }
@@ -146,6 +154,8 @@ pub enum ApproximateScoreSemantics {
     MetricDistance,
     /// A symmetric non-negative distance without the triangle inequality.
     SymmetricNonMetricDistance,
+    /// Exact configured-operation alignment cost without an asserted metric law.
+    GeneralizedEditCost,
 }
 
 /// Semiring used by distance and composition evidence.
@@ -461,6 +471,19 @@ pub enum ApproximateError {
     /// A platform-sized input or cost could not be represented in evidence.
     #[error("approximate-matching value `{0}` exceeds the evidence integer domain")]
     IntegerDomain(&'static str),
+    /// A generalized liblevenshtein operation set or evaluation failed.
+    #[error(transparent)]
+    Generalized(#[from] GeneralizedAutomatonError),
+    /// A method-specific distance bound could not be represented upstream.
+    #[error("{method:?} supports a maximum distance bound of {maximum}, not {requested}")]
+    MethodDistanceBound {
+        /// Method whose bound was rejected.
+        method: ApproximateMethod,
+        /// Caller-requested bound.
+        requested: usize,
+        /// Largest supported bound.
+        maximum: usize,
+    },
 }
 
 /// Generates bounded approximate candidates without mutating graph state.
@@ -574,6 +597,12 @@ pub fn approximate_candidates(
             limitations.insert(ApproximateLimit::StateCount);
             continue;
         }
+        if config.method == ApproximateMethod::GeneralizedMergeSplit
+            && prepared.cells > u64::try_from(MAX_GENERALIZED_ALIGNMENT_STATES).unwrap_or(u64::MAX)
+        {
+            limitations.insert(ApproximateLimit::StateCount);
+            continue;
+        }
         if resident_memory > config.limits.max_memory_bytes {
             limitations.insert(ApproximateLimit::Memory);
             continue;
@@ -593,22 +622,23 @@ pub fn approximate_candidates(
             prepared.candidate(),
             config.method,
             config.max_distance,
-        );
+        )?;
         counters.examined_candidates += 1;
-        let Some(distance) = distance else {
+        let Some(raw_cost) = distance else {
             continue;
         };
         counters.matched_candidates += 1;
-        let distance = u64::try_from(distance)
-            .map_err(|_| ApproximateError::IntegerDomain("edit distance"))?;
         let normalization =
             u64::try_from(prepared.query_units.max(prepared.candidate_units).max(1))
                 .map_err(|_| ApproximateError::IntegerDomain("normalization length"))?;
+        let normalized_denominator = raw_cost.denominator.checked_mul(normalization).ok_or(
+            ApproximateError::IntegerDomain("normalized cost denominator"),
+        )?;
         evidence.push(PendingEvidence {
             candidate: candidate.id,
             candidate_tape: Arc::clone(&candidate.tape),
-            raw_cost: ApproximateRational::new(distance, 1),
-            normalized_cost: ApproximateRational::new(distance, normalization),
+            raw_cost,
+            normalized_cost: ApproximateRational::new(raw_cost.numerator, normalized_denominator),
         });
         evidence.sort_unstable_by(compare_pending);
         if evidence.len() > config.top_k {
@@ -1285,7 +1315,17 @@ fn validate_config(config: &ApproximateConfig) -> Result<(), ApproximateError> {
     if config.top_k == 0 {
         return Err(ApproximateError::ZeroLimit("top_k"));
     }
-    validate_limits(&config.limits)
+    validate_limits(&config.limits)?;
+    if config.method == ApproximateMethod::GeneralizedMergeSplit
+        && config.max_distance > usize::from(u8::MAX)
+    {
+        return Err(ApproximateError::MethodDistanceBound {
+            method: config.method,
+            requested: config.max_distance,
+            maximum: usize::from(u8::MAX),
+        });
+    }
+    Ok(())
 }
 
 #[derive(Debug)]
@@ -1481,6 +1521,14 @@ fn estimated_pair_memory(
                     .and_then(|cols| rows.checked_mul(cols))
             })
             .and_then(|cells| cells.checked_mul(bytes_per_cell)),
+        ApproximateMethod::GeneralizedMergeSplit => query_units
+            .checked_add(1)
+            .and_then(|rows| {
+                candidate_units
+                    .checked_add(1)
+                    .and_then(|columns| rows.checked_mul(columns))
+            })
+            .and_then(|cells| cells.checked_mul(128)),
     }
     .ok_or(PairPreparation::Domain)?;
 
@@ -1523,18 +1571,49 @@ fn delegated_distance(
     candidate: &str,
     method: ApproximateMethod,
     max_distance: usize,
-) -> Option<usize> {
+) -> Result<Option<ApproximateRational>, ApproximateError> {
     match method {
         ApproximateMethod::StandardLevenshtein => {
-            standard_distance_bounded(query, candidate, max_distance)
+            integer_distance(standard_distance_bounded(query, candidate, max_distance))
         }
-        ApproximateMethod::OptimalStringAlignment => {
-            transposition_distance_bounded(query, candidate, max_distance)
-        }
-        ApproximateMethod::DamerauLevenshtein => {
-            damerau_levenshtein_distance_bounded(query, candidate, max_distance)
+        ApproximateMethod::OptimalStringAlignment => integer_distance(
+            transposition_distance_bounded(query, candidate, max_distance),
+        ),
+        ApproximateMethod::DamerauLevenshtein => integer_distance(
+            damerau_levenshtein_distance_bounded(query, candidate, max_distance),
+        ),
+        ApproximateMethod::GeneralizedMergeSplit => {
+            let bound =
+                u8::try_from(max_distance).map_err(|_| ApproximateError::MethodDistanceBound {
+                    method,
+                    requested: max_distance,
+                    maximum: usize::from(u8::MAX),
+                })?;
+            let automaton =
+                GeneralizedAutomaton::try_with_operations(bound, OperationSet::with_merge_split())?;
+            let denominator = u64::from(automaton.cost_scale()?.denominator());
+            let distance = automaton.scaled_distance(query, candidate)?;
+            distance
+                .map(|distance| {
+                    u64::try_from(distance)
+                        .map(|numerator| ApproximateRational::new(numerator, denominator))
+                        .map_err(|_| ApproximateError::IntegerDomain("generalized edit cost"))
+                })
+                .transpose()
         }
     }
+}
+
+fn integer_distance(
+    distance: Option<usize>,
+) -> Result<Option<ApproximateRational>, ApproximateError> {
+    distance
+        .map(|distance| {
+            u64::try_from(distance)
+                .map(|distance| ApproximateRational::new(distance, 1))
+                .map_err(|_| ApproximateError::IntegerDomain("edit distance"))
+        })
+        .transpose()
 }
 
 fn provenance(
@@ -1817,6 +1896,49 @@ mod tests {
         }
     }
 
+    #[test]
+    fn generalized_merge_split_retains_exact_scaled_cost() {
+        let report = approximate_candidates(
+            &external(0, "ab"),
+            &[external(1, "a")],
+            ApproximateConsumer::RevisionAlignment,
+            &ApproximateConfig {
+                method: ApproximateMethod::GeneralizedMergeSplit,
+                max_distance: 1,
+                ..ApproximateConfig::default()
+            },
+            &ApproximateCancellation::default(),
+        )
+        .unwrap();
+
+        assert_eq!(report.completion, ApproximateCompletion::Complete);
+        assert_eq!(report.evidence[0].raw_cost, ApproximateRational::new(1, 1));
+        assert_eq!(
+            report.evidence[0].score_semantics,
+            ApproximateScoreSemantics::GeneralizedEditCost
+        );
+    }
+
+    #[test]
+    fn generalized_bound_outside_upstream_domain_is_rejected() {
+        let error = approximate_candidates(
+            &external(0, "a"),
+            &[external(1, "b")],
+            ApproximateConsumer::RevisionAlignment,
+            &ApproximateConfig {
+                method: ApproximateMethod::GeneralizedMergeSplit,
+                max_distance: usize::from(u8::MAX) + 1,
+                ..ApproximateConfig::default()
+            },
+            &ApproximateCancellation::default(),
+        )
+        .unwrap_err();
+        assert!(matches!(
+            error,
+            ApproximateError::MethodDistanceBound { .. }
+        ));
+    }
+
     proptest! {
         #[test]
         fn candidate_permutation_does_not_change_report(
@@ -1873,6 +1995,37 @@ mod tests {
                 left_to_right.evidence[0].raw_cost,
                 right_to_left.evidence[0].raw_cost
             );
+        }
+
+        #[test]
+        fn merge_split_cost_never_exceeds_standard_cost(
+            left in "[a-z]{0,12}",
+            right in "[a-z]{0,12}",
+        ) {
+            let standard = approximate_candidates(
+                &external(0, &left),
+                &[external(1, &right)],
+                ApproximateConsumer::RevisionAlignment,
+                &ApproximateConfig {
+                    max_distance: 24,
+                    ..ApproximateConfig::default()
+                },
+                &ApproximateCancellation::default(),
+            ).unwrap();
+            let generalized = approximate_candidates(
+                &external(0, &left),
+                &[external(1, &right)],
+                ApproximateConsumer::RevisionAlignment,
+                &ApproximateConfig {
+                    method: ApproximateMethod::GeneralizedMergeSplit,
+                    max_distance: 24,
+                    ..ApproximateConfig::default()
+                },
+                &ApproximateCancellation::default(),
+            ).unwrap();
+            let standard_cost = standard.evidence[0].raw_cost;
+            let generalized_cost = generalized.evidence[0].raw_cost;
+            prop_assert!(generalized_cost.compare(standard_cost) != Ordering::Greater);
         }
     }
 }
