@@ -7,7 +7,9 @@ use libcpg_approximate_automata_adoption::{
 };
 use liblevenshtein::distance::{standard_distance, transposition_distance};
 use liblevenshtein::transducer::generalized::GeneralizedAutomaton;
-use liblevenshtein::transducer::OperationSet;
+use liblevenshtein::transducer::{
+    OperationSet, OperationSetBuilder, OperationType, SubstitutionSet,
+};
 use lling_llang::composition::compose;
 use lling_llang::semiring::TropicalWeight;
 use lling_llang::wfst::VectorWfstBuilder;
@@ -107,6 +109,49 @@ fn exhaustive_small_strings_match_standard_osa_and_merge_split_oracles() {
             );
         }
     }
+}
+
+#[test]
+fn restricted_generalized_operation_matches_an_independent_alignment_cost() {
+    let mut permitted = SubstitutionSet::new();
+    permitted.allow_str("ph", "f");
+    let operations = OperationSetBuilder::new()
+        .with_standard_ops()
+        .with_operation(OperationType::with_restriction(
+            2, 1, 0.5, permitted, "ph-to-f",
+        ))
+        .build();
+    let automaton = GeneralizedAutomaton::try_with_operations(2, operations)
+        .expect("the restricted operation set should have an exact finite scale");
+    let scale = automaton
+        .cost_scale()
+        .expect("the validated operation set should retain its scale");
+
+    assert_eq!(scale.denominator(), 2);
+    assert_eq!(
+        automaton
+            .scaled_distance("phone", "fone")
+            .expect("the validated operation set should execute"),
+        Some(1)
+    );
+    assert_eq!(
+        automaton
+            .scaled_distance("alpha", "alfa")
+            .expect("the validated operation set should execute"),
+        Some(1)
+    );
+    assert_eq!(
+        automaton
+            .scaled_distance("photo", "poto")
+            .expect("the validated operation set should execute"),
+        Some(2)
+    );
+    assert_eq!(
+        automaton
+            .scaled_distance("phone", "phone")
+            .expect("the validated operation set should execute"),
+        Some(0)
+    );
 }
 
 #[test]

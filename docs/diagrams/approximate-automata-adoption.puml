@@ -1,0 +1,68 @@
+@startuml
+!include _libcpg-theme.iuml
+
+title Bounded approximate-evidence integration
+
+skinparam componentStyle rectangle
+skinparam defaultTextAlignment center
+
+rectangle "Candidate libcpg consumer" as consumer #DBE4FF {
+  component "developer typo / navigation" as typo #DBE4FF
+  component "cross-version API alignment" as api #DBE4FF
+  component "API-sequence neighbors" as sequence #DBE4FF
+  component "clone / diff / vulnerability\ncandidate generation" as structural #DBE4FF
+}
+
+rectangle "Semantic admission" as semantic #FFF3BF {
+  component "advisory ranking only" as advisory #FFF3BF
+  component "independent exact confirmation" as confirm #FFF3BF
+  component "never resolver topology, SCC,\ndata flow, taint, or verdicts" as forbidden #FFE3E3
+}
+
+rectangle "Selected engine boundary" as evidence #FFE8CC {
+  component "exact registry pins + checksums" as supply #FFE8CC
+  component "oracle and category laws" as laws #E5DBFF
+  component "direct bounded kernels for\none-shot candidate scans" as direct #C3FAE8
+  component "typed WFST composition for\nreused rewrite pipelines" as composed #E5DBFF
+  component "Rust 1.95 or nightly as needed\n256 KiB stack + bounded heap" as resource #FFE8CC
+}
+
+rectangle "Typed production result" as decision #D3F9D8 {
+  component "ApproximateEvidence\ncost + rank + provenance" as result #D3F9D8
+  component "Complete or Incomplete\nwith explicit counters and cause" as completion #FFF3BF
+  component "consumer-specific exact\nconfirmation predicate" as exact #DBE4FF
+  component "navigation / alignment / API /\nclone / diff / analogue candidates" as uses #D3F9D8
+}
+
+consumer --> semantic : identify proposition
+typo --> advisory
+api --> advisory
+sequence --> advisory
+structural --> confirm
+advisory --> confirm : before any semantic claim
+semantic --> evidence : evaluate only lawful role
+supply --> direct
+supply --> composed
+laws --> composed : complete relations only
+resource --> direct : select stack-safe paths
+resource --> composed : explicit lifecycle limits
+direct --> result
+composed --> result
+result --> completion
+completion --> exact : partial evidence remains incomplete
+confirm --> exact
+exact --> uses : confirmed semantics or advisory display
+forbidden --> exact : preserve graph integrity
+
+legend right
+  |= Color |= Meaning |
+  |<#DBE4FF>| proposed consumer |
+  |<#FFF3BF>| semantic / advisory gate |
+  |<#E5DBFF>| algebraic evidence |
+  |<#C3FAE8>| measured evidence |
+  |<#FFE8CC>| supply-chain evidence |
+  |<#D3F9D8>| admitted result and consumer |
+  |<#FFE3E3>| forbidden semantic use |
+endlegend
+
+@enduml
