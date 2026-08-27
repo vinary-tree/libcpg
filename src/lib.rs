@@ -284,6 +284,9 @@ pub use analysis::{
     PYG_NODE_FEATURE_NAMES, SUMMARY_EDGE_LABEL, TRIAD_NAMES,
 };
 
+#[cfg(feature = "approximate-matching")]
+pub use analysis::approximate::*;
+
 #[cfg(feature = "metta")]
 pub use analysis::{
     analyze_critical_pairs, analyze_critical_pairs_with_caps, critical_pairs, dependency_pairs,

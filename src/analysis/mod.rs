@@ -4,6 +4,8 @@
 //! compute exact structural properties or explicitly qualified bounded
 //! numerical approximations. They are available with `default = []`.
 
+#[cfg(feature = "approximate-matching")]
+pub mod approximate;
 mod basic_blocks;
 pub mod bugs;
 mod centrality;
@@ -232,6 +234,9 @@ pub use ml::{
 pub use motifs::{
     motif_census, MotifCensus, MotifOptions, MAX_GRAPHLET_NODES, MAX_TRIAD_NODES, TRIAD_NAMES,
 };
+
+#[cfg(feature = "approximate-matching")]
+pub use approximate::*;
 
 pub use reachability::{unreachable_code, DeadBranch, ReachabilityReport};
 

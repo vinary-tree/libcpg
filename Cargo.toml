@@ -54,6 +54,15 @@ abstract-domains = ["dep:num-bigint", "dep:num-rational", "dep:num-traits"]
 rholang = []
 metta = ["dep:libdictenstein"]
 
+# Bounded approximate candidate generation and typed WFST composition.
+# The selected upstream release line declares Rust 1.95; callers may also use
+# nightly-only backend/SIMD features without libcpg weakening those features.
+approximate-matching = [
+    "dep:duallity",
+    "dep:liblevenshtein",
+    "dep:lling-llang",
+]
+
 # Serialization support
 serde = [
     "dep:serde",
@@ -99,6 +108,7 @@ full = [
     "design-patterns",
     "algorithm-detection",
     "abstract-domains",
+    "approximate-matching",
     "serde",
     "ml-rules",
     "lang-all",
@@ -118,7 +128,13 @@ rustc-hash = "2.0"
 # dictionary crate extracted from liblevenshtein; depending on it directly
 # avoids liblevenshtein's deprecated compatibility re-exports and does not pull
 # fuzzy transducers into non-MeTTa builds.
-libdictenstein = { version = "=4.0.0-rc.1", default-features = false, optional = true }
+libdictenstein = { version = "=4.0.0-rc.4", default-features = false, optional = true }
+
+# Approximate matching remains opt-in. Exact release pins keep the three-crate
+# automata/WFST family on one audited ABI and semiring implementation.
+duallity = { version = "=4.0.0-rc.4", default-features = false, optional = true }
+liblevenshtein = { version = "=4.0.0-rc.4", default-features = false, optional = true }
+lling-llang = { version = "=4.0.0-rc.4", default-features = false, optional = true }
 
 # Arbitrary-precision rational arithmetic for optional exact polyhedra.
 # num-rational 0.4 uses the compatible num-bigint 0.4 line.
