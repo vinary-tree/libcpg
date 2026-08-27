@@ -505,6 +505,36 @@ mod tests {
     }
 
     #[test]
+    fn heap_sorted_emits_each_input_value_exactly_once() {
+        let values = vec![3, 1, 2, 1, 5, 4];
+
+        let ordered = heap_sorted(values.clone());
+
+        assert_eq!(ordered, vec![1, 1, 2, 3, 4, 5]);
+        assert_eq!(ordered.len(), values.len());
+    }
+
+    proptest! {
+        #[test]
+        fn heap_sorted_preserves_the_input_multiset(
+            values in prop::collection::vec(any::<i32>(), 0..2_048),
+        ) {
+            let mut counts = BTreeMap::<i32, usize>::new();
+            for &value in &values {
+                *counts.entry(value).or_default() += 1;
+            }
+            let expected = counts
+                .into_iter()
+                .flat_map(|(value, count)| std::iter::repeat_n(value, count))
+                .collect::<Vec<_>>();
+
+            let ordered = heap_sorted(values);
+
+            prop_assert_eq!(ordered, expected);
+        }
+    }
+
+    #[test]
     fn cfg_partition_finds_loop_self_cycle_and_condensation_edges() {
         let mut cpg = CodePropertyGraph::new(Language::Rust);
         let function = cpg.add_node(node(function("f")));
