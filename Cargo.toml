@@ -379,6 +379,11 @@ required-features = ["lang-rust"]
 name = "resolve_calls"
 harness = false
 
+[[bench]]
+name = "approximate_matching"
+harness = false
+required-features = ["approximate-matching"]
+
 [[example]]
 name = "profile_workloads"
 path = "benches/profile_workloads.rs"
