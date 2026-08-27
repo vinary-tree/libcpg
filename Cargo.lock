@@ -739,8 +739,7 @@ dependencies = [
 [[package]]
 name = "liblevenshtein"
 version = "4.0.0-rc.4"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "016fea81cd6ac523e7c1321a920c8c22044dcc1be5b3440d9faaf7566fb070aa"
+source = "git+https://github.com/vinary-tree/liblevenshtein-rust.git?rev=81c0097f093b64aafec5935a1bdeddcde090d91d#81c0097f093b64aafec5935a1bdeddcde090d91d"
 dependencies = [
  "ahash",
  "arc-swap",
@@ -2364,7 +2363,3 @@ name = "zmij"
 version = "1.0.12"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "2fc5a66a20078bf1251bde995aa2fdcc4b800c70b5d92dd2c62abc5c60f679f8"
-
-[[patch.unused]]
-name = "creusot-std"
-version = "0.12.0-dev"

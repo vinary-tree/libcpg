@@ -73,20 +73,27 @@ layer. T4.5 is authorized to implement the production adapter.
 
 ## Dependency boundary
 
-The admission experiment pins exact registry release candidates. Its lockfile
-records archive checksums, while each archive's `.cargo_vcs_info.json` records
-the source commit.
+The admission experiment began from exact registry release candidates. The
+production graph retains those archive checksums except for `liblevenshtein`:
+published RC4 predates the bounded generated-target correction, so libcpg pins
+the audited root-fix commit from the canonical repository. The revision is
+immutable and remotely resolvable; no floating branch or local path participates
+in the dependency graph.
 
-| Package | Version | Crates.io checksum | VCS commit | Declared Rust | License |
+| Package | Version | Production source identity | Archive VCS commit | Declared Rust | License |
 |---|---|---|---|---:|---|
-| `duallity` | `4.0.0-rc.4` | `1864da0aa5bd1cada68bafa1c9ae160001ba93eab39b221f393a15323edb02f9` | `ce2e56b7e13a69b097cefb05dfce0b661ec5ee91` | 1.95 | Apache-2.0 |
-| `liblevenshtein` | `4.0.0-rc.4` | `016fea81cd6ac523e7c1321a920c8c22044dcc1be5b3440d9faaf7566fb070aa` | `1fbc7c0fe0602a768a22069c1423ec34a43caa8c` | 1.95 | Apache-2.0 |
-| `libdictenstein` | `4.0.0-rc.4` | `3107cc65fec16a66624be386df12a0c8f4786c665c2088124bccc63350587842` | `085f61c22f714f6a9c2aee528077be180b9545d4` | 1.95 | Apache-2.0 |
-| `lling-llang` | `4.0.0-rc.4` | `c827b5417a0ad3bf2e45ee98ce198c12cb2bbdca6243beff020924909f8871ae` | `20329d8e31f22ec4afc36736d686122133bd38c9` | 1.95 | Apache-2.0 |
-| `llattice` | `0.1.0` | `11b2da71811803fafc6a1f2aff2fb8d8f25be26ee38678a89cf4008e7374f567` | `9a35c0f08cf6dbd5f6cb8c72a431c1ccd849a095` | 1.70 | Apache-2.0 |
+| `duallity` | `4.0.0-rc.4` | crates.io SHA-256 `1864da0aa5bd1cada68bafa1c9ae160001ba93eab39b221f393a15323edb02f9` | `ce2e56b7e13a69b097cefb05dfce0b661ec5ee91` | 1.95 | Apache-2.0 |
+| `liblevenshtein` | `4.0.0-rc.4` | canonical Git revision [`81c0097f093b64aafec5935a1bdeddcde090d91d`](https://github.com/vinary-tree/liblevenshtein-rust/commit/81c0097f093b64aafec5935a1bdeddcde090d91d) | same as source identity | 1.95 | Apache-2.0 |
+| `libdictenstein` | `4.0.0-rc.4` | crates.io SHA-256 `3107cc65fec16a66624be386df12a0c8f4786c665c2088124bccc63350587842` | `085f61c22f714f6a9c2aee528077be180b9545d4` | 1.95 | Apache-2.0 |
+| `lling-llang` | `4.0.0-rc.4` | crates.io SHA-256 `c827b5417a0ad3bf2e45ee98ce198c12cb2bbdca6243beff020924909f8871ae` | `20329d8e31f22ec4afc36736d686122133bd38c9` | 1.95 | Apache-2.0 |
+| `llattice` | `0.1.0` | crates.io SHA-256 `11b2da71811803fafc6a1f2aff2fb8d8f25be26ee38678a89cf4008e7374f567` | `9a35c0f08cf6dbd5f6cb8c72a431c1ccd849a095` | 1.70 | Apache-2.0 |
 
 Production dependencies are optional and exactly pinned. Default libcpg builds
-do not pay their compilation or runtime cost. `duallity` disables
+do not pay their compilation or runtime cost. A future release may replace the
+Git source only after it contains the same correction and passes this consumer
+gate. The root `[patch.crates-io]` entry redirects both libcpg's direct request
+and `duallity`'s transitive request to that one revision; `cargo tree -d` must
+therefore report no duplicate `liblevenshtein` package identities. `duallity` disables
 `lling-llang`'s default `smt-z3` feature, so approximate matching does not pull
 Z3. PathMap remains a separately selected backend rather than an accidental
 transitive default.
@@ -170,9 +177,12 @@ The adapter addresses the root boundary structurally:
   intervals; and
 - a cap or cancellation produces typed incomplete evidence.
 
-The positional transition cache's dense-row design is not selected for the
-direct scan. If a future indexed consumer selects it, qualification must show
-that retained memory stays within its explicit budget. Raising a cgroup limit,
+The positional transition cache now selects a dense row only while one row is
+at most 2,048 bytes and stores only observed transitions for longer queries.
+Its independent upstream qualification covers randomized refinement against a
+sparse oracle, the full default suite, executable documentation, pinned causal
+benchmarks, and a 100,000-unit run on a 256 KiB thread. Future indexed consumers
+must still enforce their own end-to-end budgets. Raising a cgroup limit,
 enlarging a native stack, truncating input silently, or retrying after an abort
 is not an implementation strategy.
 

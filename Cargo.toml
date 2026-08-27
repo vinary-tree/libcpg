@@ -130,8 +130,10 @@ rustc-hash = "2.0"
 # fuzzy transducers into non-MeTTa builds.
 libdictenstein = { version = "=4.0.0-rc.4", default-features = false, optional = true }
 
-# Approximate matching remains opt-in. Exact release pins keep the three-crate
-# automata/WFST family on one audited ABI and semiring implementation.
+# Approximate matching remains opt-in. Exact source pins keep the three-crate
+# automata/WFST family on one audited ABI and semiring implementation. The
+# liblevenshtein revision contains the bounded generated-target root fix that
+# postdates rc.4; never replace it with a floating branch or local path.
 duallity = { version = "=4.0.0-rc.4", default-features = false, optional = true }
 liblevenshtein = { version = "=4.0.0-rc.4", default-features = false, optional = true }
 lling-llang = { version = "=4.0.0-rc.4", default-features = false, optional = true }
@@ -204,6 +206,12 @@ pollster = { version = "0.4", optional = true }
 
 # Optional: Serialization
 serde = { version = "1.0", features = ["derive", "rc"], optional = true }
+
+# Redirect every direct and transitive crates.io request to one audited source
+# identity. Without a root patch, duallity's exact RC4 dependency and libcpg's
+# corrected Git dependency would produce two incompatible crate instances.
+[patch.crates-io]
+liblevenshtein = { git = "https://github.com/vinary-tree/liblevenshtein-rust.git", rev = "81c0097f093b64aafec5935a1bdeddcde090d91d" }
 
 [dev-dependencies]
 criterion = "0.5"

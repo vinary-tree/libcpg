@@ -1,9 +1,11 @@
 #![cfg(feature = "approximate-matching")]
 
 use libcpg::{
-    approximate_revision_alignments, ApproximateCancellation, ApproximateCompletion,
-    ApproximateConfig, ApproximateId, ApproximateMethod, ApproximateRecord, ApproximateTape,
+    ApproximateCancellation, ApproximateConfig, ApproximateId, ApproximateRecord, ApproximateTape,
 };
+
+#[cfg(all(feature = "lang-rust", feature = "lang-python"))]
+use libcpg::{approximate_revision_alignments, ApproximateCompletion, ApproximateMethod};
 
 #[cfg(all(feature = "lang-rust", feature = "lang-python"))]
 #[test]
