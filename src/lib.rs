@@ -286,6 +286,13 @@ pub use analysis::{
 
 #[cfg(feature = "approximate-matching")]
 pub use analysis::approximate::*;
+#[cfg(feature = "approximate-matching")]
+pub use analysis::{
+    ApiTapeDomain, CompleteFiniteObservation, FiniteCompositionCounters, FiniteRelationError,
+    FiniteRelationObservation, FiniteRelationPath, FiniteRewriteRule, NormalizedTapeDomain,
+    StructuralTapeDomain, SymbolTapeDomain, TypedFiniteComposition, TypedFiniteRelation,
+    MAX_EXACT_TROPICAL_INTEGER,
+};
 
 #[cfg(feature = "metta")]
 pub use analysis::{

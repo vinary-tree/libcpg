@@ -132,8 +132,10 @@ libdictenstein = { version = "=4.0.0-rc.4", default-features = false, optional =
 
 # Approximate matching remains opt-in. Exact source pins keep the three-crate
 # automata/WFST family on one audited ABI and semiring implementation. The
-# liblevenshtein revision contains the bounded generated-target root fix that
-# postdates rc.4; never replace it with a floating branch or local path.
+# The liblevenshtein revision contains the bounded generated-target root fix,
+# and the lling-llang revision preserves paired-epsilon composition. Both
+# corrections postdate rc.4; never replace either with a floating branch or
+# local path.
 duallity = { version = "=4.0.0-rc.4", default-features = false, optional = true }
 liblevenshtein = { version = "=4.0.0-rc.4", default-features = false, optional = true }
 lling-llang = { version = "=4.0.0-rc.4", default-features = false, optional = true }
@@ -208,10 +210,12 @@ pollster = { version = "0.4", optional = true }
 serde = { version = "1.0", features = ["derive", "rc"], optional = true }
 
 # Redirect every direct and transitive crates.io request to one audited source
-# identity. Without a root patch, duallity's exact RC4 dependency and libcpg's
-# corrected Git dependency would produce two incompatible crate instances.
+# identity. Without root patches, duallity's exact RC4 dependencies and
+# libcpg's corrected Git dependencies would produce incompatible duplicate
+# crate instances.
 [patch.crates-io]
 liblevenshtein = { git = "https://github.com/vinary-tree/liblevenshtein-rust.git", rev = "81c0097f093b64aafec5935a1bdeddcde090d91d" }
+lling-llang = { git = "https://github.com/vinary-tree/lling-llang.git", rev = "d34f0ec2a8b3d5728e09196114c1e22bea4272cd" }
 
 [dev-dependencies]
 criterion = "0.5"

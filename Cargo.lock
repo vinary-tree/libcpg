@@ -812,8 +812,7 @@ checksum = "11b2da71811803fafc6a1f2aff2fb8d8f25be26ee38678a89cf4008e7374f567"
 [[package]]
 name = "lling-llang"
 version = "4.0.0-rc.4"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c827b5417a0ad3bf2e45ee98ce198c12cb2bbdca6243beff020924909f8871ae"
+source = "git+https://github.com/vinary-tree/lling-llang.git?rev=d34f0ec2a8b3d5728e09196114c1e22bea4272cd#d34f0ec2a8b3d5728e09196114c1e22bea4272cd"
 dependencies = [
  "ahash",
  "blake3",

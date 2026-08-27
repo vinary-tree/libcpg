@@ -74,26 +74,28 @@ layer. T4.5 is authorized to implement the production adapter.
 ## Dependency boundary
 
 The admission experiment began from exact registry release candidates. The
-production graph retains those archive checksums except for `liblevenshtein`:
-published RC4 predates the bounded generated-target correction, so libcpg pins
-the audited root-fix commit from the canonical repository. The revision is
-immutable and remotely resolvable; no floating branch or local path participates
-in the dependency graph.
+production graph retains those archive checksums except for `liblevenshtein`
+and `lling-llang`: published RC4 predates the bounded generated-target
+correction and the paired-epsilon composition correction, so libcpg pins the
+two audited root-fix commits from their canonical repositories. The revisions
+are immutable and remotely resolvable; no floating branch or local path
+participates in the dependency graph.
 
 | Package | Version | Production source identity | Archive VCS commit | Declared Rust | License |
 |---|---|---|---|---:|---|
 | `duallity` | `4.0.0-rc.4` | crates.io SHA-256 `1864da0aa5bd1cada68bafa1c9ae160001ba93eab39b221f393a15323edb02f9` | `ce2e56b7e13a69b097cefb05dfce0b661ec5ee91` | 1.95 | Apache-2.0 |
 | `liblevenshtein` | `4.0.0-rc.4` | canonical Git revision [`81c0097f093b64aafec5935a1bdeddcde090d91d`](https://github.com/vinary-tree/liblevenshtein-rust/commit/81c0097f093b64aafec5935a1bdeddcde090d91d) | same as source identity | 1.95 | Apache-2.0 |
 | `libdictenstein` | `4.0.0-rc.4` | crates.io SHA-256 `3107cc65fec16a66624be386df12a0c8f4786c665c2088124bccc63350587842` | `085f61c22f714f6a9c2aee528077be180b9545d4` | 1.95 | Apache-2.0 |
-| `lling-llang` | `4.0.0-rc.4` | crates.io SHA-256 `c827b5417a0ad3bf2e45ee98ce198c12cb2bbdca6243beff020924909f8871ae` | `20329d8e31f22ec4afc36736d686122133bd38c9` | 1.95 | Apache-2.0 |
+| `lling-llang` | `4.0.0-rc.4` | canonical Git revision [`d34f0ec2a8b3d5728e09196114c1e22bea4272cd`](https://github.com/vinary-tree/lling-llang/commit/d34f0ec2a8b3d5728e09196114c1e22bea4272cd) | same as source identity | 1.95 | Apache-2.0 |
 | `llattice` | `0.1.0` | crates.io SHA-256 `11b2da71811803fafc6a1f2aff2fb8d8f25be26ee38678a89cf4008e7374f567` | `9a35c0f08cf6dbd5f6cb8c72a431c1ccd849a095` | 1.70 | Apache-2.0 |
 
 Production dependencies are optional and exactly pinned. Default libcpg builds
 do not pay their compilation or runtime cost. A future release may replace the
-Git source only after it contains the same correction and passes this consumer
-gate. The root `[patch.crates-io]` entry redirects both libcpg's direct request
-and `duallity`'s transitive request to that one revision; `cargo tree -d` must
-therefore report no duplicate `liblevenshtein` package identities. `duallity` disables
+Git sources only after they contain the same corrections and pass this
+consumer gate. The root `[patch.crates-io]` entries redirect both libcpg's
+direct requests and `duallity`'s transitive requests to those revisions;
+`cargo tree -d` must therefore report no duplicate `liblevenshtein` or
+`lling-llang` package identities. `duallity` disables
 `lling-llang`'s default `smt-z3` feature, so approximate matching does not pull
 Z3. PathMap remains a separately selected backend rather than an accidental
 transitive default.
