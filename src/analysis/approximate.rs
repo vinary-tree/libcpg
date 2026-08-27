@@ -21,7 +21,9 @@ use liblevenshtein::distance::{
     damerau_levenshtein_distance_bounded, standard_distance_bounded, transposition_distance_bounded,
 };
 
-use crate::NodeId;
+use crate::{CodePropertyGraph, CpgNodeKindTag, NodeId};
+
+use super::{ApiUsageGraph, ApiUsageNodeKind};
 
 /// Schema version of replayable approximate-evidence provenance.
 pub const APPROXIMATE_EVIDENCE_SCHEMA_VERSION: u32 = 1;
@@ -363,6 +365,34 @@ pub struct ApproximateCounters {
     pub peak_state_count: u64,
     /// Largest temporary-memory estimate of any delegated comparison.
     pub peak_memory_bytes: u64,
+    /// CPG or API records visited while building an immutable projection.
+    pub projection_work_units: u64,
+    /// Largest estimated projection allocation in bytes.
+    pub projection_peak_memory_bytes: u64,
+}
+
+/// Resource accounting for an immutable CPG or API projection.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub struct ApproximateProjectionCounters {
+    /// Source nodes or API-usage graphs visited.
+    pub visited_items: usize,
+    /// Unicode scalars or typed tokens retained in projected tapes.
+    pub retained_units: usize,
+    /// Work charged to source visitation and retained units.
+    pub work_units: u64,
+    /// Peak estimated projection allocation in bytes.
+    pub peak_memory_bytes: u64,
+}
+
+/// Bounded immutable records projected from typed graph evidence.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ApproximateProjection {
+    /// Deterministically ordered records admitted by the projection.
+    pub records: Vec<ApproximateRecord>,
+    /// Whether every eligible source item was projected.
+    pub completion: ApproximateCompletion,
+    /// Projection resource accounting.
+    pub counters: ApproximateProjectionCounters,
 }
 
 /// One ranked approximate candidate requiring exact confirmation.
@@ -596,28 +626,666 @@ pub fn approximate_candidates(
     ))
 }
 
-fn validate_config(config: &ApproximateConfig) -> Result<(), ApproximateError> {
+/// Projects named CPG nodes into immutable text records.
+///
+/// The projection uses only typed node names already present in the CPG. It
+/// does not parse source text or mutate the graph.
+pub fn project_cpg_names(
+    cpg: &CodePropertyGraph,
+    graph: u64,
+    limits: &ApproximateLimits,
+) -> Result<ApproximateProjection, ApproximateError> {
+    validate_limits(limits)?;
+    let id_bytes = checked_allocation(cpg.node_count(), size_of::<NodeId>(), "CPG node IDs")?;
+    let record_capacity = cpg.node_count().min(limits.max_candidates);
+    let reserved_record_bytes = checked_allocation(
+        record_capacity,
+        size_of::<ApproximateRecord>(),
+        "CPG name records",
+    )?;
+    let base_bytes = id_bytes
+        .checked_add(reserved_record_bytes)
+        .ok_or(ApproximateError::IntegerDomain("CPG name projection"))?;
+    if base_bytes > limits.max_memory_bytes {
+        return Ok(limited_projection(ApproximateLimit::Memory, base_bytes));
+    }
+    let mut node_ids = Vec::with_capacity(cpg.node_count());
+    node_ids.extend(cpg.node_ids());
+    node_ids.sort_unstable();
+
+    let mut records = Vec::with_capacity(record_capacity);
+    let mut limitations = BTreeSet::new();
+    let mut counters = ApproximateProjectionCounters {
+        peak_memory_bytes: base_bytes,
+        ..ApproximateProjectionCounters::default()
+    };
+    let mut retained_bytes = base_bytes;
+
+    for id in node_ids {
+        if !charge_projection_visit(&mut counters, limits) {
+            limitations.insert(ApproximateLimit::TotalWork);
+            break;
+        }
+        let Some(name) = cpg.node(id).and_then(|node| node.name()) else {
+            continue;
+        };
+        let units = name.chars().count();
+        if units > limits.max_input_units {
+            limitations.insert(ApproximateLimit::InputUnits);
+            continue;
+        }
+        if records.len() == limits.max_candidates {
+            limitations.insert(ApproximateLimit::CandidateCount);
+            break;
+        }
+        let tape = ApproximateTape::text(name);
+        let additional = estimated_record_bytes(&tape)?;
+        let Some(next_bytes) = retained_bytes.checked_add(additional) else {
+            limitations.insert(ApproximateLimit::Memory);
+            break;
+        };
+        if next_bytes > limits.max_memory_bytes {
+            limitations.insert(ApproximateLimit::Memory);
+            break;
+        }
+        if !charge_projection_units(&mut counters, units, limits) {
+            limitations.insert(ApproximateLimit::TotalWork);
+            break;
+        }
+        retained_bytes = next_bytes;
+        counters.peak_memory_bytes = counters.peak_memory_bytes.max(retained_bytes);
+        records.push(ApproximateRecord::new(
+            ApproximateId::CpgNode { graph, node: id },
+            tape,
+        ));
+    }
+
+    Ok(ApproximateProjection {
+        records,
+        completion: completion_from_limits(limitations),
+        counters,
+    })
+}
+
+/// Projects function-scoped typed CPG traces into immutable token records.
+///
+/// Each function is traversed by an explicit heap-backed worklist. Cyclic or
+/// malformed child links are deduplicated, so graph depth never consumes the
+/// native call stack.
+pub fn project_cpg_functions(
+    cpg: &CodePropertyGraph,
+    graph: u64,
+    limits: &ApproximateLimits,
+) -> Result<ApproximateProjection, ApproximateError> {
+    validate_limits(limits)?;
+    let id_upper_bytes =
+        checked_allocation(cpg.node_count(), size_of::<NodeId>(), "CPG function IDs")?;
+    if id_upper_bytes > limits.max_memory_bytes {
+        return Ok(limited_projection(ApproximateLimit::Memory, id_upper_bytes));
+    }
+    let mut functions: Vec<_> = cpg
+        .nodes()
+        .filter(|node| node.kind.tag() == CpgNodeKindTag::Function)
+        .map(|node| node.id)
+        .collect();
+    functions.sort_unstable();
+    let id_bytes = checked_allocation(
+        functions.capacity(),
+        size_of::<NodeId>(),
+        "CPG function IDs",
+    )?;
+    let record_capacity = functions.len().min(limits.max_candidates);
+    let reserved_record_bytes = checked_allocation(
+        record_capacity,
+        size_of::<ApproximateRecord>(),
+        "CPG function records",
+    )?;
+    let base_bytes = id_bytes
+        .checked_add(reserved_record_bytes)
+        .ok_or(ApproximateError::IntegerDomain("CPG function projection"))?;
+    if base_bytes > limits.max_memory_bytes {
+        return Ok(limited_projection(ApproximateLimit::Memory, base_bytes));
+    }
+
+    let mut records = Vec::with_capacity(record_capacity);
+    let mut limitations = BTreeSet::new();
+    let mut counters = ApproximateProjectionCounters {
+        peak_memory_bytes: base_bytes,
+        ..ApproximateProjectionCounters::default()
+    };
+    let mut retained_bytes = base_bytes;
+
+    for function in functions {
+        if records.len() == limits.max_candidates {
+            limitations.insert(ApproximateLimit::CandidateCount);
+            break;
+        }
+        let Some(tokens) = function_tokens(
+            cpg,
+            function,
+            limits,
+            retained_bytes,
+            &mut counters,
+            &mut limitations,
+        ) else {
+            if limitations.contains(&ApproximateLimit::TotalWork) {
+                break;
+            }
+            continue;
+        };
+        let tape = ApproximateTape::Tokens(tokens);
+        let additional = estimated_record_bytes(&tape)?;
+        let Some(next_bytes) = retained_bytes.checked_add(additional) else {
+            limitations.insert(ApproximateLimit::Memory);
+            break;
+        };
+        if next_bytes > limits.max_memory_bytes {
+            limitations.insert(ApproximateLimit::Memory);
+            break;
+        }
+        retained_bytes = next_bytes;
+        counters.peak_memory_bytes = counters.peak_memory_bytes.max(retained_bytes);
+        records.push(ApproximateRecord::new(
+            ApproximateId::CpgNode {
+                graph,
+                node: function,
+            },
+            tape,
+        ));
+    }
+
+    Ok(ApproximateProjection {
+        records,
+        completion: completion_from_limits(limitations),
+        counters,
+    })
+}
+
+/// Projects centered API-usage graphs into immutable typed token records.
+pub fn project_api_usages(
+    usages: &[ApiUsageGraph],
+    graph: u64,
+    limits: &ApproximateLimits,
+) -> Result<ApproximateProjection, ApproximateError> {
+    validate_limits(limits)?;
+    let pointer_bytes = checked_allocation(
+        usages.len(),
+        size_of::<&ApiUsageGraph>(),
+        "API-usage pointers",
+    )?;
+    let record_capacity = usages.len().min(limits.max_candidates);
+    let reserved_record_bytes = checked_allocation(
+        record_capacity,
+        size_of::<ApproximateRecord>(),
+        "API-usage records",
+    )?;
+    let base_bytes = pointer_bytes
+        .checked_add(reserved_record_bytes)
+        .ok_or(ApproximateError::IntegerDomain("API-usage projection"))?;
+    if base_bytes > limits.max_memory_bytes {
+        return Ok(limited_projection(ApproximateLimit::Memory, base_bytes));
+    }
+    let mut ordered = Vec::with_capacity(usages.len());
+    ordered.extend(usages.iter());
+    ordered.sort_unstable_by_key(|usage| usage.anchor);
+
+    let mut records = Vec::with_capacity(record_capacity);
+    let mut limitations = BTreeSet::new();
+    let mut counters = ApproximateProjectionCounters {
+        peak_memory_bytes: base_bytes,
+        ..ApproximateProjectionCounters::default()
+    };
+    let mut retained_bytes = base_bytes;
+    for usage in ordered {
+        if !charge_projection_visit(&mut counters, limits) {
+            limitations.insert(ApproximateLimit::TotalWork);
+            break;
+        }
+        if records.len() == limits.max_candidates {
+            limitations.insert(ApproximateLimit::CandidateCount);
+            break;
+        }
+        let tokens = api_usage_tokens(usage);
+        if tokens.len() > limits.max_input_units {
+            limitations.insert(ApproximateLimit::InputUnits);
+            continue;
+        }
+        if !charge_projection_units(&mut counters, tokens.len(), limits) {
+            limitations.insert(ApproximateLimit::TotalWork);
+            break;
+        }
+        let tape = ApproximateTape::Tokens(tokens);
+        let additional = estimated_record_bytes(&tape)?;
+        let Some(next_bytes) = retained_bytes.checked_add(additional) else {
+            limitations.insert(ApproximateLimit::Memory);
+            break;
+        };
+        if next_bytes > limits.max_memory_bytes {
+            limitations.insert(ApproximateLimit::Memory);
+            break;
+        }
+        retained_bytes = next_bytes;
+        counters.peak_memory_bytes = counters.peak_memory_bytes.max(retained_bytes);
+        records.push(ApproximateRecord::new(
+            ApproximateId::ApiUsage {
+                graph,
+                anchor: usage.anchor,
+            },
+            tape,
+        ));
+    }
+
+    Ok(ApproximateProjection {
+        records,
+        completion: completion_from_limits(limitations),
+        counters,
+    })
+}
+
+/// Searches a bounded projection and preserves projection incompleteness.
+pub fn approximate_projected_candidates(
+    query: &ApproximateRecord,
+    projection: ApproximateProjection,
+    consumer: ApproximateConsumer,
+    config: &ApproximateConfig,
+    cancellation: &ApproximateCancellation,
+) -> Result<ApproximateReport, ApproximateError> {
+    let mut report =
+        approximate_candidates(query, &projection.records, consumer, config, cancellation)?;
+    let mut limitations = completion_limits(&report.completion);
+    limitations.extend(completion_limits(&projection.completion));
+    report.completion = completion_from_limits(limitations);
+    report.counters.projection_work_units = projection.counters.work_units;
+    report.counters.projection_peak_memory_bytes = projection.counters.peak_memory_bytes;
+    for evidence in &mut report.evidence {
+        evidence.completion = report.completion.clone();
+    }
+    Ok(report)
+}
+
+/// Generates typo-tolerant navigation candidates from named CPG nodes.
+pub fn approximate_symbol_candidates(
+    query: &ApproximateRecord,
+    cpg: &CodePropertyGraph,
+    graph: u64,
+    config: &ApproximateConfig,
+    cancellation: &ApproximateCancellation,
+) -> Result<ApproximateReport, ApproximateError> {
+    approximate_projected_candidates(
+        query,
+        project_cpg_names(cpg, graph, &config.limits)?,
+        ApproximateConsumer::SymbolNavigation,
+        config,
+        cancellation,
+    )
+}
+
+/// Generates cross-revision or cross-language named-entity candidates.
+pub fn approximate_revision_alignments(
+    query: &ApproximateRecord,
+    cpg: &CodePropertyGraph,
+    graph: u64,
+    config: &ApproximateConfig,
+    cancellation: &ApproximateCancellation,
+) -> Result<ApproximateReport, ApproximateError> {
+    approximate_projected_candidates(
+        query,
+        project_cpg_names(cpg, graph, &config.limits)?,
+        ApproximateConsumer::RevisionAlignment,
+        config,
+        cancellation,
+    )
+}
+
+/// Generates API-sequence candidates for exact usage-graph confirmation.
+pub fn approximate_api_sequence_neighbors(
+    query: &ApproximateRecord,
+    usages: &[ApiUsageGraph],
+    graph: u64,
+    config: &ApproximateConfig,
+    cancellation: &ApproximateCancellation,
+) -> Result<ApproximateReport, ApproximateError> {
+    approximate_projected_candidates(
+        query,
+        project_api_usages(usages, graph, &config.limits)?,
+        ApproximateConsumer::ApiSequenceNeighbor,
+        config,
+        cancellation,
+    )
+}
+
+/// Generates function candidates for exact structural clone confirmation.
+pub fn approximate_clone_candidates(
+    query: &ApproximateRecord,
+    cpg: &CodePropertyGraph,
+    graph: u64,
+    config: &ApproximateConfig,
+    cancellation: &ApproximateCancellation,
+) -> Result<ApproximateReport, ApproximateError> {
+    approximate_function_consumer(
+        query,
+        cpg,
+        graph,
+        ApproximateConsumer::CloneCandidate,
+        config,
+        cancellation,
+    )
+}
+
+/// Generates function candidates for exact typed CPG differencing.
+pub fn approximate_diff_candidates(
+    query: &ApproximateRecord,
+    cpg: &CodePropertyGraph,
+    graph: u64,
+    config: &ApproximateConfig,
+    cancellation: &ApproximateCancellation,
+) -> Result<ApproximateReport, ApproximateError> {
+    approximate_function_consumer(
+        query,
+        cpg,
+        graph,
+        ApproximateConsumer::SemanticDiffCandidate,
+        config,
+        cancellation,
+    )
+}
+
+/// Generates function candidates for exact vulnerability extrapolation.
+pub fn approximate_vulnerability_analogues(
+    query: &ApproximateRecord,
+    cpg: &CodePropertyGraph,
+    graph: u64,
+    config: &ApproximateConfig,
+    cancellation: &ApproximateCancellation,
+) -> Result<ApproximateReport, ApproximateError> {
+    approximate_function_consumer(
+        query,
+        cpg,
+        graph,
+        ApproximateConsumer::VulnerabilityAnalogue,
+        config,
+        cancellation,
+    )
+}
+
+fn approximate_function_consumer(
+    query: &ApproximateRecord,
+    cpg: &CodePropertyGraph,
+    graph: u64,
+    consumer: ApproximateConsumer,
+    config: &ApproximateConfig,
+    cancellation: &ApproximateCancellation,
+) -> Result<ApproximateReport, ApproximateError> {
+    approximate_projected_candidates(
+        query,
+        project_cpg_functions(cpg, graph, &config.limits)?,
+        consumer,
+        config,
+        cancellation,
+    )
+}
+
+fn function_tokens(
+    cpg: &CodePropertyGraph,
+    function: NodeId,
+    limits: &ApproximateLimits,
+    retained_base_bytes: u64,
+    counters: &mut ApproximateProjectionCounters,
+    limitations: &mut BTreeSet<ApproximateLimit>,
+) -> Option<Vec<Arc<str>>> {
+    let mut stack = vec![function];
+    let mut visited = BTreeSet::new();
+    let mut tokens = Vec::new();
+    let mut token_text_bytes = 0usize;
+    while let Some(node_id) = stack.pop() {
+        let Some(prospective_visited) = visited
+            .len()
+            .checked_add(1)
+            .and_then(|count| count.checked_mul(64))
+        else {
+            limitations.insert(ApproximateLimit::Memory);
+            return None;
+        };
+        let Some(visited_total) = u64::try_from(prospective_visited)
+            .ok()
+            .and_then(|bytes| retained_base_bytes.checked_add(bytes))
+        else {
+            limitations.insert(ApproximateLimit::Memory);
+            return None;
+        };
+        if visited_total > limits.max_memory_bytes {
+            limitations.insert(ApproximateLimit::Memory);
+            return None;
+        }
+        if !visited.insert(node_id) {
+            continue;
+        }
+        if !charge_projection_visit(counters, limits) {
+            limitations.insert(ApproximateLimit::TotalWork);
+            return None;
+        }
+        if tokens.len() == limits.max_input_units {
+            limitations.insert(ApproximateLimit::InputUnits);
+            return None;
+        }
+        let Some(node) = cpg.node(node_id) else {
+            continue;
+        };
+        let token_length = match node.name() {
+            Some(name) => {
+                let Some(length) = name.len().checked_add(16) else {
+                    limitations.insert(ApproximateLimit::Memory);
+                    return None;
+                };
+                length
+            }
+            None => 16,
+        };
+        let Some(next_token_text_bytes) = token_text_bytes.checked_add(token_length) else {
+            limitations.insert(ApproximateLimit::Memory);
+            return None;
+        };
+        let Some(prospective_stack_items) = stack.len().checked_add(node.children.len()) else {
+            limitations.insert(ApproximateLimit::Memory);
+            return None;
+        };
+        let working_bytes = visited
+            .len()
+            .checked_mul(64)
+            .and_then(|bytes| {
+                prospective_stack_items
+                    .checked_mul(2)
+                    .and_then(|items| items.checked_mul(size_of::<NodeId>()))
+                    .and_then(|stack_bytes| bytes.checked_add(stack_bytes))
+            })
+            .and_then(|bytes| {
+                tokens
+                    .len()
+                    .checked_add(1)
+                    .and_then(|items| items.checked_mul(2))
+                    .and_then(|items| items.checked_mul(size_of::<Arc<str>>()))
+                    .and_then(|token_bytes| bytes.checked_add(token_bytes))
+            })
+            .and_then(|bytes| bytes.checked_add(next_token_text_bytes))
+            .and_then(|bytes| u64::try_from(bytes).ok())
+            .and_then(|bytes| retained_base_bytes.checked_add(bytes));
+        if working_bytes.is_none_or(|bytes| bytes > limits.max_memory_bytes) {
+            limitations.insert(ApproximateLimit::Memory);
+            return None;
+        }
+        token_text_bytes = next_token_text_bytes;
+        let token = match node.name() {
+            Some(name) => format!("k{}:n{name}", node.kind.tag() as u8),
+            None => format!("k{}", node.kind.tag() as u8),
+        };
+        tokens.push(Arc::from(token));
+        for child in node.children.iter().rev() {
+            stack.push(*child);
+        }
+    }
+    if !charge_projection_units(counters, tokens.len(), limits) {
+        limitations.insert(ApproximateLimit::TotalWork);
+        return None;
+    }
+    Some(tokens)
+}
+
+fn api_usage_tokens(usage: &ApiUsageGraph) -> Vec<Arc<str>> {
+    let mut tokens = Vec::with_capacity(usage.nodes.len().saturating_add(usage.edges.len()));
+    for node in &usage.nodes {
+        let token = match &node.kind {
+            ApiUsageNodeKind::AnchorCall(api) => format!("anchor:{}", api.name()),
+            ApiUsageNodeKind::FollowingCall(api) => format!("following:{}", api.name()),
+            ApiUsageNodeKind::Data(shape) => format!("data:{shape:?}"),
+            ApiUsageNodeKind::Control(context) => format!("control:{context:?}"),
+        };
+        tokens.push(Arc::from(token));
+    }
+    for edge in &usage.edges {
+        tokens.push(Arc::from(format!(
+            "edge:{}:{}:{:?}",
+            edge.source.0, edge.target.0, edge.kind
+        )));
+    }
+    tokens
+}
+
+fn charge_projection_visit(
+    counters: &mut ApproximateProjectionCounters,
+    limits: &ApproximateLimits,
+) -> bool {
+    let Some(work) = counters.work_units.checked_add(1) else {
+        return false;
+    };
+    if work > limits.max_work_units {
+        return false;
+    }
+    let Some(visited) = counters.visited_items.checked_add(1) else {
+        return false;
+    };
+    counters.visited_items = visited;
+    counters.work_units = work;
+    true
+}
+
+fn charge_projection_units(
+    counters: &mut ApproximateProjectionCounters,
+    units: usize,
+    limits: &ApproximateLimits,
+) -> bool {
+    let Ok(units_u64) = u64::try_from(units) else {
+        return false;
+    };
+    let Some(work) = counters.work_units.checked_add(units_u64) else {
+        return false;
+    };
+    let Some(retained) = counters.retained_units.checked_add(units) else {
+        return false;
+    };
+    if work > limits.max_work_units {
+        return false;
+    }
+    counters.retained_units = retained;
+    counters.work_units = work;
+    true
+}
+
+fn checked_allocation(
+    count: usize,
+    unit_bytes: usize,
+    name: &'static str,
+) -> Result<u64, ApproximateError> {
+    count
+        .checked_mul(unit_bytes)
+        .and_then(|bytes| u64::try_from(bytes).ok())
+        .ok_or(ApproximateError::IntegerDomain(name))
+}
+
+fn validate_limits(limits: &ApproximateLimits) -> Result<(), ApproximateError> {
     for (name, value) in [
-        ("top_k", config.top_k),
-        ("max_candidates", config.limits.max_candidates),
-        ("max_input_units", config.limits.max_input_units),
-        ("max_unique_tokens", config.limits.max_unique_tokens),
+        ("max_candidates", limits.max_candidates),
+        ("max_input_units", limits.max_input_units),
+        ("max_unique_tokens", limits.max_unique_tokens),
     ] {
         if value == 0 {
             return Err(ApproximateError::ZeroLimit(name));
         }
     }
     for (name, value) in [
-        ("max_pair_cells", config.limits.max_pair_cells),
-        ("max_work_units", config.limits.max_work_units),
-        ("max_state_count", config.limits.max_state_count),
-        ("max_memory_bytes", config.limits.max_memory_bytes),
+        ("max_pair_cells", limits.max_pair_cells),
+        ("max_work_units", limits.max_work_units),
+        ("max_state_count", limits.max_state_count),
+        ("max_memory_bytes", limits.max_memory_bytes),
     ] {
         if value == 0 {
             return Err(ApproximateError::ZeroLimit(name));
         }
     }
     Ok(())
+}
+
+fn estimated_record_bytes(tape: &ApproximateTape) -> Result<u64, ApproximateError> {
+    let mut bytes = size_of::<ApproximateRecord>()
+        .checked_add(size_of::<ApproximateTape>())
+        .and_then(|bytes| bytes.checked_add(2 * size_of::<usize>()))
+        .ok_or(ApproximateError::IntegerDomain("projected record"))?;
+    match tape {
+        ApproximateTape::Text(text) => {
+            bytes = bytes
+                .checked_add(text.len())
+                .ok_or(ApproximateError::IntegerDomain("projected text"))?;
+        }
+        ApproximateTape::Tokens(tokens) => {
+            bytes = bytes
+                .checked_add(
+                    tokens
+                        .capacity()
+                        .checked_mul(size_of::<Arc<str>>())
+                        .ok_or(ApproximateError::IntegerDomain("projected token pointers"))?,
+                )
+                .ok_or(ApproximateError::IntegerDomain("projected tokens"))?;
+            for token in tokens {
+                bytes = bytes
+                    .checked_add(token.len())
+                    .and_then(|bytes| bytes.checked_add(2 * size_of::<usize>()))
+                    .ok_or(ApproximateError::IntegerDomain("projected token text"))?;
+            }
+        }
+    }
+    u64::try_from(bytes).map_err(|_| ApproximateError::IntegerDomain("projected record"))
+}
+
+fn limited_projection(limit: ApproximateLimit, peak_memory_bytes: u64) -> ApproximateProjection {
+    ApproximateProjection {
+        records: Vec::new(),
+        completion: ApproximateCompletion::Incomplete(vec![limit]),
+        counters: ApproximateProjectionCounters {
+            peak_memory_bytes,
+            ..ApproximateProjectionCounters::default()
+        },
+    }
+}
+
+fn completion_limits(completion: &ApproximateCompletion) -> BTreeSet<ApproximateLimit> {
+    match completion {
+        ApproximateCompletion::Complete => BTreeSet::new(),
+        ApproximateCompletion::Incomplete(limits) => limits.iter().copied().collect(),
+    }
+}
+
+fn completion_from_limits(limitations: BTreeSet<ApproximateLimit>) -> ApproximateCompletion {
+    if limitations.is_empty() {
+        ApproximateCompletion::Complete
+    } else {
+        ApproximateCompletion::Incomplete(limitations.into_iter().collect())
+    }
+}
+
+fn validate_config(config: &ApproximateConfig) -> Result<(), ApproximateError> {
+    if config.top_k == 0 {
+        return Err(ApproximateError::ZeroLimit("top_k"));
+    }
+    validate_limits(&config.limits)
 }
 
 #[derive(Debug)]
@@ -919,6 +1587,7 @@ impl StableHasher {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::{CpgNode, CpgNodeKind, Language, MethodSignature, SourceRange, Visibility};
     use proptest::prelude::*;
 
     fn external(item: u64, text: &str) -> ApproximateRecord {
@@ -926,6 +1595,19 @@ mod tests {
             ApproximateId::External { corpus: 7, item },
             ApproximateTape::text(text),
         )
+    }
+
+    fn function(name: &str) -> CpgNodeKind {
+        CpgNodeKind::Function {
+            signature: Box::new(MethodSignature {
+                name: name.into(),
+                params: Default::default(),
+                return_type: None,
+                is_static: false,
+                is_async: false,
+                visibility: Visibility::Private,
+            }),
+        }
     }
 
     #[test]
@@ -1000,6 +1682,139 @@ mod tests {
             report.completion,
             ApproximateCompletion::Incomplete(vec![ApproximateLimit::Cancelled])
         );
+    }
+
+    #[test]
+    fn named_cpg_projection_drives_symbol_candidates_without_mutation() {
+        let mut cpg = CodePropertyGraph::new(Language::Rust);
+        let parser = cpg.add_node(CpgNode::new(
+            NodeId::new(0),
+            CpgNodeKind::Identifier {
+                name: "parser".into(),
+                definition: None,
+            },
+            SourceRange::default(),
+        ));
+        cpg.add_node(CpgNode::new(
+            NodeId::new(0),
+            CpgNodeKind::Identifier {
+                name: "parcel".into(),
+                definition: None,
+            },
+            SourceRange::default(),
+        ));
+        let before = cpg.node_count();
+        let report = approximate_symbol_candidates(
+            &external(0, "parsr"),
+            &cpg,
+            42,
+            &ApproximateConfig::default(),
+            &ApproximateCancellation::default(),
+        )
+        .unwrap();
+
+        assert_eq!(cpg.node_count(), before);
+        assert_eq!(report.completion, ApproximateCompletion::Complete);
+        assert_eq!(
+            report.evidence[0].candidate,
+            ApproximateId::CpgNode {
+                graph: 42,
+                node: parser,
+            }
+        );
+    }
+
+    #[test]
+    fn function_projection_uses_a_cycle_safe_heap_worklist() {
+        let mut cpg = CodePropertyGraph::new(Language::Rust);
+        let root = cpg.add_node(CpgNode::new(
+            NodeId::new(0),
+            function("analyze"),
+            SourceRange::default(),
+        ));
+        let child = cpg.add_node(CpgNode::new(
+            NodeId::new(0),
+            CpgNodeKind::Identifier {
+                name: "value".into(),
+                definition: None,
+            },
+            SourceRange::default(),
+        ));
+        cpg.node_mut(root).unwrap().children.push(child);
+        cpg.node_mut(child).unwrap().children.push(root);
+
+        let projection = project_cpg_functions(&cpg, 9, &ApproximateLimits::default()).unwrap();
+        assert_eq!(projection.completion, ApproximateCompletion::Complete);
+        assert_eq!(projection.records.len(), 1);
+        assert_eq!(projection.records[0].tape.units(), 2);
+    }
+
+    #[test]
+    fn projection_limits_are_preserved_in_every_evidence_record() {
+        let mut cpg = CodePropertyGraph::new(Language::Rust);
+        for name in ["first", "second"] {
+            cpg.add_node(CpgNode::new(
+                NodeId::new(0),
+                CpgNodeKind::Identifier {
+                    name: name.into(),
+                    definition: None,
+                },
+                SourceRange::default(),
+            ));
+        }
+        let config = ApproximateConfig {
+            max_distance: 10,
+            limits: ApproximateLimits {
+                max_candidates: 1,
+                ..ApproximateLimits::default()
+            },
+            ..ApproximateConfig::default()
+        };
+        let report = approximate_revision_alignments(
+            &external(0, "first"),
+            &cpg,
+            1,
+            &config,
+            &ApproximateCancellation::default(),
+        )
+        .unwrap();
+
+        let expected = ApproximateCompletion::Incomplete(vec![ApproximateLimit::CandidateCount]);
+        assert_eq!(report.completion, expected);
+        assert_eq!(report.evidence[0].completion, report.completion);
+    }
+
+    #[test]
+    fn every_consumer_names_its_exact_confirmation_predicate() {
+        let cases = [
+            (
+                ApproximateConsumer::SymbolNavigation,
+                ExactConfirmation::UserSelectionOrExactLookup,
+            ),
+            (
+                ApproximateConsumer::RevisionAlignment,
+                ExactConfirmation::QualifiedTypedSignature,
+            ),
+            (
+                ApproximateConsumer::ApiSequenceNeighbor,
+                ExactConfirmation::ExactApiUsageTemporalProperty,
+            ),
+            (
+                ApproximateConsumer::CloneCandidate,
+                ExactConfirmation::ExactCloneStructure,
+            ),
+            (
+                ApproximateConsumer::SemanticDiffCandidate,
+                ExactConfirmation::ExactCpgDiff,
+            ),
+            (
+                ApproximateConsumer::VulnerabilityAnalogue,
+                ExactConfirmation::ExactVulnerabilityStructure,
+            ),
+        ];
+        for (consumer, confirmation) in cases {
+            assert_eq!(consumer.exact_confirmation(), confirmation);
+        }
     }
 
     proptest! {
