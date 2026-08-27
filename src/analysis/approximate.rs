@@ -536,18 +536,6 @@ pub fn approximate_candidates(
 ) -> Result<ApproximateReport, ApproximateError> {
     validate_config(config)?;
 
-    // Token structures use libdictenstein's reversible vocabulary plus its
-    // native `u64` sequence dictionary. Text retains the lower-overhead direct
-    // bounded kernels selected by the measured one-shot policy.
-    if matches!(query.tape.as_ref(), ApproximateTape::Tokens(_))
-        && candidates
-            .iter()
-            .all(|record| matches!(record.tape.as_ref(), ApproximateTape::Tokens(_)))
-    {
-        return super::approximate_index::ApproximateTokenIndex::build(candidates, &config.limits)?
-            .search(query, consumer, config, cancellation);
-    }
-
     let ordering_bytes = candidates
         .len()
         .checked_mul(size_of::<CanonicalCandidate<'_>>())
@@ -1524,9 +1512,13 @@ enum PairPreparation {
     Domain,
 }
 
+enum PreparedStrings<'a> {
+    Borrowed(&'a str, &'a str),
+    Encoded(String, String),
+}
+
 struct PreparedPair<'a> {
-    query: &'a str,
-    candidate: &'a str,
+    strings: PreparedStrings<'a>,
     query_units: usize,
     candidate_units: usize,
     cells: u64,
@@ -1535,11 +1527,17 @@ struct PreparedPair<'a> {
 
 impl PreparedPair<'_> {
     fn query(&self) -> &str {
-        self.query
+        match &self.strings {
+            PreparedStrings::Borrowed(query, _) => query,
+            PreparedStrings::Encoded(query, _) => query,
+        }
     }
 
     fn candidate(&self) -> &str {
-        self.candidate
+        match &self.strings {
+            PreparedStrings::Borrowed(_, candidate) => candidate,
+            PreparedStrings::Encoded(_, candidate) => candidate,
+        }
     }
 }
 
@@ -1555,9 +1553,14 @@ fn prepare_pair<'a>(
     {
         return Err(PairPreparation::Limit(ApproximateLimit::InputUnits));
     }
-    let (query, candidate) = match (query, candidate) {
+    let strings = match (query, candidate) {
         (ApproximateTape::Text(query), ApproximateTape::Text(candidate)) => {
-            (query.as_ref(), candidate.as_ref())
+            PreparedStrings::Borrowed(query, candidate)
+        }
+        (ApproximateTape::Tokens(query), ApproximateTape::Tokens(candidate)) => {
+            let (query, candidate) =
+                encode_token_pair(query, candidate, config.limits.max_unique_tokens)?;
+            PreparedStrings::Encoded(query, candidate)
         }
         _ => return Err(PairPreparation::Mismatch),
     };
@@ -1570,13 +1573,56 @@ fn prepare_pair<'a>(
     let cells = u64::try_from(cells).map_err(|_| PairPreparation::Domain)?;
     let memory_bytes = estimated_pair_memory(config.method, query_units, candidate_units)?;
     Ok(PreparedPair {
-        query,
-        candidate,
+        strings,
         query_units,
         candidate_units,
         cells,
         memory_bytes,
     })
+}
+
+fn encode_token_pair(
+    query: &[Arc<str>],
+    candidate: &[Arc<str>],
+    max_unique_tokens: usize,
+) -> Result<(String, String), PairPreparation> {
+    let mut vocabulary = BinaryHeap::from(
+        query
+            .iter()
+            .chain(candidate)
+            .map(AsRef::as_ref)
+            .collect::<Vec<_>>(),
+    )
+    .into_sorted_vec();
+    vocabulary.dedup();
+    if vocabulary.len() > max_unique_tokens || vocabulary.len() > VALID_TOKEN_SCALARS {
+        return Err(PairPreparation::Limit(ApproximateLimit::UniqueTokens));
+    }
+
+    let encode = |tokens: &[Arc<str>]| -> Result<String, PairPreparation> {
+        let mut encoded = String::with_capacity(tokens.len().saturating_mul(3));
+        for token in tokens {
+            let index = vocabulary
+                .binary_search_by(|item| item.cmp(&token.as_ref()))
+                .map_err(|_| PairPreparation::Domain)?;
+            let scalar = token_scalar(index).ok_or(PairPreparation::Domain)?;
+            encoded.push(scalar);
+        }
+        Ok(encoded)
+    };
+    Ok((encode(query)?, encode(candidate)?))
+}
+
+// Exclude the surrogate range and NUL, which external tape encodings commonly
+// reserve as an unambiguous sentinel.
+const VALID_TOKEN_SCALARS: usize = 0x11_0000 - 0x800 - 1;
+
+fn token_scalar(index: usize) -> Option<char> {
+    let mut scalar = u32::try_from(index).ok()?.checked_add(1)?;
+    if scalar >= 0xD800 {
+        scalar = scalar.checked_add(0x800)?;
+    }
+    char::from_u32(scalar)
 }
 
 fn estimated_pair_memory(

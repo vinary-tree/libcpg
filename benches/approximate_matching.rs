@@ -1,12 +1,14 @@
 use std::alloc::{GlobalAlloc, Layout, System};
 use std::collections::BTreeMap;
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
+use std::sync::Arc;
 use std::time::Duration;
 
 use criterion::{black_box, criterion_group, criterion_main, BenchmarkId, Criterion, Throughput};
 use libcpg::{
     approximate_candidates, ApproximateCancellation, ApproximateCompletion, ApproximateConfig,
     ApproximateConsumer, ApproximateId, ApproximateMethod, ApproximateRecord, ApproximateTape,
+    ApproximateTokenIndex,
 };
 
 struct CountingAllocator;
@@ -160,6 +162,138 @@ fn approximate_lookup(fixture: &SearchFixture) -> libcpg::ApproximateReport {
         &ApproximateCancellation::default(),
     )
     .expect("bounded approximate symbol search")
+}
+
+#[derive(Debug)]
+struct StructuralFixture {
+    query: ApproximateRecord,
+    candidates: Vec<ApproximateRecord>,
+    exact_index: BTreeMap<Vec<Arc<str>>, ApproximateId>,
+    approximate_index: ApproximateTokenIndex,
+    expected: ApproximateId,
+    config: ApproximateConfig,
+}
+
+fn structural_sequence(index: usize) -> Vec<String> {
+    vec![
+        "FUNCTION".to_string(),
+        format!("OP-{}", index % 32),
+        format!("ARG-{}", (index / 32) % 32),
+        format!("RET-{}", index / 1_024),
+        "CLOSE".to_string(),
+    ]
+}
+
+fn structural_fixture(candidate_count: usize, noisy: bool) -> StructuralFixture {
+    let candidates = (0..candidate_count)
+        .map(|index| {
+            ApproximateRecord::new(
+                ApproximateId::External {
+                    corpus: 0x5354_5255_4354,
+                    item: index as u64 + 1,
+                },
+                ApproximateTape::tokens(structural_sequence(index)),
+            )
+        })
+        .collect::<Vec<_>>();
+    let exact_index = candidates
+        .iter()
+        .map(|record| {
+            let ApproximateTape::Tokens(tokens) = record.tape.as_ref() else {
+                unreachable!("structural fixture contains only token tapes");
+            };
+            (tokens.clone(), record.id)
+        })
+        .collect();
+    let expected = candidates[0].id;
+    let mut query = structural_sequence(0);
+    if noisy {
+        query[2] = "ARG-NOISY".to_string();
+    }
+    let config = ApproximateConfig {
+        method: ApproximateMethod::StandardLevenshtein,
+        max_distance: 1,
+        top_k: 8,
+        ..ApproximateConfig::default()
+    };
+    let approximate_index =
+        ApproximateTokenIndex::build(&candidates, &config.limits).expect("structural index build");
+    StructuralFixture {
+        query: ApproximateRecord::new(
+            ApproximateId::External {
+                corpus: 0x5354_5255_4354,
+                item: 0,
+            },
+            ApproximateTape::tokens(query),
+        ),
+        candidates,
+        exact_index,
+        approximate_index,
+        expected,
+        config,
+    }
+}
+
+fn structural_exact_lookup(fixture: &StructuralFixture) -> Option<ApproximateId> {
+    let ApproximateTape::Tokens(query) = fixture.query.tape.as_ref() else {
+        unreachable!("structural fixture contains only token tapes");
+    };
+    fixture.exact_index.get(query).copied()
+}
+
+fn token_distance(left: &[Arc<str>], right: &[Arc<str>]) -> usize {
+    let mut previous = (0..=right.len()).collect::<Vec<_>>();
+    let mut current = vec![0; right.len() + 1];
+    for (left_index, left_unit) in left.iter().enumerate() {
+        current[0] = left_index + 1;
+        for (right_index, right_unit) in right.iter().enumerate() {
+            current[right_index + 1] = (previous[right_index + 1] + 1)
+                .min(current[right_index] + 1)
+                .min(previous[right_index] + usize::from(left_unit != right_unit));
+        }
+        std::mem::swap(&mut previous, &mut current);
+    }
+    previous[right.len()]
+}
+
+fn structural_direct_lookup(fixture: &StructuralFixture) -> Option<ApproximateId> {
+    let ApproximateTape::Tokens(query) = fixture.query.tape.as_ref() else {
+        unreachable!("structural fixture contains only token tapes");
+    };
+    fixture
+        .candidates
+        .iter()
+        .map(|candidate| {
+            let ApproximateTape::Tokens(tokens) = candidate.tape.as_ref() else {
+                unreachable!("structural fixture contains only token tapes");
+            };
+            (token_distance(query, tokens), candidate.id)
+        })
+        .min()
+        .map(|(_, id)| id)
+}
+
+fn structural_indexed_lookup(fixture: &StructuralFixture) -> libcpg::ApproximateReport {
+    fixture
+        .approximate_index
+        .search(
+            &fixture.query,
+            ApproximateConsumer::CloneCandidate,
+            &fixture.config,
+            &ApproximateCancellation::default(),
+        )
+        .expect("bounded reusable structural search")
+}
+
+fn structural_one_shot_lookup(fixture: &StructuralFixture) -> libcpg::ApproximateReport {
+    approximate_candidates(
+        &fixture.query,
+        &fixture.candidates,
+        ApproximateConsumer::CloneCandidate,
+        &fixture.config,
+        &ApproximateCancellation::default(),
+    )
+    .expect("bounded one-shot structural search")
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -317,6 +451,82 @@ fn benchmark_approximate_matching(c: &mut Criterion) {
         }
     }
     group.finish();
+
+    let mut structural = c.benchmark_group("approximate_matching/structural_sequence");
+    structural.sample_size(10);
+    structural.warm_up_time(Duration::from_secs(1));
+    structural.measurement_time(Duration::from_secs(2));
+    for candidate_count in [256usize, 4_096] {
+        for noisy in [false, true] {
+            let fixture = structural_fixture(candidate_count, noisy);
+            let exact = structural_exact_lookup(&fixture);
+            let direct = structural_direct_lookup(&fixture);
+            let indexed = structural_indexed_lookup(&fixture);
+            assert_eq!(direct, Some(fixture.expected));
+            assert_eq!(indexed.completion, ApproximateCompletion::Complete);
+            assert_eq!(indexed.evidence[0].candidate, fixture.expected);
+            assert_eq!(exact, (!noisy).then_some(fixture.expected));
+
+            let (_, exact_allocations) = profile_allocations(|| structural_exact_lookup(&fixture));
+            let (_, direct_allocations) =
+                profile_allocations(|| structural_direct_lookup(&fixture));
+            let (profiled_indexed, indexed_allocations) =
+                profile_allocations(|| structural_indexed_lookup(&fixture));
+            let (_, build_allocations) = profile_allocations(|| {
+                ApproximateTokenIndex::build(&fixture.candidates, &fixture.config.limits)
+                    .expect("profiled structural index build")
+            });
+            eprintln!(
+                "structural_resources,candidates={candidate_count},noisy={noisy},\
+                 exact_allocations={},exact_allocated_bytes={},\
+                 direct_allocations={},direct_allocated_bytes={},\
+                 index_build_allocations={},index_build_allocated_bytes={},\
+                 indexed_allocations={},indexed_allocated_bytes={},\
+                 algorithm_peak_live_bytes={}",
+                exact_allocations.calls,
+                exact_allocations.bytes,
+                direct_allocations.calls,
+                direct_allocations.bytes,
+                build_allocations.calls,
+                build_allocations.bytes,
+                indexed_allocations.calls,
+                indexed_allocations.bytes,
+                profiled_indexed.counters.peak_memory_bytes,
+            );
+
+            let case = if noisy { "noisy" } else { "exact" };
+            structural.throughput(Throughput::Elements(candidate_count as u64));
+            structural.bench_with_input(
+                BenchmarkId::new(format!("exact_btree/{case}"), candidate_count),
+                &fixture,
+                |benchmark, fixture| {
+                    benchmark.iter(|| black_box(structural_exact_lookup(black_box(fixture))));
+                },
+            );
+            structural.bench_with_input(
+                BenchmarkId::new(format!("direct_sequence_scan/{case}"), candidate_count),
+                &fixture,
+                |benchmark, fixture| {
+                    benchmark.iter(|| black_box(structural_direct_lookup(black_box(fixture))));
+                },
+            );
+            structural.bench_with_input(
+                BenchmarkId::new(format!("reused_u64_dawg/{case}"), candidate_count),
+                &fixture,
+                |benchmark, fixture| {
+                    benchmark.iter(|| black_box(structural_indexed_lookup(black_box(fixture))));
+                },
+            );
+            structural.bench_with_input(
+                BenchmarkId::new(format!("one_shot_direct_adapter/{case}"), candidate_count),
+                &fixture,
+                |benchmark, fixture| {
+                    benchmark.iter(|| black_box(structural_one_shot_lookup(black_box(fixture))));
+                },
+            );
+        }
+    }
+    structural.finish();
 }
 
 criterion_group!(benches, benchmark_approximate_matching);
