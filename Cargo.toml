@@ -58,6 +58,7 @@ metta = ["dep:libdictenstein"]
 # The selected upstream release line declares Rust 1.95; callers may also use
 # nightly-only backend/SIMD features without libcpg weakening those features.
 approximate-matching = [
+    "dep:libdictenstein",
     "dep:duallity",
     "dep:liblevenshtein",
     "dep:lling-llang",

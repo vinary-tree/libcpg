@@ -7,6 +7,8 @@
 #[cfg(feature = "approximate-matching")]
 pub mod approximate;
 #[cfg(feature = "approximate-matching")]
+mod approximate_index;
+#[cfg(feature = "approximate-matching")]
 mod approximate_wfst;
 mod basic_blocks;
 pub mod bugs;
@@ -239,6 +241,8 @@ pub use motifs::{
 
 #[cfg(feature = "approximate-matching")]
 pub use approximate::*;
+#[cfg(feature = "approximate-matching")]
+pub use approximate_index::*;
 #[cfg(feature = "approximate-matching")]
 pub use approximate_wfst::*;
 

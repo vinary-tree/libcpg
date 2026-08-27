@@ -3,8 +3,8 @@
 use libcpg::{
     approximate_candidates, project_cpg_functions, ApproximateCancellation, ApproximateCompletion,
     ApproximateConfig, ApproximateConsumer, ApproximateId, ApproximateLimits, ApproximateRecord,
-    ApproximateTape, CodePropertyGraph, CpgNode, CpgNodeKind, Language, MethodSignature, NodeId,
-    SourceRange, Visibility,
+    ApproximateTape, ApproximateTokenIndex, CodePropertyGraph, CpgNode, CpgNodeKind, Language,
+    MethodSignature, NodeId, SourceRange, Visibility,
 };
 
 fn function(name: &str) -> CpgNodeKind {
@@ -142,4 +142,62 @@ fn candidate_order_rank_clone_debug_and_drop_are_stack_safe_at_100k() {
         .expect("spawn 100k lifecycle stack gate")
         .join()
         .expect("ordering and lifecycle must not overflow the native stack");
+}
+
+fn indexed_sequence_lifecycle(depth: usize) {
+    let candidate = ApproximateRecord::new(
+        ApproximateId::External { corpus: 2, item: 1 },
+        ApproximateTape::tokens(std::iter::repeat_n("step", depth)),
+    );
+    let limits = ApproximateLimits {
+        max_candidates: 1,
+        max_input_units: depth,
+        max_pair_cells: 11_000_000_000,
+        max_work_units: 11_000_000_000,
+        max_state_count: 1_000_000,
+        max_memory_bytes: 256 * 1024 * 1024,
+        max_unique_tokens: 1,
+    };
+    let index = ApproximateTokenIndex::build(std::slice::from_ref(&candidate), &limits)
+        .expect("bounded deep sequence index");
+    assert_eq!(index.completion(), &ApproximateCompletion::Complete);
+    let report = index
+        .search(
+            &ApproximateRecord::new(
+                ApproximateId::External { corpus: 2, item: 0 },
+                ApproximateTape::tokens(std::iter::repeat_n("step", depth)),
+            ),
+            ApproximateConsumer::CloneCandidate,
+            &ApproximateConfig {
+                max_distance: 0,
+                top_k: 1,
+                limits,
+                ..ApproximateConfig::default()
+            },
+            &ApproximateCancellation::default(),
+        )
+        .expect("bounded deep sequence query");
+    assert_eq!(report.completion, ApproximateCompletion::Complete);
+    assert_eq!(report.evidence[0].candidate, candidate.id);
+
+    let cloned = index.clone();
+    assert!(format!("{cloned:?}").contains("ApproximateTokenIndex"));
+    drop(cloned);
+    drop(index);
+    drop(report);
+    drop(candidate);
+}
+
+#[test]
+fn token_vocabulary_dawg_query_clone_debug_and_drop_are_stack_safe() {
+    std::thread::Builder::new()
+        .name("approximate-token-index-stack-gate".into())
+        .stack_size(256 * 1024)
+        .spawn(|| {
+            indexed_sequence_lifecycle(20_000);
+            indexed_sequence_lifecycle(100_000);
+        })
+        .expect("spawn indexed small-stack gate")
+        .join()
+        .expect("indexed sequence lifecycle must not overflow the native stack");
 }

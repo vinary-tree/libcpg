@@ -90,7 +90,7 @@ impl ApproximateTape {
         Self::Tokens(tokens.into_iter().map(Into::into).collect())
     }
 
-    fn units(&self) -> usize {
+    pub(super) fn units(&self) -> usize {
         match self {
             Self::Text(text) => text.chars().count(),
             Self::Tokens(tokens) => tokens.len(),
@@ -345,7 +345,7 @@ pub struct ApproximateRational {
 }
 
 impl ApproximateRational {
-    fn new(numerator: u64, denominator: u64) -> Self {
+    pub(super) fn new(numerator: u64, denominator: u64) -> Self {
         debug_assert_ne!(denominator, 0);
         Self {
             numerator,
@@ -397,6 +397,10 @@ pub struct ApproximateCounters {
     pub projection_work_units: u64,
     /// Largest estimated projection allocation in bytes.
     pub projection_peak_memory_bytes: u64,
+    /// Work charged to construction of a reusable structural-sequence index.
+    pub index_build_work_units: u64,
+    /// Conservative peak-memory estimate for the reusable index build.
+    pub index_build_peak_memory_bytes: u64,
 }
 
 /// Resource accounting for an immutable CPG or API projection.
@@ -490,6 +494,15 @@ pub enum ApproximateError {
         /// Candidate with a tape kind incompatible with the query.
         candidate: ApproximateId,
     },
+    /// A reusable structural index was given a text record.
+    #[error("indexed structural candidate {candidate:?} must use a token tape")]
+    IndexedCandidateRequiresTokens {
+        /// Candidate whose tape cannot be represented by the structural index.
+        candidate: ApproximateId,
+    },
+    /// A reusable structural index was queried with text rather than tokens.
+    #[error("indexed structural queries must use a token tape")]
+    IndexedQueryRequiresTokens,
     /// A platform-sized input or cost could not be represented in evidence.
     #[error("approximate-matching value `{0}` exceeds the evidence integer domain")]
     IntegerDomain(&'static str),
@@ -523,9 +536,21 @@ pub fn approximate_candidates(
 ) -> Result<ApproximateReport, ApproximateError> {
     validate_config(config)?;
 
+    // Token structures use libdictenstein's reversible vocabulary plus its
+    // native `u64` sequence dictionary. Text retains the lower-overhead direct
+    // bounded kernels selected by the measured one-shot policy.
+    if matches!(query.tape.as_ref(), ApproximateTape::Tokens(_))
+        && candidates
+            .iter()
+            .all(|record| matches!(record.tape.as_ref(), ApproximateTape::Tokens(_)))
+    {
+        return super::approximate_index::ApproximateTokenIndex::build(candidates, &config.limits)?
+            .search(query, consumer, config, cancellation);
+    }
+
     let ordering_bytes = candidates
         .len()
-        .checked_mul(size_of::<(ApproximateId, &ApproximateRecord)>())
+        .checked_mul(size_of::<CanonicalCandidate<'_>>())
         .and_then(|bytes| u64::try_from(bytes).ok())
         .ok_or(ApproximateError::IntegerDomain(
             "candidate ordering storage",
@@ -552,16 +577,10 @@ pub fn approximate_candidates(
         ));
     }
 
-    let mut ordered = BinaryHeap::from(
-        candidates
-            .iter()
-            .map(|record| (record.id, record))
-            .collect::<Vec<_>>(),
-    )
-    .into_sorted_vec();
+    let mut ordered = canonical_candidates(candidates);
     for duplicate in ordered.windows(2) {
-        if duplicate[0].0 == duplicate[1].0 {
-            return Err(ApproximateError::DuplicateCandidate(duplicate[0].0));
+        if duplicate[0].record.id == duplicate[1].record.id {
+            return Err(ApproximateError::DuplicateCandidate(duplicate[0].record.id));
         }
     }
 
@@ -583,7 +602,7 @@ pub fn approximate_candidates(
         return Ok(finish_report(
             Vec::new(),
             limitations,
-            provenance(query, ordered.iter().map(|(_, record)| *record), config),
+            provenance(query, ordered.iter().map(|item| item.record), config),
             ApproximateCounters {
                 candidate_count,
                 peak_memory_bytes: base_memory_bytes,
@@ -594,7 +613,7 @@ pub fn approximate_candidates(
         ));
     }
 
-    let provenance = provenance(query, ordered.iter().map(|(_, record)| *record), config);
+    let provenance = provenance(query, ordered.iter().map(|item| item.record), config);
     let mut counters = ApproximateCounters {
         candidate_count,
         admitted_candidates: ordered.len(),
@@ -615,7 +634,8 @@ pub fn approximate_candidates(
         ));
     }
 
-    for (_, candidate) in ordered {
+    for item in ordered {
+        let candidate = item.record;
         if cancellation.is_cancelled() {
             limitations.insert(ApproximateLimit::Cancelled);
             break;
@@ -1367,7 +1387,7 @@ fn completion_from_limits(limitations: BTreeSet<ApproximateLimit>) -> Approximat
     }
 }
 
-fn validate_config(config: &ApproximateConfig) -> Result<(), ApproximateError> {
+pub(super) fn validate_config(config: &ApproximateConfig) -> Result<(), ApproximateError> {
     if config.top_k == 0 {
         return Err(ApproximateError::ZeroLimit("top_k"));
     }
@@ -1384,12 +1404,49 @@ fn validate_config(config: &ApproximateConfig) -> Result<(), ApproximateError> {
     Ok(())
 }
 
+#[derive(Clone, Copy, Debug)]
+pub(super) struct CanonicalCandidate<'a> {
+    pub(super) record: &'a ApproximateRecord,
+}
+
+impl PartialEq for CanonicalCandidate<'_> {
+    fn eq(&self, other: &Self) -> bool {
+        self.record.id == other.record.id
+    }
+}
+
+impl Eq for CanonicalCandidate<'_> {}
+
+impl PartialOrd for CanonicalCandidate<'_> {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
+impl Ord for CanonicalCandidate<'_> {
+    fn cmp(&self, other: &Self) -> Ordering {
+        self.record.id.cmp(&other.record.id)
+    }
+}
+
+pub(super) fn canonical_candidates(
+    candidates: &[ApproximateRecord],
+) -> Vec<CanonicalCandidate<'_>> {
+    BinaryHeap::from(
+        candidates
+            .iter()
+            .map(|record| CanonicalCandidate { record })
+            .collect::<Vec<_>>(),
+    )
+    .into_sorted_vec()
+}
+
 #[derive(Debug)]
-struct PendingEvidence {
-    candidate: ApproximateId,
-    candidate_tape: Arc<ApproximateTape>,
-    raw_cost: ApproximateRational,
-    normalized_cost: ApproximateRational,
+pub(super) struct PendingEvidence {
+    pub(super) candidate: ApproximateId,
+    pub(super) candidate_tape: Arc<ApproximateTape>,
+    pub(super) raw_cost: ApproximateRational,
+    pub(super) normalized_cost: ApproximateRational,
 }
 
 impl PartialEq for PendingEvidence {
@@ -1419,7 +1476,7 @@ fn compare_pending(left: &PendingEvidence, right: &PendingEvidence) -> Ordering 
         .then_with(|| left.candidate.cmp(&right.candidate))
 }
 
-fn finish_report(
+pub(super) fn finish_report(
     pending: Vec<PendingEvidence>,
     limitations: BTreeSet<ApproximateLimit>,
     provenance: ApproximateProvenance,
@@ -1467,13 +1524,9 @@ enum PairPreparation {
     Domain,
 }
 
-enum PreparedStrings<'a> {
-    Borrowed(&'a str, &'a str),
-    Encoded(String, String),
-}
-
 struct PreparedPair<'a> {
-    strings: PreparedStrings<'a>,
+    query: &'a str,
+    candidate: &'a str,
     query_units: usize,
     candidate_units: usize,
     cells: u64,
@@ -1482,17 +1535,11 @@ struct PreparedPair<'a> {
 
 impl PreparedPair<'_> {
     fn query(&self) -> &str {
-        match &self.strings {
-            PreparedStrings::Borrowed(query, _) => query,
-            PreparedStrings::Encoded(query, _) => query,
-        }
+        self.query
     }
 
     fn candidate(&self) -> &str {
-        match &self.strings {
-            PreparedStrings::Borrowed(_, candidate) => candidate,
-            PreparedStrings::Encoded(_, candidate) => candidate,
-        }
+        self.candidate
     }
 }
 
@@ -1508,14 +1555,9 @@ fn prepare_pair<'a>(
     {
         return Err(PairPreparation::Limit(ApproximateLimit::InputUnits));
     }
-    let strings = match (query, candidate) {
+    let (query, candidate) = match (query, candidate) {
         (ApproximateTape::Text(query), ApproximateTape::Text(candidate)) => {
-            PreparedStrings::Borrowed(query, candidate)
-        }
-        (ApproximateTape::Tokens(query), ApproximateTape::Tokens(candidate)) => {
-            let (query, candidate) =
-                encode_token_pair(query, candidate, config.limits.max_unique_tokens)?;
-            PreparedStrings::Encoded(query, candidate)
+            (query.as_ref(), candidate.as_ref())
         }
         _ => return Err(PairPreparation::Mismatch),
     };
@@ -1528,56 +1570,13 @@ fn prepare_pair<'a>(
     let cells = u64::try_from(cells).map_err(|_| PairPreparation::Domain)?;
     let memory_bytes = estimated_pair_memory(config.method, query_units, candidate_units)?;
     Ok(PreparedPair {
-        strings,
+        query,
+        candidate,
         query_units,
         candidate_units,
         cells,
         memory_bytes,
     })
-}
-
-fn encode_token_pair(
-    query: &[Arc<str>],
-    candidate: &[Arc<str>],
-    max_unique_tokens: usize,
-) -> Result<(String, String), PairPreparation> {
-    let mut vocabulary = BinaryHeap::from(
-        query
-            .iter()
-            .chain(candidate)
-            .map(AsRef::as_ref)
-            .collect::<Vec<_>>(),
-    )
-    .into_sorted_vec();
-    vocabulary.dedup();
-    if vocabulary.len() > max_unique_tokens || vocabulary.len() > VALID_TOKEN_SCALARS {
-        return Err(PairPreparation::Limit(ApproximateLimit::UniqueTokens));
-    }
-
-    let encode = |tokens: &[Arc<str>]| -> Result<String, PairPreparation> {
-        let mut encoded = String::with_capacity(tokens.len().saturating_mul(3));
-        for token in tokens {
-            let index = vocabulary
-                .binary_search_by(|item| item.cmp(&token.as_ref()))
-                .map_err(|_| PairPreparation::Domain)?;
-            let scalar = token_scalar(index).ok_or(PairPreparation::Domain)?;
-            encoded.push(scalar);
-        }
-        Ok(encoded)
-    };
-    Ok((encode(query)?, encode(candidate)?))
-}
-
-// Exclude the surrogate range and NUL, which is reserved as an unambiguous
-// sentinel by several external tape encodings.
-const VALID_TOKEN_SCALARS: usize = 0x11_0000 - 0x800 - 1;
-
-fn token_scalar(index: usize) -> Option<char> {
-    let mut scalar = u32::try_from(index).ok()?.checked_add(1)?;
-    if scalar >= 0xD800 {
-        scalar = scalar.checked_add(0x800)?;
-    }
-    char::from_u32(scalar)
 }
 
 fn estimated_pair_memory(
@@ -1698,7 +1697,7 @@ fn integer_distance(
         .transpose()
 }
 
-fn provenance<'a>(
+pub(super) fn provenance<'a>(
     query: &ApproximateRecord,
     candidates: impl IntoIterator<Item = &'a ApproximateRecord>,
     config: &ApproximateConfig,
