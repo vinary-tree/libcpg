@@ -89,18 +89,30 @@
 (declare-const integer_fixed Bool)
 (declare-const integer_width Int)
 (declare-const integer_arbitrary_precision Bool)
+(declare-const integer_masked_shift Bool)
 
 (define-fun integer_type_valid () Bool
   (or (and integer_fixed
            (<= 1 integer_width)
            (<= integer_width 128)
            (not integer_arbitrary_precision))
-      (and (not integer_fixed) integer_arbitrary_precision)))
+      (and (not integer_fixed)
+           integer_arbitrary_precision
+           (not integer_masked_shift))))
 
 (echo "zero-width fixed integers are invalid")
 (push)
 (assert integer_fixed)
 (assert (= integer_width 0))
+(assert integer_type_valid)
+(check-sat)
+(pop)
+
+(echo "arbitrary-precision integers cannot use width-masked shifts")
+(push)
+(assert (not integer_fixed))
+(assert integer_arbitrary_precision)
+(assert integer_masked_shift)
 (assert integer_type_valid)
 (check-sat)
 (pop)

@@ -25,7 +25,7 @@ coqc -q \
 
 z3_output=$(z3 formal/z3/expression_ir.smt2)
 printf '%s\n' "$z3_output"
-if [[ $(grep -c '^unsat$' <<<"$z3_output") -ne 14 ]]; then
+if [[ $(grep -c '^unsat$' <<<"$z3_output") -ne 15 ]]; then
     echo 'Z3 did not refute every forbidden rewrite-certificate state' >&2
     exit 1
 fi
