@@ -568,6 +568,25 @@ call-stack depth, not a universal latency or resident-memory claim. A later
 optimization may change index structures only after an oracle-guarded benchmark
 and profile show an end-to-end gain while preserving canonical output.
 
+## Tree-sitter parent-context scaling
+
+Tree-sitter nodes do not store a direct public parent pointer. Calling
+`Node::parent()` reconstructs context through descendant and child iteration;
+doing so once per node in a depth-$`d`$ chain admits $`O(d^2)`$ work. The
+preorder builder already observes the direct edge when scheduling each child,
+so its heap frame now carries raw syntax parent $`r`$ separately from effective
+CPG parent $`e`$. Child scheduling is constant-time context propagation, while
+the overall AST walk remains linear in visited nodes plus grammar-owned child
+iteration.
+
+A capped debug-profile run of the unchanged 100,000-depth/50,000-width test did
+not complete after more than 41 minutes before the repair. A 120-second
+headless `perf` sample attributed the hot path to `ts_node_parent`,
+`ts_node_child_with_descendant`, and child iteration. After commit `c8dfcb0`,
+the same test completed in 1.37 seconds of test time (1.50 seconds wall), with
+86,916 KiB maximum RSS and zero swaps. These figures describe that recorded
+host/run; they are regression evidence, not a universal latency guarantee.
+
 ## Related pages
 
 - [Build and features](01-build-and-features.md) — which dependencies each feature

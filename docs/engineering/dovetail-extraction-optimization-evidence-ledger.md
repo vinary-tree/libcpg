@@ -46,6 +46,18 @@ and explicit frontend semantic profiles. Its invariants and evidence are:
 | `70c7ad9` | numeric descriptors, overflow, shift, and finite-floating boundaries |
 | `81e518e` | exclusion of widthless masked shifts |
 | `6b7d86e` | typed flat production IR, public API, exhaustive tests, and nine parser integrations |
+| `0fd84ec` | required documentation pillars, reproducible diagrams, and exhaustive effect-mask coverage |
+| `79882fb` | formal raw/effective parent-context model discovered by the terminal gate |
+| `c8dfcb0` | constant-time carried parent context preserving ownership and CPG topology |
+
+### Terminal-gate defect resolved
+
+The first maximal-matrix attempt exposed pgmcp bug
+`dovetail-x-tree-parent-quadratic`: Rust ownership classification reconstructed
+every tree-sitter parent. The headless profile, formal repair, invariant-derived
+tests, and measured result are recorded in the
+[parent-context plan](../verification/tree-parent-context-formal-plan.md) and
+[performance guide](03-performance.md#tree-sitter-parent-context-scaling).
 
 ### Executable gates
 

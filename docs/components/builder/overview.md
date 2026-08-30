@@ -56,7 +56,11 @@ built:
    path this is done by libcpg; in [Mode B](../../GLOSSARY.md#mode-b--build_from_tree) the
    caller has already produced the `tree_sitter::Tree`.
 2. **AST construction.** `build_ast` walks the tree-sitter tree with an explicit
-   preorder work stack, maps each node's kind
+   preorder work stack. Each frame carries the direct raw syntax parent and the
+   nearest included CPG parent as separate values. The mapper consumes raw
+   context for parent-sensitive language semantics without invoking
+   tree-sitter's depth-dependent `Node::parent()` recovery; transparent wrappers
+   preserve only the effective CPG parent. The builder maps each node's kind
    string to a `CpgNodeKind` via the [`NodeMapper`](node-mapper.md), creates a `CpgNode`,
    and wires an `AstChild` edge (plus a parent pointer) from parent to child. Function
    nodes are registered as CFG entry points here.

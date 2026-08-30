@@ -561,6 +561,27 @@ dependencies and are not part of the `full` feature set.
 
 ## Additional verification surfaces
 
+### AST parent-context performance regression
+
+The unchanged `deep_and_wide_ast_builds_are_stack_safe_on_a_small_native_stack`
+case parses 100,000 nested Rust parentheses, builds the CPG, then parses and
+builds 50,000 sibling statements on a 256 KiB worker stack. It also checks
+anti-vacuity and both graph sizes. The carried-parent repair is guarded by:
+
+- the shallow recursive AST oracle, now including ownership metadata;
+- generated Mode-A/Mode-B identity and parent/`AstChild` consistency;
+- all Rust ownership and Rholang binder examples; and
+- the 122-test Rust/Rholang builder matrix.
+
+Run the formal prerequisite first, then the unchanged deep case:
+
+```bash
+scripts/verify-tree-parent-context-formal.sh
+cargo test --lib \
+  builder::tree_sitter::tests::deep_and_wide_ast_builds_are_stack_safe_on_a_small_native_stack \
+  --features lang-rust -- --exact
+```
+
 ### Typed expression-IR surface
 
 The feature-free expression IR has a focused example/property suite and a

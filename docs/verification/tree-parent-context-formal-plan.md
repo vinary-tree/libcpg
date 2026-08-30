@@ -2,26 +2,26 @@
 
 ## Purpose
 
-This plan governs pgmcp bug \`dovetail-x-tree-parent-quadratic\`. The explicit
+This plan governs pgmcp bug `dovetail-x-tree-parent-quadratic`. The explicit
 preorder Abstract Syntax Tree (AST) work machine already knows a child's direct
 raw tree-sitter parent when it schedules that child. Carrying this context must
-remove repeated \`Node::parent()\` reconstruction without changing CPG topology,
+remove repeated `Node::parent()` reconstruction without changing CPG topology,
 transparent-node behavior, ownership classification, traversal order, or stack
 safety.
 
 ## State and invariants
 
-A work frame contains syntax node $\`n\`$, raw parent $\`r\`$, and effective CPG
-parent $\`e\`$. For tree parent function $\`p\`$, included-node predicate $\`I\`$,
-and scheduled child $\`c\`$, the transition is:
+A work frame contains syntax node $`n`$, raw parent $`r`$, and effective CPG
+parent $`e`$. For tree parent function $`p`$, included-node predicate $`I`$,
+and scheduled child $`c`$, the transition is:
 
-\`\`\`math
+```math
 r_c=n,\qquad
 e_c=\begin{cases}
 n & I(n),\\
 e_n & \neg I(n).
 \end{cases}
-\`\`\`
+```
 
 The proof obligations are:
 
@@ -48,6 +48,6 @@ break CPG flattening when a grammar wrapper is omitted.
 Only after all three gates pass may production traversal frames or mapper APIs
 change. Implementation tests must then cover root, direct assignment/value,
 non-value, borrow, transparent wrapper, generated source shapes, exact CPG
-parent/\`AstChild\` equivalence, and the unchanged 100,000-depth/50,000-width
+parent/`AstChild` equivalence, and the unchanged 100,000-depth/50,000-width
 256 KiB-stack regression. Before/after profiling remains headless and is
-captured beneath \`target/verification\` under RSS/no-swap limits.
+captured beneath `target/verification` under RSS/no-swap limits.

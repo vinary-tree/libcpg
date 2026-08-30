@@ -147,10 +147,12 @@ append-only tracker progress ledger.
 
 Tests: `src/builder/tree_sitter.rs` unit/property oracles and
 `tests/tree_sitter_stack_safety.rs`, including the public 100,000-depth and
-50,000-width 256 KiB-stack cases. Documents:
+50,000-width 256 KiB-stack cases. Direct raw-parent context is formally checked
+and removes depth-dependent tree-sitter parent reconstruction without changing
+the effective CPG parent (`79882fb`, `c8dfcb0`). Documents:
 [builder API](../api/builder-reference.md),
 [testing](02-testing.md), and
-[input hardening](../security/01-input-and-resource-hardening.md).
+[parent-context formal plan](../verification/tree-parent-context-formal-plan.md).
 
 ### STACK-PROPERTY
 
@@ -401,4 +403,3 @@ regressions, clean-tree checks, plus pgmcp integration and its one permitted
 full `./scripts/verify.sh`/bug gate. Documents: this terminal ledger,
 [analysis-expansion matrix](analysis-expansion-matrix.md), and pgmcp's
 `docs/quality/live-cpg-analysis.md`.
-

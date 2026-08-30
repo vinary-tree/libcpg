@@ -6,6 +6,7 @@ start
 :tree-sitter parse
 (ParserRegistry grammar, or caller-supplied tree in Mode B);<<#DBE4FF>>
 :build_ast explicit preorder work stack
+raw syntax parent + effective CPG parent
 AST nodes + AstChild edges + parent pointers;<<#DBE4FF>>
 if (config.build_cfg?) then (yes)
   :CfgExtractor.extract(&mut cpg)

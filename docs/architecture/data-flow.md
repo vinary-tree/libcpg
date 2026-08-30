@@ -41,7 +41,10 @@ fn demo() -> libcpg::Result<()> {
 ### Stage 1 — AST construction
 
 `build_from_tree` walks the tree-sitter tree with the explicit preorder work
-stack in `build_ast`. For each retained node it:
+stack in `build_ast`. A frame stores both the direct raw syntax parent and the
+nearest retained CPG parent. The first supplies constant-time grammar context
+to parent-sensitive mappers; the second preserves transparent-wrapper
+flattening and `AstChild` topology. For each retained node it:
 
 1. asks the `NodeMapper` whether to keep the node (`should_include_node`, which drops punctuation, comments unless configured, and language-specific wrappers/tokens);
 2. maps the grammar's node-kind string to a `CpgNodeKind` (`map_kind`) and,
