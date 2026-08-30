@@ -226,6 +226,7 @@ proptest = "1.5"
 # uses the precise (not fast-but-lossy) float parser so every finite f64 that
 # libcpg forwards verbatim round-trips exactly.
 serde_json = { version = "1.0", features = ["float_roundtrip"] }
+static_assertions = "1.1"
 
 # Rholang / MeTTa tree-sitter grammars — TEST-ONLY (path dev-dependencies).
 #

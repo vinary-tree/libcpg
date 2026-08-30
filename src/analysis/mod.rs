@@ -26,6 +26,7 @@ mod distance;
 mod dominators;
 mod dsm;
 mod effects;
+pub mod expression_ir;
 mod heap;
 pub mod ifds;
 mod induction;
@@ -196,6 +197,19 @@ pub use dsm::{
 
 pub use effects::{
     analyze_effects, effect_summaries, EffectAnalysis, EffectSummary, Place, Purity,
+};
+
+pub use expression_ir::{
+    lower_expression_ir, AliasingSemantics, BinaryOperator, BindingIdentity, BindingSemantics,
+    CallIdentity, CallSemantics, EffectSemantics, EvaluationOrder, ExceptionSemantics,
+    ExpressionEffects, ExpressionEvidenceMode, ExpressionFact, ExpressionFactError,
+    ExpressionFactKind, ExpressionFactTable, ExpressionIr, ExpressionIrAllocation,
+    ExpressionIrCompletion, ExpressionIrId, ExpressionIrLimits, ExpressionIrMetrics,
+    ExpressionIrNode, ExpressionIrProvenance, ExpressionLiteral, ExpressionType, FloatMode,
+    FloatType, FloatWidth, FloatingPointSemantics, IntegerOverflow, IntegerSemantics, IntegerType,
+    MemoryAccess, RewriteCertificate, RewriteDenial, RewriteLaw, SemanticKnowledge,
+    SemanticProfile, ShiftBehavior, ShortCircuitSemantics, UnaryOperator, VolatileAtomicSemantics,
+    BUILTIN_EXPRESSION_PROFILE_LANGUAGES,
 };
 
 pub use heap::{

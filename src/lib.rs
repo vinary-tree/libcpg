@@ -167,6 +167,19 @@ pub use graph::{
     PropertyValueRef, RewriteDepEdgeKind, ScopeId, SourceRange, TypeInfo, Visibility,
 };
 
+pub use analysis::expression_ir::{
+    lower_expression_ir, AliasingSemantics, BinaryOperator, BindingIdentity, BindingSemantics,
+    CallIdentity, CallSemantics, EffectSemantics, EvaluationOrder, ExceptionSemantics,
+    ExpressionEffects, ExpressionEvidenceMode, ExpressionFact, ExpressionFactError,
+    ExpressionFactKind, ExpressionFactTable, ExpressionIr, ExpressionIrAllocation,
+    ExpressionIrCompletion, ExpressionIrId, ExpressionIrLimits, ExpressionIrMetrics,
+    ExpressionIrNode, ExpressionIrProvenance, ExpressionLiteral, ExpressionType, FloatMode,
+    FloatType, FloatWidth, FloatingPointSemantics, IntegerOverflow, IntegerSemantics, IntegerType,
+    MemoryAccess, RewriteCertificate, RewriteDenial, RewriteLaw, SemanticKnowledge,
+    SemanticProfile, ShiftBehavior, ShortCircuitSemantics, UnaryOperator, VolatileAtomicSemantics,
+    BUILTIN_EXPRESSION_PROFILE_LANGUAGES,
+};
+
 pub use analysis::{
     accumulate_for_sources, algebraic_connectivity, analyze_api_usage_mining,
     analyze_builtin_authz, analyze_builtin_crypto, analyze_builtin_cwes, analyze_builtin_secrets,
