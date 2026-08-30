@@ -152,7 +152,7 @@ once, loop bodies twice, and a path set cuts malformed AST cycles.
 
 ## Benchmark coverage and remaining gaps
 
-Thirty-three explicitly declared Criterion targets are active. Most groups are
+Thirty-five explicitly declared Criterion targets are active. Most groups are
 feature-free; DFG, PDG, corpus, and reanalysis groups request their parser
 features, while `induction_analysis` additionally registers an
 `algorithm-detection`-gated group. Every active group constructs and checks a
@@ -194,6 +194,12 @@ deterministic oracle before Criterion enters the timed loop:
   zero through 65,536 bits. Exact full/striped-set oracles run before timing;
   the 511--769-bit cases expose vector/tail crossover, while subset is the
   early-exit scalar control;
+- `approximate_matching` separates exact symbol lookup from bounded edit
+  search, tracks call/byte allocation in the measured closure, and measures
+  reversible token-index candidate retrieval under an explicit feature gate;
+- `expression_equivalence` separates public pair-output scaling at 2/8/32
+  candidates from AC-normalization width at 4/16/64 operands; every fixture
+  enters through public typed IR lowering and requires complete analysis;
 - `induction_analysis` measures DFG-backed invariant and induction analysis on
   single counted loops with 64, 512, and 2,048 invariant definitions; with
   `algorithm-detection`, its `complexity_evidence` group measures the public
@@ -410,6 +416,8 @@ cargo bench --bench traversal_primitives --no-default-features
 cargo bench --bench pattern_vf2 --no-default-features
 cargo bench --bench parallel_analysis --no-default-features
 cargo bench --bench similarity_wl --no-default-features
+cargo bench --bench expression_equivalence --no-default-features
+cargo bench --bench approximate_matching --features approximate-matching
 cargo bench --bench dfg_extraction --features lang-rust
 cargo bench --bench pdg_construction --features lang-rust
 cargo bench --bench dominator_analysis --no-default-features
@@ -428,6 +436,22 @@ target before optimization work begins.
 
 The complete pre-optimization timing, RSS, allocation, counter, and hot-path
 record is the [optimization ledger](optimization-ledger.md).
+
+### Expression-equivalence baseline
+
+The T4.2 smoke baseline keeps pair-output growth separate from
+associative-commutative (AC) width. Criterion `--quick` estimated 6.8291 us,
+48.236 us, and 652.47 us for 2, 8, and 32 identical candidates. The 4-, 16-,
+and 64-operand AC cases estimated 236.26 us, 5.5132 ms, and 196.93 ms.
+
+The directly executed quick binary completed in 0.24 seconds at 43,076 KiB
+maximum resident set size with no swap. For the 64-operand case, headless
+Massif observed about 1.454 MiB peak total, and DHAT observed 1,424,796 live
+bytes in 6,362 blocks at its global maximum. Perf-stat recorded 253.12 ms task
+clock, 2,794,582,388 instructions, and 6,740,506 cache misses. These are local
+smoke/profile observations, not portable latency or complexity claims. The
+full interpretation and profiler limitations are recorded in
+[Scientific 70](../scientific/70-expression-equivalence-validation.md).
 
 ### Liveness replay finding
 

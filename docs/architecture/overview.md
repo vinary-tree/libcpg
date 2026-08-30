@@ -107,7 +107,7 @@ The public types are built for concurrency but do **not** silently parallelize:
   ordered emitter performs graph mutation, preserving the serial edge and
   result sequence. The default builder configuration and all serial methods
   remain serial. There are **no** atomic progress counters and **no** SIMD
-  paths; the `gpu` feature is reserved with no code behind it. Thirty-three Criterion
+  paths; the `gpu` feature is reserved with no code behind it. Thirty-five Criterion
   targets include a controlled 1/2/4/8/16/32-worker parallel-analysis sweep;
   the full inventory and remaining gaps are tracked in
   [`../engineering/03-performance.md`](../engineering/03-performance.md) and

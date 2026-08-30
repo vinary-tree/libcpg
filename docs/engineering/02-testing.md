@@ -604,7 +604,7 @@ for the interpretation boundary.
 | Surface | State |
 | --- | --- |
 | Doctests | Three examples compile under both default and all-feature configurations with rustdoc warnings denied. The feature-free crate-root example executes against a real typed CPG; the two parser snippets are `no_run` because the empty default feature set intentionally has no built-in grammar. |
-| Benchmarks | Thirty-three explicit Criterion targets cover construction, traversal, DFG, PDG, SCC, VF2, liveness, induction, graph metrics, clones, advisory/security analyses, exact call-resolution families, exports, CPG differencing, and controlled parallel scaling. Each active group asserts a deterministic oracle before timing. See [performance](03-performance.md) and the [optimization ledger](optimization-ledger.md). |
+| Benchmarks | Thirty-five explicit Criterion targets cover construction, traversal, DFG, PDG, SCC, VF2, liveness, induction, graph metrics, clones, advisory/security analyses, exact call-resolution families, approximate matching, expression equivalence, exports, CPG differencing, and controlled parallel scaling. Each active group asserts a deterministic oracle before timing. See [performance](03-performance.md) and the [optimization ledger](optimization-ledger.md). |
 | `ml-linfa`, `gpu` | not exercised: optional heavy dependencies outside the `full` feature set. |
 
 The feature-free [`population_anomalies`](../../examples/population_anomalies.rs)

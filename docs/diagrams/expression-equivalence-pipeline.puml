@@ -1,0 +1,59 @@
+@startuml
+!include _libcpg-theme.iuml
+title Proof-producing expression-equivalence pipeline
+
+rectangle "Live typed ExpressionIr candidates\nsource + binding context + profile" as Input #D0EBFF
+rectangle "Admission boundary\ncomplete + pure + live + same profile" as Admission #FFD8A8
+database "Exact operator tape\nresolved bindings + context namespace" as ExactTape #E5DBFF
+database "Alpha operator tape\ndeterministic local binding slots" as AlphaTape #E5DBFF
+rectangle "Bounded Replete exact graph\ncertified rules + congruence" as ExactGraph #FFE8CC
+rectangle "Bounded Replete alpha graph\ncertified rules + congruence" as AlphaGraph #FFE8CC
+rectangle "Complete provenance?\n<<decision>>" as Provenance #FFD8A8
+rectangle "Independent iterative replay\nstructure + every atomic law" as Replay #C3FAE8
+rectangle "Qualified exact pairs\ncanonical stable order" as ExactPairs #D3F9D8
+rectangle "Qualified alpha pairs\nexplicit binding bijection" as AlphaPairs #D3F9D8
+rectangle "Typed unsupported or limited result\nabsence is not inequivalence" as Incomplete #FFE3E3
+
+Input -[#1971C2]-> Admission
+Admission -[#C92A2A]-> Incomplete : reject / limit
+Admission -[#6741D9]-> ExactTape : exact preparation
+Admission -[#6741D9]-> AlphaTape : alpha preparation
+ExactTape -[#E8590C]-> ExactGraph : child before parent
+AlphaTape -[#E8590C]-> AlphaGraph : child before parent
+ExactGraph -[#E8590C]-> ExactGraph : bounded saturation + native folds
+AlphaGraph -[#E8590C]-> AlphaGraph : bounded saturation + native folds
+ExactGraph -[#F08C00]-> Provenance : candidate equality
+AlphaGraph -[#F08C00]-> Provenance : candidate equality
+Provenance -[#C92A2A]-> Incomplete : missing / capped
+Provenance -[#0CA678]-> Replay : complete proof tape
+Replay -[#C92A2A]-> Incomplete : invalid proof
+Replay -[#2B8A3E]-> ExactPairs : exact namespace
+Replay -[#2B8A3E]-> AlphaPairs : bijection qualified
+
+note bottom of ExactGraph #FFF3BF
+Associative-commutative normalization
+preserves leaf multiplicity.
+Iteration stops at a fixed point or a typed cap.
+end note
+
+note bottom of Replay #E7F5FF
+E-class membership is never trusted alone.
+Replay uses heap frames, not native recursion.
+end note
+
+note bottom of Incomplete #FFF9DB
+No result authorizes a write to MeTTaIL.
+Standalone Replete remains independently owned.
+end note
+
+legend right
+|= Color |= Meaning |
+|<#D0EBFF>| live typed input |
+|<#FFD8A8>| evidence decision |
+|<#E5DBFF>| flat canonical tape |
+|<#FFE8CC>| standalone Replete computation |
+|<#C3FAE8>| independently replayed proof |
+|<#D3F9D8>| qualified positive evidence |
+|<#FFE3E3>| unsupported, incomplete, or rejected |
+endlegend
+@enduml

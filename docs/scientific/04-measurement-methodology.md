@@ -1,6 +1,6 @@
 # Measurement methodology
 
-`libcpg` ships thirty-three runnable Criterion targets. Their baseline groups are
+`libcpg` ships thirty-five runnable Criterion targets. Their baseline groups are
 feature-free; the `induction_analysis` target also registers an
 `algorithm-detection`-gated complexity-evidence group. Each active group
 asserts a deterministic correctness oracle **before** entering the timed loop.
@@ -19,7 +19,7 @@ the source transformation under study does not [[1]](#references).
 
 ## 1. Current evidence
 
-All thirty-three targets use `harness = false`, which hands execution to Criterion
+All thirty-five targets use `harness = false`, which hands execution to Criterion
 rather than Rust's test harness:
 
 ```toml
@@ -113,6 +113,15 @@ harness = false
 [[bench]]
 name = "ifds_taint"
 harness = false
+
+[[bench]]
+name = "approximate_matching"
+harness = false
+required-features = ["approximate-matching"]
+
+[[bench]]
+name = "expression_equivalence"
+harness = false
 ```
 
 | Target | Public operation | Families and sizes | Pre-timing oracle |
@@ -142,6 +151,8 @@ harness = false
 | `program_merge` | `merge_programs`, `build_import_graph` | 16/64 files with 16 statement nodes per file; represented import chains | summed counts, contiguous identities, embedded-reference totality, file scopes, exact resolutions, and dependency counts |
 | `ifds_summaries` | `solve_summaries` | acyclic and recursive call graphs at 256/1,024 functions | exact first-function transitive closure, complete reports, and nonempty per-function summaries |
 | `ifds_taint` | `analyze_taint_report` | call-graph paths, rings, and cyclic clusters at 32/128 workers | exact source-to-sink pair, valid witness endpoints, and complete reports before timing; SCC construction remains outside the timed closure |
+| `approximate_matching` | exact lookup, `approximate_candidates`, and `ApproximateTokenIndex::search` | exact/noisy symbol corpora and reversible token tapes at bounded size classes | expected identity, complete typed report, exact distance bound, stable candidate order, and measured-closure allocation counters |
+| `expression_equivalence` | `analyze_expression_equivalence` | identical candidates at 2/8/32 and opposite AC associations at 4/16/64 operands | live typed IR admission, complete report, replayed positive evidence, and deterministic public result |
 
 The evidence is deliberately local: a result for one named family, size,
 machine, toolchain, and environment is not a universal speed claim. DFG/PDG
@@ -198,6 +209,8 @@ tees Criterion output to one timestamped log:
 cargo bench --bench api_usage_mining --no-default-features
 ./scripts/bench.sh program_merge --save-baseline before
 ./scripts/bench.sh ifds_taint --save-baseline before
+cargo bench --bench expression_equivalence --no-default-features
+cargo bench --bench approximate_matching --features approximate-matching
 cargo bench --no-default-features --features algorithm-detection \
   --bench induction_analysis -- --test
 ```

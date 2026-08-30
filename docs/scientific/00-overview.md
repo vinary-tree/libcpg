@@ -16,7 +16,7 @@ A CPG library makes three kinds of assertion, and each demands a different stand
 
 These are distinct from *performance* claims ("construction is fast", "VF2
 prunes well"), which require controlled measurement rather than assertion.
-`libcpg` ships thirty-three oracle-guarded Criterion targets (including
+`libcpg` ships thirty-five oracle-guarded Criterion targets (including
 feature-free operation groups, three parser-gated groups, and the gated
 complexity-evidence group), but their evidence is limited to
 the named graph families, sizes, environment, and operation. The
@@ -61,7 +61,7 @@ depth-100,000 detector targets. These cases combine fixed examples,
 differential oracles, and 99 exact
 source-level `proptest!` blocks. The feature-free matrix remains
 independently runnable and exercises the exact graph/data-flow substrate
-without compiling any grammar. Thirty-three active Criterion targets supplement
+without compiling any grammar. Thirty-five active Criterion targets supplement
 correctness with feature-free controls and explicitly parser- or
 algorithm-gated operation groups; see
 [Testing](../engineering/02-testing.md) for the census and [04](04-measurement-methodology.md)
@@ -76,7 +76,7 @@ Because `default = []`, many tests are **feature-gated**. The end-to-end reachin
 | [01 — Invariants & equivalence](01-cpg-invariants-and-equivalence.md) | Single shared node set; graph-assigned unique IDs; AST child/parent consistency; idempotent extractors; `build` ≡ `build_from_tree` (identical node payloads, typed edges, and language) | example + property `build_from_tree_matches_build` tests, `parsed_shadowing_and_idempotent`, `def_use_backward_slice`, `parsed_nested_use_resolves_and_chains` | `lang-rust` (equivalence, DFG) / feature-free (slice) |
 | [02 — Reaching-defs validation](02-reaching-defs-validation.md) | Nested-expression use resolution; latest-definition (strong update); non-flow of unrelated variables; shadowing scope; idempotency | `parsed_nested_use_resolves_and_chains`, `parsed_reassignment_uses_latest_definition`, `parsed_unrelated_variable_does_not_flow`, `parsed_shadowing_and_idempotent` | `lang-rust` |
 | [03 — VF2 completeness](03-vf2-completeness.md) | Soundness floor (empty pattern → no match); kind-feasibility pruning; **all** embeddings found (diamond → exactly 2) with exact backtracking | `test_empty_pattern`, `test_single_node_match`, `test_multi_embedding_backtracking` | feature-free |
-| [04 — Measurement methodology](04-measurement-methodology.md) | Environment control and exact-oracle timing for SCC, dominators/post-dominators, condensation analytics, arena construction, bounded and batched VF2, serial/parallel CFG/DFG/PDG, liveness, loop induction, DSM, WL, centrality, community, cohesion, spectral, cycle, motif, GED, function clones, clone/feasibility, API-usage/temporal, CWE-template, program-composition, IFDS/IDE, taint-summary, bit-set, incremental-reuse, and exact call-resolution operations | thirty-three `benches/*.rs` Criterion targets | feature-free controls plus explicitly parser- and algorithm-gated groups |
+| [04 — Measurement methodology](04-measurement-methodology.md) | Environment control and exact-oracle timing for SCC, dominators/post-dominators, condensation analytics, arena construction, bounded and batched VF2, serial/parallel CFG/DFG/PDG, liveness, loop induction, DSM, WL, centrality, community, cohesion, spectral, cycle, motif, GED, function clones, clone/feasibility, API-usage/temporal, CWE-template, program-composition, IFDS/IDE, taint-summary, bit-set, incremental reuse, exact call resolution, approximate matching, and expression equivalence | thirty-five `benches/*.rs` Criterion targets | feature-free controls plus explicitly parser-, algorithm-, and approximate-matching-gated groups |
 | [05 — SCCP validation](05-sccp-validation.md) | Concrete value soundness, lattice laws, conditional-edge partition, refinement monotonicity, determinism, parser integration | `straight_line_literal_programs_match_the_concrete_interpreter`, SCCP unit/property tests, `sccp_integration` | feature-free / `lang-rust` parser case |
 | [06 — Interval validation](06-interval-analysis-validation.md) | Concrete range soundness, hull/widen/narrow laws, loop convergence, narrowing descent, determinism, SCCP cross-check, parser integration | interval unit/property tests, `intervals_integration` | feature-free / `lang-rust` parser case |
 | [07 — Loop-induction validation](07-induction-analysis-validation.md) | DFG invariant contract, unique latch-dominating recurrences, checked affine steps, comparison direction, determinism, parser integration, malformed/stack safety | induction unit/property tests, `induction_integration`, robustness harness | feature-free / `serde` / `lang-rust` parser case |
@@ -142,6 +142,7 @@ Because `default = []`, many tests are **feature-gated**. The end-to-end reachin
 | [67 — Heterogeneous-export and fuzzing-distance validation](67-heterogeneous-export-distance-validation.md) | Exact 109-column aligned node initialization, all 67 typed relation buckets, harmonic CFG/call target distance, deterministic insertion/target order, and constant native call depth | exhaustive relation oracle, hand-computed harmonic paths, 128/256-case properties, public/parser integration, serde bytes, depth-100,000/64 KiB gate | feature-free / `serde` / `lang-rust` |
 | [68 — Approximate-automata validation](68-approximate-automata-validation.md) | Bounded edit semantics, typed complete relation laws, reversible structural vocabularies, exact confirmation, and constant native call depth | independent edit/join oracles, generated renaming and corpus properties, four-library pipeline, deep lifecycle, Criterion controls | `approximate-matching` / `serde` |
 | [69 — Typed expression-IR validation](69-expression-ir-validation.md) | Flat postorder lowering, fail-closed semantic admission, numeric boundaries, persistence authority revocation, parser-profile integration, and constant native call depth | TLA+/Rocq/Z3, 24 focused campaigns, nine parsers, independent integer/IEEE oracles, depth-100,000/256 KiB lifecycle | feature-free / `serde` / nine `lang-*` features |
+| [70 — Expression-equivalence validation](70-expression-equivalence-validation.md) | Exact/alpha namespace separation, proof replay, fixed-point folds, AC multiplicity, typed limits, determinism, parser integration, and constant native call depth | TLA+/Rocq/Z3, 24 focused campaigns, nine parsers, exhaustive three-leaf AC forms, two depth-100,000/256 KiB lifecycles | feature-free / `serde` / nine `lang-*` features |
 
 ## 5. What is proven, and what is advisory
 
@@ -255,7 +256,7 @@ Scientific honesty requires separating the two:
 - **Empirically bounded.** Performance results apply only to a target's named
   fixture, size, and controlled environment. Deterministic CPG differencing and
   GNN propagation remain measurement gaps; no result
-  from the thirty-three active targets may be
+  from the thirty-five active targets may be
   generalized to them. Martin metrics, reflexion conformance, architectural
   layering, and architectural-smell detection have no dedicated targets, so
   their validation supports correctness but makes no

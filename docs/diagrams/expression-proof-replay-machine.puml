@@ -1,0 +1,60 @@
+@startuml
+!include _libcpg-theme.iuml
+title Independent expression-proof replay machine
+
+start
+repeat
+  :Read next flat proof node\nfrom the bounded arena; <<heap frame>>
+
+  if (Structural proof node?) then (yes)
+    :Check endpoint ids, child proof ids,\nand structural constructor shape; <<#D0EBFF>>
+  else (atomic law)
+    if (AC normalization?) then (yes)
+      :Flatten both endpoint terms\nwith explicit worklists; <<#E5DBFF>>
+      :Sort leaf ProofTermId multisets; <<#E5DBFF>>
+      if (Same leaves and multiplicities?) then (yes)
+        :Accept local AC law; <<#D3F9D8>>
+      else (no)
+        :Reject proof; <<#FFE3E3>>
+        stop
+      endif
+    elseif (Constant fold?) then (yes)
+      :Push Enter(source); <<#E5DBFF>>
+      repeat
+        :Pop one Enter or Exit frame; <<#E5DBFF>>
+        if (Enter?) then (yes)
+          :Validate node, then push Exit\nand child Enter frames; <<#D0EBFF>>
+        else (Exit)
+          :Evaluate exact typed operator\nfrom dense child values; <<#C3FAE8>>
+        endif
+      repeat while (Frames remain?) is (yes) not (no)
+      if (Closed source evaluates\nto exact target literal?) then (yes)
+        :Accept local fold law; <<#D3F9D8>>
+      else (no)
+        :Reject proof; <<#FFE3E3>>
+        stop
+      endif
+    else (named local law)
+      :Check exact typed operands, namespace,\nprofile authorization, and law shape; <<#C3FAE8>>
+      if (Every premise holds?) then (yes)
+        :Accept local named law; <<#D3F9D8>>
+      else (no)
+        :Reject proof; <<#FFE3E3>>
+        stop
+      endif
+    endif
+  endif
+repeat while (More proof nodes?) is (yes) not (no)
+
+:Accept replayed proof; <<#D3F9D8>>
+stop
+
+legend right
+|= Color |= Meaning |
+|<#D0EBFF>| structural validation |
+|<#E5DBFF>| explicit heap machine |
+|<#C3FAE8>| semantic premise check |
+|<#D3F9D8>| accepted evidence |
+|<#FFE3E3>| fail-closed rejection |
+endlegend
+@enduml

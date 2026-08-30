@@ -320,8 +320,10 @@ let slice = backward_slice(&cpg, func, 256);         // bounded backward slice
 
 [0074 Typed pure-expression IR](design/0074-typed-pure-expression-ir.md)
 
+[0075 Proof-producing expression equivalence](design/0075-proof-producing-expression-equivalence.md)
+
 ### API reference
-[Graph / analysis reference](api/graph-reference.md) · [Builder reference](api/builder-reference.md) · [Pattern / algorithm / GNN reference](api/pattern-reference.md) · [Approximate-matching reference](api/approximate-matching-reference.md) · [Expression-IR reference](api/expression-ir-reference.md)
+[Graph / analysis reference](api/graph-reference.md) · [Builder reference](api/builder-reference.md) · [Pattern / algorithm / GNN reference](api/pattern-reference.md) · [Approximate-matching reference](api/approximate-matching-reference.md) · [Expression-IR reference](api/expression-ir-reference.md) · [Expression-equivalence reference](api/expression-equivalence-reference.md)
 
 ### Components
 
@@ -359,6 +361,8 @@ let slice = backward_slice(&cpg, func, 256);         // bounded backward slice
 [Bounded approximate matching](components/graph/approximate-matching.md)
 
 [Typed pure-expression IR](components/graph/expression-ir.md)
+
+[Proof-producing expression equivalence](components/graph/expression-equivalence.md)
 
 [Deterministic CPG diff](components/graph/cpg-diff.md)
 
@@ -469,6 +473,8 @@ let slice = backward_slice(&cpg, func, 256);         // bounded backward slice
 
 [Use the typed expression IR](usage/42-typed-expression-ir.md)
 
+[Use bounded expression equivalence](usage/43-expression-equivalence.md)
+
 ### Engineering
 [Overview](engineering/00-overview.md) · [Build & features](engineering/01-build-and-features.md) · [Testing](engineering/02-testing.md) · [Performance](engineering/03-performance.md) · [Optimization ledger](engineering/optimization-ledger.md) · [Analysis-expansion matrix](engineering/analysis-expansion-matrix.md) · [Terminal evidence ledger](engineering/analysis-expansion-evidence-ledger.md) · [Dovetail extraction/optimization ledger](engineering/dovetail-extraction-optimization-evidence-ledger.md) · [Contributing](engineering/04-contributing.md)
 
@@ -561,8 +567,10 @@ let slice = backward_slice(&cpg, func, 256);         // bounded backward slice
 
 [Typed expression-IR validation](scientific/69-expression-ir-validation.md)
 
+[Expression-equivalence validation](scientific/70-expression-equivalence-validation.md)
+
 ### Security
-[Threat model](security/00-threat-model.md) · [Input & resource hardening](security/01-input-and-resource-hardening.md) · [Taint-analysis security boundary](security/02-taint-analysis.md) · [Interprocedural-slicing security boundary](security/03-system-dependence-slicing.md) · [Channel-topology security boundary](security/04-channel-topology.md) · [Deadlock-analysis security boundary](security/05-deadlock-analysis.md) · [MHP-analysis security boundary](security/06-mhp-analysis.md) · [Session-analysis security boundary](security/07-session-analysis.md) · [Typestate-analysis security boundary](security/08-typestate-analysis.md) · [Bug-detector security boundary](security/09-bug-detectors.md) · [Population-anomaly security boundary](security/10-population-anomaly-detectors.md) · [Clone/feasibility security boundary](security/11-clone-feasibility-detectors.md) · [API-usage protocol-mining security boundary](security/12-api-usage-protocol-mining.md) · [CWE-template security boundary](security/13-cwe-template-analysis.md) · [Cryptographic API-misuse security boundary](security/14-cryptographic-api-misuse.md) · [Secret-flow/access-policy security boundary](security/15-secret-and-access-policy-analysis.md) · [Vulnerability-extrapolation security boundary](security/16-vulnerability-extrapolation.md) · [Virtual-call type-refinement security boundary](security/17-type-refinement-boundary.md) · [Concurrency-bug detection security boundary](security/18-concurrency-bug-detection.md) · [ML-export security boundary](security/19-ml-export-boundary.md) · [CPG-diff security boundary](security/20-cpg-diff-boundary.md) · [Incremental-cache security boundary](security/21-incremental-cache-boundary.md) · [Resolver symbol-index security boundary](security/22-resolver-symbol-index-boundary.md) · [Datalog-export security boundary](security/23-datalog-export-boundary.md) · [PDG information-flow security boundary](security/24-pdg-information-flow-boundary.md) · [Relational-domain security boundary](security/25-relational-abstract-domain-boundary.md) · [Compositional-heap security boundary](security/26-compositional-heap-boundary.md) · [Rholang NameFlow security boundary](security/27-rholang-name-flow-boundary.md) · [MeTTa rewriting security boundary](security/28-metta-rewriting-boundary.md) · [Rust place-capability security boundary](security/29-place-capability-boundary.md) · [Heterogeneous-export and fuzzing-distance security boundary](security/30-heterogeneous-export-and-distance-boundary.md) · [Approximate-evidence security boundary](security/31-approximate-evidence-boundary.md) · [Expression-rewrite security boundary](security/32-expression-rewrite-boundary.md)
+[Threat model](security/00-threat-model.md) · [Input & resource hardening](security/01-input-and-resource-hardening.md) · [Taint-analysis security boundary](security/02-taint-analysis.md) · [Interprocedural-slicing security boundary](security/03-system-dependence-slicing.md) · [Channel-topology security boundary](security/04-channel-topology.md) · [Deadlock-analysis security boundary](security/05-deadlock-analysis.md) · [MHP-analysis security boundary](security/06-mhp-analysis.md) · [Session-analysis security boundary](security/07-session-analysis.md) · [Typestate-analysis security boundary](security/08-typestate-analysis.md) · [Bug-detector security boundary](security/09-bug-detectors.md) · [Population-anomaly security boundary](security/10-population-anomaly-detectors.md) · [Clone/feasibility security boundary](security/11-clone-feasibility-detectors.md) · [API-usage protocol-mining security boundary](security/12-api-usage-protocol-mining.md) · [CWE-template security boundary](security/13-cwe-template-analysis.md) · [Cryptographic API-misuse security boundary](security/14-cryptographic-api-misuse.md) · [Secret-flow/access-policy security boundary](security/15-secret-and-access-policy-analysis.md) · [Vulnerability-extrapolation security boundary](security/16-vulnerability-extrapolation.md) · [Virtual-call type-refinement security boundary](security/17-type-refinement-boundary.md) · [Concurrency-bug detection security boundary](security/18-concurrency-bug-detection.md) · [ML-export security boundary](security/19-ml-export-boundary.md) · [CPG-diff security boundary](security/20-cpg-diff-boundary.md) · [Incremental-cache security boundary](security/21-incremental-cache-boundary.md) · [Resolver symbol-index security boundary](security/22-resolver-symbol-index-boundary.md) · [Datalog-export security boundary](security/23-datalog-export-boundary.md) · [PDG information-flow security boundary](security/24-pdg-information-flow-boundary.md) · [Relational-domain security boundary](security/25-relational-abstract-domain-boundary.md) · [Compositional-heap security boundary](security/26-compositional-heap-boundary.md) · [Rholang NameFlow security boundary](security/27-rholang-name-flow-boundary.md) · [MeTTa rewriting security boundary](security/28-metta-rewriting-boundary.md) · [Rust place-capability security boundary](security/29-place-capability-boundary.md) · [Heterogeneous-export and fuzzing-distance security boundary](security/30-heterogeneous-export-and-distance-boundary.md) · [Approximate-evidence security boundary](security/31-approximate-evidence-boundary.md) · [Expression-rewrite security boundary](security/32-expression-rewrite-boundary.md) · [Expression-equivalence security boundary](security/33-expression-equivalence-boundary.md)
 
 ### Reference
 [Glossary](GLOSSARY.md) · [Diagram catalog](diagrams/README.md)

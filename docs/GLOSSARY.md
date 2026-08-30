@@ -591,6 +591,17 @@ Only complete, pure, live IR can issue a named rewrite certificate. See the
 [component guide](components/graph/expression-ir.md) and
 [ADR-0074](design/0074-typed-pure-expression-ir.md).
 
+### Expression equivalence / Exact pass / Alpha pass
+
+**Expression equivalence** is equality in libcpg's represented typed
+equational model, supported by a complete independently replayed proof. The
+**exact pass** preserves resolved binding identity and one binding-context
+namespace. The separate **alpha pass** replaces bindings with canonical local
+slots and reports a total binding bijection, qualifying semantic Type-4 clone
+evidence without asserting exact program-state identity. See the
+[component guide](components/graph/expression-equivalence.md) and
+[ADR-0075](design/0075-proof-producing-expression-equivalence.md).
+
 ### Directed triad / motif census
 
 A **directed triad** is the induced topology on three vertices. Its three dyads

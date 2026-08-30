@@ -76,11 +76,51 @@ commands run headlessly under a resident-memory ceiling with swap disabled and
 one Cargo build job; logs belong under `target/verification`, never a
 memory-backed temporary filesystem.
 
+## T4.2 -- proof-producing expression equivalence
+
+Tracker leaf `dovetail-x-t4-2` composes live T4.1 expressions with standalone
+Replete without importing parser or application ownership into the e-graph
+crate. Its invariants and evidence are:
+
+| Obligation | Durable evidence |
+|---|---|
+| Positive pairs require admission, modeled equality, complete provenance, and replay | [`ExpressionEquivalence.tla`](../../formal/tla/ExpressionEquivalence.tla), [`ExpressionEquivalence.v`](../../formal/rocq/ExpressionEquivalence.v), [`expression_equivalence.smt2`](../../formal/z3/expression_equivalence.smt2) |
+| Exact equality cannot cross binding contexts; alpha evidence retains a bijection | formal models above plus exact/alpha examples and non-bijective counterexamples |
+| AC normalization preserves association, permutation, and multiplicity | Rocq multiset laws; all 12 three-operand forms and all 66 pair proofs; repeated-leaf counterexample |
+| Nested closed folding reaches fixed point and rejects corrupted/open proofs | TLA+/Rocq/Z3 refinement plus independent full-term evaluator tests |
+| Resource exhaustion is typed and deterministic | candidate, input, e-node, work, match, iteration, pair, and proof-cap campaigns |
+| Expression/proof depth never becomes native call-stack depth | two 100,000-level lifecycle gates on 256 KiB worker stacks |
+| Frontend and CPG behavior remain unchanged | nine real tree-sitter integrations with exact pre/post node and edge counts |
+
+### Stable commits
+
+| Commit | Major changes |
+|---|---|
+| `1a6425b` | TLA+, Rocq, and Z3 fixed-point, proof-replay, AC, cap, and closed-evaluation obligations |
+| `5f31b17` | typed Replete adapter, exact/alpha passes, proof replay, canonical codecs, and exhaustive tests |
+| `adf70ef` | separable pair-output and AC-normalization Criterion baseline |
+
+### Executable gates
+
+```bash
+scripts/verify-expression-equivalence-formal.sh all
+cargo test --lib expression_equivalence --all-features
+cargo test --test expression_equivalence_integration \
+  --features lang-rust,lang-c,lang-cpp,lang-go,lang-java,lang-python,lang-javascript,lang-typescript,lang-ruby
+cargo clippy --all-targets --all-features -- -D warnings
+cargo bench --bench expression_equivalence --no-default-features -- --quick
+```
+
+The benchmark separates quadratic public pair output from AC-width effects.
+Its local smoke/profile evidence, limitations, and exact measurements are
+recorded in [Scientific 70](../scientific/70-expression-equivalence-validation.md)
+and [the performance guide](03-performance.md#expression-equivalence-baseline).
+
 ## Interpretation
 
-These artifacts support the represented T4.1 contract. They do not prove a
+These artifacts support the represented T4.1 and T4.2 contracts. They do not prove a
 frontend type checker, arbitrary source-language equivalence, Replete's future
-congruence invariants, saturation completeness, extraction optimality, or any
+extraction optimality, or any
 pending campaign leaf. A terminal green run supports claimed completion; only
 the pgmcp trust workflow may advance that claim to verified.
 
@@ -88,4 +128,8 @@ Related evidence is organized in [ADR-0074](../design/0074-typed-pure-expression
 [Theory 57](../theory/57-datalog-egraphs-and-typed-expression-semantics.md),
 [Scientific 69](../scientific/69-expression-ir-validation.md),
 [Security 32](../security/32-expression-rewrite-boundary.md), and the
-[API reference](../api/expression-ir-reference.md).
+[expression-IR API reference](../api/expression-ir-reference.md). T4.2 adds
+[ADR-0075](../design/0075-proof-producing-expression-equivalence.md),
+[Scientific 70](../scientific/70-expression-equivalence-validation.md),
+[Security 33](../security/33-expression-equivalence-boundary.md), and the
+[expression-equivalence API reference](../api/expression-equivalence-reference.md).

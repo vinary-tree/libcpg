@@ -32,3 +32,28 @@ The bounded TLA+ state space is not a proof about arbitrary Rust heap sizes.
 The universally quantified Rocq theorems cover the certificate boundary; Rust
 example, property, differential, malformed-input, and small-stack tests cover
 the refinement from typed CPG facts to the implementation.
+
+## Expression equivalence
+
+T4.2 formally refines T4.1's admission boundary before using Replete:
+
+- The TLA+ model enumerates exact and alpha modes, namespace boundaries,
+  fixed-point completion, forced stops, distinct resource caps, proof
+  availability, and deterministic positive prefixes.
+- The Rocq development proves the admitted equality laws, alpha qualification,
+  replay soundness, monotone knowledge, AC permutation/multiplicity
+  preservation, and nested closed-term evaluation without admitted axioms.
+- The Z3 model refutes 22 forbidden states, including unreplayable positives,
+  unsaturated negative conclusions, illegal AC evidence, and mismatched or
+  unevaluable closed folds.
+
+Run all three with:
+
+~~~bash
+./scripts/verify-expression-equivalence-formal.sh all
+~~~
+
+The bounded TLC exploration complements rather than replaces the universal
+Rocq results. Rust example, property, parser-backed, corruption, cap,
+serialization, and 100,000-level small-stack tests validate the implementation
+refinement.

@@ -99,6 +99,12 @@ live provenance and cannot mint a rewrite certificate. Reauthorization requires
 fresh lowering against the current CPG, fact table, and semantic profile. See
 [the expression-rewrite boundary](32-expression-rewrite-boundary.md).
 
+Expression-equivalence analysis adds a second in-process gate: Replete e-class
+membership becomes a positive libcpg relation only with complete provenance
+and successful independent replay of every typed law. Typed cap exhaustion is
+inconclusive rather than negative, and serialized proofs remain audit output.
+See [the expression-equivalence boundary](33-expression-equivalence-boundary.md).
+
 ## Results are advisory, not authoritative
 
 Several of `libcpg`'s outputs are **heuristics**, and must not be treated as
