@@ -547,6 +547,16 @@ The **dominance frontier** of node $`d`$ is the set of nodes where $`d`$'s domin
 
 `libcpg`'s small YAML/TOML schema for declaring a pattern as roles (`DpmlRole`) and constraints (`DpmlConstraint`), loaded into a `DpmlTemplate` and compiled to a [`PatternTemplate`](#pattern-template). Malformed input yields `DpmlError`. Lets users add pattern templates without writing Rust. See [`components/patterns/dpml.md`](components/patterns/dpml.md).
 
+### E-graph / E-class / Equality saturation
+
+An **e-graph** compactly represents a congruence relation over expressions. An
+**e-class** groups e-nodes asserted equal; congruence makes equal children under
+the same operator produce equal parent terms. **Equality saturation** adds
+valid rewrite consequences non-destructively until saturation or a resource
+limit, then extracts one represented term under a cost objective. Replete owns
+this mechanism as a standalone crate; libcpg supplies only typed semantic
+evidence. See [Theory 57](theory/57-datalog-egraphs-and-typed-expression-semantics.md).
+
 ### Effect summary / Place / Purity
 
 An **effect summary** is a finite, compositional description of one function's
@@ -570,6 +580,16 @@ rotation with the smallest stable `NodeId` first and bounds enumeration by
 length and count [[33]](#references). See
 [`theory/16-bounded-simple-cycle-enumeration.md`](theory/16-bounded-simple-cycle-enumeration.md)
 and [`components/graph/cycle-analysis.md`](components/graph/cycle-analysis.md).
+
+### Expression IR / Semantic profile / Evidence mode
+
+The typed **expression intermediate representation (IR)** is libcpg's flat
+postorder arena for frontend-supplied expression facts. A **semantic profile**
+declares ten required language behavior dimensions. An **evidence mode** is
+`Pure`, `IdentityOnly`, or `Unknown` and propagates descendant eligibility.
+Only complete, pure, live IR can issue a named rewrite certificate. See the
+[component guide](components/graph/expression-ir.md) and
+[ADR-0074](design/0074-typed-pure-expression-ir.md).
 
 ### Directed triad / motif census
 
@@ -1197,6 +1217,14 @@ strictly oriented [[75]](#references), [[79]](#references). See [Theory
 relations. Identity is the diagonal relation and composition is existential
 join. It supplies a precise compositional interpretation for binary CPG
 relations without turning libcpg into a general category-theory framework.
+
+### Replete / Rewrite certificate
+
+**Replete** is the standalone typed e-graph and equality-saturation crate
+extracted from Dovetail. It is not a libcpg module. A libcpg **rewrite
+certificate** is a private-construction witness that one named law passed the
+live expression-IR semantic boundary; it is serializable for audit but not
+deserializable as authority. See [Security 32](security/32-expression-rewrite-boundary.md).
 
 ### Reduced product
 

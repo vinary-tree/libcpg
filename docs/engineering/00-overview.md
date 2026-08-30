@@ -93,6 +93,7 @@ directly from that relationship, and both are visible in `Cargo.toml`:
 | [03 — Performance](03-performance.md) | The data-structure rationale, asymptotic costs including typestate, bug detectors, population anomaly inference, clone/feasibility advisories, exact call resolution, API-usage/temporal mining, declarative CWE templates, and CPG differencing, thirty-three active oracle-guarded Criterion targets, controlled parallel scaling, and explicit remaining benchmark gaps. |
 | [Optimization ledger](optimization-ledger.md) | The reproducible T9.0 `main` baseline: 34 Criterion cases, per-workload RSS and DHAT allocations, Massif and type-size snapshots, perf counters and ranked hot paths, profiler availability boundaries, and the evidence-ranked experiment queue. |
 | [Analysis-expansion matrix](analysis-expansion-matrix.md) | The epic-wide requirement-to-public-API-to-feature-to-document map, including typed overlays, caps/completeness, migration, security, examples, operations, and T5.1 reconciliation evidence. |
+| [Dovetail extraction/optimization ledger](dovetail-extraction-optimization-evidence-ledger.md) | The follow-up campaign boundary and stable formal, implementation, test, and documentation evidence for libcpg-owned leaves. |
 | [04 — Contributing](04-contributing.md) | Step-by-step recipes: add a language mapper, add a Gang-of-Four template, add a similarity metric; plus the coding conventions the crate follows. |
 
 ## Map of the security pillar

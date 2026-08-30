@@ -109,6 +109,7 @@ alternatives is folklore, and a decision without its costs is marketing.
 | [0063 — Runtime-dispatched dense bit-set kernels](0063-runtime-dispatched-bitset-kernels.md) | Preserve one portable lattice API while selecting measured AVX2 union/intersection kernels on capable x86/x86-64 hosts, with scalar tails, non-x86 fallback, and scalar early-exit subset. | Accepted |
 | [0064 — Retain the ordered exact resolver symbol index](0064-retain-ordered-resolver-symbol-index.md) | Keep call-local exact `BTreeMap` semantics after DAT, DynamicDawg, prefix, fuzzy, SIMD, version, and resource controls reject a production dependency. | Accepted |
 | [0073 — Adopt bounded, composable approximate evidence](0073-bounded-composable-approximate-evidence.md) | Add opt-in candidate generation for navigation, alignment, API sequences, clones, diffs, and vulnerability analogues while preserving typed completion and independent exact confirmation. | Accepted |
+| [0074 — Admit rewrites through a typed pure-expression IR](0074-typed-pure-expression-ir.md) | Validate frontend types, effects, language semantics, exact caps, and live provenance before issuing one named rewrite certificate from a flat stack-safe IR. | Accepted |
 | [0065 — Feature-free Datalog EDB export](0065-feature-free-datalog-edb-export.md) | Emit canonical typed relations and a lossless edge snapshot while leaving rule parsing, evaluation, I/O, and resource policy to an external engine. | Accepted |
 | [0066 — Deterministic PDG information flow](0066-deterministic-pdg-information-flow.md) | Separate explicit and implicit High-to-Low PDG/SDG witnesses, model declassification as a hard cut, and report secret-dependent branch/index sites without overstating represented evidence. | Accepted |
 | [0067 — Stack-safe relational abstract domains](0067-exact-relational-abstract-domains.md) | Compose feature-free integer octagons and static reduced products with optional exact rational polyhedra, iterative projection, validated invariants, and explicit resource costs. | Accepted |
@@ -118,7 +119,7 @@ alternatives is folklore, and a decision without its costs is marketing.
 | [0071 — Stack-safe place-capability analysis](0071-stack-safe-place-capability-analysis.md) | Compose frontend-normalized Rust ownership operations with typed DFG, Reference, AST-scope, and CFG evidence into an advisory immutable PCG and optional transactional typed overlay. | Accepted |
 | [0072 — Deterministic heterogeneous export and fuzzing distance](0072-deterministic-heterogeneous-export-and-fuzzing-distance.md) | Export aligned deterministic node initialization and all 67 typed relation buckets, then compute harmonic CFG/call target distance with heap-backed reverse BFS. | Accepted |
 
-These seventy-two are not independent. ADR-0001 fixes the substrate that all analyses
+These seventy-four are not independent. ADR-0001 fixes the substrate that all analyses
 write onto; ADR-0002 and ADR-0005 together explain how a language reaches that
 substrate and what you must switch on to get there; ADR-0003 and ADR-0004 are
 two analyses *over* the substrate (one always-on, one feature-gated) that each
@@ -350,7 +351,7 @@ distance, with all ordering and traversal state on the heap.
   (`0001`…). Numbers are never reused; a reversed decision is marked
   *Superseded* and a new record supersedes it, so history stays legible.
 - **Status lifecycle.** `Proposed → Accepted → (Superseded by NNNN | Deprecated)`.
-  All sixty-eight current records are **Accepted** and reflect the shipped `v0.1.1`
+  All seventy-four current records are **Accepted** and reflect the shipped `v0.1.1`
   code.
 - **Grounding.** Every claim here is traceable to source: the
   [`Cargo.toml`](../engineering/01-build-and-features.md) feature block, the

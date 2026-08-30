@@ -1037,6 +1037,24 @@ Two layers, at two feature levels:
 
 The distinction between the always-on `pattern` module and the gated `patterns` module is deliberate — see [`overview.md`](overview.md#pattern-versus-patterns--do-not-conflate) and [`../components/patterns/overview.md`](../components/patterns/overview.md).
 
+### Typed expression IR and rewrite admission (feature free)
+
+`lower_expression_ir(&cpg, root, &facts, &profile, limits)` consumes immutable
+CPG identity/topology plus frontend-owned typed facts. An explicit heap
+`Enter`/`Exit` machine emits a flat postorder arena and propagates
+`Pure`/`IdentityOnly`/`Unknown` evidence. Only complete, pure, live artifacts
+can issue a certificate for one named law.
+
+![Relational queries and equational exploration consume different evidence through separate ownership lanes.](../diagrams/relational-equational-reasoning.svg)
+
+The IR neither parses source text nor mutates graph overlays. Datalog exports
+remain relational evidence; they cannot assert an e-graph equality. The future
+Replete adapter consumes typed certificates, while the Replete crate remains a
+standalone repository with no libcpg ownership inversion. See the
+[component contract](../components/graph/expression-ir.md),
+[ADR-0074](../design/0074-typed-pure-expression-ir.md), and
+[Theory 57](../theory/57-datalog-egraphs-and-typed-expression-semantics.md).
+
 ### Algorithm and complexity detection (feature `algorithm-detection`)
 
 `DefaultAlgorithmDetector::detect(&cpg, function)` is **per-function**. It

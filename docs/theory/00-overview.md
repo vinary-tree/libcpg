@@ -358,6 +358,14 @@ development, or jump to the layer you need:
     Exact relation families, deterministic token feature hashing, and harmonic
     CFG/call shortest paths define feature-free interfaces for caller-owned
     relational GNNs and target-directed fuzzers.
+56. **[56 — Weighted relations and approximate matching](56-weighted-relations-and-approximate-matching.md).**
+    Complete weighted finite relations, reversible structural vocabularies,
+    bounded edit automata, and independent exact confirmation define advisory
+    matching without changing graph identity.
+57. **[57 — Datalog, e-graphs, and typed expression semantics](57-datalog-egraphs-and-typed-expression-semantics.md).**
+    Least relational fixed points, congruence closure, equality saturation,
+    extraction, categorical composition laws, and a live typed certificate
+    boundary assign Datalog and standalone Replete their distinct roles.
 
 The later chapters define deterministic projection structure, architecture
 metrics, inspectable evidence, and their interpretation limits.

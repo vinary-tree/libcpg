@@ -561,6 +561,25 @@ dependencies and are not part of the `full` feature set.
 
 ## Additional verification surfaces
 
+### Typed expression-IR surface
+
+The feature-free expression IR has a focused example/property suite and a
+separate nine-frontend parser integration. With `serde`, compile-time trait
+assertions forbid certificate deserialization, generated round trips revoke
+authority, and a 100,000-level serialize/deserialize/drop lifecycle runs on a
+256 KiB native stack. The formal gate precedes these tests:
+
+```bash
+scripts/verify-expression-ir-formal.sh all
+cargo test --lib expression_ir::tests --features serde
+cargo test --test expression_ir_integration \
+  --features lang-rust,lang-c,lang-cpp,lang-go,lang-java,lang-python,lang-javascript,lang-typescript,lang-ruby
+```
+
+See [Scientific 69](../scientific/69-expression-ir-validation.md) for the
+invariant-to-test ledger and [Security 32](../security/32-expression-rewrite-boundary.md)
+for the interpretation boundary.
+
 | Surface | State |
 | --- | --- |
 | Doctests | Three examples compile under both default and all-feature configurations with rustdoc warnings denied. The feature-free crate-root example executes against a real typed CPG; the two parser snippets are `no_run` because the empty default feature set intentionally has no built-in grammar. |

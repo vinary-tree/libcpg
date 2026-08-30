@@ -11,6 +11,8 @@ rectangle "Pure subtree and\nnamed law permitted?\n<<decision>>" as EligibilityG
 rectangle "Identity-only evidence\nno equivalence claim" as Identity #FFE3E3
 rectangle "Typed rewrite certificate\nall premises retained" as Certificate #C3FAE8
 rectangle "Incomplete report\nlimit or malformed reason" as Incomplete #FFEC99
+rectangle "Canonical serialization\nstructure only" as Serialization #D0EBFF
+rectangle "Persisted identity-only IR\nrewrite authority revoked" as Persisted #FFE3E3
 
 Facts -[#1971C2]-> Lowerer : typed facts only
 Profile -[#E67700]-> Lowerer : declared semantics
@@ -20,9 +22,17 @@ CompletionGate -[#2B8A3E]-> EligibilityGate : yes
 CompletionGate -[#C92A2A]-> Incomplete : no
 EligibilityGate -[#2B8A3E]-> Certificate : yes
 EligibilityGate -[#C92A2A]-> Identity : no
+Arena -[#1971C2]-> Serialization : serde
+Serialization -[#C92A2A]-> Persisted : deserialize
+Persisted -[#C92A2A]-> Identity : certification denied
 
 note bottom of Lowerer #E7F5FF
 No parser, source-text inference,
 native recursion, or semantic fallback
+end note
+
+note bottom of Persisted #FFF9DB
+Bytes cannot re-prove the originating
+CPG, frontend facts, or live validation.
 end note
 @enduml

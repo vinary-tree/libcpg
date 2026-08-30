@@ -553,6 +553,21 @@ Guidelines that apply specifically to `libcpg` measurements:
 The same methodology, framed as a scientific protocol, is in
 [`scientific/04-measurement-methodology.md`](../scientific/04-measurement-methodology.md).
 
+## Typed expression-IR resource model
+
+For $`n`$ reachable source facts and $`m`$ ordered operand occurrences, the
+lowerer emits exactly $`n`$ arena nodes and $`m`$ operand identifiers when
+complete. The explicit work machine processes two frames per newly emitted
+node plus one `Enter` frame per shared-source revisit. Ordered active/source
+indexes make the conservative bound $`O((n+m)\log n)`$ time and $`O(n+m)`$
+heap space; named-law checks are $`O(k)`$ in the selected node arity $`k`$.
+
+`ExpressionIrLimits` independently caps nodes, operands, and work before the
+next unit is admitted. The 100,000-level lifecycle demonstrates constant native
+call-stack depth, not a universal latency or resident-memory claim. A later
+optimization may change index structures only after an oracle-guarded benchmark
+and profile show an end-to-end gain while preserving canonical output.
+
 ## Related pages
 
 - [Build and features](01-build-and-features.md) — which dependencies each feature

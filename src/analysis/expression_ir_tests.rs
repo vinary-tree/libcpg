@@ -26,6 +26,19 @@ fn integer_type(width: u16, overflow: IntegerOverflow) -> ExpressionType {
     )
 }
 
+fn effects_from_bits(bits: u8) -> ExpressionEffects {
+    ExpressionEffects {
+        reads_memory: bits & 1 != 0,
+        writes_memory: bits & 2 != 0,
+        calls: bits & 4 != 0,
+        may_fail: bits & 8 != 0,
+        volatile: bits & 16 != 0,
+        atomic: bits & 32 != 0,
+        nondeterministic: bits & 64 != 0,
+        suspends: bits & 128 != 0,
+    }
+}
+
 fn integer_literal(value: i128, value_type: ExpressionType) -> ExpressionFact {
     ExpressionFact::known(
         ExpressionFactKind::Literal(ExpressionLiteral::Integer(value)),
@@ -622,41 +635,7 @@ fn every_profile_dimension_and_every_nonempty_effect_fail_closed() {
         );
     }
 
-    let effects = [
-        ExpressionEffects {
-            reads_memory: true,
-            ..ExpressionEffects::PURE
-        },
-        ExpressionEffects {
-            writes_memory: true,
-            ..ExpressionEffects::PURE
-        },
-        ExpressionEffects {
-            calls: true,
-            ..ExpressionEffects::PURE
-        },
-        ExpressionEffects {
-            may_fail: true,
-            ..ExpressionEffects::PURE
-        },
-        ExpressionEffects {
-            volatile: true,
-            ..ExpressionEffects::PURE
-        },
-        ExpressionEffects {
-            atomic: true,
-            ..ExpressionEffects::PURE
-        },
-        ExpressionEffects {
-            nondeterministic: true,
-            ..ExpressionEffects::PURE
-        },
-        ExpressionEffects {
-            suspends: true,
-            ..ExpressionEffects::PURE
-        },
-    ];
-    for effect in effects {
+    for bits in 1..=u8::MAX {
         let (cpg, root, mut facts) = three_node_expression(
             Language::Rust,
             BinaryOperator::Add,
@@ -665,7 +644,8 @@ fn every_profile_dimension_and_every_nonempty_effect_fail_closed() {
             value_type,
             [0, 1, 2],
         );
-        facts.facts.get_mut(&root).expect("root fact").effects = SemanticKnowledge::Known(effect);
+        facts.facts.get_mut(&root).expect("root fact").effects =
+            SemanticKnowledge::Known(effects_from_bits(bits));
         let ir = lower_expression_ir(&cpg, root, &facts, &profile, ExpressionIrLimits::default());
         assert_eq!(
             ir.node(ir.root().expect("identity root"))
@@ -1248,16 +1228,7 @@ proptest! {
             [0, 1, 2],
         );
         facts.facts.get_mut(&root).expect("root").effects =
-            SemanticKnowledge::Known(ExpressionEffects {
-                reads_memory: bits & 1 != 0,
-                writes_memory: bits & 2 != 0,
-                calls: bits & 4 != 0,
-                may_fail: bits & 8 != 0,
-                volatile: bits & 16 != 0,
-                atomic: bits & 32 != 0,
-                nondeterministic: bits & 64 != 0,
-                suspends: bits & 128 != 0,
-            });
+            SemanticKnowledge::Known(effects_from_bits(bits));
         let ir = lower_expression_ir(
             &cpg,
             root,

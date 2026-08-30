@@ -1,0 +1,45 @@
+@startuml
+!include _libcpg-theme.iuml
+title Relational consequence and equational exploration
+
+rectangle "Immutable Code Property Graph\ntyped AST / CFG / DFG / PDG facts" as CPG #DBE4FF
+
+package "Relational lane" #F8F9FA {
+  database "Datalog EDB\ncanonical ground relations" as EDB #D0EBFF
+  rectangle "Least-fixed-point engine\njoin + projection + recursion" as Datalog #FFF3BF
+  database "Derived IDB facts\nreachability / policy / summaries" as IDB #D3F9D8
+}
+
+package "Equational lane" #F8F9FA {
+  rectangle "Typed expression facts\nprofile + effects + exact types" as Facts #D0EBFF
+  database "Flat ExpressionIr\npostorder, complete, pure, live" as IR #E5DBFF
+  rectangle "Named rewrite certificate\nall semantic premises checked" as Cert #C3FAE8
+  rectangle "Standalone Replete crate\ne-classes + congruence + rewrites" as Replete #FFE8CC
+  rectangle "Cost-guided extraction\none represented equivalent term" as Extract #D3F9D8
+}
+
+CPG -[#4C6EF5]-> EDB : export exact relations
+EDB -[#F08C00]-> Datalog : seed
+Datalog -[#F08C00]-> Datalog : monotone consequence
+Datalog -[#2F9E44]-> IDB : fixed point
+
+CPG -[#4C6EF5]-> Facts : frontend adapter
+Facts -[#7048E8]-> IR : iterative lowering
+IR -[#0CA678]-> Cert : certify one law
+Cert -[#E8590C]-> Replete : authorize equality only
+Replete -[#E8590C]-> Replete : saturation + rebuild
+Replete -[#2F9E44]-> Extract : optimize objective
+
+IDB ..[#868E96]..> Facts : may qualify frontend evidence
+IDB ..[#E03131]..> Replete : never an equality by itself
+
+legend right
+|= Color |= Meaning |
+|<#DBE4FF>| immutable CPG evidence |
+|<#FFF3BF>| relational fixed point |
+|<#E5DBFF>| typed expression arena |
+|<#C3FAE8>| checked semantic authority |
+|<#FFE8CC>| standalone equational engine |
+|<#FFE3E3>| forbidden trust shortcut |
+endlegend
+@enduml

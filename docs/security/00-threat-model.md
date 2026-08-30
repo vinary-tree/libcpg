@@ -93,6 +93,12 @@ protects property lifecycle and property-tree invariants; it does not validate
 the surrounding CPG's node ids, edge endpoints, overlay semantics, or analysis
 evidence.
 
+Typed expression IR adds a narrower authority boundary inside the process.
+Serialized IR remains inspectable, but deserialization deliberately discards
+live provenance and cannot mint a rewrite certificate. Reauthorization requires
+fresh lowering against the current CPG, fact table, and semantic profile. See
+[the expression-rewrite boundary](32-expression-rewrite-boundary.md).
+
 ## Results are advisory, not authoritative
 
 Several of `libcpg`'s outputs are **heuristics**, and must not be treated as
@@ -207,6 +213,7 @@ and its build pipeline.
 | Forged or oversized smell evidence bundle | complete projection/options/metric/assignment validation, exact SCC recomputation, fail-closed empty result; caller-side projection cap | [hardening §architectural smells](01-input-and-resource-hardening.md#architectural-smells-validated-bundle-and-ingress-cap) |
 | Oversized or misleading code-metric evidence | finite iterative graph traversals, inheritance-SCC condensation, stable ordered sets, defined arithmetic edge cases; caller-side CPG cap and retained resolver policy | [hardening §code metrics](01-input-and-resource-hardening.md#code-metrics-finite-evidence-and-ingress-cap) |
 | Untrusted serialized graph | Deserialize only trusted bytes | [`usage/05-serialization.md`](../usage/05-serialization.md) |
+| Replayed or forged rewrite evidence | decoded IR is identity-only; certificates are not deserializable; re-lower against live evidence | [expression-rewrite boundary](32-expression-rewrite-boundary.md) |
 | Over-trusting heuristics, concurrency findings, taint/nullflow/population/security-policy findings, rankings, type-refined closed worlds, partitions, edit bounds, architecture/code metrics, cut/robustness evidence, bounded cycle prefixes, or motif frequencies | Treat race/atomicity, taint/nullflow, missing-check/deviant, secret-flow/access-policy, vulnerability-extrapolation, CHA/RTA/VTA, pattern/algorithm/GNN, GED, Martin, CK/LCOM/function metrics, reflexion, layering, smells, centrality, community, cohesion, spectral, truncated-cycle, and motif output as advisory outside each represented contract | this page |
 
 ## References

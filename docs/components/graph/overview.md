@@ -351,6 +351,9 @@ So the safe pattern is: build (single-threaded, `&mut`), then analyse
   variable states and conservative advisory evidence for unused writes.
 - [Available and very-busy expressions](expression-analysis.md) — dual
   forward/backward Must states and dominance-backed advisory CSE/PRE evidence.
+- [Typed pure-expression IR](expression-ir.md) — flat, stack-safe lowering from
+  frontend facts to named rewrite-law certificates under explicit language
+  profiles.
 - [Sparse conditional constant propagation](sccp-analysis.md) — coupled
   executable-edge and scalar-constant evidence with reachability refinement.
 - [Interval value ranges](interval-analysis.md) — forward integer abstract
