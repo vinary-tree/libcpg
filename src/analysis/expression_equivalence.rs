@@ -1042,28 +1042,8 @@ pub fn analyze_expression_equivalence(
     let mut unsupported = Vec::new();
 
     for candidate in ordered {
-        let reason = if !seen.insert(candidate.source) {
-            Some(UnsupportedExpressionReason::DuplicateSource)
-        } else if candidate.ir.profile() != profile {
-            Some(UnsupportedExpressionReason::ProfileMismatch)
-        } else if !matches!(candidate.ir.completion(), ExpressionIrCompletion::Complete) {
-            Some(UnsupportedExpressionReason::IncompleteLowering(
-                candidate.ir.completion().clone(),
-            ))
-        } else if candidate.ir.provenance() != ExpressionIrProvenance::LiveLowering {
-            Some(UnsupportedExpressionReason::PersistedArtifact)
-        } else if candidate.ir.root() != candidate.ir.source_id(candidate.source) {
-            Some(UnsupportedExpressionReason::RootMismatch)
-        } else if candidate
-            .ir
-            .root()
-            .and_then(|root| candidate.ir.node(root))
-            .is_none_or(|node| node.mode != ExpressionEvidenceMode::Pure)
-        {
-            Some(UnsupportedExpressionReason::NonPureEvidence)
-        } else {
-            None
-        };
+        let duplicate = !seen.insert(candidate.source);
+        let reason = candidate_unsupported_reason(candidate, profile, duplicate);
 
         if let Some(reason) = reason {
             unsupported.push(UnsupportedExpression {
@@ -1127,6 +1107,227 @@ pub fn analyze_expression_equivalence(
         unsupported,
         metrics,
         limits,
+    })
+}
+
+pub(super) fn candidate_unsupported_reason(
+    candidate: ExpressionEquivalenceCandidate<'_>,
+    profile: &SemanticProfile,
+    duplicate: bool,
+) -> Option<UnsupportedExpressionReason> {
+    if duplicate {
+        Some(UnsupportedExpressionReason::DuplicateSource)
+    } else if candidate.ir.profile() != profile {
+        Some(UnsupportedExpressionReason::ProfileMismatch)
+    } else if !matches!(candidate.ir.completion(), ExpressionIrCompletion::Complete) {
+        Some(UnsupportedExpressionReason::IncompleteLowering(
+            candidate.ir.completion().clone(),
+        ))
+    } else if candidate.ir.provenance() != ExpressionIrProvenance::LiveLowering {
+        Some(UnsupportedExpressionReason::PersistedArtifact)
+    } else if candidate.ir.root() != candidate.ir.source_id(candidate.source) {
+        Some(UnsupportedExpressionReason::RootMismatch)
+    } else if candidate
+        .ir
+        .root()
+        .and_then(|root| candidate.ir.node(root))
+        .is_none_or(|node| node.mode != ExpressionEvidenceMode::Pure)
+    {
+        Some(UnsupportedExpressionReason::NonPureEvidence)
+    } else {
+        None
+    }
+}
+
+pub(super) struct ExpressionPairComparison {
+    pub completion: ExpressionEquivalenceCompletion,
+    pub kind: Option<ExpressionEquivalenceKind>,
+    pub alpha_bindings: Vec<AlphaBindingCorrespondence>,
+    pub proof: Option<ExpressionEquivalenceProof>,
+}
+
+/// Compares roots from two independent CPG coordinate systems.
+///
+/// Public `NodeId` values may overlap across revisions, so the comparison uses
+/// two private stable slots and a distinct binding namespace per side. The
+/// alpha pass then carries the explicit binding bijection required for a
+/// cross-revision positive. No private slot escapes in the returned evidence.
+pub(super) fn compare_expression_pair(
+    profile: &SemanticProfile,
+    left: ExpressionEquivalenceCandidate<'_>,
+    right: ExpressionEquivalenceCandidate<'_>,
+    limits: ExpressionEquivalenceLimits,
+) -> Result<ExpressionPairComparison, ExpressionProofError> {
+    let limits = limits.validate()?;
+    if limits.max_candidates < 2 {
+        return Ok(ExpressionPairComparison {
+            completion: ExpressionEquivalenceCompletion::CandidateLimited,
+            kind: None,
+            alpha_bindings: Vec::new(),
+            proof: None,
+        });
+    }
+    if candidate_unsupported_reason(left, profile, false).is_some()
+        || candidate_unsupported_reason(right, profile, false).is_some()
+    {
+        return Ok(ExpressionPairComparison {
+            completion: ExpressionEquivalenceCompletion::UnsupportedInputs,
+            kind: None,
+            alpha_bindings: Vec::new(),
+            proof: None,
+        });
+    }
+    let input_nodes = left
+        .ir
+        .metrics()
+        .nodes
+        .checked_add(right.ir.metrics().nodes);
+    if input_nodes.is_none_or(|nodes| nodes > limits.max_input_nodes) {
+        return Ok(ExpressionPairComparison {
+            completion: ExpressionEquivalenceCompletion::InputNodeLimited,
+            kind: None,
+            alpha_bindings: Vec::new(),
+            proof: None,
+        });
+    }
+
+    let mut left = prepare_candidate(left)?;
+    let mut right = prepare_candidate(right)?;
+    left.source = NodeId::new(0);
+    left.binding_context = NodeId::new(0);
+    right.source = NodeId::new(1);
+    right.binding_context = NodeId::new(1);
+    let mut pass = run_pass(
+        NodeId::new(0),
+        profile,
+        &[left, right],
+        limits,
+        PassMode::Alpha,
+    )?;
+    let pair = pass.pairs.pop();
+    Ok(ExpressionPairComparison {
+        completion: pass.completion,
+        kind: pair.as_ref().map(|pair| pair.kind),
+        alpha_bindings: pair
+            .as_ref()
+            .map_or_else(Vec::new, |pair| pair.alpha_bindings.clone()),
+        proof: pair.map(|pair| pair.proof),
+    })
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub(super) struct ClosedExpressionValue {
+    pub literal: ExpressionLiteral,
+    pub value_type: ExpressionType,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub(super) enum ClosedExpressionEvaluation {
+    Value(ClosedExpressionValue),
+    Unsupported,
+    WorkLimited,
+}
+
+/// Evaluates one closed typed IR with the same literal-folding semantics used
+/// by proof replay. The IR is already postorder, so evaluation needs one flat
+/// value tape and never native recursion.
+pub(super) fn evaluate_closed_ir(ir: &ExpressionIr, max_work: usize) -> ClosedExpressionEvaluation {
+    if !matches!(ir.completion(), ExpressionIrCompletion::Complete)
+        || ir.provenance() != ExpressionIrProvenance::LiveLowering
+        || ir
+            .root()
+            .and_then(|root| ir.node(root))
+            .is_none_or(|node| node.mode != ExpressionEvidenceMode::Pure)
+    {
+        return ClosedExpressionEvaluation::Unsupported;
+    }
+
+    let node_count = ir.metrics().nodes;
+    let mut values = Vec::new();
+    if values.try_reserve_exact(node_count).is_err() {
+        return ClosedExpressionEvaluation::WorkLimited;
+    }
+    values.resize_with(node_count, || None::<EquivalenceOperator>);
+    let mut work = 0usize;
+
+    for index in 0..node_count {
+        let Ok(raw_id) = u32::try_from(index) else {
+            return ClosedExpressionEvaluation::WorkLimited;
+        };
+        let id = ExpressionIrId(raw_id);
+        let Some(node) = ir.node(id) else {
+            return ClosedExpressionEvaluation::Unsupported;
+        };
+        let Some(operands) = ir.operands(id) else {
+            return ClosedExpressionEvaluation::Unsupported;
+        };
+        let Some(next_work) = work.checked_add(1usize.saturating_add(operands.len())) else {
+            return ClosedExpressionEvaluation::WorkLimited;
+        };
+        if next_work > max_work {
+            return ClosedExpressionEvaluation::WorkLimited;
+        }
+        work = next_work;
+        let SemanticKnowledge::Known(value_type) = node.value_type else {
+            return ClosedExpressionEvaluation::Unsupported;
+        };
+        let operator = EquivalenceOperator {
+            namespace: None,
+            kind: exact_kind(&node.kind),
+            value_type,
+        };
+        let evaluated = if operands.is_empty() {
+            if matches!(operator.kind, EquivalenceOperatorKind::Literal(_)) {
+                operator
+            } else {
+                return ClosedExpressionEvaluation::Unsupported;
+            }
+        } else {
+            let expected_arity = match operator.kind {
+                EquivalenceOperatorKind::Unary(_) => 1,
+                EquivalenceOperatorKind::Binary(_) => 2,
+                _ => return ClosedExpressionEvaluation::Unsupported,
+            };
+            if operands.len() != expected_arity {
+                return ClosedExpressionEvaluation::Unsupported;
+            }
+            let mut children = Vec::new();
+            if children.try_reserve_exact(expected_arity).is_err() {
+                return ClosedExpressionEvaluation::WorkLimited;
+            }
+            for child in operands {
+                let Some(child) = values.get(child.0 as usize).and_then(Option::as_ref) else {
+                    return ClosedExpressionEvaluation::Unsupported;
+                };
+                if child.value_type != value_type {
+                    return ClosedExpressionEvaluation::Unsupported;
+                }
+                children.push(child);
+            }
+            let Some(literal) = fold_literal(&operator, &children) else {
+                return ClosedExpressionEvaluation::Unsupported;
+            };
+            EquivalenceOperator {
+                namespace: None,
+                kind: EquivalenceOperatorKind::Literal(literal),
+                value_type,
+            }
+        };
+        values[index] = Some(evaluated);
+    }
+
+    let Some(root) = ir.root() else {
+        return ClosedExpressionEvaluation::Unsupported;
+    };
+    let Some(evaluated) = values.get_mut(root.0 as usize).and_then(Option::take) else {
+        return ClosedExpressionEvaluation::Unsupported;
+    };
+    let EquivalenceOperatorKind::Literal(literal) = evaluated.kind else {
+        return ClosedExpressionEvaluation::Unsupported;
+    };
+    ClosedExpressionEvaluation::Value(ClosedExpressionValue {
+        literal,
+        value_type: evaluated.value_type,
     })
 }
 

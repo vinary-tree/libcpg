@@ -49,6 +49,7 @@ mod rewriting;
 mod scc;
 mod sdg;
 pub mod security;
+mod semantic_expression_flow;
 #[cfg(feature = "serde")]
 pub(crate) mod serde_util;
 mod smells;
@@ -219,6 +220,16 @@ pub use expression_ir::{
     MemoryAccess, RewriteCertificate, RewriteDenial, RewriteLaw, SemanticKnowledge,
     SemanticProfile, ShiftBehavior, ShortCircuitSemantics, UnaryOperator, VolatileAtomicSemantics,
     BUILTIN_EXPRESSION_PROFILE_LANGUAGES,
+};
+
+pub use semantic_expression_flow::{
+    analyze_semantic_expression_diff, analyze_semantic_expression_flow, SemanticCseCandidate,
+    SemanticDataflowCompletion, SemanticExpressionClass, SemanticExpressionDiff,
+    SemanticExpressionDiffLimitation, SemanticExpressionDiffLimits, SemanticExpressionDiffStatus,
+    SemanticExpressionFlowCompletion, SemanticExpressionFlowError, SemanticExpressionFlowLimits,
+    SemanticExpressionFlowMetrics, SemanticExpressionFlowReport, SemanticExpressionValue,
+    SemanticFlowExclusion, SemanticFlowExclusionReason, SemanticPreCandidate,
+    MAX_SEMANTIC_DIFF_EVALUATION_WORK, MAX_SEMANTIC_FLOW_WORK,
 };
 
 pub use heap::{
