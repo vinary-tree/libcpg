@@ -1,6 +1,7 @@
 From Stdlib Require Import Arith.PeanoNat.
 From Stdlib Require Import Lists.List.
 From Stdlib Require Import Sorting.Sorted.
+From Stdlib Require Import Sorting.Permutation.
 From Stdlib Require Import Lia.
 Import ListNotations.
 
@@ -17,6 +18,7 @@ Inductive Completion : Type :=
 | WorkLimited
 | NodeLimited
 | MatchLimited
+| IterationLimited
 | Cancelled
 | Malformed
 | ProofLimited.
@@ -316,6 +318,93 @@ Proof.
   - eapply equality_trans; eassumption.
 Qed.
 
+Section AssociativeCommutativeNormalization.
+
+Variable Value : Type.
+Variable operation : Value -> Value -> Value.
+Variable identity : Value.
+Hypothesis operation_associative :
+  forall left middle right,
+    operation left (operation middle right) =
+    operation (operation left middle) right.
+Hypothesis operation_commutative :
+  forall left right, operation left right = operation right left.
+
+Definition evaluate_members (members : list Value) : Value :=
+  fold_right operation identity members.
+
+Theorem ac_permutation_preserves_evaluation :
+  forall source target,
+    Permutation source target ->
+    evaluate_members source = evaluate_members target.
+Proof.
+  intros source target permutation.
+  induction permutation.
+  - reflexivity.
+  - simpl. now rewrite IHpermutation.
+  - simpl.
+    transitivity
+      (operation (operation y x) (fold_right operation identity l)).
+    + apply operation_associative.
+    + rewrite (operation_commutative y x).
+      symmetry. apply operation_associative.
+  - etransitivity; eassumption.
+Qed.
+
+End AssociativeCommutativeNormalization.
+
+Section ClosedEvaluationFolding.
+
+Variable Value Operator : Type.
+Variable evaluate_operator : Operator -> list Value -> option Value.
+
+Inductive ClosedTerm : Type :=
+| LiteralTerm : Value -> ClosedTerm
+| UnaryTerm : Operator -> ClosedTerm -> ClosedTerm
+| BinaryTerm : Operator -> ClosedTerm -> ClosedTerm -> ClosedTerm.
+
+Fixpoint evaluate_closed_term (term : ClosedTerm) : option Value :=
+  match term with
+  | LiteralTerm value => Some value
+  | UnaryTerm operator operand =>
+      match evaluate_closed_term operand with
+      | Some value => evaluate_operator operator [value]
+      | None => None
+      end
+  | BinaryTerm operator left_operand right_operand =>
+      match evaluate_closed_term left_operand, evaluate_closed_term right_operand with
+      | Some left_value, Some right_value =>
+          evaluate_operator operator [left_value; right_value]
+      | _, _ => None
+      end
+  end.
+
+Definition certified_closed_fold (source target : ClosedTerm) : Prop :=
+  exists value,
+    evaluate_closed_term source = Some value /\ target = LiteralTerm value.
+
+Theorem certified_closed_fold_preserves_evaluation :
+  forall source target,
+    certified_closed_fold source target ->
+    evaluate_closed_term source = evaluate_closed_term target.
+Proof.
+  intros source target [value [source_evaluates target_literal]].
+  subst target.
+  simpl.
+  exact source_evaluates.
+Qed.
+
+Theorem certified_closed_fold_requires_a_literal_target :
+  forall source target,
+    certified_closed_fold source target ->
+    exists value, target = LiteralTerm value.
+Proof.
+  intros source target [value [_ target_literal]].
+  now exists value.
+Qed.
+
+End ClosedEvaluationFolding.
+
 Definition can_commit (used cost maximum : nat) : Prop :=
   used + cost <= maximum.
 
@@ -323,6 +412,55 @@ Theorem committed_resource_stays_within_cap :
   forall used cost maximum,
     can_commit used cost maximum -> used + cost <= maximum.
 Proof. intros used cost maximum permitted. exact permitted. Qed.
+
+Record SaturationAccounting : Type := {
+  accounting_work : nat;
+  accounting_nodes : nat;
+  accounting_matches : nat;
+  accounting_iterations : nat;
+  accounting_max_work : nat;
+  accounting_max_nodes : nat;
+  accounting_max_matches : nat;
+  accounting_max_iterations : nat;
+  accounting_work_within_cap : accounting_work <= accounting_max_work;
+  accounting_nodes_within_cap : accounting_nodes <= accounting_max_nodes;
+  accounting_matches_within_cap : accounting_matches <= accounting_max_matches;
+  accounting_iterations_within_cap :
+    accounting_iterations <= accounting_max_iterations
+}.
+
+Theorem saturation_accounting_conserves_every_cap :
+  forall accounting,
+    accounting_work accounting <= accounting_max_work accounting /\
+    accounting_nodes accounting <= accounting_max_nodes accounting /\
+    accounting_matches accounting <= accounting_max_matches accounting /\
+    accounting_iterations accounting <= accounting_max_iterations accounting.
+Proof.
+  intros accounting.
+  repeat split.
+  - exact (accounting_work_within_cap accounting).
+  - exact (accounting_nodes_within_cap accounting).
+  - exact (accounting_matches_within_cap accounting).
+  - exact (accounting_iterations_within_cap accounting).
+Qed.
+
+Record CompleteSaturation : Type := {
+  complete_saturation_completion : Completion;
+  complete_saturation_is_saturated : complete_saturation_completion = Saturated;
+  complete_saturation_pending : list nat;
+  complete_saturation_fixed_point : complete_saturation_pending = []
+}.
+
+Theorem saturated_completion_has_no_pending_rewrite :
+  forall evidence,
+    complete_saturation_completion evidence = Saturated /\
+    complete_saturation_pending evidence = [].
+Proof.
+  intros evidence.
+  split.
+  - exact (complete_saturation_is_saturated evidence).
+  - exact (complete_saturation_fixed_point evidence).
+Qed.
 
 Definition pair_rank (pair : nat * nat) : nat :=
   fst pair * 1024 + snd pair.
@@ -371,8 +509,13 @@ Print Assumptions ExpressionEquivalence.positive_evidence_is_admitted_replayable
 Print Assumptions ExpressionEquivalence.limited_completion_has_no_negative_evidence.
 Print Assumptions ExpressionEquivalence.unsupported_has_no_negative_evidence.
 Print Assumptions ExpressionEquivalence.equality_grows_monotonically.
+Print Assumptions ExpressionEquivalence.ac_permutation_preserves_evaluation.
+Print Assumptions ExpressionEquivalence.certified_closed_fold_preserves_evaluation.
+Print Assumptions ExpressionEquivalence.certified_closed_fold_requires_a_literal_target.
 Print Assumptions ExpressionEquivalence.alpha_forward_is_injective.
 Print Assumptions ExpressionEquivalence.alpha_clone_is_qualified_not_exact.
 Print Assumptions ExpressionEquivalence.committed_resource_stays_within_cap.
+Print Assumptions ExpressionEquivalence.saturation_accounting_conserves_every_cap.
+Print Assumptions ExpressionEquivalence.saturated_completion_has_no_pending_rewrite.
 Print Assumptions ExpressionEquivalence.append_canonical_preserves_strict_order.
 Print Assumptions ExpressionEquivalence.legacy_clone_result_is_unchanged.

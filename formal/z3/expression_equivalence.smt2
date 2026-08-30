@@ -11,12 +11,21 @@
 (declare-const proof_replayable Bool)
 (declare-const provenance_complete Bool)
 (declare-const saturated Bool)
+(declare-const pending_rewrite Bool)
 (declare-const reported_equivalent Bool)
 (declare-const reported_alpha_clone Bool)
 (declare-const reported_not_equivalent Bool)
 (declare-const unsupported Bool)
 (declare-const cpg_unchanged Bool)
 (declare-const legacy_clone_unchanged Bool)
+(declare-const ac_associative_authorized Bool)
+(declare-const ac_commutative_authorized Bool)
+(declare-const ac_leaf_multiset_equal Bool)
+(declare-const ac_normalization_accepted Bool)
+(declare-const fold_source_closed_evaluable Bool)
+(declare-const fold_target_literal Bool)
+(declare-const fold_values_equal Bool)
+(declare-const fold_evidence_accepted Bool)
 
 (define-fun boundary_admitted () Bool
   (and left_admitted right_admitted same_scope same_profile))
@@ -25,6 +34,7 @@
   (and boundary_admitted (or same_binding_context alpha_bijection_witness)))
 
 (assert (= unsupported (not pair_supported)))
+(assert (= saturated (not pending_rewrite)))
 (assert (= reported_equivalent
   (and boundary_admitted same_binding_context equality_reached proof_replayable
        provenance_complete)))
@@ -33,6 +43,10 @@
        equality_reached proof_replayable provenance_complete)))
 (assert (= reported_not_equivalent
   (and pair_supported (not equality_reached) saturated provenance_complete)))
+(assert (= ac_normalization_accepted
+  (and ac_associative_authorized ac_commutative_authorized ac_leaf_multiset_equal)))
+(assert (= fold_evidence_accepted
+  (and fold_source_closed_evaluable fold_target_literal fold_values_equal)))
 
 (echo "positive evidence cannot include an inadmissible endpoint")
 (push)
@@ -104,6 +118,13 @@
 (check-sat)
 (pop)
 
+(echo "complete saturation cannot retain a pending rewrite")
+(push)
+(assert saturated)
+(assert pending_rewrite)
+(check-sat)
+(pop)
+
 (echo "clean absence cannot be returned for unsupported inputs")
 (push)
 (assert reported_not_equivalent)
@@ -136,6 +157,64 @@
 (push)
 (assert commit_nodes)
 (assert (> (+ used_nodes added_nodes) max_nodes))
+(check-sat)
+(pop)
+
+(declare-const used_matches Int)
+(declare-const added_matches Int)
+(declare-const max_matches Int)
+(declare-const commit_matches Bool)
+(assert (= commit_matches
+  (and (<= 0 used_matches) (<= 0 added_matches)
+       (<= (+ used_matches added_matches) max_matches))))
+
+(echo "an accepted match transaction cannot exceed its cap")
+(push)
+(assert commit_matches)
+(assert (> (+ used_matches added_matches) max_matches))
+(check-sat)
+(pop)
+
+(declare-const used_iterations Int)
+(declare-const added_iterations Int)
+(declare-const max_iterations Int)
+(declare-const commit_iterations Bool)
+(assert (= commit_iterations
+  (and (<= 0 used_iterations) (<= 0 added_iterations)
+       (<= (+ used_iterations added_iterations) max_iterations))))
+
+(echo "an accepted iteration transaction cannot exceed its cap")
+(push)
+(assert commit_iterations)
+(assert (> (+ used_iterations added_iterations) max_iterations))
+(check-sat)
+(pop)
+
+(echo "AC normalization requires both semantic laws")
+(push)
+(assert ac_normalization_accepted)
+(assert (or (not ac_associative_authorized) (not ac_commutative_authorized)))
+(check-sat)
+(pop)
+
+(echo "AC normalization requires the same multiplicity-preserving leaf multiset")
+(push)
+(assert ac_normalization_accepted)
+(assert (not ac_leaf_multiset_equal))
+(check-sat)
+(pop)
+
+(echo "constant-fold evidence requires a fully evaluable closed source and literal target")
+(push)
+(assert fold_evidence_accepted)
+(assert (or (not fold_source_closed_evaluable) (not fold_target_literal)))
+(check-sat)
+(pop)
+
+(echo "constant-fold evidence requires exact source and target values")
+(push)
+(assert fold_evidence_accepted)
+(assert (not fold_values_equal))
 (check-sat)
 (pop)
 

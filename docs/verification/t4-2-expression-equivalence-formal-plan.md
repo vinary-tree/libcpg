@@ -73,7 +73,7 @@ clone relation from being mistaken for equality in one concrete program state.
 |---|---|---|
 | `formal/tla/ExpressionEquivalence.tla` | Enumerates admission modes, scopes, profiles, caps, forced stops, proof exhaustion, and deterministic output steps. | TLC explores every reachable bounded state with all invariants true. |
 | `formal/rocq/ExpressionEquivalence.v` | Proves equivalence laws, boundary confinement, replay soundness, cap conservation, monotone knowledge, and legacy-result preservation. | Every printed theorem is closed without axioms, assumptions, or admissions. |
-| `formal/z3/expression_equivalence.smt2` | Refutes fifteen forbidden reporting, boundary, alpha-witness, evidence, cap, ordering, and immutability states. | Every query is `unsat`; no query is `sat` or `unknown`. |
+| `formal/z3/expression_equivalence.smt2` | Refutes twenty-two forbidden reporting, fixed-point, AC-normalization, closed-evaluation folding, boundary, alpha-witness, evidence, cap, ordering, and immutability states. | Every query is `unsat`; no query is `sat` or `unknown`. |
 
 The executable command is
 `scripts/verify-expression-equivalence-formal.sh`. It creates its temporary
@@ -105,6 +105,48 @@ The failed proof strategies are recorded so later work does not repeat them:
    constructs each public contract field explicitly, so the domain/profile
    pair remains one named premise and cannot be confused with the outer
    evidence conjunction.
+6. The first adapter implementation expanded certified rewrites only at the
+   original IR nodes. Example proofs were sound, but a one-shot expansion did
+   not justify the stronger `Complete` fixed-point claim for newly generated
+   terms. The refined model makes match and iteration budgets explicit and
+   requires a saturated completion to have no pending rewrite. Production must
+   therefore use Replete's bounded fixed-point runner, including typed native
+   folding, before it may publish complete absence.
+7. Unrestricted positional associativity and commutativity produced a
+   combinatorial saturation frontier on a small mixed candidate set. Replete's
+   multiplicity-preserving AC constructor is the semantic root-cause fix: Rocq
+   proves that a leaf permutation preserves evaluation under associative and
+   commutative hypotheses, while replay must independently flatten both terms
+   and compare their exact leaf multisets before accepting the normalization.
+8. The first Rocq AC swap proof used unconstrained `rewrite` orientation; after
+   reassociation, its expected `operation x y` subterm was not at the selected
+   position. The final proof names the grouped intermediate explicitly, applies
+   associativity in each required direction, and performs commutativity only at
+   the two-element subterm.
+9. Rocq's `Permutation_swap` constructor presents the source as `y :: x`, not
+   `x :: y`. The first explicit intermediate reversed that constructor order
+   and failed unification. The grouped intermediate now follows the constructor
+   exactly before commuting `y` and `x`.
+10. Nested folding exposed an evidence-materialization mismatch rather than an
+    arithmetic error. A native rewrite discovers a literal witness inside each
+    child e-class, but a later canonical proof may select an equivalent closed,
+    nested representative for that child. A verifier restricted to one local
+    operator then rejects a sound equality. Rocq now models arbitrarily nested
+    closed unary/binary terms and proves that accepting a fold only when the
+    whole source evaluates and the target is exactly that literal preserves
+    evaluation. Z3 independently forbids acceptance when the source is not
+    closed and evaluable, the target is not a literal, or their values differ.
+    Production replay must implement this evaluator with an explicit work tape;
+    it must not trust e-class membership or use native recursion.
+11. The first Rocq closed-term evaluator used `right` as a binary-pattern
+    binder, colliding with Rocq's predeclared `right` constructor for decidable
+    sums. Renaming the operands made the intended structural recursion
+    unambiguous; no proposition or evaluator case changed.
+12. The first preservation proof attempted to substitute the name of the
+    equality hypothesis rather than its `target` variable. Rocq correctly
+    rejected that non-variable substitution. Substituting `target` exposes the
+    literal evaluator case, after which the certified source equality closes
+    the theorem directly.
 
 These were specification/proof-construction failures, not counterexamples to
 the contract. The final run completes every model and theorem without axioms,
@@ -129,6 +171,7 @@ assumptions, or admissions.
 | EQ-13 | Positive evidence states only modeled equality, never whole-program equivalence or a security verdict. | API type names, rustdoc, security examples, and serialization fixtures preserve the qualification. |
 | EQ-14 | Replete remains an independent crate; libcpg owns only its typed adapter. | Dependency-direction and packaging checks; no Replete source is copied into libcpg and no MeTTaIL file is modified. |
 | EQ-15 | Alpha-renamed clone evidence carries a bijection witness and is never labeled exact semantic equality. | Exhaustive small binding maps, non-bijective rejection, repeated-variable counterexamples, and cross-function alpha examples. |
+| EQ-16 | Constant-fold evidence is valid for a canonical nested representative only when that entire source term is closed, its iterative typed evaluation completes, and the target is exactly the resulting literal. | Nested multi-pass folds replay independently; open, malformed, type-invalid, overflowing, and result-mismatched proof terms are rejected; deep evaluation uses a heap work tape. |
 
 ## Model-to-code sequence
 

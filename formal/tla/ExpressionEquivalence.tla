@@ -12,7 +12,7 @@ Candidates == 0..5
 Modes == {"PureLive", "IdentityOnly", "Unknown", "Persisted"}
 Statuses == {
     "Running", "Saturated", "WorkLimited", "NodeLimited", "MatchLimited",
-    "Cancelled", "Malformed", "ProofLimited"
+    "IterationLimited", "Cancelled", "Malformed", "ProofLimited"
 }
 ForcedStops == {"None", "Match", "Cancel", "Malformed"}
 Outcomes == {
@@ -20,8 +20,9 @@ Outcomes == {
 }
 
 VARIABLES status, pending, equalities, proofPairs, output, work, nodes,
-          proofFacts, provenanceComplete, blockedMode, maxWork, maxNodes,
-          maxProofFacts, forcedStop, cpgDigest, legacyCloneDigest
+          matches, iterations, proofFacts, provenanceComplete, blockedMode,
+          maxWork, maxNodes, maxMatches, maxIterations, maxProofFacts,
+          forcedStop, cpgDigest, legacyCloneDigest
 
 CanonicalPair(left, right) ==
     IF left <= right THEN <<left, right>> ELSE <<right, left>>
@@ -30,9 +31,11 @@ CandidatePairs ==
     {<<left, right>> \in Candidates \X Candidates : left < right}
 
 IdentityPairs == {<<candidate, candidate>> : candidate \in Candidates}
-ExactLawPair == <<0, 5>>
+ClosedEvaluationLawPair == <<0, 5>>
 AlphaLawPair == <<0, 1>>
-LawPairs == {ExactLawPair, AlphaLawPair}
+LawPairs == {ClosedEvaluationLawPair, AlphaLawPair}
+CertifiedLawPair(pair) ==
+    pair = ClosedEvaluationLawPair \/ pair = AlphaLawPair
 
 ScopeOf(candidate) == IF candidate = 2 THEN 1 ELSE 0
 ProfileOf(candidate) == IF candidate = 3 THEN 1 ELSE 0
@@ -55,8 +58,9 @@ SeqRange(sequence) == {sequence[index] : index \in DOMAIN sequence}
 PairRank(pair) == pair[1] * Cardinality(Candidates) + pair[2]
 
 vars == <<status, pending, equalities, proofPairs, output, work, nodes,
-          proofFacts, provenanceComplete, blockedMode, maxWork, maxNodes,
-          maxProofFacts, forcedStop, cpgDigest, legacyCloneDigest>>
+          matches, iterations, proofFacts, provenanceComplete, blockedMode,
+          maxWork, maxNodes, maxMatches, maxIterations, maxProofFacts,
+          forcedStop, cpgDigest, legacyCloneDigest>>
 
 Equivalent(left, right) == CanonicalPair(left, right) \in equalities
 Replayable(left, right) == CanonicalPair(left, right) \in proofPairs
@@ -86,11 +90,15 @@ Init ==
     /\ output = <<>>
     /\ work = 0
     /\ nodes = Cardinality(Candidates)
+    /\ matches = 0
+    /\ iterations = 0
     /\ proofFacts = 0
     /\ provenanceComplete = TRUE
     /\ blockedMode \in Modes
     /\ maxWork \in 0..2
     /\ maxNodes \in Cardinality(Candidates)..(Cardinality(Candidates) + 2)
+    /\ maxMatches \in 0..2
+    /\ maxIterations \in 0..2
     /\ maxProofFacts \in 0..2
     /\ forcedStop \in ForcedStops
     /\ cpgDigest = "immutable-cpg"
@@ -103,8 +111,9 @@ StopForced ==
                     [] forcedStop = "Cancel" -> "Cancelled"
                     [] forcedStop = "Malformed" -> "Malformed"
     /\ pending' = {}
-    /\ UNCHANGED <<equalities, proofPairs, output, work, nodes, proofFacts,
-                    provenanceComplete, blockedMode, maxWork, maxNodes,
+    /\ UNCHANGED <<equalities, proofPairs, output, work, nodes, matches,
+                    iterations, proofFacts, provenanceComplete, blockedMode,
+                    maxWork, maxNodes, maxMatches, maxIterations,
                     maxProofFacts, forcedStop, cpgDigest, legacyCloneDigest>>
 
 StopWork ==
@@ -114,8 +123,9 @@ StopWork ==
     /\ work >= maxWork
     /\ status' = "WorkLimited"
     /\ pending' = {}
-    /\ UNCHANGED <<equalities, proofPairs, output, work, nodes, proofFacts,
-                    provenanceComplete, blockedMode, maxWork, maxNodes,
+    /\ UNCHANGED <<equalities, proofPairs, output, work, nodes, matches,
+                    iterations, proofFacts, provenanceComplete, blockedMode,
+                    maxWork, maxNodes, maxMatches, maxIterations,
                     maxProofFacts, forcedStop, cpgDigest, legacyCloneDigest>>
 
 StopNodes ==
@@ -126,8 +136,38 @@ StopNodes ==
     /\ nodes >= maxNodes
     /\ status' = "NodeLimited"
     /\ pending' = {}
-    /\ UNCHANGED <<equalities, proofPairs, output, work, nodes, proofFacts,
-                    provenanceComplete, blockedMode, maxWork, maxNodes,
+    /\ UNCHANGED <<equalities, proofPairs, output, work, nodes, matches,
+                    iterations, proofFacts, provenanceComplete, blockedMode,
+                    maxWork, maxNodes, maxMatches, maxIterations,
+                    maxProofFacts, forcedStop, cpgDigest, legacyCloneDigest>>
+
+StopMatches ==
+    /\ status = "Running"
+    /\ forcedStop = "None"
+    /\ pending # {}
+    /\ work < maxWork
+    /\ nodes < maxNodes
+    /\ matches >= maxMatches
+    /\ status' = "MatchLimited"
+    /\ pending' = {}
+    /\ UNCHANGED <<equalities, proofPairs, output, work, nodes, matches,
+                    iterations, proofFacts, provenanceComplete, blockedMode,
+                    maxWork, maxNodes, maxMatches, maxIterations,
+                    maxProofFacts, forcedStop, cpgDigest, legacyCloneDigest>>
+
+StopIterations ==
+    /\ status = "Running"
+    /\ forcedStop = "None"
+    /\ pending # {}
+    /\ work < maxWork
+    /\ nodes < maxNodes
+    /\ matches < maxMatches
+    /\ iterations >= maxIterations
+    /\ status' = "IterationLimited"
+    /\ pending' = {}
+    /\ UNCHANGED <<equalities, proofPairs, output, work, nodes, matches,
+                    iterations, proofFacts, provenanceComplete, blockedMode,
+                    maxWork, maxNodes, maxMatches, maxIterations,
                     maxProofFacts, forcedStop, cpgDigest, legacyCloneDigest>>
 
 ApplyLaw ==
@@ -135,6 +175,8 @@ ApplyLaw ==
     /\ forcedStop = "None"
     /\ work < maxWork
     /\ nodes < maxNodes
+    /\ matches < maxMatches
+    /\ iterations < maxIterations
     /\ \E lawPair \in pending :
         /\ pending' = pending \ {lawPair}
         /\ equalities' = equalities \cup {lawPair}
@@ -147,17 +189,20 @@ ApplyLaw ==
                    /\ provenanceComplete' = FALSE
     /\ work' = work + 1
     /\ nodes' = nodes + 1
+    /\ matches' = matches + 1
+    /\ iterations' = iterations + 1
     /\ UNCHANGED <<status, output, blockedMode, maxWork, maxNodes,
-                    maxProofFacts, forcedStop, cpgDigest, legacyCloneDigest>>
+                    maxMatches, maxIterations, maxProofFacts, forcedStop,
+                    cpgDigest, legacyCloneDigest>>
 
 Finish ==
     /\ status = "Running"
     /\ pending = {}
     /\ status' = IF provenanceComplete THEN "Saturated" ELSE "ProofLimited"
     /\ UNCHANGED <<pending, equalities, proofPairs, output, work, nodes,
-                    proofFacts, provenanceComplete, blockedMode, maxWork,
-                    maxNodes, maxProofFacts, forcedStop, cpgDigest,
-                    legacyCloneDigest>>
+                    matches, iterations, proofFacts, provenanceComplete,
+                    blockedMode, maxWork, maxNodes, maxMatches, maxIterations,
+                    maxProofFacts, forcedStop, cpgDigest, legacyCloneDigest>>
 
 EmitNext ==
     LET remaining == PositivePairs \ SeqRange(output)
@@ -168,11 +213,12 @@ EmitNext ==
     /\ remaining # {}
     /\ output' = Append(output, next)
     /\ UNCHANGED <<status, pending, equalities, proofPairs, work, nodes,
-                    proofFacts, provenanceComplete, blockedMode, maxWork,
-                    maxNodes, maxProofFacts, forcedStop, cpgDigest,
-                    legacyCloneDigest>>
+                    matches, iterations, proofFacts, provenanceComplete,
+                    blockedMode, maxWork, maxNodes, maxMatches, maxIterations,
+                    maxProofFacts, forcedStop, cpgDigest, legacyCloneDigest>>
 
-Next == StopForced \/ StopWork \/ StopNodes \/ ApplyLaw \/ Finish \/ EmitNext
+Next == StopForced \/ StopWork \/ StopNodes \/ StopMatches \/ StopIterations \/
+        ApplyLaw \/ Finish \/ EmitNext
 Spec == Init /\ [][Next]_vars
 
 TypeOK ==
@@ -184,9 +230,13 @@ TypeOK ==
     /\ blockedMode \in Modes
     /\ work \in Nat
     /\ nodes \in Nat
+    /\ matches \in Nat
+    /\ iterations \in Nat
     /\ proofFacts \in Nat
     /\ maxWork \in Nat
     /\ maxNodes \in Nat
+    /\ maxMatches \in Nat
+    /\ maxIterations \in Nat
     /\ maxProofFacts \in Nat
     /\ forcedStop \in ForcedStops
 
@@ -204,6 +254,9 @@ EqualityConfinement ==
 
 EvidenceSound == proofPairs \subseteq equalities
 
+ReplayEvidenceCertified ==
+    \A pair \in proofPairs \ IdentityPairs : CertifiedLawPair(pair)
+
 PositiveHasReplayableProof ==
     \A pair \in CandidatePairs :
         QueryOutcome(pair[1], pair[2]) \in {"Equivalent", "AlphaClone"} =>
@@ -219,8 +272,8 @@ NegativeRequiresCompleteSaturation ==
             /\ ~Equivalent(pair[1], pair[2])
 
 LimitedNeverReportsAbsence ==
-    status \in {"WorkLimited", "NodeLimited", "MatchLimited", "Cancelled",
-                 "Malformed", "ProofLimited"} =>
+    status \in {"WorkLimited", "NodeLimited", "MatchLimited",
+                 "IterationLimited", "Cancelled", "Malformed", "ProofLimited"} =>
         \A pair \in CandidatePairs :
             QueryOutcome(pair[1], pair[2]) # "NotEquivalent"
 
@@ -247,9 +300,13 @@ OutputIsStrictlySorted ==
     \A left, right \in DOMAIN output :
         left < right => PairRank(output[left]) < PairRank(output[right])
 
+SaturatedIsFixedPoint == status = "Saturated" => pending = {}
+
 CapConservation ==
     /\ work <= maxWork
     /\ nodes <= maxNodes
+    /\ matches <= maxMatches
+    /\ iterations <= maxIterations
     /\ proofFacts <= maxProofFacts
 
 =============================================================================
