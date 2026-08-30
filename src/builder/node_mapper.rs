@@ -90,23 +90,21 @@ impl NodeMapper {
 
     /// Returns normalized reflective-name semantics for a syntax node.
     ///
-    /// Binder classification uses the concrete parent only here, at the
-    /// frontend boundary. Downstream analyses consume [`NameOperationKind`]
-    /// and remain independent of the Rholang grammar.
+    /// Binder classification uses the direct raw parent carried by the
+    /// builder's preorder work frame. This avoids asking tree-sitter to
+    /// reconstruct a parent from the root for every visited node. Downstream
+    /// analyses consume [`NameOperationKind`] and remain independent of the
+    /// Rholang grammar.
     pub(crate) fn name_operation(
         &self,
         _ts_kind: &str,
-        _node: &tree_sitter::Node,
+        _raw_parent: Option<&tree_sitter::Node>,
     ) -> Option<NameOperationKind> {
         match self.language {
             #[cfg(feature = "rholang")]
             Language::Rholang => match _ts_kind {
                 "new" => Some(NameOperationKind::Restriction),
-                "var"
-                    if _node
-                        .parent()
-                        .is_some_and(|parent| parent.kind() == "name_decl") =>
-                {
+                "var" if _raw_parent.is_some_and(|parent| parent.kind() == "name_decl") => {
                     Some(NameOperationKind::FreshBinder)
                 }
                 "quote" => Some(NameOperationKind::Quote),
@@ -119,12 +117,16 @@ impl NodeMapper {
 
     /// Returns normalized ownership semantics for a syntax node.
     ///
-    /// Rust grammar roles are interpreted only at this frontend boundary.
-    /// Analyses consume the closed marker and never reparse retained source.
+    /// Rust grammar roles are interpreted only at this frontend boundary. The
+    /// direct raw parent is carried by the iterative AST work frame; it is not
+    /// the nearest included CPG parent because transparent wrappers keep those
+    /// identities distinct. Analyses consume the closed marker and never
+    /// reparse retained source.
     pub(crate) fn ownership_operation(
         &self,
         ts_kind: &str,
         node: &tree_sitter::Node,
+        raw_parent: Option<&tree_sitter::Node>,
     ) -> Option<OwnershipOperationKind> {
         if self.language != Language::Rust {
             return None;
@@ -136,7 +138,7 @@ impl NodeMapper {
                 OwnershipOperationKind::SharedBorrow
             });
         }
-        let parent = node.parent()?;
+        let parent = raw_parent?;
         let value = match parent.kind() {
             "let_declaration" => parent.child_by_field_name("value"),
             "assignment_expression" | "compound_assignment_expr" => {

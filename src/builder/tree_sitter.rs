@@ -328,9 +328,9 @@ impl TreeSitterCpgBuilder {
                 "failed to allocate the AST traversal work stack: {error}"
             ))
         })?;
-        work.push((tree.root_node(), None));
+        work.push((tree.root_node(), None, None));
 
-        while let Some((ts_node, parent_id)) = work.pop() {
+        while let Some((ts_node, raw_parent, parent_id)) = work.pop() {
             let ts_kind = ts_node.kind();
 
             // An omitted syntax node is transparent: its included descendants
@@ -358,8 +358,9 @@ impl TreeSitterCpgBuilder {
 
                 let mut cpg_node = CpgNode::new(NodeId::new(0), cpg_kind, range);
                 cpg_node.message_kind = mapper.message_kind(ts_kind);
-                cpg_node.name_operation = mapper.name_operation(ts_kind, &ts_node);
-                cpg_node.ownership_operation = mapper.ownership_operation(ts_kind, &ts_node);
+                cpg_node.name_operation = mapper.name_operation(ts_kind, raw_parent.as_ref());
+                cpg_node.ownership_operation =
+                    mapper.ownership_operation(ts_kind, &ts_node, raw_parent.as_ref());
                 cpg_node.allocation_type = mapper
                     .allocation_type(ts_kind, &ts_node, source)
                     .map(Box::new);
@@ -390,7 +391,7 @@ impl TreeSitterCpgBuilder {
             work.extend(
                 ts_node
                     .children(&mut cursor)
-                    .map(|child| (child, child_parent)),
+                    .map(|child| (child, Some(ts_node), child_parent)),
             );
             work[first_child..].reverse();
         }
@@ -417,6 +418,7 @@ mod tests {
         kind: CpgNodeKind,
         range: SourceRange,
         message_kind: Option<crate::MsgKind>,
+        ownership_operation: Option<crate::OwnershipOperationKind>,
         allocation_type: Option<crate::TypeInfo>,
         parent: Option<NodeId>,
     }
@@ -434,6 +436,7 @@ mod tests {
             let start = node.start_position();
             let end = node.end_position();
             let id = NodeId::new(u32::try_from(output.len()).expect("shallow oracle node id"));
+            let raw_parent = node.parent();
             output.push(ExpectedAstNode {
                 kind: mapper.map_kind(node.kind(), &node, source),
                 range: SourceRange::new(
@@ -445,6 +448,11 @@ mod tests {
                     end.column as u32,
                 ),
                 message_kind: mapper.message_kind(node.kind()),
+                ownership_operation: mapper.ownership_operation(
+                    node.kind(),
+                    &node,
+                    raw_parent.as_ref(),
+                ),
                 allocation_type: mapper.allocation_type(node.kind(), &node, source),
                 parent,
             });
@@ -852,6 +860,10 @@ mod tests {
                 assert_eq!(actual.kind, expected_node.kind);
                 assert_eq!(actual.range, expected_node.range);
                 assert_eq!(actual.message_kind, expected_node.message_kind);
+                assert_eq!(
+                    actual.ownership_operation,
+                    expected_node.ownership_operation
+                );
                 assert_eq!(
                     actual.allocation_type.as_deref(),
                     expected_node.allocation_type.as_ref()
