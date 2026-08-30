@@ -1,5 +1,5 @@
 ; Boolean abstraction of the public rewrite-certificate boundary.
-(set-logic QF_UF)
+(set-logic QF_UFBVLIA)
 
 (declare-const purity_effects_known Bool)
 (declare-const evaluation_order_known Bool)
@@ -82,5 +82,82 @@
 (push)
 (assert eligible)
 (assert (not live_lowering))
+(check-sat)
+(pop)
+
+; Typed integer descriptors are well formed before they can support a law.
+(declare-const integer_fixed Bool)
+(declare-const integer_width Int)
+(declare-const integer_arbitrary_precision Bool)
+
+(define-fun integer_type_valid () Bool
+  (or (and integer_fixed
+           (<= 1 integer_width)
+           (<= integer_width 128)
+           (not integer_arbitrary_precision))
+      (and (not integer_fixed) integer_arbitrary_precision)))
+
+(echo "zero-width fixed integers are invalid")
+(push)
+(assert integer_fixed)
+(assert (= integer_width 0))
+(assert integer_type_valid)
+(check-sat)
+(pop)
+
+(echo "fixed integers cannot claim arbitrary precision")
+(push)
+(assert integer_fixed)
+(assert integer_arbitrary_precision)
+(assert integer_type_valid)
+(check-sat)
+(pop)
+
+; Masked shifts accept every signed count; checked and undefined shifts only
+; accept counts in [0,width). All modes require a positive fixed width.
+(define-fun shift_defined ((masked Bool) (width Int) (count Int)) Bool
+  (and (> width 0)
+       (or masked (and (<= 0 count) (< count width)))))
+
+(echo "masked shifts accept negative counts")
+(push)
+(assert (not (shift_defined true 32 (- 1))))
+(check-sat)
+(pop)
+
+(echo "checked shifts reject negative counts")
+(push)
+(assert (shift_defined false 32 (- 1)))
+(check-sat)
+(pop)
+
+(echo "checked shifts reject counts at the width")
+(push)
+(assert (shift_defined false 32 32))
+(check-sat)
+(pop)
+
+; Finite reassociation rejects both IEEE exceptional encodings and negative
+; zero. Positive zero remains a valid finite value.
+(define-fun binary64_finite_reassociation_literal
+    ((bits (_ BitVec 64))) Bool
+  (and (not (= ((_ extract 62 52) bits) #b11111111111))
+       (not (= bits #x8000000000000000))))
+
+(echo "finite reassociation rejects negative zero")
+(push)
+(assert (binary64_finite_reassociation_literal #x8000000000000000))
+(check-sat)
+(pop)
+
+(echo "finite reassociation rejects infinity")
+(push)
+(assert (binary64_finite_reassociation_literal #x7ff0000000000000))
+(check-sat)
+(pop)
+
+(echo "finite reassociation rejects NaN")
+(push)
+(assert (binary64_finite_reassociation_literal #x7ff8000000000001))
 (check-sat)
 (pop)

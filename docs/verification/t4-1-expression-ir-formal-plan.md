@@ -59,7 +59,7 @@ default, or e-class membership substitutes for a premise.
 |---|---|---|
 | TLA+ / TLC | bounded operational lowerer | explicit heap worklist terminates in Complete, a named limit, or malformed-cycle rejection; mapped children precede parents; incomplete and persisted states expose no rewrite |
 | Rocq | universally quantified certificate logic | eligibility implies live provenance, complete lowering, total profile, pure mode, and named-law permission; identity-only, unknown, and persisted modes deny rewrites; flat append preserves backward references |
-| Z3 | independent Boolean abstraction | no assignment can make eligibility true while any semantic or live-provenance prerequisite is false |
+| Z3 | independent Boolean and bit-vector abstraction | no assignment can make eligibility true while any semantic or live-provenance prerequisite is false; integer descriptors, masked shifts, checked shifts, and finite-reassociation literals obey their exact boundary conditions |
 
 The [official TLA+ documentation](https://docs.tlapl.us/using%3Atlc%3Astart)
 describes TLC's explicit-state role; the
@@ -111,8 +111,8 @@ therefore changes heap work memory, not native call-stack depth.
 | IR-06 | identity-only, impure, and unknown evidence never exposes a rewrite | assignment, call, memory, volatile, atomic, await, yield, and unsupported-node examples |
 | IR-07 | every certificate names one law and retains its checked premises | one positive and one denied example per law; certificate/profile mismatch property |
 | IR-08 | every profile dimension participates in totality | independently erase each dimension and prove all laws denied |
-| IR-09 | integer identities respect width, signedness, and overflow mode | wrapping, checked, saturating, unbounded, undefined-overflow, division-by-zero, and shift-bound examples |
-| IR-10 | floating identities respect NaN, infinities, rounding, and signed zero | exact-bit examples for NaN payloads, both zeros, infinities, and reassociation denial |
+| IR-09 | integer identities respect valid widths, signedness, overflow mode, and shift-count mode | invalid public descriptors plus wrapping, checked, saturating, unbounded, undefined-overflow, division-by-zero, negative masked-shift, and checked shift-bound examples |
+| IR-10 | floating identities respect NaN, infinities, rounding, and signed zero; finite-reassociation claims reject contradictory literals | exact-bit examples for NaN payloads, both zeros, infinities, finite-mode validation, and reassociation denial |
 | IR-11 | evaluation and short-circuit order are ordered semantic data | left-to-right, unspecified-order, eager Boolean, and short-circuit examples |
 | IR-12 | exceptions, calls, memory reads, aliases, volatile, and atomic operations propagate non-purity | isolated and nested examples plus generated subtree propagation |
 | IR-13 | binding identity includes resolved scope, not identifier spelling alone | shadowing, unresolved binding, and alpha-renamed resolved-binding examples |
