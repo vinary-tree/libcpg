@@ -181,6 +181,14 @@ pub use analysis::expression_ir::{
 };
 
 pub use analysis::{
+    analyze_expression_equivalence, AlphaBindingCorrespondence, ExpressionEquivalenceCandidate,
+    ExpressionEquivalenceCompletion, ExpressionEquivalenceKind, ExpressionEquivalenceLimits,
+    ExpressionEquivalenceMetrics, ExpressionEquivalencePair, ExpressionEquivalenceProof,
+    ExpressionEquivalenceReport, ExpressionProofError, UnsupportedExpression,
+    UnsupportedExpressionReason,
+};
+
+pub use analysis::{
     accumulate_for_sources, algebraic_connectivity, analyze_api_usage_mining,
     analyze_builtin_authz, analyze_builtin_crypto, analyze_builtin_cwes, analyze_builtin_secrets,
     analyze_crypto_misuse, analyze_cwe_templates, analyze_deviant_behavior, analyze_dsm,

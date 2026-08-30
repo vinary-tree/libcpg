@@ -26,6 +26,7 @@ mod distance;
 mod dominators;
 mod dsm;
 mod effects;
+mod expression_equivalence;
 pub mod expression_ir;
 mod heap;
 pub mod ifds;
@@ -197,6 +198,14 @@ pub use dsm::{
 
 pub use effects::{
     analyze_effects, effect_summaries, EffectAnalysis, EffectSummary, Place, Purity,
+};
+
+pub use expression_equivalence::{
+    analyze_expression_equivalence, AlphaBindingCorrespondence, ExpressionEquivalenceCandidate,
+    ExpressionEquivalenceCompletion, ExpressionEquivalenceKind, ExpressionEquivalenceLimits,
+    ExpressionEquivalenceMetrics, ExpressionEquivalencePair, ExpressionEquivalenceProof,
+    ExpressionEquivalenceReport, ExpressionProofError, UnsupportedExpression,
+    UnsupportedExpressionReason,
 };
 
 pub use expression_ir::{

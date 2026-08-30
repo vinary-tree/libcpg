@@ -2,6 +2,7 @@
 name = "libcpg"
 version = "0.1.1"
 edition = "2021"
+rust-version = "1.95"
 autobenches = false
 authors = ["Dylon Edwards <dylon@f1r3fly.io>"]
 description = "Code Property Graph library for program analysis, pattern detection, and semantic code understanding"
@@ -116,6 +117,12 @@ full = [
 ]
 
 [dependencies]
+# Replete is an independent, unpublished top-level crate. The sibling path is
+# restricted to this extraction campaign until the standalone repository has a
+# canonical remote; T4.2 is verified against committed revision 1faddad. Keep
+# the exact package version so a future Git/registry source change cannot float.
+replete = { version = "=0.1.0", path = "../replete-dovetail-extraction" }
+
 # Core graph library
 petgraph = "0.7"
 
