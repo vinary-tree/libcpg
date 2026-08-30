@@ -8,14 +8,16 @@ completion, and deterministic public ordering.  The model deliberately keeps
 the CPG and legacy clone result as immutable observations.
 ***************************************************************************)
 
-Candidates == 0..4
+Candidates == 0..5
 Modes == {"PureLive", "IdentityOnly", "Unknown", "Persisted"}
 Statuses == {
     "Running", "Saturated", "WorkLimited", "NodeLimited", "MatchLimited",
     "Cancelled", "Malformed", "ProofLimited"
 }
 ForcedStops == {"None", "Match", "Cancel", "Malformed"}
-Outcomes == {"Equivalent", "NotEquivalent", "Inconclusive", "Unsupported"}
+Outcomes == {
+    "Equivalent", "AlphaClone", "NotEquivalent", "Inconclusive", "Unsupported"
+}
 
 VARIABLES status, pending, equalities, proofPairs, output, work, nodes,
           proofFacts, provenanceComplete, blockedMode, maxWork, maxNodes,
@@ -28,15 +30,26 @@ CandidatePairs ==
     {<<left, right>> \in Candidates \X Candidates : left < right}
 
 IdentityPairs == {<<candidate, candidate>> : candidate \in Candidates}
-LawPair == <<0, 1>>
+ExactLawPair == <<0, 5>>
+AlphaLawPair == <<0, 1>>
+LawPairs == {ExactLawPair, AlphaLawPair}
 
 ScopeOf(candidate) == IF candidate = 2 THEN 1 ELSE 0
 ProfileOf(candidate) == IF candidate = 3 THEN 1 ELSE 0
 ModeOf(candidate) == IF candidate = 4 THEN blockedMode ELSE "PureLive"
+BindingNamespaceOf(candidate) == IF candidate = 1 THEN 1 ELSE 0
+AlphaWitness(left, right) == CanonicalPair(left, right) = AlphaLawPair
 Admitted(candidate) == ModeOf(candidate) = "PureLive"
 SameBoundary(left, right) ==
     /\ ScopeOf(left) = ScopeOf(right)
     /\ ProfileOf(left) = ProfileOf(right)
+SameBindingContext(left, right) ==
+    BindingNamespaceOf(left) = BindingNamespaceOf(right)
+SupportedPair(left, right) ==
+    /\ Admitted(left)
+    /\ Admitted(right)
+    /\ SameBoundary(left, right)
+    /\ (SameBindingContext(left, right) \/ AlphaWitness(left, right))
 
 SeqRange(sequence) == {sequence[index] : index \in DOMAIN sequence}
 PairRank(pair) == pair[1] * Cardinality(Candidates) + pair[2]
@@ -49,22 +62,25 @@ Equivalent(left, right) == CanonicalPair(left, right) \in equalities
 Replayable(left, right) == CanonicalPair(left, right) \in proofPairs
 
 QueryOutcome(left, right) ==
-    IF ~Admitted(left) \/ ~Admitted(right) \/ ~SameBoundary(left, right)
+    IF ~SupportedPair(left, right)
     THEN "Unsupported"
     ELSE IF Equivalent(left, right)
          THEN IF provenanceComplete /\ Replayable(left, right)
-              THEN "Equivalent"
+              THEN IF SameBindingContext(left, right)
+                   THEN "Equivalent"
+                   ELSE "AlphaClone"
               ELSE "Inconclusive"
          ELSE IF status = "Saturated" /\ provenanceComplete
               THEN "NotEquivalent"
               ELSE "Inconclusive"
 
 PositivePairs ==
-    {pair \in CandidatePairs : QueryOutcome(pair[1], pair[2]) = "Equivalent"}
+    {pair \in CandidatePairs :
+        QueryOutcome(pair[1], pair[2]) \in {"Equivalent", "AlphaClone"}}
 
 Init ==
     /\ status = "Running"
-    /\ pending = {LawPair}
+    /\ pending = LawPairs
     /\ equalities = IdentityPairs
     /\ proofPairs = IdentityPairs
     /\ output = <<>>
@@ -73,9 +89,9 @@ Init ==
     /\ proofFacts = 0
     /\ provenanceComplete = TRUE
     /\ blockedMode \in Modes
-    /\ maxWork \in 0..1
-    /\ maxNodes \in Cardinality(Candidates)..(Cardinality(Candidates) + 1)
-    /\ maxProofFacts \in 0..1
+    /\ maxWork \in 0..2
+    /\ maxNodes \in Cardinality(Candidates)..(Cardinality(Candidates) + 2)
+    /\ maxProofFacts \in 0..2
     /\ forcedStop \in ForcedStops
     /\ cpgDigest = "immutable-cpg"
     /\ legacyCloneDigest = "unchanged-type-1-2-3"
@@ -117,20 +133,20 @@ StopNodes ==
 ApplyLaw ==
     /\ status = "Running"
     /\ forcedStop = "None"
-    /\ LawPair \in pending
     /\ work < maxWork
     /\ nodes < maxNodes
-    /\ pending' = pending \ {LawPair}
-    /\ equalities' = equalities \cup {LawPair}
+    /\ \E lawPair \in pending :
+        /\ pending' = pending \ {lawPair}
+        /\ equalities' = equalities \cup {lawPair}
+        /\ IF proofFacts < maxProofFacts
+              THEN /\ proofPairs' = proofPairs \cup {lawPair}
+                   /\ proofFacts' = proofFacts + 1
+                   /\ provenanceComplete' = provenanceComplete
+              ELSE /\ proofPairs' = proofPairs
+                   /\ proofFacts' = proofFacts
+                   /\ provenanceComplete' = FALSE
     /\ work' = work + 1
     /\ nodes' = nodes + 1
-    /\ IF proofFacts < maxProofFacts
-          THEN /\ proofPairs' = proofPairs \cup {LawPair}
-               /\ proofFacts' = proofFacts + 1
-               /\ provenanceComplete' = provenanceComplete
-          ELSE /\ proofPairs' = proofPairs
-               /\ proofFacts' = proofFacts
-               /\ provenanceComplete' = FALSE
     /\ UNCHANGED <<status, output, blockedMode, maxWork, maxNodes,
                     maxProofFacts, forcedStop, cpgDigest, legacyCloneDigest>>
 
@@ -161,7 +177,7 @@ Spec == Init /\ [][Next]_vars
 
 TypeOK ==
     /\ status \in Statuses
-    /\ pending \subseteq {LawPair}
+    /\ pending \subseteq LawPairs
     /\ equalities \subseteq CandidatePairs \cup IdentityPairs
     /\ proofPairs \subseteq CandidatePairs \cup IdentityPairs
     /\ SeqRange(output) \subseteq CandidatePairs
@@ -183,12 +199,14 @@ EqualityConfinement ==
             /\ Admitted(pair[1])
             /\ Admitted(pair[2])
             /\ SameBoundary(pair[1], pair[2])
+            /\ (SameBindingContext(pair[1], pair[2]) \/
+                AlphaWitness(pair[1], pair[2]))
 
 EvidenceSound == proofPairs \subseteq equalities
 
 PositiveHasReplayableProof ==
     \A pair \in CandidatePairs :
-        QueryOutcome(pair[1], pair[2]) = "Equivalent" =>
+        QueryOutcome(pair[1], pair[2]) \in {"Equivalent", "AlphaClone"} =>
             /\ Equivalent(pair[1], pair[2])
             /\ Replayable(pair[1], pair[2])
             /\ provenanceComplete
@@ -208,9 +226,19 @@ LimitedNeverReportsAbsence ==
 
 UnsupportedNeverReportsAbsence ==
     \A pair \in CandidatePairs :
-        (~Admitted(pair[1]) \/ ~Admitted(pair[2]) \/
-         ~SameBoundary(pair[1], pair[2])) =>
+        ~SupportedPair(pair[1], pair[2]) =>
             QueryOutcome(pair[1], pair[2]) = "Unsupported"
+
+ExactEqualityRetainsBindingContext ==
+    \A pair \in CandidatePairs :
+        QueryOutcome(pair[1], pair[2]) = "Equivalent" =>
+            SameBindingContext(pair[1], pair[2])
+
+AlphaCloneIsQualified ==
+    \A pair \in CandidatePairs :
+        QueryOutcome(pair[1], pair[2]) = "AlphaClone" =>
+            /\ ~SameBindingContext(pair[1], pair[2])
+            /\ AlphaWitness(pair[1], pair[2])
 
 OutputContainsOnlyProvedPairs == SeqRange(output) \subseteq PositivePairs
 OutputHasNoDuplicates == Len(output) = Cardinality(SeqRange(output))

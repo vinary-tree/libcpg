@@ -5,11 +5,14 @@
 (declare-const right_admitted Bool)
 (declare-const same_scope Bool)
 (declare-const same_profile Bool)
+(declare-const same_binding_context Bool)
+(declare-const alpha_bijection_witness Bool)
 (declare-const equality_reached Bool)
 (declare-const proof_replayable Bool)
 (declare-const provenance_complete Bool)
 (declare-const saturated Bool)
 (declare-const reported_equivalent Bool)
+(declare-const reported_alpha_clone Bool)
 (declare-const reported_not_equivalent Bool)
 (declare-const unsupported Bool)
 (declare-const cpg_unchanged Bool)
@@ -18,11 +21,18 @@
 (define-fun boundary_admitted () Bool
   (and left_admitted right_admitted same_scope same_profile))
 
-(assert (= unsupported (not boundary_admitted)))
+(define-fun pair_supported () Bool
+  (and boundary_admitted (or same_binding_context alpha_bijection_witness)))
+
+(assert (= unsupported (not pair_supported)))
 (assert (= reported_equivalent
-  (and boundary_admitted equality_reached proof_replayable provenance_complete)))
+  (and boundary_admitted same_binding_context equality_reached proof_replayable
+       provenance_complete)))
+(assert (= reported_alpha_clone
+  (and boundary_admitted (not same_binding_context) alpha_bijection_witness
+       equality_reached proof_replayable provenance_complete)))
 (assert (= reported_not_equivalent
-  (and boundary_admitted (not equality_reached) saturated provenance_complete)))
+  (and pair_supported (not equality_reached) saturated provenance_complete)))
 
 (echo "positive evidence cannot include an inadmissible endpoint")
 (push)
@@ -63,6 +73,27 @@
 (push)
 (assert reported_equivalent)
 (assert (not provenance_complete))
+(check-sat)
+(pop)
+
+(echo "exact semantic equality cannot cross binding contexts")
+(push)
+(assert reported_equivalent)
+(assert (not same_binding_context))
+(check-sat)
+(pop)
+
+(echo "alpha-clone evidence requires distinct binding contexts")
+(push)
+(assert reported_alpha_clone)
+(assert same_binding_context)
+(check-sat)
+(pop)
+
+(echo "alpha-clone evidence requires a bijective-renaming witness")
+(push)
+(assert reported_alpha_clone)
+(assert (not alpha_bijection_witness))
 (check-sat)
 (pop)
 

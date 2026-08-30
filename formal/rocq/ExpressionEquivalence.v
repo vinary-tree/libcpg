@@ -25,6 +25,7 @@ Record Candidate : Type := {
   source : nat;
   scope : nat;
   profile : nat;
+  binding_namespace : nat;
   mode : EvidenceMode
 }.
 
@@ -33,6 +34,9 @@ Definition admitted (candidate : Candidate) : Prop :=
 
 Definition same_boundary (left right : Candidate) : Prop :=
   scope left = scope right /\ profile left = profile right.
+
+Definition same_binding_context (left right : Candidate) : Prop :=
+  binding_namespace left = binding_namespace right.
 
 Definition canonical_pair (left right : nat) : nat * nat :=
   if left <=? right then (left, right) else (right, left).
@@ -86,10 +90,12 @@ Inductive EqualityClosure : Candidate -> Candidate -> Prop :=
 Definition SoundEdges : Prop :=
   forall left right,
     rewrite_edge left right ->
-    admitted left /\ admitted right /\ same_boundary left right.
+    admitted left /\ admitted right /\ same_boundary left right /\
+    same_binding_context left right.
 
 Definition PublicEquality (left right : Candidate) : Prop :=
-  admitted left /\ admitted right /\ EqualityClosure left right.
+  admitted left /\ admitted right /\ same_binding_context left right /\
+  EqualityClosure left right.
 
 Theorem public_equality_reflexive :
   forall candidate,
@@ -104,9 +110,12 @@ Theorem public_equality_symmetric :
   forall left right,
     PublicEquality left right -> PublicEquality right left.
 Proof.
-  intros left right [left_ok [right_ok equality]].
-  repeat split; try assumption.
-  now apply equality_sym.
+  intros left right [left_ok [right_ok [bindings equality]]].
+  split; [exact right_ok |].
+  split; [exact left_ok |].
+  split.
+  - symmetry. exact bindings.
+  - now apply equality_sym.
 Qed.
 
 Theorem public_equality_transitive :
@@ -115,11 +124,13 @@ Theorem public_equality_transitive :
     PublicEquality middle right ->
     PublicEquality left right.
 Proof.
-  intros left middle right [left_ok [_ left_middle]]
-    [_ [right_ok middle_right]].
+  intros left middle right [left_ok [_ [left_binding left_middle]]]
+    [_ [right_ok [right_binding middle_right]]].
   split; [exact left_ok |].
   split; [exact right_ok |].
-  eapply equality_trans; eassumption.
+  split.
+  - etransitivity; eassumption.
+  - eapply equality_trans; eassumption.
 Qed.
 
 Lemma equality_closure_confined :
@@ -130,7 +141,7 @@ Proof.
   intros sound left right equality.
   induction equality.
   - split; reflexivity.
-  - destruct (sound _ _ H) as [_ [_ boundary]]. exact boundary.
+  - destruct (sound _ _ H) as [_ [_ [boundary _]]]. exact boundary.
   - destruct IHequality as [scope_eq profile_eq].
     split; symmetry; assumption.
   - destruct IHequality1 as [left_scope left_profile].
@@ -143,9 +154,14 @@ Theorem public_equality_same_boundary :
   forall left right,
     PublicEquality left right -> same_boundary left right.
 Proof.
-  intros sound left right [_ [_ equality]].
+  intros sound left right [_ [_ [_ equality]]].
   now eapply equality_closure_confined.
 Qed.
+
+Theorem public_equality_retains_binding_context :
+  forall left right,
+    PublicEquality left right -> same_binding_context left right.
+Proof. intros left right [_ [_ [bindings _]]]. exact bindings. Qed.
 
 Variable proof_edge : Candidate -> Candidate -> Prop.
 
@@ -189,7 +205,7 @@ Theorem positive_evidence_is_admitted_replayable_equality :
     EqualityClosure left right /\ ReplayClosure left right.
 Proof.
   intros sound left right positive.
-  destruct positive as [[left_ok [right_ok _]] replay].
+  destruct positive as [[left_ok [right_ok [_ _]]] replay].
   split; [exact left_ok |].
   split; [exact right_ok |].
   split.
@@ -203,6 +219,7 @@ Record NegativeEvidence (left right : Candidate) : Type := {
   negative_left_admitted : admitted left;
   negative_right_admitted : admitted right;
   negative_same_boundary : same_boundary left right;
+  negative_same_binding_context : same_binding_context left right;
   negative_absent : ~ PublicEquality left right
 }.
 
@@ -220,17 +237,69 @@ Qed.
 
 Theorem unsupported_has_no_negative_evidence :
   forall left right,
-    (~ admitted left \/ ~ admitted right \/ ~ same_boundary left right) ->
+    (~ admitted left \/ ~ admitted right \/ ~ same_boundary left right \/
+     ~ same_binding_context left right) ->
     NegativeEvidence left right -> False.
 Proof.
   intros left right unsupported evidence.
-  destruct unsupported as [left_bad | [right_bad | boundary_bad]].
+  destruct unsupported as [left_bad | [right_bad | [boundary_bad | binding_bad]]].
   - exact (left_bad (negative_left_admitted left right evidence)).
   - exact (right_bad (negative_right_admitted left right evidence)).
   - exact (boundary_bad (negative_same_boundary left right evidence)).
+  - exact (binding_bad (negative_same_binding_context left right evidence)).
 Qed.
 
 End EqualityAndEvidence.
+
+Record AlphaRenaming : Type := {
+  alpha_forward : nat -> nat;
+  alpha_backward : nat -> nat;
+  alpha_backward_forward : forall binding,
+    alpha_backward (alpha_forward binding) = binding;
+  alpha_forward_backward : forall binding,
+    alpha_forward (alpha_backward binding) = binding
+}.
+
+Theorem alpha_forward_is_injective :
+  forall renaming left right,
+    alpha_forward renaming left = alpha_forward renaming right -> left = right.
+Proof.
+  intros renaming left right equal.
+  rewrite <- (alpha_backward_forward renaming left).
+  rewrite <- (alpha_backward_forward renaming right).
+  now rewrite equal.
+Qed.
+
+Section AlphaClone.
+
+Variable normalized_replay : Candidate -> Candidate -> Prop.
+
+Record AlphaCloneEvidence (left right : Candidate) : Type := {
+  alpha_left_admitted : admitted left;
+  alpha_right_admitted : admitted right;
+  alpha_same_boundary : same_boundary left right;
+  alpha_distinct_binding_context :
+    binding_namespace left <> binding_namespace right;
+  alpha_bijection : AlphaRenaming;
+  alpha_replayable : normalized_replay left right
+}.
+
+Theorem alpha_clone_is_qualified_not_exact :
+  forall left right,
+    AlphaCloneEvidence left right ->
+    admitted left /\ admitted right /\ same_boundary left right /\
+    ~ same_binding_context left right /\ normalized_replay left right.
+Proof.
+  intros left right evidence.
+  split; [exact (alpha_left_admitted left right evidence) |].
+  split; [exact (alpha_right_admitted left right evidence) |].
+  split; [exact (alpha_same_boundary left right evidence) |].
+  split.
+  - exact (alpha_distinct_binding_context left right evidence).
+  - exact (alpha_replayable left right evidence).
+Qed.
+
+End AlphaClone.
 
 Theorem equality_grows_monotonically :
   forall (smaller_edge larger_edge : Candidate -> Candidate -> Prop),
@@ -297,10 +366,13 @@ Print Assumptions ExpressionEquivalence.public_equality_reflexive.
 Print Assumptions ExpressionEquivalence.public_equality_symmetric.
 Print Assumptions ExpressionEquivalence.public_equality_transitive.
 Print Assumptions ExpressionEquivalence.public_equality_same_boundary.
+Print Assumptions ExpressionEquivalence.public_equality_retains_binding_context.
 Print Assumptions ExpressionEquivalence.positive_evidence_is_admitted_replayable_equality.
 Print Assumptions ExpressionEquivalence.limited_completion_has_no_negative_evidence.
 Print Assumptions ExpressionEquivalence.unsupported_has_no_negative_evidence.
 Print Assumptions ExpressionEquivalence.equality_grows_monotonically.
+Print Assumptions ExpressionEquivalence.alpha_forward_is_injective.
+Print Assumptions ExpressionEquivalence.alpha_clone_is_qualified_not_exact.
 Print Assumptions ExpressionEquivalence.committed_resource_stays_within_cap.
 Print Assumptions ExpressionEquivalence.append_canonical_preserves_strict_order.
 Print Assumptions ExpressionEquivalence.legacy_clone_result_is_unchanged.

@@ -21,19 +21,22 @@ behavioral equivalence.
 ## Mathematical contract
 
 Let `C` be the finite set of candidate expression roots. Each candidate `c`
-has a stable source identifier `n(c)`, lexical scope `s(c)`, semantic profile
-`p(c)`, and admission mode `m(c)`. The admission predicate is:
+has a stable source identifier `n(c)`, analysis domain `s(c)`, semantic profile
+`p(c)`, binding namespace `b(c)`, and admission mode `m(c)`. An analysis
+domain is the caller-selected function, module, or program inside which pairs
+may be compared; it is not itself a lexical binder. The admission predicate is:
 
 ```math
 A(c) \iff m(c)=\mathrm{PureLive}.
 ```
 
-A rewrite edge may join `x` and `y` only when both endpoints are admitted and
-their boundaries agree:
+A semantic rewrite edge may join `x` and `y` only when both endpoints are
+admitted, their analysis boundaries agree, and their exact binding namespaces
+agree:
 
 ```math
 R(x,y) \Longrightarrow
-A(x)\land A(y)\land s(x)=s(y)\land p(x)=p(y).
+A(x)\land A(y)\land s(x)=s(y)\land p(x)=p(y)\land b(x)=b(y).
 ```
 
 The modeled equality `E` is the reflexive, symmetric, transitive, congruence-
@@ -50,13 +53,27 @@ A negative result is stronger than failure to discover a path. It requires
 complete saturation, complete provenance, supported endpoints, and absence
 from `E`. Every other outcome is `Inconclusive` or `Unsupported`.
 
+Type-4 clone comparison additionally permits a *qualified alpha clone*: two
+expressions from different binding namespaces whose flat binding occurrences
+are related by an explicit bijection. Let `f` and `g` be the forward and
+backward maps. The witness must satisfy both inverse laws on every referenced
+binding:
+
+```math
+g(f(x))=x \quad\text{and}\quad f(g(y))=y.
+```
+
+The adapter compares alpha-normalized terms in a separate Replete graph and
+returns `AlphaClone`, never `Equivalent`. This distinction prevents a useful
+clone relation from being mistaken for equality in one concrete program state.
+
 ## Executable models
 
 | Model | Role | Required result |
 |---|---|---|
 | `formal/tla/ExpressionEquivalence.tla` | Enumerates admission modes, scopes, profiles, caps, forced stops, proof exhaustion, and deterministic output steps. | TLC explores every reachable bounded state with all invariants true. |
 | `formal/rocq/ExpressionEquivalence.v` | Proves equivalence laws, boundary confinement, replay soundness, cap conservation, monotone knowledge, and legacy-result preservation. | Every printed theorem is closed without axioms, assumptions, or admissions. |
-| `formal/z3/expression_equivalence.smt2` | Refutes twelve forbidden reporting, boundary, evidence, cap, ordering, and immutability states. | Every query is `unsat`; no query is `sat` or `unknown`. |
+| `formal/z3/expression_equivalence.smt2` | Refutes fifteen forbidden reporting, boundary, alpha-witness, evidence, cap, ordering, and immutability states. | Every query is `unsat`; no query is `sat` or `unknown`. |
 
 The executable command is
 `scripts/verify-expression-equivalence-formal.sh`. It creates its temporary
@@ -83,6 +100,11 @@ The failed proof strategies are recorded so later work does not repeat them:
    `StronglySorted_app` lemma. Canonical output ordering is instead proven by
    structural induction over `StronglySorted`, with an explicit `Forall_app`
    step for the new terminal pair.
+5. A `repeat split` proof for qualified alpha evidence decomposed the nested
+   `same_boundary` conjunction more deeply than intended. The final proof
+   constructs each public contract field explicitly, so the domain/profile
+   pair remains one named premise and cannot be confused with the outer
+   evidence conjunction.
 
 These were specification/proof-construction failures, not counterexamples to
 the contract. The final run completes every model and theorem without axioms,
@@ -93,7 +115,7 @@ assumptions, or admissions.
 | ID | Invariant | Required implementation/test witness |
 |---|---|---|
 | EQ-01 | Only complete, live, pure IR roots are admitted. | Reject identity-only, unknown, incomplete, malformed, and deserialized IR examples; generate every rejected mode in properties. |
-| EQ-02 | Equality never crosses lexical scope or semantic profile. | Cross-scope and cross-language/profile adversarial pairs remain unsupported under insertion permutations. |
+| EQ-02 | Exact equality never crosses analysis domain, semantic profile, or binding namespace. | Cross-domain, cross-language/profile, and cross-binding adversarial pairs remain unsupported under insertion permutations. |
 | EQ-03 | Every published positive pair is a reached e-class equality with complete provenance and an independently replayable proof. | Replay every returned proof through an adapter-owned verifier that does not trust the e-graph's union-find. |
 | EQ-04 | Reflexivity, symmetry, and transitivity hold for admitted modeled equality. | Exhaustive small-term oracle plus property campaigns over candidate order and rule order. |
 | EQ-05 | Equality knowledge grows monotonically as sound rules or larger complete budgets are added. | Metamorphic subset checks; a limited run cannot invalidate a prior positive. |
@@ -106,13 +128,14 @@ assumptions, or admissions.
 | EQ-12 | Expression depth does not consume native call-stack depth. | Full build, saturation, proof replay, report formatting, cloning, serialization, and drop at 100,000 depth on a 256 KiB thread. |
 | EQ-13 | Positive evidence states only modeled equality, never whole-program equivalence or a security verdict. | API type names, rustdoc, security examples, and serialization fixtures preserve the qualification. |
 | EQ-14 | Replete remains an independent crate; libcpg owns only its typed adapter. | Dependency-direction and packaging checks; no Replete source is copied into libcpg and no MeTTaIL file is modified. |
+| EQ-15 | Alpha-renamed clone evidence carries a bijection witness and is never labeled exact semantic equality. | Exhaustive small binding maps, non-bijective rejection, repeated-variable counterexamples, and cross-function alpha examples. |
 
 ## Model-to-code sequence
 
 The implementation must follow this order:
 
 1. Verify all three formal models and record their exact output.
-2. Freeze the public completion and evidence types from EQ-01 through EQ-14.
+2. Freeze the public completion and evidence types from EQ-01 through EQ-15.
 3. Add the minimal pinned Replete dependency boundary; never use a semantic
    fallback or a second equality engine.
 4. Implement flat, iterative IR-to-e-node lowering and deterministic grouping.
