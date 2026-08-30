@@ -1286,7 +1286,7 @@ proptest! {
                 ..ExpressionIrLimits::default()
             },
         );
-        if cap >= depth + 1 {
+        if cap > depth {
             prop_assert_eq!(node_ir.completion(), &ExpressionIrCompletion::Complete);
         } else {
             prop_assert_eq!(
