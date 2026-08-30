@@ -57,3 +57,29 @@ The bounded TLC exploration complements rather than replaces the universal
 Rocq results. Rust example, property, parser-backed, corruption, cap,
 serialization, and 100,000-level small-stack tests validate the implementation
 refinement.
+
+## Semantic expression flow
+
+T4.3 composes exact expression evidence with available and very-busy
+dataflow without confusing equality with a control-flow fact:
+
+- The TLA+ model checks 391,168 reachable combinations of proof, completion,
+  availability, dominance, kill, anticipability, evaluator, and reporting
+  states.
+- The Rocq development proves path-transfer laws, must-fact soundness,
+  PRE/CSE prerequisites, four-way semantic-diff classification, evidence
+  consistency, and CPG immutability.
+- The Z3 model refutes twenty-four forbidden states, including availability
+  without dominance, intervening kills, decisive evidence hidden by limits,
+  proof/evaluator contradictions, and noncanonical public pairs.
+
+Run all three with:
+
+~~~bash
+./scripts/verify-semantic-expression-flow-formal.sh
+~~~
+
+The implementation refinement uses deterministic heap work queues and flat
+expression/proof tapes. It reports advisory candidates and additive semantic
+diff evidence; it never mutates the CPG or changes the legacy structural-diff
+taxonomy.
