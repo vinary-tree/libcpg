@@ -397,6 +397,10 @@ required-features = ["approximate-matching"]
 name = "expression_equivalence"
 harness = false
 
+[[bench]]
+name = "semantic_expression_flow"
+harness = false
+
 [[example]]
 name = "profile_workloads"
 path = "benches/profile_workloads.rs"
