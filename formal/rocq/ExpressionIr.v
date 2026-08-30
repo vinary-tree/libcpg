@@ -14,6 +14,7 @@ Inductive RewriteLaw : Type :=
 | BooleanShortCircuit.
 
 Inductive EvidenceMode : Type := Pure | IdentityOnly | Unknown.
+Inductive Provenance : Type := LiveLowering | PersistedIdentityOnly.
 Inductive Completion : Type :=
 | Complete
 | WorkLimited
@@ -50,54 +51,64 @@ Definition rewrite_eligibleb
     (profile : SemanticProfile)
     (mode : EvidenceMode)
     (law : RewriteLaw)
-    (completion : Completion) : bool :=
-  match completion, mode with
-  | Complete, Pure => profile_completeb profile && rewrite_allowed profile law
-  | _, _ => false
+    (completion : Completion)
+    (provenance : Provenance) : bool :=
+  match completion, mode, provenance with
+  | Complete, Pure, LiveLowering =>
+      profile_completeb profile && rewrite_allowed profile law
+  | _, _, _ => false
   end.
 
 Theorem rewrite_eligible_sound :
-  forall profile mode law completion,
-    rewrite_eligibleb profile mode law completion = true ->
+  forall profile mode law completion provenance,
+    rewrite_eligibleb profile mode law completion provenance = true ->
     completion = Complete /\
     mode = Pure /\
+    provenance = LiveLowering /\
     profile_completeb profile = true /\
     rewrite_allowed profile law = true.
 Proof.
-  intros profile mode law completion eligible.
-  destruct completion, mode; simpl in eligible; try discriminate.
+  intros profile mode law completion provenance eligible.
+  destruct completion, mode, provenance; simpl in eligible; try discriminate.
   apply andb_true_iff in eligible as [complete_profile allowed].
   repeat split; assumption || reflexivity.
 Qed.
 
 Theorem incomplete_profile_denies_rewrite :
-  forall profile mode law completion,
+  forall profile mode law completion provenance,
     profile_completeb profile = false ->
-    rewrite_eligibleb profile mode law completion = false.
+    rewrite_eligibleb profile mode law completion provenance = false.
 Proof.
-  intros profile mode law completion incomplete.
-  destruct completion, mode; simpl; try reflexivity.
+  intros profile mode law completion provenance incomplete.
+  destruct completion, mode, provenance; simpl; try reflexivity.
   rewrite incomplete.
   reflexivity.
 Qed.
 
 Theorem identity_only_denies_rewrite :
-  forall profile law completion,
-    rewrite_eligibleb profile IdentityOnly law completion = false.
-Proof. intros; destruct completion; reflexivity. Qed.
+  forall profile law completion provenance,
+    rewrite_eligibleb profile IdentityOnly law completion provenance = false.
+Proof. intros; destruct completion, provenance; reflexivity. Qed.
 
 Theorem unknown_denies_rewrite :
-  forall profile law completion,
-    rewrite_eligibleb profile Unknown law completion = false.
-Proof. intros; destruct completion; reflexivity. Qed.
+  forall profile law completion provenance,
+    rewrite_eligibleb profile Unknown law completion provenance = false.
+Proof. intros; destruct completion, provenance; reflexivity. Qed.
 
 Theorem incomplete_lowering_denies_rewrite :
-  forall profile mode law completion,
+  forall profile mode law completion provenance,
     completion <> Complete ->
-    rewrite_eligibleb profile mode law completion = false.
+    rewrite_eligibleb profile mode law completion provenance = false.
 Proof.
-  intros profile mode law completion incomplete.
-  destruct completion; try contradiction; destruct mode; reflexivity.
+  intros profile mode law completion provenance incomplete.
+  destruct completion; try contradiction; destruct mode, provenance; reflexivity.
+Qed.
+
+Theorem persisted_artifact_denies_rewrite :
+  forall profile mode law completion,
+    rewrite_eligibleb profile mode law completion PersistedIdentityOnly = false.
+Proof.
+  intros; destruct completion, mode; reflexivity.
 Qed.
 
 Definition FlatNode : Type := list nat.
@@ -154,5 +165,6 @@ End ExpressionIr.
 
 Print Assumptions ExpressionIr.rewrite_eligible_sound.
 Print Assumptions ExpressionIr.incomplete_profile_denies_rewrite.
+Print Assumptions ExpressionIr.persisted_artifact_denies_rewrite.
 Print Assumptions ExpressionIr.append_preserves_backward_references.
 Print Assumptions ExpressionIr.advance_has_both_capacities.

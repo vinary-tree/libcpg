@@ -14,6 +14,7 @@
 (declare-const law_allowed Bool)
 (declare-const lowering_complete Bool)
 (declare-const pure_subtree Bool)
+(declare-const live_lowering Bool)
 
 (define-fun profile_complete () Bool
   (and purity_effects_known
@@ -28,7 +29,7 @@
        binding_scope_semantics_known))
 
 (define-fun eligible () Bool
-  (and lowering_complete profile_complete pure_subtree law_allowed))
+  (and lowering_complete profile_complete pure_subtree law_allowed live_lowering))
 
 (echo "eligible requires complete lowering")
 (push)
@@ -74,5 +75,12 @@
             (not volatile_atomic_semantics_known)
             (not binding_scope_semantics_known)))
 (assert eligible)
+(check-sat)
+(pop)
+
+(echo "eligible requires live lowering evidence")
+(push)
+(assert eligible)
+(assert (not live_lowering))
 (check-sat)
 (pop)

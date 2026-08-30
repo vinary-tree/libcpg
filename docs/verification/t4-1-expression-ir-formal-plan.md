@@ -33,6 +33,10 @@ mode, exceptions, short-circuiting, aliasing and memory reads, calls, volatile
 and atomic access, or binding and scope. A *named rewrite law* is a closed IR
 identifier such as additive identity or Boolean short-circuiting. A *rewrite
 certificate* is an unforgeable successful check of all premises for one law.
+*Live provenance* means that the in-memory artifact was produced by the
+validated lowerer during the current process. Persistence preserves structural
+evidence for inspection, but deliberately revokes rewrite authority because
+bytes alone cannot re-prove the originating CPG and frontend facts.
 
 For profile $`p`$, subtree $`t`$, law $`r`$, and lowering result $`q`$, public
 eligibility is defined by:
@@ -42,7 +46,8 @@ eligibility is defined by:
 \operatorname{complete}(q) \land
 \operatorname{total}(p) \land
 \operatorname{pure}(t,p) \land
-\operatorname{permits}(p,r,t).
+\operatorname{permits}(p,r,t) \land
+\operatorname{live}(q).
 ~~~
 
 The conjunction is intentional. No finite hash, operator string, language
@@ -52,9 +57,9 @@ default, or e-class membership substitutes for a premise.
 
 | Model | Scope | Checked claim |
 |---|---|---|
-| TLA+ / TLC | bounded operational lowerer | explicit heap worklist terminates in Complete, a named limit, or malformed-cycle rejection; mapped children precede parents; incomplete states expose no rewrite |
-| Rocq | universally quantified certificate logic | eligibility implies complete lowering, total profile, pure mode, and named-law permission; identity-only and unknown modes deny rewrites; flat append preserves backward references |
-| Z3 | independent Boolean abstraction | no assignment can make eligibility true while any semantic prerequisite is false |
+| TLA+ / TLC | bounded operational lowerer | explicit heap worklist terminates in Complete, a named limit, or malformed-cycle rejection; mapped children precede parents; incomplete and persisted states expose no rewrite |
+| Rocq | universally quantified certificate logic | eligibility implies live provenance, complete lowering, total profile, pure mode, and named-law permission; identity-only, unknown, and persisted modes deny rewrites; flat append preserves backward references |
+| Z3 | independent Boolean abstraction | no assignment can make eligibility true while any semantic or live-provenance prerequisite is false |
 
 The [official TLA+ documentation](https://docs.tlapl.us/using%3Atlc%3Astart)
 describes TLC's explicit-state role; the
@@ -87,7 +92,8 @@ LOWER(root, facts, profile, limits):
             require every child to have an earlier mapped IR identifier
             append the node, remove source from active, and propagate evidence
 
-    expose rewrite certificates only after returning Complete
+    expose rewrite certificates only after returning Complete with live provenance
+    on deserialization, preserve structure but revoke rewrite authority
 ~~~
 
 The pending list, active set, and arena are heap-owned. Logical expression depth
@@ -101,7 +107,7 @@ therefore changes heap work memory, not native call-stack depth.
 | IR-02 | a shared source fact maps to one deterministic IR node | diamond example; insertion-order and repeated-operand properties |
 | IR-03 | an active-source revisit is a typed malformed-cycle result | self-cycle and multi-node cycle examples; generated cyclic graphs |
 | IR-04 | work and node caps are exact, monotone, and fail closed | boundary examples at zero, one, exact, and one-short limits; cap-monotonicity property |
-| IR-05 | only Complete can expose a rewrite certificate | exhaustive completion-enum example and property |
+| IR-05 | only Complete with live lowering provenance can expose a rewrite certificate | exhaustive completion/provenance examples and properties |
 | IR-06 | identity-only, impure, and unknown evidence never exposes a rewrite | assignment, call, memory, volatile, atomic, await, yield, and unsupported-node examples |
 | IR-07 | every certificate names one law and retains its checked premises | one positive and one denied example per law; certificate/profile mismatch property |
 | IR-08 | every profile dimension participates in totality | independently erase each dimension and prove all laws denied |
@@ -110,7 +116,7 @@ therefore changes heap work memory, not native call-stack depth.
 | IR-11 | evaluation and short-circuit order are ordered semantic data | left-to-right, unspecified-order, eager Boolean, and short-circuit examples |
 | IR-12 | exceptions, calls, memory reads, aliases, volatile, and atomic operations propagate non-purity | isolated and nested examples plus generated subtree propagation |
 | IR-13 | binding identity includes resolved scope, not identifier spelling alone | shadowing, unresolved binding, and alpha-renamed resolved-binding examples |
-| IR-14 | equivalent fact input yields byte-identical public order | repeated execution, node-storage permutation, and serialization round-trip properties |
+| IR-14 | equivalent fact input yields byte-identical public order; persistence preserves structure but revokes authority | repeated execution, node-storage permutation, structural serialization round-trip, forged-certificate rejection, and post-deserialization denial properties |
 | IR-15 | source text is neither read nor parsed by the IR layer | API review, dependency/source scan, and parser-built integration through existing frontends only |
 | IR-16 | lowering, queries, clone, equality, hash, debug, persistence, and drop are input-depth stack safe | 100,000-level lifecycle and at least 20,000-level semantic operations on a 256 KiB native stack |
 | IR-17 | malformed facts never yield a negative or optimization claim | missing node, wrong arity, invalid type, invalid operator, foreign root, and cap examples |

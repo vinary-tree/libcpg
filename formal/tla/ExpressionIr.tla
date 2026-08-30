@@ -13,6 +13,7 @@ Modes == {"Pure", "IdentityOnly", "Unknown"}
 Shapes == {"Tree", "Shared", "SelfCycle"}
 Statuses == {"Running", "Complete", "WorkLimited", "NodeLimited", "Malformed"}
 Phases == {"Enter", "Exit"}
+Provenances == {"LiveLowering", "PersistedIdentityOnly"}
 
 ChildrenOf(shapeValue, fact) ==
     CASE shapeValue = "Tree" ->
@@ -31,10 +32,12 @@ EnterFrames(children) ==
     [index \in DOMAIN children |-> EnterFrame(children[index])]
 
 VARIABLES status, pending, active, tape, safe, certified, work,
-          profileComplete, lawAllowed, mode, shape, maxWork, maxNodes
+          profileComplete, lawAllowed, mode, shape, maxWork, maxNodes,
+          provenance
 
 vars == <<status, pending, active, tape, safe, certified, work,
-          profileComplete, lawAllowed, mode, shape, maxWork, maxNodes>>
+          profileComplete, lawAllowed, mode, shape, maxWork, maxNodes,
+          provenance>>
 
 Children(fact) == ChildrenOf(shape, fact)
 Mapped == SeqRange(tape)
@@ -48,6 +51,7 @@ NodeSafe(fact) == /\ profileComplete
                   /\ mode[fact] = "Pure"
                   /\ ChildrenSafe(fact)
 CanRewrite == /\ status = "Complete"
+              /\ provenance = "LiveLowering"
               /\ Root \in certified
 
 Init ==
@@ -64,13 +68,15 @@ Init ==
     /\ shape \in Shapes
     /\ maxWork \in 0..8
     /\ maxNodes \in 0..Cardinality(Facts)
+    /\ provenance = "LiveLowering"
 
 CompleteLowering ==
     /\ status = "Running"
     /\ pending = <<>>
     /\ status' = "Complete"
     /\ UNCHANGED <<pending, active, tape, safe, certified, work,
-                    profileComplete, lawAllowed, mode, shape, maxWork, maxNodes>>
+                    profileComplete, lawAllowed, mode, shape, maxWork, maxNodes,
+                    provenance>>
 
 StopForWorkLimit ==
     /\ status = "Running"
@@ -80,7 +86,7 @@ StopForWorkLimit ==
     /\ pending' = <<>>
     /\ active' = {}
     /\ UNCHANGED <<tape, safe, certified, work, profileComplete,
-                    lawAllowed, mode, shape, maxWork, maxNodes>>
+                    lawAllowed, mode, shape, maxWork, maxNodes, provenance>>
 
 RejectCycle ==
     /\ status = "Running"
@@ -93,7 +99,7 @@ RejectCycle ==
     /\ active' = {}
     /\ work' = work + 1
     /\ UNCHANGED <<tape, safe, certified, profileComplete,
-                    lawAllowed, mode, shape, maxWork, maxNodes>>
+                    lawAllowed, mode, shape, maxWork, maxNodes, provenance>>
 
 ReuseMapped ==
     /\ status = "Running"
@@ -105,7 +111,8 @@ ReuseMapped ==
     /\ pending' = Tail(pending)
     /\ work' = work + 1
     /\ UNCHANGED <<status, active, tape, safe, certified,
-                    profileComplete, lawAllowed, mode, shape, maxWork, maxNodes>>
+                    profileComplete, lawAllowed, mode, shape, maxWork, maxNodes,
+                    provenance>>
 
 EnterFresh ==
     /\ status = "Running"
@@ -120,7 +127,7 @@ EnterFresh ==
     /\ active' = active \cup {Top.fact}
     /\ work' = work + 1
     /\ UNCHANGED <<status, tape, safe, certified, profileComplete,
-                    lawAllowed, mode, shape, maxWork, maxNodes>>
+                    lawAllowed, mode, shape, maxWork, maxNodes, provenance>>
 
 StopForNodeLimit ==
     /\ status = "Running"
@@ -132,7 +139,7 @@ StopForNodeLimit ==
     /\ pending' = <<>>
     /\ active' = {}
     /\ UNCHANGED <<tape, safe, certified, work, profileComplete,
-                    lawAllowed, mode, shape, maxWork, maxNodes>>
+                    lawAllowed, mode, shape, maxWork, maxNodes, provenance>>
 
 ExitFresh ==
     LET fact == Top.fact IN
@@ -153,7 +160,14 @@ ExitFresh ==
                       ELSE certified
     /\ work' = work + 1
     /\ UNCHANGED <<status, profileComplete, lawAllowed, mode, shape,
-                    maxWork, maxNodes>>
+                    maxWork, maxNodes, provenance>>
+
+PersistArtifact ==
+    /\ status # "Running"
+    /\ provenance = "LiveLowering"
+    /\ provenance' = "PersistedIdentityOnly"
+    /\ UNCHANGED <<status, pending, active, tape, safe, certified, work,
+                    profileComplete, lawAllowed, mode, shape, maxWork, maxNodes>>
 
 Next == CompleteLowering
      \/ StopForWorkLimit
@@ -162,6 +176,7 @@ Next == CompleteLowering
      \/ EnterFresh
      \/ StopForNodeLimit
      \/ ExitFresh
+     \/ PersistArtifact
 
 Spec == Init /\ [][Next]_vars
 
@@ -179,6 +194,7 @@ TypeOK ==
     /\ shape \in Shapes
     /\ maxWork \in Nat
     /\ maxNodes \in Nat
+    /\ provenance \in Provenances
 
 MapMatchesTape ==
     Len(tape) = Cardinality(Mapped)
@@ -203,6 +219,7 @@ CertificateSound ==
 PublicRewriteSound ==
     CanRewrite =>
         /\ status = "Complete"
+        /\ provenance = "LiveLowering"
         /\ profileComplete
         /\ lawAllowed
         /\ Root \in safe
@@ -210,6 +227,7 @@ PublicRewriteSound ==
 
 IncompleteDeniesRewrite == status # "Complete" => ~CanRewrite
 IdentityDeniesRewrite == mode[Root] # "Pure" => ~CanRewrite
+PersistedDeniesRewrite == provenance = "PersistedIdentityOnly" => ~CanRewrite
 CompleteHasRoot == status = "Complete" => Root \in Mapped
 TerminalQuiescent == status # "Running" => /\ pending = <<>> /\ active = {}
 WorkLimitHonest == status = "WorkLimited" => work >= maxWork
