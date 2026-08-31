@@ -112,18 +112,18 @@ The driver keeps temporary proof output below `target/` and deletes it on exit.
 
 | ID | Formal invariant | Required implementation witness |
 |---|---|---|
-| RB-01 | Every exported exact semantic relation is backed by an independently replayed proof. | Corrupt or omit every proof form and require typed rejection/no tuple. |
-| RB-02 | Positive proof facts survive unrelated incomplete equality or Datalog dimensions. | Exhaust all completion pairs and preserve the canonical positive prefix. |
+| RB-01 | Every non-reflexive exported exact relation is connected by independently replayed proof evidence; representative self-membership uses equality reflexivity. | Corrupt or omit proof edges and require typed rejection/no non-reflexive class or candidate tuple. |
+| RB-02 | Positive proof facts survive unrelated incomplete equality or Datalog dimensions. | Exercise every upstream limit and all semantic/Datalog completion pairs while preserving the canonical positive prefix. |
 | RB-03 | Conclusive absence requires equality and Datalog completion. | Exhaust the four completion pairs; only complete/complete permits a negative conclusion. |
 | RB-04 | Combined completion is exact and never turns a limit into no-match. | Property-test the completion truth table and serialized labels. |
 | RB-05 | Public facts contain stable source `NodeId`s, never Replete e-class or proof-arena IDs. | Compile-time API/privacy checks plus runtime range/provenance assertions. |
-| RB-06 | All relation rows and fact files use deterministic canonical order. | Shuffle classes, occurrences, candidates, and maps; require byte-identical files. |
+| RB-06 | All relation rows and fact files use deterministic canonical order. | Permute upstream candidate insertion and map construction; reject noncanonical report rows and require byte-identical files. |
 | RB-07 | Export owns its tuples and shares no mutable engine state. | Drop source reports after export, clone/serialize facts, and prove outputs remain usable and equal. |
 | RB-08 | Export does not mutate the CPG, semantic report, or structural Datalog facts. | Snapshot all three before/after complete and limited paths. |
 | RB-09 | A Datalog tuple cannot construct or deserialize equality authority. | Compile-fail/private-constructor checks and one-way public API tests. |
 | RB-10 | Replete has no libcpg/Datalog-runtime dependency and libcpg embeds no Datalog/e-graph alternative runtime. | Repository dependency script checks manifests, Cargo metadata/tree, and source-module boundaries. |
 | RB-11 | Base CPG EDB export remains feature-free and semantically unchanged. | Existing Datalog unit/integration/property tests plus exact pre/post fixtures. |
-| RB-12 | Semantic relation files use the same canonical RFC 4180 tab-separated encoding contract. | Quoting, empty, singleton, parallel-context, and round-trip file examples. |
+| RB-12 | Semantic relation files use the same canonical RFC 4180 tab-separated encoding contract. | Exact numeric rows, fixed quoted dimension/completion labels, empty relations, and deterministic repeated rendering. |
 | RB-13 | Large exports use iterative flat loops and constant native-stack depth. | 100,000 class members through export/clone/format/serialize/drop on a 256 KiB stack. |
 | RB-14 | Invalid indices, duplicate identities, malformed completion, and oversized work fail closed. | Adversarial constructors/caps and typed errors; no panics on untrusted input. |
 | RB-15 | MeTTaIL remains untouched. | Dirty-worktree and dependency audits record no MeTTaIL write/build/format/branch/commit. |
@@ -135,6 +135,8 @@ EXPORT-SEMANTIC-EDB(report):
     borrow report immutably
     replay every proof referenced by a public semantic relation
         because an e-class or tuple alone has no equality authority
+    accept representative self-membership by equality reflexivity
+    require replayed proof connectivity for every other class member
     copy stable source IDs into owned relation rows
     sort and deduplicate every relation by its declared total order
     copy exact completion dimensions into typed completion rows

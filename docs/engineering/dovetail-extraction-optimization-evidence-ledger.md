@@ -156,9 +156,48 @@ The benchmark and its interpretation are recorded in
 [Scientific 71](../scientific/71-semantic-expression-flow-validation.md) and
 the [performance guide](03-performance.md#semantic-expression-flow-baseline).
 
+## T4.4 -- Replete, Datalog, and CPG responsibility boundary
+
+Tracker leaf `dovetail-x-t4-4` adds a one-way owned semantic EDB bridge. It
+replays proof-qualified T4.3 evidence, exports stable source identities and
+exact completion, and leaves rule evaluation to a caller-owned Datalog engine.
+
+| Obligation | Durable evidence |
+|---|---|
+| Non-reflexive semantic relations require replayed proof connectivity | [`ResponsibilityBoundary.tla`](../../formal/tla/ResponsibilityBoundary.tla), [`ResponsibilityBoundary.v`](../../formal/rocq/ResponsibilityBoundary.v), [`responsibility_boundary.smt2`](../../formal/z3/responsibility_boundary.smt2), proof corruption and connectivity tests |
+| Positive rows survive limits; absence requires both fixed points | formal completion laws plus generated testing of all 91 semantic/Datalog completion pairs |
+| Public identity is stable and engine-local state cannot leak | canonical `NodeId` fact types, private bundle fields, compile-fail proof promotion, and dependency/source gate |
+| CSE/PRE references match endpoints and span their classes | adversarial missing, mismatched, cross-class, and disconnected proof tests |
+| Ordinary CPG export and the CPG remain immutable | parser-built before/after integration test with equal ordinary facts and graph snapshots |
+| Replete, Datalog, and CPG responsibilities remain acyclic | `scripts/verify-reasoning-boundaries.sh` Cargo-tree and module checks |
+| Fact and rendering growth is bounded and stack-safe | checked row/byte limits plus 100,000-row export/clone/render/serialize/drop on a 256 KiB stack |
+
+### Stable commits
+
+| Commit | Major changes |
+|---|---|
+| `14c29ad` | TLA+, Rocq, and Z3 proof/completion/identity/ownership/dependency contract |
+| `68887f2` | owned semantic relations, proof/candidate validation, completion API, exhaustive tests, and architecture gate |
+
+### Executable gates
+
+```bash
+scripts/verify-responsibility-boundary-formal.sh
+scripts/verify-reasoning-boundaries.sh
+cargo test --lib --all-features semantic_datalog
+cargo test --all-features --test semantic_datalog_integration
+cargo test --doc --all-features
+cargo clippy --all-targets --all-features -- -D warnings
+```
+
+The schema, trust boundary, and interpretation limits are recorded in
+[ADR-0077](../design/0077-owned-semantic-datalog-evidence.md),
+[Scientific 72](../scientific/72-semantic-datalog-boundary-validation.md), and
+[Security 35](../security/35-semantic-datalog-boundary.md).
+
 ## Interpretation
 
-These artifacts support the represented T4.1, T4.2, and T4.3 contracts. They do not prove a
+These artifacts support the represented T4.1 through T4.4 contracts. They do not prove a
 frontend type checker, arbitrary source-language equivalence, Replete's future
 extraction optimality, or any
 pending campaign leaf. A terminal green run supports claimed completion; only
@@ -177,3 +216,7 @@ Related evidence is organized in [ADR-0074](../design/0074-typed-pure-expression
 [Scientific 71](../scientific/71-semantic-expression-flow-validation.md),
 [Security 34](../security/34-semantic-expression-flow-boundary.md), and the
 [semantic expression-flow API reference](../api/semantic-expression-flow-reference.md).
+T4.4 adds [ADR-0077](../design/0077-owned-semantic-datalog-evidence.md),
+[Scientific 72](../scientific/72-semantic-datalog-boundary-validation.md),
+[Security 35](../security/35-semantic-datalog-boundary.md), and the
+[semantic Datalog API reference](../api/semantic-datalog-reference.md).

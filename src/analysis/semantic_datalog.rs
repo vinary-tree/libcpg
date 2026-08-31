@@ -251,6 +251,16 @@ impl SemanticDatalogQueryCompletion {
 /// The bundle retains no CPG, semantic-report, Replete, or Datalog-engine
 /// reference. Serialization is audit/data transport only; it does not restore
 /// equality-proof authority.
+///
+/// A fact bundle cannot be promoted into a live equality proof:
+///
+/// ```compile_fail
+/// use libcpg::analysis::{ExpressionEquivalenceProof, SemanticDatalogFacts};
+///
+/// fn forge_proof(facts: SemanticDatalogFacts) -> ExpressionEquivalenceProof {
+///     facts.into()
+/// }
+/// ```
 #[derive(Clone, Debug, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(Serialize))]
 pub struct SemanticDatalogFacts {
@@ -493,6 +503,7 @@ pub fn export_semantic_datalog(
     limits: SemanticDatalogLimits,
 ) -> Result<SemanticDatalogFacts, SemanticDatalogError> {
     let limits = limits.validate()?;
+    validate_report_completion(report)?;
     let minimum_required = report
         .classes
         .iter()
@@ -548,6 +559,7 @@ pub fn export_semantic_datalog(
     let mut proof_edges = BTreeSet::new();
     let mut proof_by_index = BTreeMap::new();
     let mut adjacency = BTreeMap::<NodeId, Vec<NodeId>>::new();
+    let mut previous_exact_pair = None;
     for (index, pair) in report.equivalence.pairs.iter().enumerate() {
         if pair.kind != ExpressionEquivalenceKind::Exact {
             continue;
@@ -557,6 +569,13 @@ pub fn export_semantic_datalog(
                 "exact proof pair is not canonically qualified",
             ));
         }
+        let pair_key = (pair.left, pair.right);
+        if previous_exact_pair.is_some_and(|previous| previous >= pair_key) {
+            return Err(SemanticDatalogError::Invariant(
+                "exact proof pairs are not canonical",
+            ));
+        }
+        previous_exact_pair = Some(pair_key);
         let (Some(&left_class), Some(&right_class)) =
             (source_class.get(&pair.left), source_class.get(&pair.right))
         else {
@@ -608,7 +627,20 @@ pub fn export_semantic_datalog(
     )?;
 
     let mut cse_candidates = BTreeSet::new();
+    let mut previous_cse = None;
     for candidate in &report.cse_candidates {
+        let candidate_key = (
+            candidate.producer,
+            candidate.use_node,
+            candidate.class,
+            candidate.proof_pair,
+        );
+        if previous_cse.is_some_and(|previous| previous >= candidate_key) {
+            return Err(SemanticDatalogError::Invariant(
+                "CSE candidates are not canonical",
+            ));
+        }
+        previous_cse = Some(candidate_key);
         let &(left, right) =
             proof_by_index
                 .get(&candidate.proof_pair)
@@ -639,7 +671,15 @@ pub fn export_semantic_datalog(
     }
 
     let mut pre_candidates = BTreeSet::new();
+    let mut previous_pre = None;
     for candidate in &report.pre_candidates {
+        let candidate_key = (candidate.class, candidate.placement);
+        if previous_pre.is_some_and(|previous| previous >= candidate_key) {
+            return Err(SemanticDatalogError::Invariant(
+                "PRE candidates are not canonical",
+            ));
+        }
+        previous_pre = Some(candidate_key);
         if candidate.occurrences.is_empty() || !strictly_sorted(&candidate.occurrences) {
             return Err(SemanticDatalogError::Invariant(
                 "PRE occurrences are not canonical",
@@ -714,6 +754,37 @@ pub fn export_semantic_datalog(
         });
     }
     Ok(facts)
+}
+
+fn validate_report_completion(
+    report: &SemanticExpressionFlowReport,
+) -> Result<(), SemanticDatalogError> {
+    let equality = report.equivalence.exact_completion;
+    let valid = if equality == ExpressionEquivalenceCompletion::UnsupportedInputs {
+        report.completion == SemanticExpressionFlowCompletion::UnsupportedInputs
+    } else if equality != ExpressionEquivalenceCompletion::Complete {
+        report.completion == SemanticExpressionFlowCompletion::EquivalenceLimited(equality)
+    } else if report.available_completion != SemanticDataflowCompletion::Complete {
+        report.completion == SemanticExpressionFlowCompletion::AvailableDataflowLimited
+    } else if report.very_busy_completion != SemanticDataflowCompletion::Complete {
+        report.completion == SemanticExpressionFlowCompletion::VeryBusyDataflowLimited
+    } else {
+        match report.completion {
+            SemanticExpressionFlowCompletion::Complete => report.excluded.is_empty(),
+            SemanticExpressionFlowCompletion::UnsupportedInputs => !report.excluded.is_empty(),
+            SemanticExpressionFlowCompletion::CandidateWorkLimited => true,
+            SemanticExpressionFlowCompletion::EquivalenceLimited(_)
+            | SemanticExpressionFlowCompletion::AvailableDataflowLimited
+            | SemanticExpressionFlowCompletion::VeryBusyDataflowLimited => false,
+        }
+    };
+    if valid {
+        Ok(())
+    } else {
+        Err(SemanticDatalogError::Invariant(
+            "semantic flow completion is inconsistent",
+        ))
+    }
 }
 
 fn estimated_fact_count(

@@ -627,6 +627,19 @@ independent old/new typed roots and returns `ProvenEquivalent`,
 `ProvenDifferent`, `Limited`, or `Unknown`; structural `CpgDiff` remains
 separate. See [Usage 44](usage/44-semantic-expression-flow.md).
 
+### Semantic Datalog facts / Combined completion
+
+**Semantic Datalog facts** are the seven owned canonical EDB relations copied
+from a checked semantic-flow report: class membership, replayed proof edges,
+availability, anticipability, CSE candidates, PRE occurrences, and five
+completion dimensions. **Combined completion** is conclusive only when the
+queried semantic dimension and caller-owned Datalog fixed point both complete.
+Representative self-membership is reflexive identity; every non-reflexive
+class membership requires a path of replayed exact proofs. Facts are relational
+observations and cannot recreate equality-proof authority. See
+[ADR-0077](design/0077-owned-semantic-datalog-evidence.md) and the
+[component guide](components/graph/semantic-datalog-boundary.md).
+
 ### Directed triad / motif census
 
 A **directed triad** is the induced topology on three vertices. Its three dyads

@@ -103,6 +103,11 @@ demonstrates allocation propagation through def-use assignments. The shipped
 [`ifc.dl`](../../../examples/datalog/ifc.dl) demonstrates explicit
 and implicit flow closure. They are examples, not privileged built-in policies.
 
+Proof-qualified equality and flow facts use the separate
+[`SemanticDatalogFacts`](semantic-datalog-boundary.md) adapter. That additive
+bundle preserves semantic completion and proof indices; it neither changes
+this whole-CPG export nor grants Datalog tuples equality-proof authority.
+
 ## References
 
 1. Bravenboer, M., Smaragdakis, Y. (2009). *Strictly Declarative Specification

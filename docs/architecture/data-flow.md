@@ -1051,12 +1051,16 @@ can issue a certificate for one named law.
 ![Relational queries and equational exploration consume different evidence through separate ownership lanes.](../diagrams/relational-equational-reasoning.svg)
 
 The IR neither parses source text nor mutates graph overlays. Datalog exports
-remain relational evidence; they cannot assert an e-graph equality. The future
-Replete adapter consumes typed certificates, while the Replete crate remains a
-standalone repository with no libcpg ownership inversion. See the
+remain relational evidence; they cannot assert an e-graph equality. The
+implemented Replete adapter consumes typed certificates, while the Replete
+crate remains a standalone repository with no libcpg ownership inversion. The
+one-way semantic EDB bridge then replays exact report proofs and copies stable
+source identities plus explicit completion into owned canonical facts; it
+retains no CPG, report, Replete, or Datalog-engine reference. See the
 [component contract](../components/graph/expression-ir.md),
 [ADR-0074](../design/0074-typed-pure-expression-ir.md), and
-[Theory 57](../theory/57-datalog-egraphs-and-typed-expression-semantics.md).
+[Theory 57](../theory/57-datalog-egraphs-and-typed-expression-semantics.md),
+plus the [semantic Datalog boundary](../components/graph/semantic-datalog-boundary.md).
 
 ### Algorithm and complexity detection (feature `algorithm-detection`)
 

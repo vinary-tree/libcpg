@@ -289,6 +289,114 @@ fn valid_positive_evidence_survives_an_honestly_limited_report() {
 }
 
 #[test]
+fn every_limit_dimension_preserves_replayed_positive_evidence() {
+    let equality_limits = [
+        ExpressionEquivalenceCompletion::UnsupportedInputs,
+        ExpressionEquivalenceCompletion::CandidateLimited,
+        ExpressionEquivalenceCompletion::InputNodeLimited,
+        ExpressionEquivalenceCompletion::NodeLimited,
+        ExpressionEquivalenceCompletion::WorkLimited,
+        ExpressionEquivalenceCompletion::MatchLimited,
+        ExpressionEquivalenceCompletion::IterationLimited,
+        ExpressionEquivalenceCompletion::PairLimited,
+        ExpressionEquivalenceCompletion::ProofLimited,
+    ];
+    for limit in equality_limits {
+        let mut limited = report();
+        limited.equivalence.exact_completion = limit;
+        limited.completion = if limit == ExpressionEquivalenceCompletion::UnsupportedInputs {
+            SemanticExpressionFlowCompletion::UnsupportedInputs
+        } else {
+            SemanticExpressionFlowCompletion::EquivalenceLimited(limit)
+        };
+        let facts = export_semantic_datalog(&limited, SemanticDatalogLimits::default())
+            .expect("a limit does not invalidate an existing proof");
+        assert_eq!(facts.proof_edges().len(), 1);
+        assert_eq!(
+            facts.query_completion(
+                SemanticDatalogDimension::ExactEquality,
+                DatalogEvaluationCompletion::Complete,
+            ),
+            SemanticDatalogQueryCompletion {
+                dimension: SemanticDatalogDimension::ExactEquality,
+                semantic: equality_completion(limit),
+                datalog: DatalogEvaluationCompletion::Complete,
+            }
+        );
+    }
+
+    let mut availability_limited = report();
+    availability_limited.available_completion = SemanticDataflowCompletion::IterationLimited;
+    availability_limited.completion = SemanticExpressionFlowCompletion::AvailableDataflowLimited;
+    let availability =
+        export_semantic_datalog(&availability_limited, SemanticDatalogLimits::default()).unwrap();
+    assert_eq!(availability.proof_edges().len(), 1);
+    assert_eq!(
+        availability
+            .query_completion(
+                SemanticDatalogDimension::CseCandidates,
+                DatalogEvaluationCompletion::Complete,
+            )
+            .semantic,
+        SemanticDatalogCompletion::AvailableDataflowLimited
+    );
+
+    let mut anticipability_limited = report();
+    anticipability_limited.very_busy_completion = SemanticDataflowCompletion::IterationLimited;
+    anticipability_limited.completion = SemanticExpressionFlowCompletion::VeryBusyDataflowLimited;
+    let anticipability =
+        export_semantic_datalog(&anticipability_limited, SemanticDatalogLimits::default()).unwrap();
+    assert_eq!(anticipability.proof_edges().len(), 1);
+    assert_eq!(
+        anticipability
+            .query_completion(
+                SemanticDatalogDimension::PreCandidates,
+                DatalogEvaluationCompletion::Complete,
+            )
+            .semantic,
+        SemanticDatalogCompletion::VeryBusyDataflowLimited
+    );
+
+    let mut candidate_limited = report();
+    candidate_limited.completion = SemanticExpressionFlowCompletion::CandidateWorkLimited;
+    let candidates =
+        export_semantic_datalog(&candidate_limited, SemanticDatalogLimits::default()).unwrap();
+    assert_eq!(candidates.proof_edges().len(), 1);
+    for dimension in [
+        SemanticDatalogDimension::CseCandidates,
+        SemanticDatalogDimension::PreCandidates,
+    ] {
+        assert_eq!(
+            candidates
+                .query_completion(dimension, DatalogEvaluationCompletion::Complete)
+                .semantic,
+            SemanticDatalogCompletion::CandidateWorkLimited
+        );
+    }
+}
+
+#[test]
+fn facts_remain_owned_and_usable_after_the_source_report_is_dropped() {
+    let report = report();
+    let before = format!("{report:?}");
+    let facts = export_semantic_datalog(&report, SemanticDatalogLimits::default()).unwrap();
+    assert_eq!(format!("{report:?}"), before);
+    drop(report);
+
+    let clone = facts.clone();
+    assert_eq!(clone, facts);
+    assert_eq!(
+        clone.souffle_files().unwrap(),
+        facts.souffle_files().unwrap()
+    );
+    #[cfg(feature = "serde")]
+    assert_eq!(
+        serde_json::to_vec(&clone).unwrap(),
+        serde_json::to_vec(&facts).unwrap()
+    );
+}
+
+#[test]
 fn malformed_report_evidence_is_rejected_at_the_boundary() {
     let mut noncanonical = report();
     noncanonical.classes[0].occurrences.reverse();
@@ -326,6 +434,60 @@ fn malformed_report_evidence_is_rejected_at_the_boundary() {
         export_semantic_datalog(&unknown_class, SemanticDatalogLimits::default()),
         Err(SemanticDatalogError::Invariant(_))
     ));
+
+    let mut duplicate_member = report();
+    let representative = duplicate_member.classes[0].representative;
+    duplicate_member.classes[0].occurrences = vec![representative, representative];
+    assert!(matches!(
+        export_semantic_datalog(&duplicate_member, SemanticDatalogLimits::default()),
+        Err(SemanticDatalogError::Invariant(_))
+    ));
+
+    let mut duplicate_point = report();
+    let representative = duplicate_point.classes[0].representative;
+    duplicate_point
+        .available_in
+        .insert(NodeId::new(902), vec![representative, representative]);
+    assert!(matches!(
+        export_semantic_datalog(&duplicate_point, SemanticDatalogLimits::default()),
+        Err(SemanticDatalogError::Invariant(_))
+    ));
+
+    let mut duplicate_proof = report();
+    duplicate_proof
+        .equivalence
+        .pairs
+        .push(duplicate_proof.equivalence.pairs[0].clone());
+    assert!(matches!(
+        export_semantic_datalog(&duplicate_proof, SemanticDatalogLimits::default()),
+        Err(SemanticDatalogError::Invariant(_))
+    ));
+
+    let mut duplicate_cse = report();
+    duplicate_cse
+        .cse_candidates
+        .push(duplicate_cse.cse_candidates[0].clone());
+    assert!(matches!(
+        export_semantic_datalog(&duplicate_cse, SemanticDatalogLimits::default()),
+        Err(SemanticDatalogError::Invariant(_))
+    ));
+
+    let mut duplicate_pre = report();
+    duplicate_pre
+        .pre_candidates
+        .push(duplicate_pre.pre_candidates[0].clone());
+    assert!(matches!(
+        export_semantic_datalog(&duplicate_pre, SemanticDatalogLimits::default()),
+        Err(SemanticDatalogError::Invariant(_))
+    ));
+
+    let mut inconsistent_completion = report();
+    inconsistent_completion.equivalence.exact_completion =
+        ExpressionEquivalenceCompletion::WorkLimited;
+    assert!(matches!(
+        export_semantic_datalog(&inconsistent_completion, SemanticDatalogLimits::default()),
+        Err(SemanticDatalogError::Invariant(_))
+    ));
 }
 
 #[test]
@@ -340,6 +502,16 @@ fn fact_and_rendering_limits_fail_closed() {
             }
         ),
         Err(SemanticDatalogError::InvalidLimit("max_facts"))
+    ));
+    assert!(matches!(
+        export_semantic_datalog(
+            &report,
+            SemanticDatalogLimits {
+                max_rendered_bytes: MAX_SEMANTIC_DATALOG_BYTES + 1,
+                ..SemanticDatalogLimits::default()
+            }
+        ),
+        Err(SemanticDatalogError::InvalidLimit("max_rendered_bytes"))
     ));
 
     let facts = export_semantic_datalog(&report, SemanticDatalogLimits::default()).unwrap();
@@ -373,6 +545,27 @@ fn fact_and_rendering_limits_fail_closed() {
         byte_limited.souffle_files(),
         Err(SemanticDatalogError::RenderedByteLimit { .. })
     ));
+}
+
+#[test]
+fn completion_rendering_is_exact_and_canonical() {
+    let facts = export_semantic_datalog(&report(), SemanticDatalogLimits::default()).unwrap();
+    let files = facts.souffle_files().unwrap();
+    let completion = files
+        .iter()
+        .find(|file| file.relation == "semantic_completion")
+        .expect("completion relation exists");
+    let function = facts.completions()[0].function.as_u32();
+    assert_eq!(
+        completion.contents,
+        format!(
+            "{function}\t\"exact_equality\"\t\"complete\"\n\
+             {function}\t\"availability\"\t\"complete\"\n\
+             {function}\t\"anticipability\"\t\"complete\"\n\
+             {function}\t\"cse_candidates\"\t\"complete\"\n\
+             {function}\t\"pre_candidates\"\t\"complete\"\n"
+        )
+    );
 }
 
 fn semantic_completions() -> [SemanticDatalogCompletion; 13] {

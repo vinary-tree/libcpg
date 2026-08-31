@@ -1,0 +1,55 @@
+@startuml
+!include _libcpg-theme.iuml
+title Proof-qualified semantic facts cross a one-way ownership boundary
+
+package "Standalone equational engine" #FFF4E6 {
+  rectangle "Replete\ntyped e-graph + equality saturation" as Replete #FFE8CC
+  rectangle "Replayable exact proof\nno libcpg or Datalog dependency" as Proof #C3FAE8
+  Replete -[#E8590C]-> Proof : emits certificate tape
+}
+
+package "libcpg program-semantics owner" #EDF2FF {
+  rectangle "Immutable CPG\nstable NodeId + CFG" as CPG #DBE4FF
+  rectangle "Semantic flow report\nclasses + availability +\nanticipability + CSE/PRE + completion" as Report #E5DBFF
+  rectangle "Semantic Datalog bridge\nreplay + validate + bound + copy" as Bridge #C3FAE8
+  database "Owned canonical EDB\n7 relations + 5 completion rows" as EDB #D0EBFF
+
+  CPG -[#4C6EF5]-> Report : program topology
+  Proof -[#0CA678]-> Report : exact equality evidence
+  Report -[#7048E8]-> Bridge : immutable borrow
+  Bridge -[#0CA678]-> EDB : owned stable-source rows
+}
+
+package "Caller-owned relational engine" #FFF9DB {
+  rectangle "File policy\natomic write + sandbox" as Files #F1F3F5
+  rectangle "Datalog rules + engine\nleast fixed point + provenance" as Datalog #FFF3BF
+  database "Derived IDB\ncaller interpretation" as IDB #D3F9D8
+
+  EDB -[#868E96]-> Files : in-memory RFC 4180 TSV
+  Files -[#F08C00]-> Datalog : caller loads
+  Datalog -[#F08C00]-> Datalog : monotone evaluation
+  Datalog -[#2F9E44]-> IDB : explicit completion
+}
+
+rectangle "Forbidden\nDatalog tuple -> proof\nengine-local ID -> public row\nshared mutable engine state\nCPG/report mutation" as Forbidden #FFE3E3
+IDB ..[#E03131]..> Proof : never authority
+Bridge ..[#E03131]..> Forbidden : rejects
+
+note bottom of EDB
+  Positive rows survive honest limits.
+  Conclusive absence requires:
+  <math>SemanticComplete(d) \land DatalogComplete</math>
+end note
+
+legend right
+|= Color |= Responsibility |
+|<#FFE8CC>| standalone Replete equational mechanics |
+|<#DBE4FF>| immutable CPG identity/topology |
+|<#E5DBFF>| libcpg semantic report |
+|<#C3FAE8>| checked proof/adapter boundary |
+|<#D0EBFF>| owned EDB transport |
+|<#FFF3BF>| caller Datalog fixed point |
+|<#D3F9D8>| derived relational evidence |
+|<#FFE3E3>| forbidden trust shortcut |
+endlegend
+@enduml

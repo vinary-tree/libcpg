@@ -145,8 +145,9 @@ the law only when:
 The flat `ExpressionIr` is the executable witness for the structural part of
 this predicate. The private `RewriteCertificate` witnesses one successful law
 check. Replete may add an equality only after receiving such evidence through
-its later adapter. Replete remains a standalone generic crate; it must not
-depend on libcpg, and libcpg must not absorb its e-graph implementation.
+libcpg's implemented typed adapter. Replete remains a standalone generic
+crate; it does not depend on libcpg, and libcpg does not absorb its e-graph
+implementation.
 
 This division of labor is deliberate:
 
@@ -204,6 +205,38 @@ category-theory abstraction should enter production only when it removes
 duplication or makes an executable law impossible to violate. The diagrams,
 formal models, and property tests may use the theory immediately without
 forcing runtime indirection.
+
+## 7. The implemented one-way semantic EDB bridge
+
+After Replete-backed proofs and libcpg must-flow produce a
+`SemanticExpressionFlowReport`, `export_semantic_datalog` copies checked stable
+source evidence into seven canonical owned EDB relations. It replays exact
+proof edges, requires those edges to connect every nontrivial semantic class,
+validates CSE/PRE proof references, and preserves five semantic completion
+dimensions. Representative self-membership is justified by equality
+reflexivity; all non-reflexive membership requires a replayed proof path.
+
+![Proof-qualified semantic reports cross a one-way owned-data boundary into caller-owned Datalog evaluation.](../diagrams/semantic-datalog-responsibility-boundary.svg)
+
+*Figure -- the implemented responsibility boundary. Source:
+[`semantic-datalog-responsibility-boundary.puml`](../diagrams/semantic-datalog-responsibility-boundary.puml).*
+
+The adapter direction is intentionally not invertible:
+
+```math
+\operatorname{ReplayedProof}(x,y)
+\Longrightarrow
+\operatorname{SemanticTuple}(x,y),
+\qquad
+\operatorname{SemanticTuple}(x,y)
+\not\Longrightarrow
+\operatorname{ReplayedProof}(x,y).
+```
+
+This is a practical categorical asymmetry: the adapter preserves evidence into
+a weaker relational observation, but there is no authority-preserving inverse.
+See [ADR-0077](../design/0077-owned-semantic-datalog-evidence.md) and the
+[component contract](../components/graph/semantic-datalog-boundary.md).
 
 ## References
 

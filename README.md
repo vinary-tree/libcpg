@@ -66,6 +66,11 @@ PDG). A query can therefore mix syntax, control flow, and data flow freely.
 - **Datalog fact export** — feature-free deterministic EDB relations for every
   represented CPG overlay, plus lossless edge snapshots and caller-owned
   Soufflé buffers; external engines retain rule evaluation and fixed points.
+- **Proof-qualified semantic Datalog evidence** — standalone Replete-backed
+  exact expression proofs composed with libcpg-owned flow, then replayed into
+  bounded canonical class, availability, anticipability, CSE, PRE, proof, and
+  completion relations without sharing mutable engine state or granting tuples
+  equality-proof authority.
 - **Interprocedural effect summaries** — feature-free global, parameter, and
   field read/write places; transitive purity; parameter-to-return flow; and
   checked constant returns over the same bounded call-SCC schedule, with
