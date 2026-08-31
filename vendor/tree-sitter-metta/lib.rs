@@ -1,19 +1,18 @@
 //! Version-agnostic shim of the MeTTa tree-sitter grammar.
 //!
-//! Exposes the canonical MeTTa grammar (whose C sources live in
-//! `MeTTa-Compiler/tree-sitter-metta/src`, recompiled by this crate's
-//! `build.rs`) as a [`tree_sitter_language::LanguageFn`], mirroring how
+//! Exposes a byte-for-byte snapshot of the canonical MeTTa grammar as a
+//! [`tree_sitter_language::LanguageFn`], mirroring how
 //! `rholang-tree-sitter` publishes its grammar. Using `LanguageFn` decouples
 //! the grammar from any specific `tree-sitter` crate version, so a consumer can
 //! obtain a `tree_sitter::Language` via `LANGUAGE.into()` regardless of whether
 //! it links tree-sitter 0.25, 0.26, or later.
 //!
-//! Consumers (all by path; see `Cargo.toml` for the full rationale and the
-//! condition under which this shim should be dropped):
+//! Consumers use one immutable git package identity; see `Cargo.toml` and
+//! `SOURCE.md` for the rationale, provenance, and replacement condition:
 //!
 //! | Crate | Kind | Uses |
 //! |---|---|---|
-//! | `libcpg` | dev-dependency | [`LANGUAGE`] |
+//! | `libcpg` | workspace dev-dependency | [`LANGUAGE`] |
 //! | `pgmcp` | dependency | [`LANGUAGE`] |
 //! | `libgrammstein` | dependency | [`LANGUAGE`] |
 //! | `libgeiststein` | dependency | [`LANGUAGE`], [`node_types`] |

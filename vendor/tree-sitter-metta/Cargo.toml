@@ -16,14 +16,14 @@
 # libgrammstein, libcpg, pgmcp), so changing it would break MeTTa-Compiler and
 # fan out across all of them.
 #
-# This shim recompiles the SAME canonical C sources (parser.c + scanner.c, by
-# absolute path — no vendoring/duplication) but exposes them through
+# This shim compiles a byte-for-byte snapshot of the canonical generated C
+# sources recorded in SOURCE.md and exposes them through
 # `tree-sitter-language`'s `LanguageFn` instead of `tree_sitter::Language`,
 # exactly as `rholang-tree-sitter` already does. `LanguageFn` is decoupled from
 # the `tree-sitter` version, so `LANGUAGE.into()` yields whatever
 # `tree_sitter::Language` the consumer links — 0.26 today.
 #
-# WHY ONE SHARED SHIM AND NOT ONE PER REPO: `tree_sitter_metta` is a C symbol.
+# WHY ONE SHARED SHIM AND NOT ONE PER CONSUMER: `tree_sitter_metta` is a C symbol.
 # Two shim crates would each contribute a static archive defining it, and the
 # linker would silently satisfy every reference from whichever archive it pulls
 # first. Both would compile identical C here, so the outcome would be benign, but
@@ -40,6 +40,7 @@ edition = "2021"
 description = "Version-agnostic shim of the MeTTa tree-sitter grammar (LanguageFn over the canonical C sources)"
 license = "MIT"
 publish = false
+include = ["build.rs", "lib.rs", "src/**", "SOURCE.md"]
 
 [lib]
 name = "tree_sitter_metta"

@@ -1,18 +1,11 @@
-//! Recompiles the canonical MeTTa grammar C sources (parser.c + the stub
-//! external scanner.c) from the MeTTa-Compiler tree-sitter-metta crate, WITHOUT
-//! duplicating them, so this shim exposes the exact same grammar as MeTTaTron
-//! but through `tree-sitter-language` (version-agnostic) rather than a pinned
-//! `tree-sitter` crate. See Cargo.toml for the full rationale.
+//! Compiles the repository-contained snapshot of the canonical MeTTa grammar C
+//! sources through `tree-sitter-language`. See `SOURCE.md` for provenance and
+//! reproducible integrity checks.
 
 use std::path::PathBuf;
 
 fn main() {
-    // Canonical grammar sources — the single source of truth for the MeTTa
-    // grammar. Kept as an absolute path (consistent with how libcpg's
-    // dev-dependency previously referenced this crate) so we recompile, never
-    // copy, the upstream parser.
-    let src_dir =
-        PathBuf::from("/home/dylon/Workspace/f1r3fly.io/MeTTa-Compiler/tree-sitter-metta/src");
+    let src_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("src");
 
     let parser_path = src_dir.join("parser.c");
     let scanner_path = src_dir.join("scanner.c");

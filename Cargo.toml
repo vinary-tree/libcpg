@@ -1,3 +1,7 @@
+[workspace]
+members = ["vendor/tree-sitter-metta"]
+resolver = "2"
+
 [package]
 name = "libcpg"
 version = "0.1.1"
