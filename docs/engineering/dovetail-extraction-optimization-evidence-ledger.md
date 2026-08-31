@@ -116,9 +116,49 @@ Its local smoke/profile evidence, limitations, and exact measurements are
 recorded in [Scientific 70](../scientific/70-expression-equivalence-validation.md)
 and [the performance guide](03-performance.md#expression-equivalence-baseline).
 
+## T4.3 -- proof-qualified semantic expression flow
+
+Tracker leaf `dovetail-x-t4-3` composes exact T4.2 equality with libcpg-owned
+control-flow facts. It emits advisory CSE/PRE candidates and additive
+cross-revision semantic evidence without changing the CPG or legacy structural
+diff taxonomy.
+
+| Obligation | Durable evidence |
+|---|---|
+| Equality never substitutes for availability, anticipability, dominance, or kill freedom | [`SemanticExpressionFlow.tla`](../../formal/tla/SemanticExpressionFlow.tla), [`SemanticExpressionFlow.v`](../../formal/rocq/SemanticExpressionFlow.v), [`semantic_expression_flow.smt2`](../../formal/z3/semantic_expression_flow.smt2) |
+| Kills use resolved definitions and unknown effects fail closed | formal models plus shadowing, true-redefinition, unknown-assignment, call-barrier, and exceptional-exit tests |
+| CSE requires a dominating producer; PRE requires a busy common placement | all sixteen diamond transfer combinations, loop/exit examples, premise counterexamples, and proof-index replay |
+| Four semantic-diff results retain decisive-evidence precedence | formal classification plus example/property tests for equivalent, different, limited, unknown, and contradiction rejection |
+| Revision-local `NodeId` values may overlap safely | private comparison-slot invariant and parser-built old/new CPG integrations |
+| CPGs and legacy structural diff remain immutable | exact before/after node, edge, and `CpgDiff` checks across nine languages |
+| CFG/expression depth never becomes native call-stack depth | 100,000-node full report lifecycle on a 256 KiB worker stack |
+
+### Stable commits
+
+| Commit | Major changes |
+|---|---|
+| `e8f8f98` | TLA+, Rocq, and Z3 equality/dataflow composition and four-way diff contract |
+| `bf8cf87` | stack-safe semantic classes, resolved kills, must flow, CSE/PRE candidates, diff API, exhaustive unit/property/integration tests |
+| `868cc78` | separable proof-plus-flow and cross-revision Criterion baselines |
+
+### Executable gates
+
+```bash
+scripts/verify-semantic-expression-flow-formal.sh
+cargo test --lib semantic_expression_flow --all-features
+cargo test --test semantic_expression_flow_integration \
+  --features lang-rust,lang-c,lang-cpp,lang-go,lang-java,lang-python,lang-javascript,lang-typescript,lang-ruby
+cargo clippy --all-targets --all-features -- -D warnings
+cargo bench --bench semantic_expression_flow --no-default-features -- --quick
+```
+
+The benchmark and its interpretation are recorded in
+[Scientific 71](../scientific/71-semantic-expression-flow-validation.md) and
+the [performance guide](03-performance.md#semantic-expression-flow-baseline).
+
 ## Interpretation
 
-These artifacts support the represented T4.1 and T4.2 contracts. They do not prove a
+These artifacts support the represented T4.1, T4.2, and T4.3 contracts. They do not prove a
 frontend type checker, arbitrary source-language equivalence, Replete's future
 extraction optimality, or any
 pending campaign leaf. A terminal green run supports claimed completion; only
@@ -132,4 +172,8 @@ Related evidence is organized in [ADR-0074](../design/0074-typed-pure-expression
 [ADR-0075](../design/0075-proof-producing-expression-equivalence.md),
 [Scientific 70](../scientific/70-expression-equivalence-validation.md),
 [Security 33](../security/33-expression-equivalence-boundary.md), and the
-[expression-equivalence API reference](../api/expression-equivalence-reference.md).
+[expression-equivalence API reference](../api/expression-equivalence-reference.md). T4.3 adds
+[ADR-0076](../design/0076-proof-qualified-semantic-expression-flow.md),
+[Scientific 71](../scientific/71-semantic-expression-flow-validation.md),
+[Security 34](../security/34-semantic-expression-flow-boundary.md), and the
+[semantic expression-flow API reference](../api/semantic-expression-flow-reference.md).

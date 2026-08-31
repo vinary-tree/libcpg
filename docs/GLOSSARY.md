@@ -602,6 +602,31 @@ evidence without asserting exact program-state identity. See the
 [component guide](components/graph/expression-equivalence.md) and
 [ADR-0075](design/0075-proof-producing-expression-equivalence.md).
 
+### Semantic expression class / Availability / Anticipability / Kill
+
+A **semantic expression class** is a deterministic set of live typed
+expression occurrences connected by exact independently replayed proofs.
+**Availability** is the forward must-dataflow fact that a class was generated
+on every path to a point and not subsequently **killed**. **Anticipability**,
+also called **very busy**, is the backward must fact that every path from a
+point evaluates the class before a kill or exit. A kill is a resolved
+definition or conservative effect barrier that invalidates a class depending
+on that exact `BindingIdentity`. Equality is not a path fact, and availability
+does not by itself identify a dominating producer. See the
+[semantic-flow component guide](components/graph/semantic-expression-flow.md)
+and [ADR-0076](design/0076-proof-qualified-semantic-expression-flow.md).
+
+### Semantic CSE / Semantic PRE / Semantic diff
+
+**Semantic common-subexpression elimination (CSE)** evidence identifies one
+exactly equal dominating producer and later use with must-availability and no
+represented intervening kill. **Semantic partial-redundancy elimination
+(PRE)** evidence identifies a very-busy semantic class and a common dominating
+placement. Both are advisory, not transformations. A **semantic diff** compares
+independent old/new typed roots and returns `ProvenEquivalent`,
+`ProvenDifferent`, `Limited`, or `Unknown`; structural `CpgDiff` remains
+separate. See [Usage 44](usage/44-semantic-expression-flow.md).
+
 ### Directed triad / motif census
 
 A **directed triad** is the induced topology on three vertices. Its three dyads

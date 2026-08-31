@@ -1,0 +1,58 @@
+@startuml
+!include _libcpg-theme.iuml
+title Cross-revision semantic-diff decision machine
+
+rectangle "Old revision\nsource id + live typed IR" as Old #D0EBFF
+rectangle "New revision\nsource id + live typed IR" as New #D0EBFF
+database "Private comparison slots\nrevision-local ids may overlap" as Slots #E9ECEF
+rectangle "Bounded Replete comparison\nindependent proof replay" as Proof #E5DBFF
+rectangle "Two bounded iterative\nclosed-term evaluations" as Eval #FFF3BF
+rectangle "Replayed proof?\n<<decision>>" as HasProof #FFD8A8
+rectangle "Exact unequal typed values?\n<<decision>>" as Unequal #FFD8A8
+rectangle "Relevant limit?\n<<decision>>" as HasLimit #FFD8A8
+rectangle "ProvenEquivalent" as Equivalent #D3F9D8
+rectangle "ProvenDifferent" as Different #FFE8CC
+rectangle "Limited" as Limited #FFE3E3
+rectangle "Unknown" as Unknown #F1F3F5
+rectangle "Typed contradiction error" as Contradiction #FCC2D7
+
+Old -[#868E96]-> Slots
+New -[#868E96]-> Slots
+Slots -[#6741D9]-> Proof
+Slots -[#F08C00]-> Eval
+Proof -[#F08C00]-> HasProof
+Eval -[#F08C00]-> HasProof
+HasProof -[#C2255C]-> Contradiction : yes + unequal values
+HasProof -[#2F9E44]-> Equivalent : yes
+HasProof -[#495057]-> Unequal : no
+Unequal -[#E8590C]-> Different : yes
+Unequal -[#495057]-> HasLimit : no
+HasLimit -[#C92A2A]-> Limited : yes
+HasLimit -[#495057]-> Unknown : no
+
+note bottom of Slots #E7F5FF
+Private slots separate revision coordinate systems.
+They never appear in a public report.
+Both CPGs remain immutable.
+end note
+
+note bottom of HasProof #FFF9DB
+Decisive evidence precedes unrelated limits.
+Unknown means complete but undecided;
+Limited means incomplete and undecided.
+end note
+
+legend right
+|= Color |= Meaning |
+|<#D0EBFF>| independent revision input |
+|<#E9ECEF>| private namespace boundary |
+|<#E5DBFF>| replayed equality evidence |
+|<#FFF3BF>| exact closed evaluation |
+|<#FFD8A8>| ordered evidence decision |
+|<#D3F9D8>| proved equality |
+|<#FFE8CC>| proved unequal values |
+|<#FFE3E3>| incomplete evidence |
+|<#F1F3F5>| complete but undecided |
+|<#FCC2D7>| internal inconsistency |
+endlegend
+@enduml

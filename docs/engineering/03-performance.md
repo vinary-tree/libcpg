@@ -152,7 +152,7 @@ once, loop bodies twice, and a path set cuts malformed AST cycles.
 
 ## Benchmark coverage and remaining gaps
 
-Thirty-five explicitly declared Criterion targets are active. Most groups are
+Thirty-six explicitly declared Criterion targets are active. Most groups are
 feature-free; DFG, PDG, corpus, and reanalysis groups request their parser
 features, while `induction_analysis` additionally registers an
 `algorithm-detection`-gated group. Every active group constructs and checks a
@@ -200,6 +200,9 @@ deterministic oracle before Criterion enters the timed loop:
 - `expression_equivalence` separates public pair-output scaling at 2/8/32
   candidates from AC-normalization width at 4/16/64 operands; every fixture
   enters through public typed IR lowering and requires complete analysis;
+- `semantic_expression_flow` separates exact-proof plus forward/backward flow
+  over 2/8/32 linear occurrences from one cross-revision constant fold; each
+  fixture requires the expected proof-qualified report before timing;
 - `induction_analysis` measures DFG-backed invariant and induction analysis on
   single counted loops with 64, 512, and 2,048 invariant definitions; with
   `algorithm-detection`, its `complexity_evidence` group measures the public
@@ -452,6 +455,22 @@ clock, 2,794,582,388 instructions, and 6,740,506 cache misses. These are local
 smoke/profile observations, not portable latency or complexity claims. The
 full interpretation and profiler limitations are recorded in
 [Scientific 70](../scientific/70-expression-equivalence-validation.md).
+
+### Semantic expression-flow baseline
+
+The T4.3 Criterion `--quick` smoke run measured complete proof-plus-flow
+analysis for 2, 8, and 32 equal linear occurrences at midpoint estimates of
+14.208 us, 72.533 us, and 920.57 us, respectively. The corresponding midpoint
+throughputs were 140.77, 110.29, and 34.761 Kelem/s. Cross-revision comparison
+of `1 + 2` with `3` measured a 44.401 us midpoint.
+
+The linear fixture includes equality proof construction/replay, both must
+fixed points, candidate checks, and report materialization. Public proof-pair
+output grows with the number of equal occurrences, so this smoke series is a
+regression baseline rather than a claim of linear scaling. The run was
+headless, limited to 4 GiB resident memory with swap disabled, and used one
+Cargo job. Full test and interpretation evidence is in
+[Scientific 71](../scientific/71-semantic-expression-flow-validation.md).
 
 ### Liveness replay finding
 

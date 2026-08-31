@@ -1,0 +1,51 @@
+@startuml
+!include _libcpg-theme.iuml
+title Proof-qualified semantic expression flow
+
+rectangle "Immutable CPG + function CFG\nlive typed ExpressionIr roots" as Input #D0EBFF
+rectangle "Admission and exact Replete equality\ncomplete provenance + replay" as Equality #E5DBFF
+database "Semantic classes\nresolved BindingIdentity dependencies" as Classes #FFE8CC
+rectangle "Resolved generations and kills\nunknown effects are barriers" as Transfer #FFF3BF
+rectangle "Forward must-availability\ndeterministic fixed point" as Available #D3F9D8
+rectangle "Backward must-anticipability\ndeterministic fixed point" as Busy #C3FAE8
+rectangle "Dominance + explicit no-kill search\n<<decision>>" as Qualify #FFD8A8
+rectangle "Advisory CSE candidates\nproducer + use + proof index" as Cse #D3F9D8
+rectangle "Advisory PRE candidates\nplacement + occurrences + proofs" as Pre #C3FAE8
+rectangle "Typed exclusion or completion limit\nabsence is inconclusive" as Limited #FFE3E3
+
+Input -[#6741D9]-> Equality
+Equality -[#C92A2A]-> Limited : unsupported / incomplete
+Equality -[#E8590C]-> Classes : exact proof edges only
+Classes -[#F08C00]-> Transfer
+Transfer -[#2F9E44]-> Available
+Transfer -[#0CA678]-> Busy
+Available -[#F08C00]-> Qualify
+Busy -[#F08C00]-> Qualify
+Qualify -[#2F9E44]-> Cse : available + dominating producer
+Qualify -[#0CA678]-> Pre : busy + common dominator
+Qualify -[#C92A2A]-> Limited : cap / incomplete flow
+
+note bottom of Qualify #FFF9DB
+Equality is not a path fact.
+Availability does not identify a producer.
+Every reported candidate remains advisory.
+end note
+
+note bottom of Transfer #E7F5FF
+Resolved definitions kill dependent classes.
+Same spelling in a different scope does not.
+Heap work queues keep depth off the native stack.
+end note
+
+legend right
+|= Color |= Meaning |
+|<#D0EBFF>| immutable typed input |
+|<#E5DBFF>| replayed equality evidence |
+|<#FFE8CC>| canonical semantic identity |
+|<#FFF3BF>| transfer evidence |
+|<#D3F9D8>| forward-flow evidence / CSE |
+|<#C3FAE8>| backward-flow evidence / PRE |
+|<#FFD8A8>| composition decision |
+|<#FFE3E3>| excluded or incomplete |
+endlegend
+@enduml
