@@ -27,6 +27,7 @@ run_gate test-examples cargo test --all-features --examples
 run_gate clippy cargo clippy --all-targets --all-features -- -D warnings
 run_gate rustdoc ./scripts/verify-rustdoc.sh
 run_gate docs ./scripts/verify-docs.sh
+run_gate reasoning-boundaries ./scripts/verify-reasoning-boundaries.sh
 run_gate diff-check git diff --check
 
 echo "all libcpg verification gates passed"

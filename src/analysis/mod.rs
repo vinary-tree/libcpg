@@ -49,6 +49,7 @@ mod rewriting;
 mod scc;
 mod sdg;
 pub mod security;
+mod semantic_datalog;
 mod semantic_expression_flow;
 #[cfg(feature = "serde")]
 pub(crate) mod serde_util;
@@ -230,6 +231,14 @@ pub use semantic_expression_flow::{
     SemanticExpressionFlowMetrics, SemanticExpressionFlowReport, SemanticExpressionValue,
     SemanticFlowExclusion, SemanticFlowExclusionReason, SemanticPreCandidate,
     MAX_SEMANTIC_DIFF_EVALUATION_WORK, MAX_SEMANTIC_FLOW_WORK,
+};
+
+pub use semantic_datalog::{
+    export_semantic_datalog, DatalogEvaluationCompletion, SemanticClassFact,
+    SemanticCompletionFact, SemanticCseFact, SemanticDatalogCompletion, SemanticDatalogDimension,
+    SemanticDatalogError, SemanticDatalogFacts, SemanticDatalogLimits,
+    SemanticDatalogQueryCompletion, SemanticPointFact, SemanticPreFact, SemanticProofFact,
+    MAX_SEMANTIC_DATALOG_BYTES, MAX_SEMANTIC_DATALOG_FACTS,
 };
 
 pub use heap::{

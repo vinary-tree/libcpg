@@ -546,12 +546,12 @@ fn render_declared_types(facts: &[DeclaredTypeFact]) -> String {
     output
 }
 
-fn number(output: &mut String, value: u32) {
+pub(super) fn number(output: &mut String, value: u32) {
     use std::fmt::Write as _;
     write!(output, "{value}").expect("writing to a String cannot fail");
 }
 
-fn symbol(output: &mut String, value: &str) {
+pub(super) fn symbol(output: &mut String, value: &str) {
     output.push('"');
     for character in value.chars() {
         if character == '"' {
