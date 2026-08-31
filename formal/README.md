@@ -83,3 +83,29 @@ The implementation refinement uses deterministic heap work queues and flat
 expression/proof tapes. It reports advisory candidates and additive semantic
 diff evidence; it never mutates the CPG or changes the legacy structural-diff
 taxonomy.
+
+## Datalog, e-graph, and CPG responsibility boundary
+
+T4.4 formally fixes the one-way evidence and dependency boundary before
+semantic equality becomes a caller-owned Datalog EDB relation:
+
+- The TLA+ model exhaustively varies proof replay, equality/Datalog completion,
+  stable/canonical identity, and attempted shared-state, reverse-dependency,
+  embedded-runtime, tuple-authority, and internal-ID violations.
+- The Rocq development proves that exported positives require proofs, negatives
+  require both fixed points, completion is honest, every architecture shortcut
+  is rejected, public pairs are canonical, and owned export preserves its CPG
+  and semantic-report inputs.
+- The Z3 model refutes twenty forbidden publication, absence, completion,
+  dependency, authority, identity-leak, and mutation states.
+
+Run all three with:
+
+~~~bash
+./scripts/verify-responsibility-boundary-formal.sh
+~~~
+
+The intended implementation copies stable source identities and explicit
+completion into owned canonical fact rows. It shares no mutable Replete or
+Datalog engine state, exposes no engine-local IDs, and gives no Datalog tuple
+the authority of an independently replayed equality proof.
