@@ -103,9 +103,11 @@ completeness, whole-program transformation soundness, or profitability.
 Representative self-membership follows equality identity; non-reflexive
 connectivity requires replayed evidence.
 
-Replete is standalone and unpublished; publication is a separate immutable
-dependency-source operation, not an adapter change. MeTTaIL was not modified,
-built, formatted, branched, or committed.
+Replete is standalone and unpublished. libcpg consumes exact package version
+`0.1.0` at canonical Git revision
+`907fc4b953e7e13beb237e8ce369629a15eb4cb8`; registry publication remains a
+separate operation, not an adapter change. MeTTaIL was not modified, built,
+formatted, branched, or committed.
 
 ## References
 

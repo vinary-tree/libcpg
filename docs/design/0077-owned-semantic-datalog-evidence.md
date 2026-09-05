@@ -118,8 +118,9 @@ ownership.
   relations without changing the CPG.
 - Persisted facts remain audit data but cannot recreate proof authority.
 - Callers must preserve semantic and Datalog completion separately.
-- Replacing the temporary local Replete path with an immutable Git revision or
-  exact registry release does not change this adapter contract.
+- libcpg pins Replete package version `0.1.0` and canonical Git revision
+  `907fc4b953e7e13beb237e8ce369629a15eb4cb8`; a future exact registry release
+  would not change this adapter contract.
 
 ## Verification
 
