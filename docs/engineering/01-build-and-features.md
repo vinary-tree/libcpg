@@ -30,6 +30,19 @@ Or from the command line:
 cargo add libcpg --features "lang-rust,design-patterns"
 ```
 
+### Rust toolchain
+
+libcpg declares Rust 1.97 and the repository pins `nightly-2026-04-21` in
+`rust-toolchain.toml`. The nightly pin is a reproducible capability boundary,
+not a request to float on the newest compiler: Replete uses `allocator_api` to
+propagate allocation refusal through typed `Result` paths without replacing
+that behavior with aborts or infallible allocation. Rustup selects the pinned
+toolchain automatically when commands run inside the repository.
+
+Downstream packages that enable libcpg's Replete-backed semantic analyses must
+use a compiler providing the same capability. Do not lower the compiler floor
+by disabling the fallible, stack-safe implementation.
+
 ### The consequence of `default = []`
 
 With no features, the only construction paths that work are the feature-free ones:

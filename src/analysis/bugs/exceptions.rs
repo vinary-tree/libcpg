@@ -679,15 +679,13 @@ fn collect_input_issues(
         let scope = function_scope_nodes(cpg, function);
         for node in scope {
             match cpg.node(node).map(|node| &node.kind) {
-                Some(CpgNodeKind::Throw) => {
-                    if throw_types(cpg, node).contains(&ExceptionType::Unknown) {
-                        issues.insert(ExceptionFlowIssue::UnknownThrowType { site: node });
-                    }
+                Some(CpgNodeKind::Throw)
+                    if throw_types(cpg, node).contains(&ExceptionType::Unknown) =>
+                {
+                    issues.insert(ExceptionFlowIssue::UnknownThrowType { site: node });
                 }
-                Some(CpgNodeKind::Call { .. }) => {
-                    if represented_targets(cpg, node).len() > 1 {
-                        issues.insert(ExceptionFlowIssue::AmbiguousCall { site: node });
-                    }
+                Some(CpgNodeKind::Call { .. }) if represented_targets(cpg, node).len() > 1 => {
+                    issues.insert(ExceptionFlowIssue::AmbiguousCall { site: node });
                 }
                 Some(CpgNodeKind::Catch) => {
                     let body = cpg.ast_children(node).iter().copied().find(|&child| {

@@ -300,11 +300,7 @@ impl ControlFlowAnalyzer {
         for &child_id in children {
             if let Some(child) = cpg.node(child_id) {
                 match &child.kind {
-                    CpgNodeKind::Identifier { name, .. } => {
-                        if name == target_name {
-                            return true;
-                        }
-                    }
+                    CpgNodeKind::Identifier { name, .. } if name == target_name => return true,
                     // For method calls like self.func_name()
                     CpgNodeKind::MemberAccess { member } if member == target_name => {
                         return true;

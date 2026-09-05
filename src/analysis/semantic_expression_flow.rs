@@ -739,13 +739,11 @@ fn build_transfer(
                         kill_all = true;
                     }
                 }
-                CpgNodeKind::Call { .. } => {
+                CpgNodeKind::Call { .. } if !admitted.contains_key(&node) => {
                     // A call root admitted as a pure ExpressionIr carries an
                     // explicit effect certificate. Unmodeled calls remain a
                     // conservative barrier for every semantic class.
-                    if !admitted.contains_key(&node) {
-                        kill_all = true;
-                    }
+                    kill_all = true;
                 }
                 CpgNodeKind::Await | CpgNodeKind::Yield => kill_all = true,
                 _ => {}

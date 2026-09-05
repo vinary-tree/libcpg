@@ -27,7 +27,7 @@ rectangle "Selected engine boundary" as evidence #FFE8CC {
   component "libdictenstein bijection\nterm <-> u64 id" as vocabulary #FCC2D7
   component "libdictenstein DAWG\nsequence<u64> -> candidate slots" as dictionary #FCC2D7
   component "liblevenshtein bounded\nsequence intersection" as distance #C3FAE8
-  component "Rust 1.95 or nightly as needed\n256 KiB stack + bounded heap" as resource #FFE8CC
+  component "Rust 1.97 + pinned nightly\n256 KiB stack + bounded heap" as resource #FFE8CC
 }
 
 rectangle "Typed production result" as decision #D3F9D8 {

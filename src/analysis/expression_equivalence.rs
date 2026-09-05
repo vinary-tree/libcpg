@@ -13,16 +13,16 @@ use std::fmt;
 use std::sync::{Arc, Mutex};
 
 use replete::{
-    apply_native_rewrite, write_framed, write_ordered_framed, AcBuildError, AcBuildLimits,
-    AcOperatorCapability, AtomicEvidence, AtomicEvidenceVerifier, CanonicalSink, CanonicalValue,
-    CanonicalValueError, ConditionId, ConditionOutcome, EClassId, EGraph, EGraphConfig,
-    EGraphError, EvidenceLabel, ExplanationCompletion, MatchCompletion, MatchLimits, ModelConfig,
-    NativeActionBudget, NativeActionDecision, NativeActionId, NativeActionLimits,
-    NativeActionOutcome, NativeActionPlanBuilder, NativeActionPlanError, NativeActionResource,
-    NativeMatchView, NativeRewriteAdapter, NativeRewriteRequest, PatternBuilder, PatternTape,
-    PatternVariableId, ProofLimits, ProofTape, ProofTermId, ProvenanceStatus, RebuildCompletion,
-    RewriteDirection, SaturationCompletion, SaturationLimits, SaturationProgram, SaturationRunner,
-    SemanticHash, SerialScheduler, TapeLimits,
+    apply_native_rewrite, AcBuildError, AcBuildLimits, AcOperatorCapability, AtomicEvidence,
+    AtomicEvidenceVerifier, CanonicalSink, CanonicalValue, CanonicalValueError, ConditionId,
+    ConditionOutcome, ContentKeyError, EClassId, EGraph, EGraphConfig, EGraphError, EvidenceLabel,
+    ExplanationCompletion, MatchCompletion, MatchLimits, ModelConfig, NativeActionBudget,
+    NativeActionDecision, NativeActionId, NativeActionLimits, NativeActionOutcome,
+    NativeActionPlanBuilder, NativeActionPlanError, NativeActionResource, NativeMatchView,
+    NativeRewriteAdapter, NativeRewriteRequest, PatternBuilder, PatternTape, PatternVariableId,
+    ProofLimits, ProofTape, ProofTermId, ProvenanceStatus, RebuildCompletion, RewriteDirection,
+    SaturationCompletion, SaturationLimits, SaturationProgram, SaturationRunner, SemanticHash,
+    SemanticWriter, SerialScheduler, TapeLimits,
 };
 use thiserror::Error;
 
@@ -487,23 +487,24 @@ struct EquivalenceOperator {
 }
 
 impl SemanticHash for EquivalenceOperator {
-    fn write_content(&self, output: &mut Vec<u8>) {
+    fn write_content(&self, output: &mut SemanticWriter<'_>) -> Result<(), ContentKeyError> {
         match self.namespace {
             Some(namespace) => {
-                output.push(1);
-                output.extend_from_slice(&namespace.as_u32().to_le_bytes());
+                output.write_byte(1)?;
+                output.write(&namespace.as_u32().to_le_bytes())?;
             }
-            None => output.push(0),
+            None => output.write_byte(0)?,
         }
-        write_operator_kind(&self.kind, output);
-        write_expression_type(self.value_type, output);
+        write_operator_kind(&self.kind, output)?;
+        write_expression_type(self.value_type, output)
     }
 }
 
 impl CanonicalValue for EquivalenceOperator {
     fn encode_canonical(&self, output: &mut dyn CanonicalSink) -> Result<(), CanonicalValueError> {
         let mut encoded = Vec::new();
-        self.write_content(&mut encoded);
+        self.write_content(&mut SemanticWriter::new(&mut encoded))
+            .map_err(canonical_value_error)?;
         output.write(&encoded)
     }
 
@@ -742,114 +743,133 @@ fn decode_binary_operator(code: u8) -> Result<BinaryOperator, CanonicalValueErro
     })
 }
 
-fn write_operator_kind(kind: &EquivalenceOperatorKind, output: &mut Vec<u8>) {
+fn canonical_value_error(error: ContentKeyError) -> CanonicalValueError {
+    match error {
+        ContentKeyError::Capacity(_) => CanonicalValueError::Capacity,
+        ContentKeyError::Invariant(detail) => CanonicalValueError::Custom(detail),
+    }
+}
+
+fn write_operator_kind(
+    kind: &EquivalenceOperatorKind,
+    output: &mut SemanticWriter<'_>,
+) -> Result<(), ContentKeyError> {
     match kind {
         EquivalenceOperatorKind::Literal(literal) => {
-            output.push(0);
-            write_literal(literal, output);
+            output.write_byte(0)?;
+            write_literal(literal, output)?;
         }
         EquivalenceOperatorKind::Binding(EquivalenceBinding::Exact(binding)) => {
-            output.push(1);
-            output.extend_from_slice(&binding.definition.as_u32().to_le_bytes());
-            output.extend_from_slice(&binding.scope.to_le_bytes());
+            output.write_byte(1)?;
+            output.write(&binding.definition.as_u32().to_le_bytes())?;
+            output.write(&binding.scope.to_le_bytes())?;
         }
         EquivalenceOperatorKind::Binding(EquivalenceBinding::Alpha(slot)) => {
-            output.push(2);
-            output.extend_from_slice(&slot.to_le_bytes());
+            output.write_byte(2)?;
+            output.write(&slot.to_le_bytes())?;
         }
         EquivalenceOperatorKind::Unary(operator) => {
-            output.push(3);
-            output.push(unary_code(*operator));
+            output.write_byte(3)?;
+            output.write_byte(unary_code(*operator))?;
         }
         EquivalenceOperatorKind::Binary(operator) => {
-            output.push(4);
-            output.push(binary_code(*operator));
+            output.write_byte(4)?;
+            output.write_byte(binary_code(*operator))?;
         }
         EquivalenceOperatorKind::Call(identity) => {
-            output.push(5);
+            output.write_byte(5)?;
             match identity {
                 CallIdentity::Resolved(node) => {
-                    output.push(0);
-                    output.extend_from_slice(&node.as_u32().to_le_bytes());
+                    output.write_byte(0)?;
+                    output.write(&node.as_u32().to_le_bytes())?;
                 }
                 CallIdentity::External(symbol) => {
-                    output.push(1);
-                    write_framed(output, symbol.as_bytes());
+                    output.write_byte(1)?;
+                    output.write_framed(symbol.as_bytes())?;
                 }
-                CallIdentity::Unresolved => output.push(2),
+                CallIdentity::Unresolved => output.write_byte(2)?,
             }
         }
         EquivalenceOperatorKind::Load { location, access } => {
-            output.push(6);
-            output.extend_from_slice(&location.as_u32().to_le_bytes());
-            output.push(memory_access_code(*access));
+            output.write_byte(6)?;
+            output.write(&location.as_u32().to_le_bytes())?;
+            output.write_byte(memory_access_code(*access))?;
         }
-        EquivalenceOperatorKind::Opaque => output.push(7),
+        EquivalenceOperatorKind::Opaque => output.write_byte(7)?,
     }
+    Ok(())
 }
 
-fn write_literal(literal: &ExpressionLiteral, output: &mut Vec<u8>) {
+fn write_literal(
+    literal: &ExpressionLiteral,
+    output: &mut SemanticWriter<'_>,
+) -> Result<(), ContentKeyError> {
     match literal {
         ExpressionLiteral::Integer(value) => {
-            output.push(0);
-            output.extend_from_slice(&value.to_le_bytes());
+            output.write_byte(0)?;
+            output.write(&value.to_le_bytes())?;
         }
         ExpressionLiteral::Float32(bits) => {
-            output.push(1);
-            output.extend_from_slice(&bits.to_le_bytes());
+            output.write_byte(1)?;
+            output.write(&bits.to_le_bytes())?;
         }
         ExpressionLiteral::Float64(bits) => {
-            output.push(2);
-            output.extend_from_slice(&bits.to_le_bytes());
+            output.write_byte(2)?;
+            output.write(&bits.to_le_bytes())?;
         }
         ExpressionLiteral::Bool(value) => {
-            output.push(3);
-            output.push(u8::from(*value));
+            output.write_byte(3)?;
+            output.write_byte(u8::from(*value))?;
         }
         ExpressionLiteral::String(value) => {
-            output.push(4);
-            write_framed(output, value.as_bytes());
+            output.write_byte(4)?;
+            output.write_framed(value.as_bytes())?;
         }
         ExpressionLiteral::Char(value) => {
-            output.push(5);
-            output.extend_from_slice(&u32::from(*value).to_le_bytes());
+            output.write_byte(5)?;
+            output.write(&u32::from(*value).to_le_bytes())?;
         }
-        ExpressionLiteral::Null => output.push(6),
+        ExpressionLiteral::Null => output.write_byte(6)?,
     }
+    Ok(())
 }
 
-fn write_expression_type(value_type: ExpressionType, output: &mut Vec<u8>) {
+fn write_expression_type(
+    value_type: ExpressionType,
+    output: &mut SemanticWriter<'_>,
+) -> Result<(), ContentKeyError> {
     match value_type {
-        ExpressionType::Bool => output.push(0),
+        ExpressionType::Bool => output.write_byte(0)?,
         ExpressionType::Integer(integer) => {
-            output.push(1);
+            output.write_byte(1)?;
             match integer.width {
                 Some(width) => {
-                    output.push(1);
-                    output.extend_from_slice(&width.to_le_bytes());
+                    output.write_byte(1)?;
+                    output.write(&width.to_le_bytes())?;
                 }
-                None => output.push(0),
+                None => output.write_byte(0)?,
             }
-            output.push(u8::from(integer.signed));
-            output.push(integer_overflow_code(integer.overflow));
-            output.push(shift_code(integer.shift));
+            output.write_byte(u8::from(integer.signed))?;
+            output.write_byte(integer_overflow_code(integer.overflow))?;
+            output.write_byte(shift_code(integer.shift))?;
         }
         ExpressionType::Float(FloatType { width, mode }) => {
-            output.push(2);
-            output.push(match width {
+            output.write_byte(2)?;
+            output.write_byte(match width {
                 FloatWidth::F32 => 0,
                 FloatWidth::F64 => 1,
-            });
-            output.push(match mode {
+            })?;
+            output.write_byte(match mode {
                 FloatMode::StrictIeee754 => 0,
                 FloatMode::FiniteReassociation => 1,
-            });
+            })?;
         }
-        ExpressionType::String => output.push(3),
-        ExpressionType::Char => output.push(4),
-        ExpressionType::Unit => output.push(5),
-        ExpressionType::Dynamic => output.push(6),
+        ExpressionType::String => output.write_byte(3)?,
+        ExpressionType::Char => output.write_byte(4)?,
+        ExpressionType::Unit => output.write_byte(5)?,
+        ExpressionType::Dynamic => output.write_byte(6)?,
     }
+    Ok(())
 }
 
 fn unary_code(operator: UnaryOperator) -> u8 {
@@ -911,13 +931,27 @@ fn shift_code(shift: ShiftBehavior) -> u8 {
     }
 }
 
-fn operator_header(operator: &EquivalenceOperator, arity: usize) -> Vec<u8> {
+fn operator_header(
+    operator: &EquivalenceOperator,
+    arity: usize,
+) -> Result<Vec<u8>, ContentKeyError> {
+    operator_header_with_limit(operator, arity, usize::MAX)
+}
+
+fn operator_header_with_limit(
+    operator: &EquivalenceOperator,
+    arity: usize,
+    maximum: usize,
+) -> Result<Vec<u8>, ContentKeyError> {
     let mut value = Vec::new();
-    operator.write_content(&mut value);
+    operator.write_content(&mut SemanticWriter::with_limit(&mut value, maximum))?;
     let mut header = Vec::new();
-    write_ordered_framed(&mut header, &value);
-    header.extend_from_slice(&(arity as u64).to_be_bytes());
-    header
+    let mut writer = SemanticWriter::with_limit(&mut header, maximum);
+    writer.write_ordered_framed(&value)?;
+    let arity =
+        u64::try_from(arity).map_err(|_| ContentKeyError::Capacity("operator-header arity"))?;
+    writer.write(&arity.to_be_bytes())?;
+    Ok(header)
 }
 
 #[derive(Clone, Debug)]
@@ -1772,10 +1806,9 @@ fn normalize_ac_node(
             ExpressionEquivalenceCompletion::WorkLimited,
         ));
     }
-    operators.insert(
-        operator_header(operator, report.canonical_members()),
-        operator.clone(),
-    );
+    let header = operator_header(operator, report.canonical_members())
+        .map_err(|error| PassAbort::Fatal(content_key_error(error)))?;
+    operators.insert(header, operator.clone());
     Ok(report.root())
 }
 
@@ -2124,7 +2157,9 @@ fn run_fold_sweep(
                     if let Some(operator) = adapter.take_produced().map_err(|error| {
                         PassAbort::Fatal(ExpressionProofError::Graph(error.to_string()))
                     })? {
-                        operators.insert(operator_header(&operator, 0), operator);
+                        let header = operator_header(&operator, 0)
+                            .map_err(|error| PassAbort::Fatal(content_key_error(error)))?;
+                        operators.insert(header, operator);
                     }
                 }
                 NativeActionOutcome::NotApplicable => {}
@@ -2231,7 +2266,8 @@ fn run_pass(
                 })?;
                 children.push(class);
             }
-            operators.insert(operator_header(operator, children.len()), operator.clone());
+            let header = operator_header(operator, children.len()).map_err(content_key_error)?;
+            operators.insert(header, operator.clone());
             let class = match graph.add(operator.clone(), &children) {
                 Ok(class) => class,
                 Err(error) => {
@@ -2414,6 +2450,10 @@ fn ordered_pair_payload(
 }
 
 fn graph_error(error: EGraphError) -> ExpressionProofError {
+    ExpressionProofError::Graph(error.to_string())
+}
+
+fn content_key_error(error: ContentKeyError) -> ExpressionProofError {
     ExpressionProofError::Graph(error.to_string())
 }
 

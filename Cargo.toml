@@ -6,7 +6,7 @@ resolver = "2"
 name = "libcpg"
 version = "0.1.1"
 edition = "2021"
-rust-version = "1.95"
+rust-version = "1.97"
 autobenches = false
 authors = ["Dylon Edwards <dylon@f1r3fly.io>"]
 description = "Code Property Graph library for program analysis, pattern detection, and semantic code understanding"
@@ -60,8 +60,8 @@ rholang = []
 metta = ["dep:libdictenstein"]
 
 # Bounded approximate candidate generation and typed WFST composition.
-# The selected upstream release line declares Rust 1.95; callers may also use
-# nightly-only backend/SIMD features without libcpg weakening those features.
+# The selected upstream release line and Replete's fallible-allocation surface
+# are qualified on the repository's pinned Rust 1.97 nightly toolchain.
 approximate-matching = [
     "dep:libdictenstein",
     "dep:duallity",
@@ -121,11 +121,10 @@ full = [
 ]
 
 [dependencies]
-# Replete is an independent, unpublished top-level crate. The sibling path is
-# restricted to this extraction campaign until the standalone repository has a
-# canonical remote; T4.2 is verified against committed revision 1faddad. Keep
-# the exact package version so a future Git/registry source change cannot float.
-replete = { version = "=0.1.0", path = "../replete-dovetail-extraction" }
+# Replete is an independent, unpublished top-level crate. Pin both its package
+# version and its fully qualified canonical Git revision so neither the source
+# identity nor the public compatibility surface can float.
+replete = { version = "=0.1.0", git = "https://github.com/vinary-tree/replete.git", rev = "907fc4b953e7e13beb237e8ce369629a15eb4cb8" }
 
 # Core graph library
 petgraph = "0.7"

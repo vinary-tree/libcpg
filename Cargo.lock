@@ -1409,6 +1409,7 @@ checksum = "19b30a45b0cd0bcca8037f3d0dc3421eaf95327a17cad11964fb8179b4fc4832"
 [[package]]
 name = "replete"
 version = "0.1.0"
+source = "git+https://github.com/vinary-tree/replete.git?rev=907fc4b953e7e13beb237e8ce369629a15eb4cb8#907fc4b953e7e13beb237e8ce369629a15eb4cb8"
 dependencies = [
  "serde",
 ]

@@ -955,6 +955,82 @@ fn canonical_operator_decoder_rejects_truncation_trailing_bytes_and_bad_tags() {
 }
 
 #[test]
+fn checked_semantic_writer_preserves_the_frozen_operator_and_header_grammar() {
+    let operator = EquivalenceOperator {
+        namespace: Some(NodeId::new(0x0102_0304)),
+        kind: EquivalenceOperatorKind::Call(CallIdentity::External(Arc::from("xy"))),
+        value_type: ExpressionType::String,
+    };
+    let expected = vec![1, 4, 3, 2, 1, 5, 1, 2, 0, 0, 0, 0, 0, 0, 0, b'x', b'y', 3];
+    let mut encoded = Vec::new();
+    operator
+        .write_content(&mut SemanticWriter::new(&mut encoded))
+        .expect("checked semantic encoding");
+    assert_eq!(encoded, expected);
+
+    let mut expected_header = Vec::new();
+    for byte in expected {
+        expected_header.extend_from_slice(&[1, byte]);
+    }
+    expected_header.push(0);
+    expected_header.extend_from_slice(&7u64.to_be_bytes());
+    assert_eq!(
+        operator_header(&operator, 7).expect("checked operator header"),
+        expected_header
+    );
+}
+
+#[test]
+fn every_strict_semantic_and_header_prefix_refuses_without_publication() {
+    let operator = EquivalenceOperator {
+        namespace: Some(NodeId::new(u32::MAX)),
+        kind: EquivalenceOperatorKind::Literal(ExpressionLiteral::String(Arc::from(
+            "bounded-λ-value",
+        ))),
+        value_type: ExpressionType::Dynamic,
+    };
+    let mut expected = Vec::new();
+    operator
+        .write_content(&mut SemanticWriter::new(&mut expected))
+        .expect("unbounded oracle encoding");
+    for maximum in 0..expected.len() {
+        let mut private = Vec::new();
+        assert!(matches!(
+            operator.write_content(&mut SemanticWriter::with_limit(&mut private, maximum)),
+            Err(ContentKeyError::Capacity(_))
+        ));
+        assert!(expected.starts_with(&private));
+        assert!(private.len() <= maximum);
+    }
+    let mut exact = Vec::new();
+    operator
+        .write_content(&mut SemanticWriter::with_limit(&mut exact, expected.len()))
+        .expect("exact semantic boundary succeeds");
+    assert_eq!(exact, expected);
+
+    let complete_header = operator_header(&operator, usize::MAX).expect("complete header");
+    for maximum in 0..complete_header.len() {
+        let sentinel = EquivalenceOperator {
+            namespace: None,
+            kind: EquivalenceOperatorKind::Opaque,
+            value_type: ExpressionType::Unit,
+        };
+        let mut published = BTreeMap::from([(vec![0xff], sentinel)]);
+        let before = published.clone();
+        let result = operator_header_with_limit(&operator, usize::MAX, maximum);
+        if let Ok(header) = result {
+            published.insert(header, operator.clone());
+        }
+        assert_eq!(published, before);
+    }
+    assert_eq!(
+        operator_header_with_limit(&operator, usize::MAX, complete_header.len())
+            .expect("exact header boundary succeeds"),
+        complete_header
+    );
+}
+
+#[test]
 fn exact_relation_is_transitive_canonical_and_unaffected_by_irrelevant_candidates() {
     let profile = SemanticProfile::for_language(Language::Rust);
     let value_type = wrapping_i32();
@@ -1036,6 +1112,46 @@ fn invalid_public_limits_are_rejected_before_graph_construction() {
 
 proptest! {
     #![proptest_config(ProptestConfig::with_cases(64))]
+
+    #[test]
+    fn generated_header_refusal_never_mutates_the_published_operator_map(
+        namespace in proptest::option::of(any::<u32>()),
+        symbol in ".{0,64}",
+        arity in any::<u16>(),
+        maximum in 0usize..256,
+    ) {
+        let operator = EquivalenceOperator {
+            namespace: namespace.map(NodeId::new),
+            kind: EquivalenceOperatorKind::Call(CallIdentity::External(Arc::from(symbol))),
+            value_type: ExpressionType::Dynamic,
+        };
+        let complete = operator_header(&operator, usize::from(arity))
+            .expect("generated complete header");
+        let sentinel = EquivalenceOperator {
+            namespace: None,
+            kind: EquivalenceOperatorKind::Opaque,
+            value_type: ExpressionType::Unit,
+        };
+        let mut published = BTreeMap::from([(vec![0xff], sentinel)]);
+        let before = published.clone();
+
+        match operator_header_with_limit(&operator, usize::from(arity), maximum) {
+            Ok(header) => {
+                prop_assert!(header.len() <= maximum);
+                prop_assert_eq!(&header, &complete);
+                published.insert(header, operator);
+            }
+            Err(ContentKeyError::Capacity(_)) => {
+                prop_assert_eq!(published, before);
+                prop_assert!(maximum < complete.len());
+            }
+            Err(ContentKeyError::Invariant(detail)) => {
+                return Err(TestCaseError::fail(format!(
+                    "generated valid operator violated an invariant: {detail}"
+                )));
+            }
+        }
+    }
 
     #[test]
     fn wrapping_addition_commutativity_is_insertion_order_invariant(
@@ -1219,8 +1335,14 @@ fn depth_100_000_closed_evaluation_proof_replay_fits_a_small_native_stack() {
                 .expect("deep fold proof");
             let tape = builder.finish(proof).expect("finish flat proof");
             let operators = BTreeMap::from([
-                (operator_header(&literal, 0), literal),
-                (operator_header(&bitwise_not, 1), bitwise_not),
+                (
+                    operator_header(&literal, 0).expect("literal header"),
+                    literal,
+                ),
+                (
+                    operator_header(&bitwise_not, 1).expect("unary header"),
+                    bitwise_not,
+                ),
             ]);
             let proof = ExpressionEquivalenceProof {
                 tape,

@@ -129,9 +129,11 @@ task.
   changing the legacy clone taxonomy.
 - Native-stack use is constant with expression depth; heap and logical work
   remain explicitly bounded.
-- The current unpublished Replete dependency uses a sibling path pinned to
-  exact package version `0.1.0` and verified commit `1faddad`. A future remote
-  transition must pin an immutable Git revision or registry checksum.
+- The unpublished Replete dependency pins exact package version `0.1.0` and
+  canonical Git revision `907fc4b953e7e13beb237e8ce369629a15eb4cb8`.
+  libcpg therefore consumes the clean release-qualified source identity rather
+  than a sibling worktree, moving branch, or registry name owned by another
+  package.
 
 ## Verification
 

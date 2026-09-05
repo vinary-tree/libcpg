@@ -34,7 +34,7 @@ The following is taken verbatim from [`Cargo.toml`](../../Cargo.toml).
 | Keywords | `code-analysis`, `cpg`, `ast`, `cfg`, `dfg`, `pattern-detection`, `gnn` |
 | Categories | `development-tools`, `parsing`, `algorithms` |
 | Default features | `default = []` (nothing on by default) |
-| MSRV | not declared — `Cargo.toml` carries no `rust-version`; any edition-2021 toolchain that satisfies `tree-sitter 0.26` should build it |
+| Rust floor | Rust 1.97; repository verification pins `nightly-2026-04-21` for Replete's typed fallible-allocation support |
 
 The single most important fact for a newcomer is the empty default feature set:
 with no [feature flags](../GLOSSARY.md#feature-flag-cargo) enabled,

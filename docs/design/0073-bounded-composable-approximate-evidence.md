@@ -70,11 +70,12 @@ layer. T4.5 is authorized to implement the production adapter.
    and work bounds are reachable from the adapter. The complete construction,
    query, evidence, formatting, cloning, serialization, and destruction
    lifecycle is qualified at 100,000 token units on a 256 KiB native stack.
-9. Rust 1.85 is not a project requirement or an admission gate. The evaluated
-   release graph declares Rust 1.95. libcpg may require that toolchain, and may
-   use nightly when a selected PathMap, portable-SIMD, or other retained fast
-   path needs nightly functionality. Capabilities are not disabled merely to
-   preserve an unrequested older compiler.
+9. Rust 1.85 is not a project requirement or an admission gate. libcpg declares
+   Rust 1.97 and pins `nightly-2026-04-21` because Replete's typed fallible
+   allocation requires `allocator_api`. Selected PathMap, portable-SIMD, or
+   other retained fast paths may use nightly functionality when qualified.
+   Capabilities are not disabled merely to preserve an unrequested older
+   compiler.
 
 ## Dependency boundary
 
