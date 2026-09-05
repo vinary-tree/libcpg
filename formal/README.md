@@ -50,7 +50,7 @@ T4.2 formally refines T4.1's admission boundary before using Replete:
 Run all three with:
 
 ~~~bash
-./scripts/verify-expression-equivalence-formal.sh all
+./scripts/verify-expression-equivalence-formal.sh
 ~~~
 
 The bounded TLC exploration complements rather than replaces the universal

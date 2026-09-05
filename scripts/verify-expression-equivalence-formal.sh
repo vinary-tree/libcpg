@@ -16,12 +16,21 @@ tlc -cleanup -workers 1 \
     -metadir "$build_dir/tla" \
     -config formal/tla/ExpressionEquivalence.cfg \
     formal/tla/ExpressionEquivalence.tla
+tla2sany formal/tla/SemanticKeyAdapter.tla
+tlc -cleanup -workers 1 \
+    -metadir "$build_dir/semantic-key-tla" \
+    -config formal/tla/SemanticKeyAdapter.cfg \
+    formal/tla/SemanticKeyAdapter.tla
 
 mkdir -p "$build_dir/rocq"
 cp formal/rocq/ExpressionEquivalence.v "$build_dir/rocq/"
+cp formal/rocq/SemanticKeyAdapter.v "$build_dir/rocq/"
 coqc -q \
     -Q "$build_dir/rocq" LibcpgFormal \
     "$build_dir/rocq/ExpressionEquivalence.v"
+coqc -q \
+    -Q "$build_dir/rocq" LibcpgFormal \
+    "$build_dir/rocq/SemanticKeyAdapter.v"
 
 z3_output=$(z3 formal/z3/expression_equivalence.smt2)
 printf '%s\n' "$z3_output"
@@ -31,6 +40,17 @@ if [[ $(grep -c '^unsat$' <<<"$z3_output") -ne 22 ]]; then
 fi
 if grep -Eq '^(sat|unknown)$' <<<"$z3_output"; then
     echo 'Z3 found or could not decide a forbidden expression-equivalence state' >&2
+    exit 1
+fi
+
+key_z3_output=$(z3 formal/z3/semantic_key_adapter.smt2)
+printf '%s\n' "$key_z3_output"
+if [[ $(grep -c '^unsat$' <<<"$key_z3_output") -ne 6 ]]; then
+    echo 'Z3 did not refute every forbidden semantic-key adapter state' >&2
+    exit 1
+fi
+if grep -Eq '^(sat|unknown)$' <<<"$key_z3_output"; then
+    echo 'Z3 found or could not decide a forbidden semantic-key adapter state' >&2
     exit 1
 fi
 

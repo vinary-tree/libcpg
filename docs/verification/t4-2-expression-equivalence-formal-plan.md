@@ -74,6 +74,9 @@ clone relation from being mistaken for equality in one concrete program state.
 | `formal/tla/ExpressionEquivalence.tla` | Enumerates admission modes, scopes, profiles, caps, forced stops, proof exhaustion, and deterministic output steps. | TLC explores every reachable bounded state with all invariants true. |
 | `formal/rocq/ExpressionEquivalence.v` | Proves equivalence laws, boundary confinement, replay soundness, cap conservation, monotone knowledge, and legacy-result preservation. | Every printed theorem is closed without axioms, assumptions, or admissions. |
 | `formal/z3/expression_equivalence.smt2` | Refutes twenty-two forbidden reporting, fixed-point, AC-normalization, closed-evaluation folding, boundary, alpha-witness, evidence, cap, ordering, and immutability states. | Every query is `unsat`; no query is `sat` or `unknown`. |
+| `formal/tla/SemanticKeyAdapter.tla` | Explores every effective byte-capacity boundary while canonical bytes remain private until a complete commit. | TLC proves canonical-prefix, capacity, exact-publication, prior-state preservation, and termination properties. |
+| `formal/rocq/SemanticKeyAdapter.v` | Proves complete encodings are exact, sufficient capacity completes, refusal preserves prior public state, and equal successful bytes imply equal canonical bytes. | Every printed theorem is closed without axioms, assumptions, or admissions. |
+| `formal/z3/semantic_key_adapter.smt2` | Refutes six truncated, substituted, partially published, and misclassified capacity outcomes. | Every query is `unsat`; no query is `sat` or `unknown`. |
 
 The executable command is
 `scripts/verify-expression-equivalence-formal.sh`. It creates its temporary
@@ -147,6 +150,12 @@ The failed proof strategies are recorded so later work does not repeat them:
     rejected that non-variable substitution. Substituting `target` exposes the
     literal evaluator case, after which the certified source equality closes
     the theorem directly.
+13. The first semantic-key capacity proof tried to rewrite the proposition
+    form of `Nat.leb_le` directly into a Boolean conditional. Rocq correctly
+    found no matching Boolean equality. The repaired proof derives the explicit
+    equation `Nat.leb (length canonical) capacity = true` from the arithmetic
+    premise and rewrites with that equation; the encoding definition and
+    theorem statement are unchanged.
 
 These were specification/proof-construction failures, not counterexamples to
 the contract. The final run completes every model and theorem without axioms,
@@ -172,6 +181,7 @@ assumptions, or admissions.
 | EQ-14 | Replete remains an independent crate; libcpg owns only its typed adapter. | Dependency-direction and packaging checks; no Replete source is copied into libcpg and no MeTTaIL file is modified. |
 | EQ-15 | Alpha-renamed clone evidence carries a bijection witness and is never labeled exact semantic equality. | Exhaustive small binding maps, non-bijective rejection, repeated-variable counterexamples, and cross-function alpha examples. |
 | EQ-16 | Constant-fold evidence is valid for a canonical nested representative only when that entire source term is closed, its iterative typed evaluation completes, and the target is exactly the resulting literal. | Nested multi-pass folds replay independently; open, malformed, type-invalid, overflowing, and result-mismatched proof terms are rejected; deep evaluation uses a heap work tape. |
+| EQ-17 | Semantic operator bytes are written through Replete's checked `SemanticWriter`; a refusal publishes neither a truncated e-node key nor a partial proof-header mapping, while success preserves the prior canonical byte grammar exactly. | Compare every operator variant with the frozen byte oracle; force writer refusal at every strict prefix; assert graph and operator maps are unchanged; propagate capacity/invariant errors without panic; run generated round trips and the deep lifecycle on a 256 KiB stack. |
 
 ## Model-to-code sequence
 
