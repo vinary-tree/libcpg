@@ -316,9 +316,11 @@ fn connect_labeled_new(
     kind: CpgEdgeKind,
     label: Option<&str>,
 ) -> bool {
+    // A mutation invalidates the CSR projection.  Native adjacency checks
+    // the source's outgoing row without rebuilding the whole-graph cache,
+    // preserving the same directed endpoint/kind/label identity.
     if cpg
-        .edges_between(source, target)
-        .into_iter()
+        .native_edges_between(source, target)
         .any(|edge| edge.kind == kind && edge.label.as_deref() == label)
     {
         return false;
@@ -336,9 +338,11 @@ fn connect_new(
     target: NodeId,
     kind: CpgEdgeKind,
 ) -> bool {
+    // Preserve the historical kind-only identity, including a preexisting
+    // labeled Exports edge that suppresses a new unlabeled overlay edge.
+    // The native check visits local outgoing adjacency, not every graph edge.
     if cpg
-        .edges_between(source, target)
-        .into_iter()
+        .native_edges_between(source, target)
         .any(|edge| edge.kind == kind)
     {
         return false;
@@ -734,6 +738,81 @@ mod tests {
         (nodes, edges)
     }
 
+    fn overlay_edge_observations(
+        cpg: &CodePropertyGraph,
+    ) -> Vec<(EdgeId, NodeId, NodeId, CpgEdgeKind, Option<String>)> {
+        let mut edges: Vec<_> = cpg
+            .edges()
+            .map(|edge| {
+                (
+                    edge.id,
+                    edge.source,
+                    edge.target,
+                    edge.kind.clone(),
+                    edge.label.as_deref().map(str::to_owned),
+                )
+            })
+            .collect();
+        edges.sort_unstable_by_key(|edge| (edge.0).0);
+        edges
+    }
+
+    fn generated_overlay_kind(code: u8) -> CpgEdgeKind {
+        match code % 3 {
+            0 => CpgEdgeKind::Imports,
+            1 => CpgEdgeKind::Exports,
+            _ => CpgEdgeKind::StaticCall,
+        }
+    }
+
+    fn generated_overlay_label(code: u8) -> Option<&'static str> {
+        match code % 4 {
+            0 => None,
+            1 => Some("alpha"),
+            2 => Some("beta"),
+            _ => Some(""),
+        }
+    }
+
+    // Frozen pre-optimization reference.  In particular, the unlabeled
+    // helper's kind-only check intentionally ignores labels.
+    fn legacy_connect_new(
+        cpg: &mut CodePropertyGraph,
+        source: NodeId,
+        target: NodeId,
+        kind: CpgEdgeKind,
+    ) -> bool {
+        if cpg
+            .edges_between(source, target)
+            .into_iter()
+            .any(|edge| edge.kind == kind)
+        {
+            return false;
+        }
+        cpg.connect(source, target, kind).is_some()
+    }
+
+    fn legacy_connect_labeled_new(
+        cpg: &mut CodePropertyGraph,
+        source: NodeId,
+        target: NodeId,
+        kind: CpgEdgeKind,
+        label: Option<&str>,
+    ) -> bool {
+        if cpg
+            .edges_between(source, target)
+            .into_iter()
+            .any(|edge| edge.kind == kind && edge.label.as_deref() == label)
+        {
+            return false;
+        }
+        let mut edge = CpgEdge::new(EdgeId::new(0), source, target, kind);
+        if let Some(label) = label {
+            edge = edge.with_label(label);
+        }
+        cpg.add_edge(edge).is_some()
+    }
+
     fn embedded_references_resolve(cpg: &CodePropertyGraph) -> bool {
         cpg.nodes().all(|node| {
             node.parent.is_none_or(|target| cpg.contains_node(target))
@@ -867,6 +946,56 @@ mod tests {
         assert_eq!(second.resolutions, first.resolutions);
         assert_eq!(second.exports, first.exports);
         assert_eq!(program.cpg.edge_count(), edges);
+    }
+
+    #[test]
+    fn overlay_edge_identity_preserves_labeled_imports_and_legacy_exports_exception() {
+        let mut graph = CodePropertyGraph::new(Language::Rust);
+        let source = graph.add_node(node(CpgNodeKind::Root));
+        let target = graph.add_node(node(CpgNodeKind::Root));
+
+        assert!(connect_labeled_new(
+            &mut graph,
+            source,
+            target,
+            CpgEdgeKind::Imports,
+            Some("alpha"),
+        ));
+        assert!(connect_labeled_new(
+            &mut graph,
+            source,
+            target,
+            CpgEdgeKind::Imports,
+            None,
+        ));
+        assert!(connect_labeled_new(
+            &mut graph,
+            source,
+            target,
+            CpgEdgeKind::Imports,
+            Some("beta"),
+        ));
+        assert!(!connect_labeled_new(
+            &mut graph,
+            source,
+            target,
+            CpgEdgeKind::Imports,
+            Some("alpha"),
+        ));
+
+        let labeled_export = CpgEdge::new(EdgeId::new(0), source, target, CpgEdgeKind::Exports)
+            .with_label("preexisting");
+        graph
+            .add_edge(labeled_export)
+            .expect("represented endpoints");
+        let before = overlay_edge_observations(&graph);
+        assert!(!connect_new(
+            &mut graph,
+            source,
+            target,
+            CpgEdgeKind::Exports
+        ));
+        assert_eq!(overlay_edge_observations(&graph), before);
     }
 
     #[test]
@@ -1119,6 +1248,99 @@ mod tests {
 
     proptest! {
         #![proptest_config(ProptestConfig::with_cases(256))]
+
+        #[test]
+        fn generated_native_overlay_adjacency_matches_projected_queries(
+            seed in proptest::collection::vec((0u8..4, 0u8..4, 0u8..3, 0u8..4), 0..48),
+        ) {
+            let mut graph = CodePropertyGraph::new(Language::Rust);
+            let nodes: Vec<_> = (0..4).map(|_| graph.add_node(node(CpgNodeKind::Root))).collect();
+            for (source, target, kind, label) in seed {
+                let mut edge = CpgEdge::new(
+                    EdgeId::new(0),
+                    nodes[usize::from(source)],
+                    nodes[usize::from(target)],
+                    generated_overlay_kind(kind),
+                );
+                if let Some(label) = generated_overlay_label(label) {
+                    edge = edge.with_label(label);
+                }
+                graph.add_edge(edge).expect("represented endpoints");
+            }
+
+            for source in 0..5 {
+                for target in 0..5 {
+                    let source = if source == 4 { NodeId::new(99) } else { nodes[source] };
+                    let target = if target == 4 { NodeId::new(99) } else { nodes[target] };
+                    for kind in 0..3 {
+                        for label in 0..4 {
+                            let kind = generated_overlay_kind(kind);
+                            let label = generated_overlay_label(label);
+                            let projected_exact = graph.edges_between(source, target)
+                                .iter()
+                                .any(|edge| edge.kind == kind && edge.label.as_deref() == label);
+                            let native_exact = graph.native_edges_between(source, target)
+                                .any(|edge| edge.kind == kind && edge.label.as_deref() == label);
+                            prop_assert_eq!(native_exact, projected_exact);
+                            let projected_kind = graph.edges_between(source, target)
+                                .iter().any(|edge| edge.kind == kind);
+                            let native_kind = graph.native_edges_between(source, target)
+                                .any(|edge| edge.kind == kind);
+                            prop_assert_eq!(native_kind, projected_kind);
+                        }
+                    }
+                }
+            }
+        }
+
+        #[test]
+        fn generated_overlay_insertions_match_legacy_observations_and_are_idempotent(
+            seed in proptest::collection::vec((0u8..4, 0u8..4, 0u8..3, 0u8..4), 0..24),
+            operations in proptest::collection::vec((0u8..4, 0u8..4, 0u8..3, 0u8..4, any::<bool>()), 0..40),
+        ) {
+            let mut graph = CodePropertyGraph::new(Language::Rust);
+            let nodes: Vec<_> = (0..4).map(|_| graph.add_node(node(CpgNodeKind::Root))).collect();
+            for (source, target, kind, label) in seed {
+                let mut edge = CpgEdge::new(
+                    EdgeId::new(0),
+                    nodes[usize::from(source)],
+                    nodes[usize::from(target)],
+                    generated_overlay_kind(kind),
+                );
+                if let Some(label) = generated_overlay_label(label) {
+                    edge = edge.with_label(label);
+                }
+                graph.add_edge(edge).expect("represented endpoints");
+            }
+            let mut legacy = graph.clone();
+
+            for (source, target, kind, label, is_labeled) in operations {
+                let source = nodes[usize::from(source)];
+                let target = nodes[usize::from(target)];
+                let kind = generated_overlay_kind(kind);
+                let label = generated_overlay_label(label);
+                let actual = if is_labeled {
+                    connect_labeled_new(&mut graph, source, target, kind.clone(), label)
+                } else {
+                    connect_new(&mut graph, source, target, kind.clone())
+                };
+                let expected = if is_labeled {
+                    legacy_connect_labeled_new(&mut legacy, source, target, kind.clone(), label)
+                } else {
+                    legacy_connect_new(&mut legacy, source, target, kind.clone())
+                };
+                prop_assert_eq!(actual, expected);
+                prop_assert_eq!(overlay_edge_observations(&graph), overlay_edge_observations(&legacy));
+
+                let repeated = if is_labeled {
+                    connect_labeled_new(&mut graph, source, target, kind, label)
+                } else {
+                    connect_new(&mut graph, source, target, kind)
+                };
+                prop_assert!(!repeated);
+                prop_assert_eq!(overlay_edge_observations(&graph), overlay_edge_observations(&legacy));
+            }
+        }
 
         #[test]
         fn merging_generated_well_formed_files_is_deterministic_and_total(

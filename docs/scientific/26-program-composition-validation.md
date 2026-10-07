@@ -30,11 +30,19 @@ and import evidence from the later topology that evidence authorizes.
 | nested declarations do not leak | top-level function/class plus class method | only top-level namespace declarations exported |
 | public API is feature-free | black-box integration tests | exact cross-file call and ambiguous-alias boundary pass under `default = []` |
 | serialized values preserve evidence | JSON round-trip under `serde` | `FileScope` and `ImportGraph` exact equality; graph counts equal |
+| local duplicate lookup preserves the earlier result | generated graphs with endpoint, kind, and label combinations, including absent endpoints | native adjacency and projected queries agree for both exact-label and kind-only predicates |
+| insertion preserves observable edge identities | generated pre-existing edges and ordered insertion sequences | native and earlier projected insertion helpers return the same decision and exact ordered edge observations; repeating an insertion changes nothing |
+| labelled export exception remains intact | pre-existing labelled `Exports` edge | kind-only unlabelled insertion rejects it; labelled `Imports` remain distinct by label |
 
 Two 256-case property campaigns use `arb_well_formed_cpg`. One directly tests
 `merge_from` append-only counts, contiguous identities, reference totality, and
 repeat determinism. The other tests `merge_programs` over two files. A third
 256-case property merges an equal snapshot and checks exact count doubling.
+Two further 256-case campaigns compare native and projected duplicate queries
+and their resulting insertion sequences. The six named propositions in
+[`ImportOverlayEdgeIdentity.v`](../../formal/rocq/ImportOverlayEdgeIdentity.v)
+prove the finite-list duplicate/refinement and idempotence laws; run their
+isolated kernel gate with `bash scripts/verify-import-overlay-identity-formal.sh`.
 
 ## Independent public integration boundary
 
@@ -72,13 +80,14 @@ between samples.
 ## Reproduction
 
 ```bash
-cargo test --no-default-features analysis::program
-cargo test --no-default-features prop_merge
-cargo test --no-default-features prop_merging_equal
-cargo test --no-default-features --test program_integration
-cargo test --no-default-features --features serde analysis::program
-cargo clippy --all-targets --no-default-features -- -D warnings
-cargo bench --bench program_merge --no-default-features -- --test
+cargo test --locked --no-default-features analysis::program
+cargo test --locked --no-default-features prop_merge
+cargo test --locked --no-default-features prop_merging_equal
+cargo test --locked --no-default-features --test program_integration
+cargo test --locked --no-default-features --features serde analysis::program
+cargo clippy --locked --all-targets --no-default-features -- -D warnings
+cargo bench --locked --bench program_merge --no-default-features -- --test
+bash scripts/verify-import-overlay-identity-formal.sh
 ./scripts/verify.sh
 ```
 

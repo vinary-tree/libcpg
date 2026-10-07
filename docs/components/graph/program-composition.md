@@ -185,6 +185,17 @@ declaration imports use endpoint, kind, and local-binding-label uniqueness. A
 second `build_import_graph` invocation produces the same evidence and reports
 `emitted_edges == 0`.
 
+The insertion helpers check that identity through petgraph's native directed
+adjacency at the source node. They do not rebuild the whole-graph read
+projection between insertions. The kind-only `Exports` rule deliberately
+rejects an additional unlabelled edge even when the existing `Exports` edge
+has a label; the label-sensitive `Imports` rule does not. The [finite-list
+refinement proof](../../../formal/rocq/ImportOverlayEdgeIdentity.v) establishes
+both duplicate decisions and insertion idempotence. Generated differential
+tests compare native adjacency with the earlier projected query, including
+pre-existing labelled exports and arbitrary insertion orders. These checks
+support the edge-identity claim; they are not a proof of all petgraph internals.
+
 ## Complexity and boundaries
 
 For $`N`$ source nodes, $`E`$ source edges, and $`R`$ embedded references,
@@ -195,6 +206,14 @@ For $`F`$ files, $`I`$ import nodes, at most $`T`$ import tokens, $`A`$ aliases,
 and $`D`$ declarations, import construction is bounded by the represented
 program. Its conservative worst case is $`O(DN + ITA)`$ before edge insertion;
 ordinary AST depth and alias buckets make the practical work much smaller.
+For $`K`$ attempted overlay insertions, let $`d_i`$ be the source node's
+outgoing degree at attempt $`i`$. The pinned petgraph `edges_connecting`
+iterator scans that local outgoing row, so duplicate probing adds at most
+$`O(\sum_{i=1}^{K} d_i)`$ time and constant iterator storage per attempt.
+This removes the repeated global projection rebuild, but does **not** promise
+constant-time insertion: a high-degree source can still yield a quadratic
+worst case in $`K`$. The bounded full-corpus replay must therefore measure
+the remaining cost before a release claim is made.
 There is no filesystem access, package-manager lookup, network resolution, or
 language parser in this pass. `External` means “not represented by this
 `ProgramCpg`,” not “the package does not exist.”
